@@ -1,0 +1,78 @@
+Instrucciones Optimizadas para el Agente de Cursor: Desarrollo del Portal Inmobiliario SkyTerra (Foco Web Inicial)
+Objetivo General del Agente:
+Tu misión principal es desarrollar la versión web del portal inmobiliario SkyTerra, siguiendo el plan de desarrollo detallado en la "Guía de Desarrollo SkyTerra", específicamente las Semanas 1 a 10, que culminan con el prototipo web completo. Posteriormente, se abordará el desarrollo móvil. El portal debe permitir a los compradores urbanos evaluar terrenos rurales en Chile de forma remota, ofreciendo una experiencia visual inmersiva, información precisa y herramientas útiles, con el objetivo de superar las soluciones existentes como Google Earth/Street View en el contexto inmobiliario.
+
+Principios Fundamentales para el Desarrollo (Asegúrate de que cada tarea y componente cumpla con esto):
+
+Prioridad Desarrollo Web: Enfoca todos los esfuerzos iniciales en completar las tareas designadas para el desarrollo web (Semanas 1-10 de la "Guía de Desarrollo SkyTerra"). El desarrollo móvil (Semanas 11-16) se abordará una vez que la plataforma web esté funcional y probada.
+
+Experiencia de Usuario Primero (Enfoque en Comprador Urbano 30-55 años):
+
+Intuitividad: El diseño debe ser claro, fácil de navegar y comprensible para usuarios que no necesariamente son expertos en tecnología ("Guía de Desarrollo SkyTerra").
+Inmersión Visual de Calidad Superior: La plataforma debe ofrecer una experiencia rica y detallada a través de mapas interactivos (Mapbox), tours 360° (Pano2VR) y vistas aéreas de alta resolución (drones DJI) ("Guía de Desarrollo SkyTerra").
+Fluidez y Rendimiento: Garantiza transiciones animadas suaves (react spring) y tiempos de carga rápidos (< 2 segundos para mapas, imágenes y tours) ("Guía de Desarrollo SkyTerra").
+Estándar Superior de Calidad Visual:
+
+El portal se diferenciará por la calidad y estandarización de sus elementos visuales. El frontend debe estar diseñado para:
+Mostrar imágenes y tours en la más alta resolución posible (e.g., 20MP, 4K de drones DJI) ("Guía de Desarrollo SkyTerra").
+Soportar la visualización de diversos tipos de tomas (frontales, laterales, aéreas), alturas de dron especificadas y condiciones de luz óptimas para asegurar la comparabilidad objetiva entre terrenos ("Guía de Desarrollo SkyTerra", "Entrega 2 Jan Schürch").
+Modularidad y Escalabilidad:
+
+Desarrolla componentes reutilizables y bien definidos (React) ("Guía de Desarrollo SkyTerra").
+La arquitectura debe permitir la futura integración de funcionalidades adicionales y el desarrollo de las apps móviles.
+Enfoque en la Solución "Portal con Mapa Interactivo":
+
+El mapa interactivo es el núcleo de la experiencia web.
+Prioriza la correcta implementación de la navegación basada en mapas, filtros detallados (precio, tamaño, acceso a agua, vistas) y la visualización de propiedades (marcadores, polígonos) directamente desde el mapa ("Guía de Desarrollo SkyTerra").
+Instrucciones Específicas para el Agente Cursor:
+
+Referencia Principal:
+
+Utiliza la "Guía de Desarrollo SkyTerra" como tu hoja de ruta técnica y de planificación principal. Presta especial atención a los requisitos, la arquitectura del sistema, el diseño de la base de datos y el plan de desarrollo semanal.
+Consulta la "Entrega 2 Jan Schürch" para profundizar en la propuesta de valor, el modelo de negocio y la validación con usuarios, lo que te dará contexto sobre la importancia de cada funcionalidad.
+La "Guía Agente Cursor" (el primer documento que analizamos) puede servir como referencia complementaria para ejemplos de código y estructura si es necesario, pero la "Guía de Desarrollo SkyTerra" tiene precedencia por ser más reciente y detallada.
+Ejecución de Tareas Semanales (Según "Guía de Desarrollo SkyTerra" - Foco Web Semanas 1-10):
+
+Sigue rigurosamente las tareas asignadas para cada semana del plan de desarrollo, comenzando por las Semanas 1 a 10 para el prototipo web.
+Al generar código para cada tarea, ten en cuenta:
+Frontend Web (React):
+Componentes Visuales: Al crear MapView ("Guía de Desarrollo SkyTerra"), PropertyDetails ("Guía de Desarrollo SkyTerra"), TourViewer ("Guía de Desarrollo SkyTerra"), ImageViewer, y PropertyModal ("Guía de Desarrollo SkyTerra"), asegúrate de que puedan manejar y destacar la alta calidad visual especificada.
+Mapbox (MapView): Implementa la animación flyTo ("Guía de Desarrollo SkyTerra"). Los marcadores y polígonos deben ser claros.
+Filtros (FilterPanel): Implementa los filtros funcionales ("Guía de Desarrollo SkyTerra").
+Tours 360° (TourViewer): Integra fluidamente los tours HTML5 de Pano2VR usando iframes ("Guía de Desarrollo SkyTerra"). Considera la navegación con hotspots ("Guía de Desarrollo SkyTerra").
+Transiciones (react-spring): Implementa animaciones suaves para una UX superior ("Guía de Desarrollo SkyTerra").
+Optimización Móvil para la Web: Aunque el desarrollo de apps nativas es posterior, la versión web debe ser completamente responsiva y optimizada para navegadores móviles, dado que el 80% del uso inmobiliario es móvil ("Guía de Desarrollo SkyTerra").
+Backend (Django, PostgreSQL/PostGIS):
+Modelos de Datos: Implementa los modelos (Property, Tour, Image, User) según la Sección 4 de la "Guía de Desarrollo SkyTerra" ("Guía de Desarrollo SkyTerra").
+APIs (Django REST Framework): Desarrolla APIs robustas para properties y auth ("Guía de Desarrollo SkyTerra"). Asegura que las APIs soporten los filtros y la entrega eficiente de datos para tours e imágenes desde AWS S3 ("Guía de Desarrollo SkyTerra").
+Integración de Servicios Futuros: Aunque el prototipo inicial se centra en las funcionalidades visuales y de búsqueda, diseña las APIs y componentes del frontend de manera que puedan extenderse para integrar:
+Datos topográficos y legales ("Guía de Desarrollo SkyTerra").
+Comparación de propiedades ("Guía de Desarrollo SkyTerra").
+Conexión con topógrafos, abogados y financieros ("Guía de Desarrollo SkyTerra").
+Generación de Código (Interacción con el Agente Cursor):
+
+Cuando necesites que genere código, utiliza prompts claros y específicos, referenciando las secciones y tareas de la "Guía de Desarrollo SkyTerra".
+Ejemplos de Prompts Mejorados (alineados con "Guía de Desarrollo SkyTerra"):
+"Crea el componente React MapView según la Tarea 8 y el ejemplo en la Semana 4 de la 'Guía de Desarrollo SkyTerra'. Asegúrate de que utilice react-map-gl, incluya la animación flyTo (Tarea 9), y esté optimizado para la visualización de marcadores de propiedades. La interfaz debe ser intuitiva para usuarios de 30-55 años."
+"Desarrolla el modelo Django Property como se especifica en la Sección 4 'Diseño de la Base de Datos' de la 'Guía de Desarrollo SkyTerra', incluyendo todos los campos como name, price (DecimalField), size (FloatField en hectáreas), location (PointField), description, has_water, y has_views."
+"Implementa las APIs RESTful GET /api/properties/ y GET /api/properties/:id/ (Tarea 6, Semana 3 de la 'Guía de Desarrollo SkyTerra') utilizando Django REST Framework. La API de listado debe permitir filtrar por los criterios definidos."
+"Crea el componente React TourViewer (Tarea 13, Semana 6 y ejemplo de la 'Guía de Desarrollo SkyTerra') para embeber un tour virtual de Pano2VR usando un iframe. El componente debe ser responsivo y garantizar la correcta visualización del tour en alta calidad."
+Estrategia para Evitar Caos y Buenas Prácticas (Recordatorio Constante):
+
+Modularidad: Divide en componentes reutilizables ("Guía de Desarrollo SkyTerra").
+Control de Versiones (Git): Sigue la estructura de ramas (feature, develop, main) ("Guía de Desarrollo SkyTerra").
+Documentación: Usa comentarios y READMEs ("Guía de Desarrollo SkyTerra").
+Pruebas: Escribe pruebas unitarias (Jest para React, pytest para Django) y de integración ("Guía de Desarrollo SkyTerra").
+CI/CD y Revisión de Código: Considera la configuración de GitHub Actions para pruebas automáticas y la importancia de las revisiones de código ("Guía de Desarrollo SkyTerra").
+Reporte y Comunicación:
+
+Si encuentras ambigüedades en la "Guía de Desarrollo SkyTerra" o necesitas clarificaciones, indícalo.
+Al finalizar cada tarea semanal (especialmente las de las Semanas 1-10), resume brevemente el progreso, los entregables generados y cualquier desafío encontrado.
+Flujo de Usuario Clave a Implementar para el Prototipo Web (Semanas 1-10):
+Sigue el flujo descrito en la Sección 10 de la "Guía de Desarrollo SkyTerra" ("Guía de Desarrollo SkyTerra"):
+
+Mapa Global: Visualización de propiedades en Mapbox, con filtros aplicables.
+Selección de Propiedad: Clic en marcador → animación flyTo.
+Vista Intermedia/Detalles: Presentación de imagen aérea de dron y botón/acceso al tour 360°. Implementación del PropertyDetails y/o PropertyModal.
+Exploración del Tour 360°: Carga del tour en pantalla completa o en un visor dedicado, con hotspots.
+Navegación: Facilidad para volver al mapa o cambiar a otra propiedad.
