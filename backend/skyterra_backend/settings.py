@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-oz7k_zw9rjk8qc_01i9ataa7a0-1=z&2pq7=l14lq@w-9)%a&n'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-oz7k_zw9rjk8qc_01i9ataa7a0-1=z&2pq7=l14lq@w-9)%a&n')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -37,17 +42,29 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',  # Para manejar CORS con el frontend
+    'django_filters',  # Añadimos django-filter
+    'properties',   # Nuestra app principal
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Middleware de CORS
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Configuración de API Keys
+GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY', '')
+
+# Configuración de CORS
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'skyterra_backend.urls'
 
@@ -72,6 +89,7 @@ WSGI_APPLICATION = 'skyterra_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Usamos SQLite estándar para desarrollo
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -102,9 +120,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-cl'  # Cambiamos a español de Chile
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Santiago'  # Zona horaria de Chile
 
 USE_I18N = True
 
@@ -115,8 +133,26 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        # 'rest_framework.permissions.IsAuthenticatedOrReadOnly', # Temporarily commented out
+        'rest_framework.permissions.AllowAny', # Temporarily added for debugging
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}

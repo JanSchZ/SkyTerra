@@ -1,0 +1,139 @@
+################################################################################
+# Guía de Programación para Agente IA (Cursor IDE): Portal Inmobiliario Rural Interactivo
+################################################################################
+
+**Contexto del Proyecto:**
+
+Este proyecto tiene como **misión principal** revolucionar la forma en que los compradores urbanos exploran y evalúan terrenos rurales en Chile. Actualmente, estos compradores enfrentan serias dificultades para tomar decisiones informadas debido a la falta de información visual inmersiva y datos precisos sobre las propiedades remotas. Esto a menudo resulta en compras de baja calidad y poca fidelidad.
+
+La **solución propuesta** es un **Portal Inmobiliario Rural con Mapa Interactivo**. El foco central es la experiencia de compra del usuario, permitiéndole explorar terrenos de manera remota a través de un mapa interactivo, complementado con visuales inmersivos (tours 360°, imágenes aéreas de alta calidad) y datos precisos (topográficos, legales). Crucialmente, el portal integrará servicios clave del proceso de compra, desde la estimación de costos hasta la gestión legal y topográfica.
+
+**Problema a Resolver:**
+* Dificultad de los compradores urbanos para evaluar terrenos rurales de forma remota.
+* Falta de información visual inmersiva y datos precisos.
+* Decisiones de compra poco informadas, de baja calidad y fidelidad.
+* Proceso de compra fragmentado y complejo, especialmente en aspectos legales y administrativos.
+
+**Foco y Misión Principal de la Solución:**
+* **Foco:** Ofrecer una experiencia de compra centrada en un mapa interactivo que permita una exploración y evaluación remota intuitiva y completa.
+* **Misión:** Empoderar a los usuarios con las herramientas y la información necesaria para tomar decisiones de compra de terrenos rurales bien fundamentadas, seguras y satisfactorias, integrando todo el proceso en una única plataforma.
+
+---
+
+**Instrucciones para el Agente IA (Cursor IDE): Guía de Desarrollo desde Primeros Principios**
+
+Cursor, tu tarea es asistir en el desarrollo del "Portal Inmobiliario Rural con Mapa Interactivo". Debes adherirte a los siguientes principios y directrices para asegurar que el producto final cumpla con la visión del proyecto.
+
+**I. Filosofía Fundamental de Desarrollo:**
+
+1.  **Comprensión Profunda del Usuario Final:**
+    * **Target:** Individuos urbanos, entre 30-55 años, interesados en terrenos rurales en Chile (segundas viviendas, inversión, cambio de vida). No necesariamente expertos en tecnología.
+    * **Necesidad Primaria:** Poder "visitar" y entender un terreno remotamente con la misma o mayor claridad que si estuvieran físicamente allí. Buscan confianza y transparencia.
+    * **Dolor Principal:** La incertidumbre, la falta de información fidedigna y la complejidad del proceso de compra actual.
+    * **Acción para Cursor:** Antes de implementar cualquier funcionalidad, pregúntate: "¿Cómo ayuda esto a un usuario de 40 años, con poco tiempo, a entender mejor este terreno y a sentirse más seguro en su decisión?".
+
+2.  **El Mapa como Núcleo de la Experiencia:**
+    * La interacción principal debe girar en torno al mapa. No es solo un visualizador de propiedades, sino la herramienta de descubrimiento, exploración y contextualización.
+    * El usuario busca por ubicación, quiere ver qué hay cerca, las vistas potenciales, y otros terrenos en la zona.
+    * **Acción para Cursor:** Prioriza la fluidez, interactividad y riqueza informativa del mapa. Todas las demás características deben complementar o surgir de la interacción con el mapa.
+
+3.  **La Verdad está en los Datos (Precisos y Bien Presentados):**
+    * La información visual es crucial, pero debe estar respaldada por datos duros: topografía, límites legales, acceso a servicios, etc.
+    * La estandarización en la presentación de datos es clave para la comparabilidad objetiva.
+    * **Acción para Cursor:** Asegura integraciones robustas con fuentes de datos (APIs de Skyquest, gubernamentales). Diseña modelos de datos que reflejen la realidad de una propiedad rural de forma exhaustiva. Propón formas claras y uniformes de visualizar estos datos.
+
+4.  **Calidad Visual Inmersiva y Estandarizada como Diferenciador:**
+    * El proyecto define un estándar de calidad visual avanzado (tipos de tomas, alturas de drones, condiciones de luz). Esto no es negociable.
+    * El objetivo es la comparabilidad y la claridad visual para el usuario.
+    * **Acción para Cursor:** Al desarrollar componentes de visualización (tours 360°, galerías de imágenes/videos), asegúrate de que puedan manejar y presentar este contenido de alta calidad de manera óptima y consistente con los estándares definidos.
+
+5.  **Solución Integral, No Solo un Listado:**
+    * El portal debe ir más allá de mostrar propiedades. Debe integrar servicios que resuelvan los dolores del proceso de compra (legal, topográfico, estimación de costos).
+    * **Acción para Cursor:** Diseña la arquitectura pensando en módulos de servicios integrables. Facilita la conexión con proveedores externos o la gestión de estos servicios dentro de la plataforma.
+
+6.  **Desarrollo Iterativo con Foco en la Calidad y Escalabilidad:**
+    * Aunque se busca agilidad, la calidad del código, la estabilidad y la mantenibilidad son primordiales.
+    * Diseña con modularidad para permitir el desarrollo, prueba y escalabilidad independiente de los componentes.
+    * **Acción para Cursor:** Propón arquitecturas (Frontend con React, Backend con Python/Django) y patrones de diseño que favorezcan la modularidad. Automatiza pruebas (unitarias, integración, E2E).
+
+**II. Componentes Clave y Directrices de Programación Específicas:**
+
+Basándote en la guía proporcionada y los principios anteriores, enfócate en:
+
+1.  **Frontend (React):**
+    * **Componente Principal - Mapa Interactivo (Mapbox):**
+        * Integración fluida de Mapbox GL JS.
+        * Renderizado eficiente de múltiples propiedades (marcadores/polígonos) con información clave al hacer hover/click.
+        * Manejo de eventos del mapa (zoom, pan, click en propiedad) para actualizar dinámicamente la información y otros componentes de la UI.
+        * Capas de datos personalizables (topografía, límites, servicios).
+        * Estilo visual alineado con la identidad del portal.
+    * **Componentes de Visualización de Propiedad:**
+        * Visor de Tours 360° (integración Matterport SDK/API).
+        * Galerías de imágenes/videos aéreos (optimizadas, con controles).
+        * Presentación clara y estandarizada de datos del terreno (legales, topográficos, características).
+    * **Gestión de Estado:** Elige y aplica consistentemente una estrategia (Context, Redux, Zustand) para manejar datos de propiedades, filtros, estado del mapa, usuario.
+    * **Sistema de Filtros Avanzado:** Permite filtrar por precio, tamaño, tipo de propiedad, características (acceso a agua, vistas), etc., y que estos filtros se reflejen dinámicamente en el mapa y listados.
+    * **Interfaz de Usuario (UI) Intuitiva y Responsiva:** Prioriza la usabilidad para el segmento objetivo. Asegura una experiencia óptima en escritorio y tablet.
+    * **Rutas Claras y Semánticas.**
+    * **Optimización de Rendimiento:** Lazy loading para contenido pesado (imágenes, tours).
+
+2.  **Backend (Python/Django):**
+    * **API RESTful Robusta y Bien Documentada:**
+        * Endpoints claros para: obtener propiedades (con filtros geográficos y por atributos), detalles de propiedad, gestión de usuarios, gestión de servicios contratados, etc.
+    * **Modelado de Datos Detallado (PostgreSQL):**
+        * Entidades: Propiedad (con todos sus atributos geográficos, legales, descriptivos, visuales), Usuario (comprador, vendedor, admin), Servicios (topografía, legal, etc.), Transacciones, Suscripciones.
+        * Relaciones claras y eficientes.
+    * **Lógica de Negocio:**
+        * Algoritmos de búsqueda y filtrado espacial y por atributos.
+        * Gestión de usuarios, roles y permisos.
+        * Lógica para la integración y gestión de servicios de terceros.
+        * Procesamiento de suscripciones y comisiones (si aplica según modelo de negocio).
+    * **Integración de APIs Externas:**
+        * Skyquest (datos topográficos).
+        * Bases de datos gubernamentales (SII, CBRS para datos legales y de propiedad).
+        * Pasarelas de pago.
+        * Implementa manejo robusto de errores, reintentos y caching para estas integraciones.
+    * **Seguridad:** Autenticación (JWT), autorización, validación de entradas (prevenir XSS, SQL Injection), protección de datos sensibles.
+
+3.  **Gestión de Datos Visuales y Almacenamiento:**
+    * **Estándar de Calidad Visual:** El sistema debe poder ingestar, procesar y categorizar los visuales según el estándar definido (tipos de toma, metadatos de altura de drone, condiciones de luz).
+    * **Almacenamiento de Archivos (AWS S3):** Imágenes, videos, datos de tours 360°. Gestión eficiente de subida, versionado (si aplica) y entrega (ej. via CDN). URLs pre-firmadas para acceso seguro si es necesario.
+
+4.  **Servicios Integrados:**
+    * Diseña la plataforma para facilitar la solicitud y seguimiento de servicios como:
+        * Estimación de costos (construcción, legales, etc.).
+        * Conexión con topógrafos, abogados, constructores.
+
+**III. Estándares de Calidad de Código y Proceso:**
+
+1.  **Código Limpio y Documentado:** Sigue convenciones (PEP 8 para Python, guías de estilo de React). Nombres descriptivos. Comentarios donde sea necesario. Documenta APIs (Swagger/OpenAPI).
+2.  **Pruebas Automatizadas:** Unitarias, de integración y E2E. Cubre casos de éxito, borde y error.
+3.  **Control de Versiones (Git):** Ramas para features/bugs, commits atómicos, PRs con revisión de código.
+4.  **Manejo de Errores Robusto:** Mensajes claros al usuario en frontend; logging detallado y códigos de estado HTTP apropiados en backend.
+5.  **Observabilidad:** Implementa logging y métricas para monitorear rendimiento y salud del sistema.
+6.  **Refactorización Continua:** Mantén la calidad del código a medida que el proyecto evoluciona.
+
+**IV. Flujo de Desarrollo Sugerido (Iterativo y Modular):**
+
+1.  **MVP 1: Visualización Básica en Mapa.**
+    * Mapa interactivo con propiedades de prueba (marcadores).
+    * Panel simple de información al seleccionar una propiedad.
+2.  **MVP 2: Integración de Visuales Inmersivos.**
+    * Añadir tours 360° e imágenes/videos a las propiedades.
+3.  **MVP 3: Datos Detallados e Integraciones Básicas.**
+    * Integrar datos topográficos y legales básicos.
+    * Implementar filtros primarios.
+4.  **Iteraciones Subsiguientes:**
+    * Sistema de usuarios y roles.
+    * Integración de servicios (calculadora de costos, conexión con profesionales).
+    * Sistema de comparación de propiedades.
+    * Afinamiento de UI/UX basado en feedback.
+    * Implementación completa del modelo de negocio (suscripciones, comisiones).
+
+**Cursor, tu rol es ser un copiloto proactivo. No solo escribas código bajo demanda, sino también:**
+* **Anticipa desafíos:** Basado en estas directrices, señala posibles problemas de arquitectura, rendimiento o integración.
+* **Sugiere soluciones y alternativas:** Ofrece opciones de implementación, librerías o patrones de diseño que se alineen con los principios.
+* **Haz preguntas aclaratorias:** Si una instrucción no es clara o requiere más contexto del negocio/usuario, pregunta.
+* **Mantén la consistencia:** Ayuda a mantener la coherencia en el código y la arquitectura a lo largo del desarrollo.
+
+El éxito de este portal depende de una ejecución técnica impecable que materialice la visión de una experiencia de usuario superior y una solución integral a un problema real. ¡Contamos con tu inteligencia para lograrlo!

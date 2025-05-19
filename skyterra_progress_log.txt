@@ -1,0 +1,100 @@
+## SkyTerra Project - Progress and Issue Log
+
+**Fecha de Última Actualización:** 2024-08-02
+
+### I. Funcionalidad del Asistente de IA Conversacional ("Sky")
+
+**Estado:**
+*   **Backend (`backend/properties/views.py` - `AISearchView`):**
+    *   Modificado para aceptar `current_query` y `conversation_history`.
+    *   Utiliza un nuevo prompt de sistema para que Gemini actúe como "Sky", un asistente conversacional.
+    *   Espera y procesa una respuesta JSON con `assistant_message` y `extracted_filters`.
+    *   Devuelve `recommendations` y el `conversation_history` actualizado al frontend.
+    *   Corregido error de sintaxis en `system_instruction_text` (cadena multilínea no terminada).
+    *   **[NUEVO]** Refactorizado para usar `GeminiService` de `backend/properties/services.py` para la interacción con la API de Gemini. Esto mejora la modularidad y la claridad del código de la vista.
+    *   **[NUEVO]** Mejorado el logging y el manejo de errores, utilizando `settings.DEBUG` para controlar la verbosidad.
+    *   **[NUEVO]** La consulta de propiedades para recomendaciones ahora anota `image_count_annotation` y `has_tour_annotation` para ser usadas por `PropertyListSerializer`.
+    *   **[NUEVO]** Filtrado de propiedades por `type` ahora usa `type__in` para soportar múltiples tipos de propiedad sugeridos por la IA.
+    *   **[NUEVO]** Filtrado de propiedades por `has360Tour` ahora usa la anotación `has_tour_annotation`.
+*   **Backend (`backend/properties/services.py`):**
+    *   **[NUEVO]** Creado el servicio `GeminiService` para encapsular la lógica de llamadas a la API de Gemini, incluyendo construcción de payload, envío de request, y manejo detallado de errores (timeouts, HTTP errors, JSON parsing errors, etc.).
+    *   **[NUEVO]** Implementada clase de excepción `GeminiServiceError`.
+*   **Frontend (`frontend/src/components/ui/AIChatAssistant.jsx`):**
+    *   Componente creado para una interfaz de chat flotante.
+    *   Gestiona el historial de la conversación.
+    *   Envía `current_query` y `conversation_history` al backend.
+    *   Muestra `assistant_message`, `suggestedFilters` (filtros sugeridos) y `recommendations`.
+    *   Props `onFiltersSuggested` y `onRecommendations` para integración con `App.jsx`.
+    *   **[NUEVO]** Las tarjetas de propiedades recomendadas ahora son clickables y enlazan a la página de detalles de la propiedad (`/property/:id`) usando `react-router-dom Link`.
+    *   **[NUEVO]** Lógica de actualización de la conversación simplificada para usar directamente `response.data.conversation_history` del backend.
+    *   **[NUEVO]** Mejoras visuales menores en las burbujas de mensajes y en la presentación de los chips de rango de precios.
+    *   **[NUEVO]** Se muestra el chip "Tour 360" en las tarjetas de propiedades recomendadas si `prop.has_tour` es verdadero.
+*   **Frontend (`frontend/src/components/ui/FilterPanel.jsx`):**
+    *   **[NUEVO]** `useEffect` para `externalFilters` (sugerencias de IA) mejorado para:
+        *   Manejar correctamente un array de `propertyTypes` sugeridos por la IA.
+        *   Validar rangos de precios de la IA y usar defaults si son nulos/undefined.
+        *   Comparar con el estado actual para aplicar cambios solo si hay diferencias reales, evitando re-renders innecesarios.
+        *   Llamar a `onApplyFilters` directamente con los filtros derivados de la IA.
+    *   **[NUEVO]** Añadidos campos de texto (`TextField`) para entrada numérica directa de rangos de precio y tamaño, sincronizados con los componentes `Slider` correspondientes.
+    *   **[NUEVO]** Los `Slider` para precio y tamaño ahora aplican filtros en `onChangeCommitted` (al soltar el control). Los campos de texto aplican filtros en `onBlur` o al presionar Enter.
+    *   **[NUEVO]** `valueLabelDisplay="auto"` en Sliders para mejor visibilidad del valor actual.
+*   **Frontend (`frontend/src/components/map/MapView.jsx`):**
+    *   **[NUEVO]** Implementada la clusterización de marcadores de propiedades utilizando una fuente GeoJSON de Mapbox (`cluster: true`) y capas para clusters y puntos individuales. Esto reemplaza el renderizado individual de `<Marker>` para propiedades no editables.
+    *   **[NUEVO]** Añadida función `propertiesToGeoJSON` para transformar la lista de propiedades a formato GeoJSON.
+    *   **[NUEVO]** Implementado `onMapClick` para manejar clicks en clusters (zoom) y en puntos individuales (activa `handleMarkerClick`).
+    *   **[NUEVO]** Re-integrados los popups (MUI `Card` con imagen y detalles) para puntos individuales no clusterizados, ahora activados por `onMapMouseMove` y `onMapMouseLeave` sobre la capa de puntos.
+    *   **[ADVERTENCIA DE SEGURIDAD]** Se identificó que `MAPBOX_TOKEN` está hardcodeado. Debe moverse a una variable de entorno (ej. `REACT_APP_MAPBOX_TOKEN`).
+*   **Integración (`frontend/src/App.jsx`):**
+    *   `AIChatAssistant` integrado en el layout principal.
+    *   Callbacks `handleAssistantFilters` y `handleAssistantRecommendations` implementados para actualizar `globalFilters`.
+
+**Problemas Conocidos/Resueltos:**
+*   **[RESUELTO]** Error de frontend `Cannot read properties of null (reading 'toLocaleString')` en `AISearchBar.jsx` debido a `priceRange: [null, null]`. Se añadió manejo de nulos (ahora también mejorado en `AIChatAssistant.jsx`).
+*   **[RESUELTO]** Exposición de API Key en mensajes de error del frontend. Modificada la gestión de errores en `AISearchView` (`backend/properties/views.py`) y centralizada en `GeminiService`.
+*   **[RESUELTO]** Error "API key not valid" de Gemini en el backend. Se aconsejó verificar `.env` y permisos en Google Cloud Console (ahora `GeminiService` también verifica la key al inicio).
+*   **[RESUELTO]** `UnorderedObjectListWarning` para el modelo `Property` en la paginación. Se añadió `.order_by('-created_at')` al queryset de `PropertyViewSet` en `backend/properties/views.py`.
+
+**Próximos Pasos:**
+*   Abordar la advertencia de seguridad de `MAPBOX_TOKEN` (acción manual del usuario).
+*   Testear exhaustivamente la nueva implementación de clustering y popups en `MapView.jsx`.
+*   Continuar refinando la UI/UX del asistente de chat (ej. interactividad de chips de filtro, feedback más detallado).
+*   Mejorar la integración de los filtros sugeridos y recomendaciones con la interfaz principal de búsqueda de propiedades (más allá de la actualización de `globalFilters`).
+*   **[NUEVO]** Aplicar un tema visual minimalista (gris/negro/blanco) y una fuente más seria ("Inter") globalmente.
+*   **[NUEVO]** Ajustar estilos en `PropertyDetails.jsx` para alinearse con el nuevo tema minimalista, incluyendo la actualización de iconos en pestañas para consistencia visual.
+
+### II. Gestión de Propiedades Basada en Mapa (Definición de Límites)
+
+**Estado:**
+*   **Backend - Modelo (`backend/properties/models.py` - `Property`):**
+    *   Añadido campo `boundary_polygon = models.JSONField(null=True, blank=True)`.
+    ```python
+    # backend/properties/models.py
+    # class Property(models.Model):
+    #    # ... otros campos
+    #    boundary_polygon = models.JSONField(null=True, blank=True, help_text="GeoJSON polygon data for property boundaries") # MODIFICADO: help_text añadido antes
+    ```
+*   **Backend - Serializers (`backend/properties/serializers.py`):**
+    *   Actualizados `PropertySerializer` y `PropertyListSerializer` para incluir `boundary_polygon`.
+    *   **[NUEVO]** `PropertyListSerializer` optimizado para usar anotaciones (`image_count_annotation`, `has_tour_annotation`) desde `PropertyViewSet` para evitar N+1 queries. Eliminado `get_has_tour`.
+*   **Backend - Views (`backend/properties/views.py` - `PropertyViewSet`):
+    *   **[NUEVO]** `get_queryset` ahora anota `image_count_annotation` y `has_tour_annotation` para `PropertyListSerializer`.
+    *   **[NUEVO]** `get_queryset` ahora incluye manejo básico de `ValueError` para conversiones de filtros de precio/tamaño a float.
+    *   **[NUEVO]** `my_properties` action también anota el queryset para consistencia con `PropertyListSerializer`.
+*   **Backend - Migraciones:**
+    *   Eliminada importación errónea de `ArrayField` de `django.contrib.postgres.fields` en `models.py` que causaba fallo en `makemigrations` por ausencia de `psycopg2` (ya que no se usa PostgreSQL directamente para este campo inicialmente).
+    *   Ejecutados `python manage.py makemigrations properties` y `python manage.py migrate properties` con éxito.
+
+**Problemas Conocidos/Resueltos:**
+*   **[RESUELTO]** Fallo de `makemigrations` debido a importación de `ArrayField` y dependencia `psycopg2` no necesaria para `JSONField`.
+
+**Próximos Pasos:**
+*   Implementar la interfaz de usuario en el frontend para el panel de administración de propiedades que permita:
+    *   Visualizar un mapa (e.g., usando Leaflet, Google Maps API, etc.).
+    *   Permitir a los administradores dibujar polígonos en el mapa para definir los límites de una propiedad.
+    *   Guardar estos polígonos en el campo `boundary_polygon` del backend.
+    *   Mostrar los polígonos guardados al ver/editar una propiedad.
+
+### III. Log General del Proyecto
+
+*   Este archivo (`skyterra_progress_log.txt`) ha sido creado para rastrear el progreso y los problemas.
+*   Se incluirán fragmentos de código relevantes al discutir errores. 
