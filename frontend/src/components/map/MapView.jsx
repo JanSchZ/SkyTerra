@@ -14,6 +14,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Link from '@mui/material/Link';
+import config from '../../config/environment';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => ({
@@ -40,12 +41,12 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     longitude: -70.6693,
     latitude: -33.4489,
     zoom: 3,
-    pitch: 0, // Ángulo de inclinación (0 = vista plana, 60 = vista en ángulo)
+    pitch: 45, // SIEMPRE EN 3D - Ángulo de inclinación por defecto
     bearing: 0, // Rotación del mapa
   });
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
-  const [is3dEnabled, setIs3dEnabled] = useState(false);
+  const [is3dEnabled, setIs3dEnabled] = useState(true); // SIEMPRE ACTIVADO POR DEFECTO
   const [isDrawingMode, setIsDrawingMode] = useState(editable);
   const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -53,10 +54,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const mapRef = useRef(null);
 
   // Define map styles
-  const mapStyles = {
-    light: 'mapbox://styles/mapbox/outdoors-v12',
-    dark: 'mapbox://styles/mapbox/satellite-streets-v12',
-  };
+  const mapStyles = config.mapbox.styles;
 
   const [currentMapStyle, setCurrentMapStyle] = useState(mapStyles[mode]);
 
@@ -96,7 +94,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     }
   }, [filters, editable]);
 
-  const MAPBOX_TOKEN = 'pk.eyJ1IjoiamFuc2NoeiIsImEiOiJjbWF0MHJkbTQwb2I2Mm5xOGRpdml5aGtwIn0.KzH4_qPWMU-GnVP4XSFp0Q';
+  const MAPBOX_TOKEN = config.mapbox.accessToken;
 
   const formatPrice = (price) => {
     if (price >= 1000000) {
@@ -212,8 +210,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     if (mapRef.current) {
       const map = mapRef.current.getMap();
       
-      // Habilitar terreno 3D si está disponible
-      if (map.getTerrain && is3dEnabled) {
+      // SIEMPRE habilitar terreno 3D cuando el mapa se carga
+      if (map.getTerrain) {
         map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
       }
       
@@ -223,19 +221,16 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     }
   };
 
-  // Actualizar terreno cuando cambie el modo 3D
+  // Mantener terreno 3D siempre activado
   useEffect(() => {
     if (mapRef.current) {
       const map = mapRef.current.getMap();
       if (map.getTerrain) {
-        if (is3dEnabled) {
-          map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-        } else {
-          map.setTerrain(null);
-        }
+        // SIEMPRE mantener el terreno 3D activado
+        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
       }
     }
-  }, [is3dEnabled]);
+  }, [is3dEnabled]); // Mantener la dependencia pero siempre activar
 
   // Estilos para el twinkle de estrellas en vista de globo
   // Eliminado para remover el fondo de estrellas completamente
@@ -441,7 +436,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           mapboxAccessToken={MAPBOX_TOKEN}
           style={{ width: '100%', height: '100%' }}
           attributionControl={false}
-          terrain={is3dEnabled ? { source: 'mapbox-dem', exaggeration: 1.5 } : null}
+          terrain={{ source: 'mapbox-dem', exaggeration: 1.5 }}
           projection={viewState.zoom < 4 ? "globe" : "mercator"}
           onClick={onMapClick} // NEW: Added map click handler for clusters/points
           interactiveLayerIds={[clusterLayer.id, unclusteredPointLayer.id]} // NEW: Make layers interactive
@@ -510,12 +505,20 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               }}
             >
               <IconButton 
-                onClick={toggle3DMode}
+                onClick={() => {
+                  // Cambiar entre diferentes ángulos de pitch en lugar de activar/desactivar 3D
+                  const newPitch = viewState.pitch >= 45 ? 60 : viewState.pitch <= 0 ? 45 : 0;
+                  setViewState({
+                    ...viewState,
+                    pitch: newPitch,
+                    transitionDuration: 1000
+                  });
+                }}
                 sx={{ 
-                  color: is3dEnabled ? '#4caf50' : 'rgba(0,0,0,0.8)',
+                  color: '#4caf50', // SIEMPRE VERDE porque 3D está siempre activo
                   padding: 1.2
                 }}
-                title={is3dEnabled ? "Desactivar modo 3D" : "Activar modo 3D"}
+                title="Ajustar ángulo 3D (0°, 45°, 60°)"
               >
                 <View3dIcon />
               </IconButton>
@@ -534,9 +537,16 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             >
               <IconButton 
                 onClick={() => {
+                  // Ciclar entre ángulos de visión: 0° -> 30° -> 45° -> 60° -> 0°
+                  let newPitch;
+                  if (viewState.pitch <= 0) newPitch = 30;
+                  else if (viewState.pitch <= 30) newPitch = 45;
+                  else if (viewState.pitch <= 45) newPitch = 60;
+                  else newPitch = 0;
+                  
                   setViewState({
                     ...viewState,
-                    pitch: viewState.pitch < 10 ? 45 : 0,
+                    pitch: newPitch,
                     transitionDuration: 1000
                   });
                 }}
@@ -544,7 +554,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   color: 'rgba(0,0,0,0.8)', 
                   padding: 1.2
                 }}
-                title="Cambiar ángulo de visión"
+                title={`Ángulo actual: ${Math.round(viewState.pitch)}° - Click para cambiar`}
               >
                 <TerrainIcon />
               </IconButton>

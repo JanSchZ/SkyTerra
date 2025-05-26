@@ -153,153 +153,101 @@ class AISearchView(APIView):
             self._log_debug(f"Current Query: '{current_query}'")
             self._log_debug(f"Conversation History (entrada):", conversation_history)
 
-            gemini_service = GeminiService()
-            
-            gemini_contents = []
-            for msg in conversation_history:
-                role = "user" if msg.get("role") == "user" else "model"
-                gemini_contents.append({"role": role, "parts": [{"text": msg.get("content", "")}]})
-            
-            if current_query: 
-                 gemini_contents.append({"role": "user", "parts": [{"text": current_query}]})
-
-            system_instruction_text = (
-                "Eres Sky, un asistente virtual experto en la búsqueda y recomendación de terrenos rurales en Chile para el portal SkyTerra. "
-                "Tu objetivo principal es ayudar al usuario a encontrar el terreno perfecto de forma amigable y conversacional. "
-                "Interactúa con el usuario, haz preguntas para clarificar sus necesidades si es necesario, y ofrece sugerencias. "
-                "Cuando identifiques criterios de búsqueda claros (tipos de propiedad, rango de precios, características como agua o vistas, ubicaciones), "
-                "extráelos y proporciónalos en una estructura JSON específica. Además, proporciona una respuesta conversacional."
-                "Tu respuesta DEBE ser un único bloque de texto JSON válido que contenga dos claves principales: 'assistant_message' y 'extracted_filters'. "
-                "'assistant_message' debe ser tu respuesta textual y amigable para el usuario. "
-                "'extracted_filters' debe ser un objeto JSON con los siguientes campos posibles: "
-                "  'propertyTypes': (lista de strings, ej: [\"farm\", \"ranch\"]), "
-                "  'priceRange': (lista de dos números [min, max] o [null, null] si no se especifica), "
-                "  'features': (lista de strings, ej: [\"hasWater\", \"hasViews\"]), "
-                "  'locations': (lista de strings con nombres de lugares). "
-                "Si no se pueden extraer filtros, estos campos pueden ser listas vacías o priceRange puede ser [null, null]. "
-                "Ejemplo de respuesta JSON completa que debes generar: "
-                "```json\n"
-                "{\n"
-                "  \"assistant_message\": \"¡Hola! Busco terrenos con acceso a agua. ¿Tienes alguna preferencia de ubicación o tamaño?\",\n"
-                "  \"extracted_filters\": {\n"
-                "    \"propertyTypes\": [],\n"
-                "    \"priceRange\": [null, null],\n"
-                "    \"features\": [\"hasWater\"],\n"
-                "    \"locations\": []\n"
-                "  }\n"
-                "}\n"
-                "```\n"
-                "Mantén la conversación fluida. Si el usuario solo saluda, saluda de vuelta y pregúntale cómo puedes ayudarle a encontrar un terreno."
-                "Si la consulta es muy vaga, pide más detalles. No inventes filtros si no están implícitos en la conversación."
-            )
-
-            generation_config = {
-                "temperature": 0.7, 
-                "topP": 0.8,
-                "topK": 40,
-                "maxOutputTokens": 1024,
-                "responseMimeType": "application/json", 
-            }
-            safety_settings = [ 
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}
-            ]
-
-            parsed_gemini_response, raw_gemini_text = gemini_service.generate_content(
-                system_instruction_text, gemini_contents, generation_config, safety_settings
-            )
-            
-            assistant_text_response = parsed_gemini_response.get("assistant_message", "No se pudo obtener una respuesta del asistente.")
-            suggested_filters = parsed_gemini_response.get("extracted_filters", {})
-
-            final_suggested_filters = {
-                "propertyTypes": suggested_filters.get("propertyTypes", []),
-                "priceRange": suggested_filters.get("priceRange", [None, None]),
-                "features": suggested_filters.get("features", []),
-                "locations": suggested_filters.get("locations", [])
-            }
-            if not isinstance(final_suggested_filters["priceRange"], list) or len(final_suggested_filters["priceRange"]) != 2:
-                final_suggested_filters["priceRange"] = [None, None]
-
-            logger.info(f"[AISearchView] Mensaje del Asistente: {assistant_text_response}")
-            logger.info(f"[AISearchView] Filtros Sugeridos (final): {json.dumps(final_suggested_filters, ensure_ascii=False)}")
-            
-            properties_query = Property.objects.all()
-            tour_exists_annotation = Tour.objects.filter(property=OuterRef('pk'))
-            properties_query = properties_query.annotate(
-                image_count_annotation=Count('images'),
-                has_tour_annotation=Exists(tour_exists_annotation)
-            )
-
-            if final_suggested_filters.get('propertyTypes') and len(final_suggested_filters['propertyTypes']) > 0:
-                properties_query = properties_query.filter(type__in=final_suggested_filters['propertyTypes'])
-            
-            if final_suggested_filters.get('priceRange'):
-                min_price, max_price = final_suggested_filters['priceRange']
-                if isinstance(min_price, (int, float)):
-                    properties_query = properties_query.filter(price__gte=min_price)
-                if isinstance(max_price, (int, float)):
-                    properties_query = properties_query.filter(price__lte=max_price)
-            
-            if final_suggested_filters.get('features'):
-                for feature in final_suggested_filters['features']:
-                    if feature == 'hasWater':
-                        properties_query = properties_query.filter(has_water=True)
-                    elif feature == 'hasViews':
-                        properties_query = properties_query.filter(has_views=True)
-                    elif feature == 'has360Tour':
-                        properties_query = properties_query.filter(has_tour_annotation=True)
-
-            matching_properties_data = []
-            property_count = 0
             try:
-                matching_properties = properties_query.order_by('-created_at')[:5]
-                property_count = matching_properties.count()
-                serializer = PropertyListSerializer(matching_properties, many=True)
-                matching_properties_data = serializer.data
-                logger.info(f"[AISearchView] Se encontraron {property_count} propiedades que coinciden.")
-            except Exception as e:
-                logger.error(f"[AISearchView ERROR] Error al obtener o serializar propiedades: {str(e)}", exc_info=True)
-
-            updated_history = list(conversation_history) 
-            if current_query:
-                 updated_history.append({"role": "user", "content": current_query})
-            updated_history.append({"role": "assistant", "content": assistant_text_response})
-            
-            final_backend_response = {
-                "assistant_message": assistant_text_response,
-                "suggestedFilters": final_suggested_filters, 
-                "recommendations": matching_properties_data,
-                "conversation_history": updated_history 
-            }
-
-            if self.DEBUG_MODE:
-                final_backend_response['_debug_backend'] = {
-                    'raw_gemini_response_text': raw_gemini_text,
-                    'parsed_gemini_response': parsed_gemini_response,
-                    'matching_properties_count': property_count,
+                gemini_service = GeminiService()
+                
+                # Usar el nuevo método que integra propiedades reales
+                ai_response = gemini_service.search_properties_with_ai(
+                    user_query=current_query,
+                    conversation_history=conversation_history
+                )
+                
+                self._log_debug("Respuesta de IA procesada:", ai_response)
+                
+                # Verificar si es una respuesta válida
+                if ai_response and isinstance(ai_response, dict):
+                    # Asegurar que tenemos los campos necesarios
+                    response_data = {
+                        'assistant_message': ai_response.get('assistant_message', 'Búsqueda procesada'),
+                        'suggestedFilters': ai_response.get('suggestedFilters', {
+                            'propertyTypes': [],
+                            'priceRange': [None, None],
+                            'features': [],
+                            'sizeRange': [None, None]
+                        }),
+                        'recommendations': ai_response.get('recommendations', []),
+                        'interpretation': ai_response.get('interpretation', current_query),
+                        'fallback': ai_response.get('fallback', False)
+                    }
+                    
+                    # Agregar información adicional si es respuesta de fallback
+                    if ai_response.get('fallback'):
+                        response_data['assistant_message'] += " (Usando búsqueda básica)"
+                    
+                    self._log_debug("Respuesta final enviada:", response_data)
+                    return Response(response_data, status=status.HTTP_200_OK)
+                
+                else:
+                    # Si no hay respuesta válida, crear una respuesta básica
+                    fallback_response = {
+                        'assistant_message': 'No se pudo procesar tu búsqueda en este momento.',
+                        'suggestedFilters': {
+                            'propertyTypes': [],
+                            'priceRange': [None, None],
+                            'features': [],
+                            'sizeRange': [None, None]
+                        },
+                        'recommendations': [],
+                        'interpretation': current_query,
+                        'error': 'Servicio temporalmente no disponible'
+                    }
+                    
+                    return Response(fallback_response, status=status.HTTP_200_OK)
+                
+            except GeminiServiceError as e:
+                logger.error(f"Error específico de GeminiService: {e}")
+                
+                # Crear respuesta de error más informativa
+                error_response = {
+                    'assistant_message': f'Error en el servicio de IA: {str(e)}',
+                    'suggestedFilters': {
+                        'propertyTypes': [],
+                        'priceRange': [None, None],
+                        'features': [],
+                        'sizeRange': [None, None]
+                    },
+                    'recommendations': [],
+                    'interpretation': current_query,
+                    'error': str(e),
+                    'suggestions': 'Verifique la configuración de la API de Gemini o intente más tarde.'
                 }
-            
-            self._log_debug(f"Respuesta final al frontend:", final_backend_response)
-            return Response(final_backend_response, status=status.HTTP_200_OK)
+                
+                return Response(error_response, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Error inesperado en AISearchView: {e}", exc_info=True)
+                
+                # Respuesta de error genérico
+                error_response = {
+                    'assistant_message': 'Error interno del servidor. Intente nuevamente.',
+                    'suggestedFilters': {
+                        'propertyTypes': [],
+                        'priceRange': [None, None],
+                        'features': [],
+                        'sizeRange': [None, None]
+                    },
+                    'recommendations': [],
+                    'interpretation': current_query,
+                    'error': 'Error interno del servidor'
+                }
+                
+                return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        except GeminiServiceError as e:
-            logger.error(f"[AISearchView ERROR] GeminiServiceError: {e.message}", extra={'details': e.details, 'status_code': e.status_code})
-            return Response({
-                'error': e.message,
-                'details': e.details if self.DEBUG_MODE else "Error details suppressed.",
-                'status_code_from_service': e.status_code
-            }, status=e.status_code or status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
         except Exception as e:
-            error_message = f"Error inesperado en AISearchView: {str(e)}"
-            logger.error(error_message, exc_info=True)
+            logger.error(f"Error crítico en AISearchView: {e}", exc_info=True)
             return Response({
-                'error': 'Unexpected server error', 
-                'details': error_message if self.DEBUG_MODE else "Contacte al administrador del sistema.",
-                'traceback': traceback.format_exc() if self.DEBUG_MODE else None
+                'error': 'Error crítico del servidor',
+                'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request, *args, **kwargs):

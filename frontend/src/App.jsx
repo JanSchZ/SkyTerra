@@ -29,7 +29,6 @@ import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import CreateProperty from './components/property/CreateProperty';
 import { authService, propertyService, tourService } from './services/api';
-import AIChatAssistant from './components/ui/AIChatAssistant';
 import './App.css';
 
 // Create a context for theme mode
@@ -153,7 +152,7 @@ const AppWrapper = () => {
 }
 
 // Component principal para la vista del mapa con filtros
-const MapWithFilters = ({ isFilterPanelOpen, toggleFilterPanel, globalFilters, setGlobalFilters }) => {
+const MapWithFilters = ({ isFilterPanelOpen, toggleFilterPanel, globalFilters, setGlobalFilters, mapRef }) => {
   const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -180,14 +179,14 @@ const MapWithFilters = ({ isFilterPanelOpen, toggleFilterPanel, globalFilters, s
         externalFilters={globalFilters.aiResponse}
       />
       <Box sx={{ flexGrow: 1, position: 'relative', height: '100%', transition: 'margin-left 0.3s' }}>
-        <MapView filters={globalFilters} />
+        <MapView ref={mapRef} filters={globalFilters} />
       </Box>
     </Box>
   );
 };
 
 // Componente de barra de navegación
-const NavBar = ({ user, onLogout, onToggleFilterPanel, onAISearch }) => {
+const NavBar = ({ user, onLogout, onToggleFilterPanel, onAISearch, onLocationSearch }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const themeModeContext = React.useContext(ThemeModeContext);
   const muiTheme = useMuiTheme();
@@ -254,7 +253,7 @@ const NavBar = ({ user, onLogout, onToggleFilterPanel, onAISearch }) => {
           mr: 2,
           maxWidth: '800px'
         }}>
-          <AISearchBar onSearch={onAISearch} />
+          <AISearchBar onSearch={onAISearch} onLocationSearch={onLocationSearch} />
         </Box>
 
         <IconButton sx={{ ml: 1 }} onClick={themeModeContext.toggleThemeMode} color="inherit">
@@ -302,6 +301,7 @@ function App() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(true);
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const mapRef = React.useRef(null); // Referencia al mapa
 
   const [globalFilters, setGlobalFilters] = useState({
     priceMin: 0,
@@ -342,6 +342,28 @@ function App() {
     setGlobalFilters(newFilters);
   };
 
+  // Nueva función para manejar la búsqueda de ubicaciones como Google Earth
+  const handleLocationSearch = (locationData) => {
+    if (!locationData || !mapRef.current) return;
+    
+    console.log('Flying to location:', locationData);
+    
+    // Usar la referencia del mapa para volar a la ubicación
+    if (mapRef.current && mapRef.current.flyTo) {
+      mapRef.current.flyTo({
+        center: locationData.center,
+        zoom: locationData.zoom,
+        pitch: 45, // Ángulo para vista más dinámica
+        bearing: 0,
+        duration: 3000, // 3 segundos de vuelo
+        essential: true
+      });
+    }
+    
+    // Opcional: mostrar notificación
+    console.log(`Volando a ${locationData.locationName}...`);
+  };
+
   const handleLogin = async (credentials) => {
     setLoadingAuth(true);
     setAuthError(null);
@@ -380,28 +402,6 @@ function App() {
     }
   };
 
-  // Nueva función para recibir filtros sugeridos desde el asistente
-  const handleAssistantFilters = (suggestedFilters) => {
-    if (!suggestedFilters) return;
-    // Actualiza los filtros globales según lo sugerido por la IA
-    setGlobalFilters((prev) => ({
-      ...prev,
-      priceMin: suggestedFilters.priceRange ? suggestedFilters.priceRange[0] ?? prev.priceMin : prev.priceMin,
-      priceMax: suggestedFilters.priceRange ? suggestedFilters.priceRange[1] ?? prev.priceMax : prev.priceMax,
-      propertyTypes: suggestedFilters.propertyTypes || prev.propertyTypes,
-      hasWater: suggestedFilters.features?.includes('hasWater') ?? prev.hasWater,
-      hasViews: suggestedFilters.features?.includes('hasViews') ?? prev.hasViews,
-      has360Tour: suggestedFilters.features?.includes('has360Tour') ?? prev.has360Tour,
-      aiResponse: suggestedFilters, // Guarda la última respuesta de la IA
-    }));
-  };
-
-  // Opcional: función para manejar recomendaciones (puedes usarla para mostrar en otro panel)
-  const handleAssistantRecommendations = (recommendations) => {
-    // Aquí podrías actualizar un estado global de recomendaciones si lo deseas
-    // console.log('Recomendaciones IA:', recommendations);
-  };
-
   if (loadingAuth) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -412,7 +412,13 @@ function App() {
 
   return (
     <Router>
-      <NavBar user={user} onLogout={handleLogout} onToggleFilterPanel={toggleFilterPanel} onAISearch={handleAISearch} />
+      <NavBar 
+        user={user} 
+        onLogout={handleLogout} 
+        onToggleFilterPanel={toggleFilterPanel} 
+        onAISearch={handleAISearch} 
+        onLocationSearch={handleLocationSearch} 
+      />
       <Box sx={{
         paddingTop: isMobile ? '120px' : '64px',
         height: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 64px)', 
@@ -429,6 +435,7 @@ function App() {
                         toggleFilterPanel={toggleFilterPanel} 
                         globalFilters={globalFilters} 
                         setGlobalFilters={setGlobalFilters}
+                        mapRef={mapRef}
                     />} 
           />
           <Route path="/property/:id" element={<PropertyDetails />} />
@@ -446,8 +453,6 @@ function App() {
             element={<ProtectedRoute user={user} element={<Dashboard user={user} />} />}
           />
         </Routes>
-        {/* Chat asistente flotante global */}
-        <AIChatAssistant onFiltersSuggested={handleAssistantFilters} onRecommendations={handleAssistantRecommendations} />
       </Box>
     </Router>
   );

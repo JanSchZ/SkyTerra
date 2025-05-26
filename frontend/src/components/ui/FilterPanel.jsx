@@ -58,11 +58,21 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
 
   // Update text inputs when slider range changes
   useEffect(() => {
-    setPriceInput({ min: priceRange[0].toString(), max: priceRange[1].toString() });
+    if (priceRange && Array.isArray(priceRange) && priceRange.length === 2) {
+      setPriceInput({ 
+        min: (priceRange[0] ?? 0).toString(), 
+        max: (priceRange[1] ?? 500000).toString() 
+      });
+    }
   }, [priceRange]);
 
   useEffect(() => {
-    setSizeInput({ min: sizeRange[0].toString(), max: sizeRange[1].toString() });
+    if (sizeRange && Array.isArray(sizeRange) && sizeRange.length === 2) {
+      setSizeInput({ 
+        min: (sizeRange[0] ?? 0).toString(), 
+        max: (sizeRange[1] ?? 200).toString() 
+      });
+    }
   }, [sizeRange]);
 
   // Efecto para actualizar el estado interno si los filtros globales cambian
@@ -133,10 +143,12 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
       
       if (aiFilters.priceRange && Array.isArray(aiFilters.priceRange) && aiFilters.priceRange.length === 2) {
         const newPriceRange = [
-          aiFilters.priceRange[0] === null || aiFilters.priceRange[0] === undefined ? initialPriceRange[0] : aiFilters.priceRange[0],
-          aiFilters.priceRange[1] === null || aiFilters.priceRange[1] === undefined ? initialPriceRange[1] : aiFilters.priceRange[1]
+          (aiFilters.priceRange[0] === null || aiFilters.priceRange[0] === undefined) ? initialPriceRange[0] : aiFilters.priceRange[0],
+          (aiFilters.priceRange[1] === null || aiFilters.priceRange[1] === undefined) ? initialPriceRange[1] : aiFilters.priceRange[1]
         ];
-        if (priceRange[0] !== newPriceRange[0] || priceRange[1] !== newPriceRange[1]) {
+        // Additional validation to ensure we have valid numbers
+        if (!isNaN(newPriceRange[0]) && !isNaN(newPriceRange[1]) && 
+            (priceRange[0] !== newPriceRange[0] || priceRange[1] !== newPriceRange[1])) {
             setPriceRange(newPriceRange);
             changedByAI = true;
         }
