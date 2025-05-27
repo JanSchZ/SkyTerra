@@ -164,11 +164,11 @@ const PropertyDetails = () => {
               console.log(`🌍 Ubicación detectada: ${userCountry} (${latitude}, ${longitude})`);
               console.log(`🚁 Iniciando vuelo automático para ${userCountry}`);
               performAutoFlight(userCountry);
-            },
-            (error) => {
-              console.log('📍 No se pudo obtener ubicación, usando vuelo por defecto');
-              performAutoFlight('default');
-            },
+                    },
+        (error) => {
+          console.log('📍 No se pudo obtener ubicación, usando Chile como país por defecto');
+          performAutoFlight('chile');
+        },
             {
               enableHighAccuracy: false,
               timeout: 5000,
@@ -176,8 +176,8 @@ const PropertyDetails = () => {
             }
           );
         } else {
-          console.log('🌐 Geolocalización no disponible, usando vuelo por defecto');
-          performAutoFlight('default');
+          console.log('🌐 Geolocalización no disponible, usando Chile como país por defecto');
+          performAutoFlight('chile');
         }
       }, 2000); // Esperar 2 segundos después de que la propiedad esté cargada
 
@@ -199,7 +199,7 @@ const PropertyDetails = () => {
   };
 
   // Función para realizar vuelo automático inicial
-  const performAutoFlight = (userCountry = 'default') => {
+  const performAutoFlight = (userCountry = 'chile') => {
     if (!mapRef.current || autoFlyCompleted) return;
 
     const flightPath = countryFlightPaths[userCountry];

@@ -36,13 +36,13 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Vista inicial del mapa: Movimiento libre desde el centro del globo
+  // Vista inicial del mapa: Chile por defecto (asumiendo dominio .cl)
   const initialMapViewState = {
-    longitude: 0, // Centro del mundo
-    latitude: 20, // Ligeramente al norte para mejor vista del globo
-    zoom: 1.2,    // Zoom para ver el globo completo
-    pitch: 0,     // Sin pitch inicial para movimiento libre
-    bearing: 0,   // Sin bearing inicial
+    longitude: -71.5430, // Centro de Chile
+    latitude: -35.6751,  // Centro de Chile
+    zoom: 5.5,           // Zoom para ver Chile completo
+    pitch: 45,           // Vista cinematográfica con inclinación
+    bearing: 0,          // Sin rotación inicial
   };
 
   const [viewState, setViewState] = useState(propInitialViewState || initialMapViewState);
@@ -257,8 +257,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           performAutoFlight(userCountry);
         },
         (error) => {
-          console.log('No se pudo obtener ubicación, usando vuelo por defecto');
-          performAutoFlight('default');
+          console.log('No se pudo obtener ubicación, usando Chile como país por defecto');
+          performAutoFlight('chile'); // Chile por defecto en lugar de 'default'
         },
         {
           enableHighAccuracy: false,
@@ -267,8 +267,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         }
       );
     } else if (!autoFlyCompleted) {
-      // Si no hay geolocalización, usar vuelo por defecto
-      performAutoFlight('default');
+      // Si no hay geolocalización, usar Chile por defecto
+      performAutoFlight('chile'); // Chile por defecto
     }
   }, []); // Solo ejecutar una vez al montar
 

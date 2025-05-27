@@ -241,18 +241,31 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
           ),
           sx: {
             backgroundColor: 'transparent',
-            borderRadius: '50px', // Totalmente circular
+            borderRadius: '50px',
             fontSize: '0.95rem',
             paddingLeft: '12px',
             paddingRight: '12px',
             color: theme.palette.text.primary,
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(12px)',
             '&.MuiOutlinedInput-root': {
                 '& fieldset': { 
-                  borderColor: 'transparent',
-                  borderRadius: '50px', // Mantener forma circular en fieldset
+                  border: 'none', // Quitar el borde por defecto
+                  borderRadius: '50px',
                 },
-                '&:hover fieldset': { borderColor: 'transparent' },
-                '&.Mui-focused fieldset': { borderColor: 'transparent', borderWidth: '0px !important' },
+                '&:hover fieldset': { 
+                  border: 'none',
+                },
+                '&.Mui-focused fieldset': { 
+                  border: 'none',
+                },
+                '&:hover': {
+                  borderColor: 'rgba(255, 255, 255, 0.25)',
+                },
+                '&.Mui-focused': {
+                  borderColor: 'rgba(255, 255, 255, 0.35)',
+                  boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.1)',
+                },
             },
             '& .MuiInputBase-input': {
                 paddingTop: '12px',
@@ -262,7 +275,7 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
                  '&::placeholder': {
                     color: theme.palette.text.secondary,
                     opacity: 0.9,
-                    fontWeight: 500,
+                    fontWeight: 300,
                 },
             },
           }
