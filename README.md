@@ -1,153 +1,189 @@
-# SkyTerra - Plataforma de Propiedades Rurales
+# SkyTerra V1
 
-SkyTerra es una plataforma innovadora para la visualización y búsqueda de propiedades rurales que utiliza inteligencia artificial para mejorar la experiencia del usuario.
+This is the main repository for the SkyTerra V1 project.
 
-## Características principales
+## Project Structure
 
-- **Búsqueda impulsada por IA**: Utiliza Google Gemini 2.0 Flash para interpretar consultas en lenguaje natural
-- **Visualización geoespacial**: Explora propiedades en un mapa interactivo
-- **Filtrado inteligente**: Filtra propiedades por tipo, precio, características y ubicación
-- **Tours virtuales**: Explora propiedades con tours 360°
+The project is divided into two main parts:
 
-## Requisitos previos
+*   `backend/`: Contains the Django backend application.
+*   `frontend/`: Contains the React frontend application.
 
-- [Python 3.9+](https://www.python.org/downloads/)
-- [Node.js 18+](https://nodejs.org/)
-- Clave API de [Google Gemini](https://ai.google.dev/)
-- Se recomienda el uso de entornos virtuales para Python (`venv` o `.venv`).
+## Key Features
 
-## Configuración rápida
+*   **AI-Powered Search**: Utilizes Google Gemini for natural language query interpretation.
+*   **Geospatial Visualization**: Explore properties on an interactive map (Mapbox).
+*   **Smart Filtering**: Filter properties by type, price, features, and location.
+*   **Virtual Tours**: Explore properties with 360° tours.
 
-### 1. Clonar el repositorio
+## Prerequisites
 
-```bash
-git clone https://github.com/JanSchZ/SkyTerra.git
-cd SkyTerra
-```
-*(Nota: La URL del repositorio puede variar si lo has bifurcado o clonado de otro lugar)*
+*   Python (version 3.13 or higher recommended, 3.9+ required)
+*   Node.js (version 18.x or higher recommended)
+*   npm (usually comes with Node.js)
+*   A PostgreSQL database instance (for production/persistent data). SQLite can be used for initial development.
+*   Google Gemini API Key: Obtain from [Google AI Studio](https://makersuite.google.com/app/apikey).
+*   Mapbox Access Token: Obtain from [Mapbox](https://account.mapbox.com/) (for the `VITE_MAPBOX_TOKEN` in the frontend).
 
-### 2. Configurar las variables de entorno
+## Setup Instructions
 
-Crea un archivo `.env` en la **raíz** del proyecto (junto a `.gitignore` y `README.md`) copiando el contenido de `.env.example` y rellenando tus datos.
-
-```bash
-cp .env.example .env
-# Luego edita .env con tus claves y configuraciones
-```
-
-Para generar una `SECRET_KEY` para Django, puedes usar:
+### 1. Clone the Repository
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(50))"
+git clone <repository-url> # Replace <repository-url> with the actual URL of this repository
+cd SkyTerraV1 # Or your repository's root folder name
 ```
 
-Para obtener una `GEMINI_API_KEY`, visita [Google AI Studio](https://makersuite.google.com/app/apikey).
-Para obtener una `VITE_MAPBOX_TOKEN`, visita [Mapbox](https://account.mapbox.com/).
+### 2. Configure Environment Variables
 
-### 3. Instalar dependencias
+*   Copy the example `.env.example` file to a new file named `.env` in the **root** of the project.
+    ```bash
+    cp .env.example .env
+    ```
+*   Edit the `.env` file with your specific configurations:
+    *   `SECRET_KEY`: A unique secret key for your Django application. You can generate one using:
+        ```bash
+        python -c "import secrets; print(secrets.token_urlsafe(50))"
+        ```
+    *   `DEBUG`: Set to `True` for development, `False` for production.
+    *   `DATABASE_URL`: Your PostgreSQL connection string (e.g., `postgres://user:password@host:port/dbname`). For initial development, Django will default to SQLite if this is not set or is misconfigured, creating a `db.sqlite3` file in the `backend/` directory.
+    *   `GEMINI_API_KEY`: Your Google Gemini API key.
+    *   `VITE_MAPBOX_TOKEN`: Your Mapbox access token (this will be used by the frontend).
 
-Instala las dependencias del backend y frontend:
+### 3. Backend Setup (Django)
 
-```bash
-# Backend (desde la raíz del proyecto)
-cd backend
-python -m venv .venv  # Crea un entorno virtual si no lo tienes
-.\.venv\Scripts\activate  # Activa el entorno virtual en Windows (PowerShell/CMD)
-# source .venv/bin/activate  # Activa el entorno virtual en Unix/MacOS
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py create_demo_data # Opcional: crea datos de ejemplo
-deactivate # Desactiva el entorno virtual en Windows
-# unset VIRTUAL_ENV # Desactiva en Unix/MacOS
-cd .. # Vuelve a la raíz
+1.  **Navigate to the backend directory:**
+    ```bash
+    cd backend
+    ```
+2.  **Create and activate a virtual environment:**
+    On Windows (PowerShell/CMD):
+    ```bash
+    python -m venv .venv
+    .venv\Scripts\activate
+    ```
+    On macOS/Linux:
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    ```
+3.  **Install Python dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **Apply database migrations:**
+    This will set up your database schema. If using SQLite for the first time, this will create the `db.sqlite3` file.
+    ```bash
+    python manage.py migrate
+    ```
+5.  **(Optional) Create demo data:**
+    ```bash
+    python manage.py create_demo_data
+    ```
+6.  **Run the development server:**
+    ```bash
+    python manage.py runserver
+    ```
+    The backend will usually be available at `http://127.0.0.1:8000/`.
+7.  **Deactivate the virtual environment when done (optional):**
+    ```bash
+    deactivate
+    ```
 
-# Frontend (desde la raíz del proyecto)
-cd frontend
-npm install
-cd .. # Vuelve a la raíz
-```
+### 4. Frontend Setup (React/Vite)
 
-### 4. Iniciar la aplicación
+1.  **Navigate to the frontend directory (from the project root):**
+    ```bash
+    cd frontend
+    ```
+2.  **Install Node.js dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Run the development server:**
+    ```bash
+    npm run dev # or npm start, depending on your package.json scripts
+    ```
+    The frontend development server will usually start on `http://localhost:3000/` or `http://localhost:5173/` (for Vite) and may open automatically in your browser.
+    Ensure your `.env` file in the project root has `VITE_MAPBOX_TOKEN` set, as the frontend might depend on it during its build/run process.
 
-#### Inicio rápido con script (Windows)
+### 5. Running Both Frontend and Backend Concurrently
 
-Si estás en Windows, puedes usar el script `start_app.bat` ubicado en la raíz del proyecto para iniciar tanto el backend como el frontend con un solo comando. Asegúrate de haber completado los pasos 1-3 primero.
+It's recommended to use two separate terminal windows/tabs:
 
-Simplemente ejecuta:
+*   **Terminal 1 (Backend):**
+    ```bash
+    cd backend
+    # Activate virtual environment (e.g., .venv\Scripts\activate or source .venv/bin/activate)
+    python manage.py runserver
+    ```
+*   **Terminal 2 (Frontend):**
+    ```bash
+    cd frontend
+    npm run dev # or npm start
+    ```
 
+### Quick Start Script (Windows - `start_skyterra.bat`)
+
+The `start_skyterra.bat` script in the root directory is intended to automate starting both backend and frontend services on Windows. Review and adapt this script to ensure it aligns with the current setup steps (virtual environment activation, correct paths, and commands).
+
+To use it (after completing steps 1-3 for initial setup):
 ```cmd
-start_app.bat
+start_skyterra.bat
 ```
 
-Este script activará los entornos virtuales, ejecutará los servidores de desarrollo de Django y Vite, y abrirá la aplicación en tu navegador.
+## Troubleshooting Common Issues
 
-#### Manualmente
+*   **Virtual Environment Problems:**
+    *   Ensure the correct virtual environment is activated before installing dependencies or running the Django server.
+    *   If `pip install -r requirements.txt` fails, double-check activation.
+*   **.env File Not Found or Environment Variable Errors:**
+    *   Verify you copied `.env.example` to `.env` in the **project root**.
+    *   Ensure all required variables are correctly filled in `.env`.
+*   **Gemini API Errors:**
+    *   Confirm your `GEMINI_API_KEY` in `.env` is valid.
+    *   Check backend server logs (`python manage.py runserver`) for details.
+*   **AI Search Errors:**
+    *   AI search issues might show in the browser console (F12) if the backend response isn't as expected.
+    *   Ensure `GEMINI_API_KEY` is valid and the backend is running correctly.
+*   **Server Not Starting (Backend or Frontend):**
+    *   Make sure you are in the correct directory (`backend/` or `frontend/`).
+    *   Verify Python and Node.js are installed correctly and accessible in your PATH.
+    *   Check if ports (e.g., 8000 for backend, 3000/5173 for frontend) are available. You can configure different ports if needed (see Django and Vite/React script documentation).
+*   **SQL / Database Errors:**
+    *   If using SQLite and encountering issues, you can try deleting `backend/db.sqlite3` and re-running `python manage.py migrate` (this will erase existing SQLite data).
+    *   For PostgreSQL, ensure your `DATABASE_URL` is correct and the server is accessible.
+*   **Map Visualization Issues:**
+    *   If the map doesn't load, verify `VITE_MAPBOX_TOKEN` in `.env` is correct and the frontend is configured to read it (often as `import.meta.env.VITE_MAPBOX_TOKEN` in Vite projects).
 
-Si prefieres iniciar los servicios manualmente (o si no usas Windows):
+## Technologies Used
 
-**Backend (Django)**:
-```bash
-cd backend
-.\.venv\Scripts\activate  # Activa el entorno virtual en Windows (PowerShell/CMD)
-# source .venv/bin/activate  # Activa el entorno virtual en Unix/MacOS
-python manage.py runserver
-```
+*   **Backend**: Django, Django REST Framework, psycopg2-binary (for PostgreSQL)
+*   **Frontend**: React, Material-UI, react-map-gl, Mapbox GL JS (likely with Vite as a build tool)
+*   **AI**: Google Gemini API
+*   **Database**: SQLite (development), PostgreSQL (production)
 
-**Frontend (React/Vite)**:
-```bash
-cd frontend
-npm run dev
-```
+## Additional Resources & Documentation
 
-## Solución de problemas comunes
+*   Project-specific development guides: `Guía de desarrollo1.txt`, `Guia de desarrollo2.txt` (Note: these appear to be in Spanish)
+*   [Google Gemini API Documentation](https://ai.google.dev/gemini-api/docs)
+*   [Django Documentation](https://docs.djangoproject.com/)
+*   [React Documentation](https://react.dev/)
+*   [Vite Documentation](https://vitejs.dev/) (if used for the frontend)
+*   [Mapbox GL JS Documentation](https://docs.mapbox.com/mapbox-gl-js/api/)
 
-### Problemas con entornos virtuales
-- Asegúrate de activar el entorno virtual correcto (`.venv` o `venv`) antes de instalar dependencias o ejecutar el servidor Django.
-- Si `pip install -r requirements.txt` falla, verifica que el entorno virtual esté activado.
+## Contributing
 
-### Archivo .env no encontrado o errores de variables de entorno
-- Verifica que copiaste `.env.example` a `.env` en la raíz del proyecto.
-- Asegúrate de haber rellenado correctamente todas las variables necesarias en tu archivo `.env`.
+Please refer to the project-specific development guides for details on the code of conduct and the process for submitting pull requests.
 
-### Error en la API de Gemini
-- Verifica que tu clave API de Gemini en el `.env` sea válida.
-- Asegúrate de que el archivo `.env` esté correctamente configurado.
-- Verifica los logs del servidor backend para más detalles (`python manage.py runserver`).
+## Progress Log
 
-### Errores en la búsqueda por IA
-- La búsqueda por IA puede mostrar errores en la consola del navegador (F12) si la respuesta del backend no tiene el formato esperado.
-- Si ves errores al realizar búsquedas, verifica que la `GEMINI_API_KEY` en el `.env` sea válida y que el backend esté funcionando correctamente.
+Refer to `skyterra_progress_log.txt` for a log of development progress.
 
-### El servidor no inicia (Backend o Frontend)
-- Asegúrate de estar en el directorio correcto (`backend/` para Django, `frontend/` para Vite).
-- Verifica que Python y Node.js estén instalados correctamente.
-- Comprueba si los puertos 8000 (backend) y 5173 (frontend) están disponibles. Puedes cambiarlos si es necesario (revisa la documentación de Django y Vite).
+## Contact
 
-### Errores de SQL / Base de datos
-- Si encuentras errores de base de datos (SQLite durante el desarrollo), intenta eliminar el archivo `db.sqlite3` en la carpeta `backend/` y vuelve a ejecutar `python manage.py migrate`.
-
-### Visualización del mapa
-- Si el mapa no carga o muestra errores, verifica que el `VITE_MAPBOX_TOKEN` en tu `.env` sea correcto.
-
-## Tecnologías utilizadas
-
-- **Backend**: Django, Django REST Framework, psycopq2-binary (para PostgreSQL)
-- **Frontend**: React, Material-UI, react-map-gl, Mapbox GL JS
-- **IA**: Google Gemini API
-- **Base de datos**: SQLite (desarrollo), PostgreSQL (producción)
-
-## Recursos adicionales
-
-- [Documentación de la API de Gemini](https://ai.google.dev/gemini-api/docs?hl=es-419)
-- [Documentación de Django](https://docs.djangoproject.com/)
-- [Documentación de React](https://react.dev/)
-- [Documentación de Vite](https://vitejs.dev/)
-- [Documentación de Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/api/)
-
-## Contacto
-
-Para reportar problemas o sugerencias, por favor abre un issue en este repositorio de GitHub.
+For reporting problems or suggestions, please open an issue in this GitHub repository.
 
 ---
 
-Desarrollado con ❤️ por el equipo de SkyTerra 
+Developed by the SkyTerra team. 

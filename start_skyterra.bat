@@ -7,7 +7,7 @@ REM Iniciar el Backend
 echo Iniciando el backend...
 REM La opción "start" abre el comando en una nueva ventana y permite que el script continúe.
 REM Usa "cmd /k" para mantener la ventana abierta después de ejecutar el comando.
-start "SkyTerra Backend" cmd /k "cd backend && .venv\Scripts\python.exe manage.py runserver"
+start "SkyTerra Backend" cmd /k "cd backend && .\.venv\Scripts\activate && python manage.py runserver"
 
 REM Dar un momento para que el backend inicie (opcional, ajusta según sea necesario)
 timeout /t 5 /nobreak
