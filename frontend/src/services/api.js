@@ -95,22 +95,25 @@ export const authService = {
   // Iniciar sesión
   async login(credentials) {
     try {
+      console.log('Attempting login with:', { email: credentials.email });
       const response = await api.post('/auth/login/', credentials);
+      console.log('Login successful:', response.data);
+      
       localStorage.setItem('auth_token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     } catch (error) {
       console.error('Error during login:', error);
-      // Si la API no responde, simular sesión con datos de muestra
-      const mockUser = {
-        id: 1,
-        username: 'usuario_demo',
-        email: credentials.email,
-        token: 'sample_token_12345'
-      };
-      localStorage.setItem('auth_token', 'sample_token_12345');
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      return { user: mockUser, token: 'sample_token_12345' };
+      
+      // Lanzar el error real en lugar de simular
+      if (error.response && error.response.data) {
+        const errorMessage = error.response.data.error || 'Error de autenticación';
+        throw new Error(errorMessage);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Error de conexión con el servidor');
+      }
     }
   },
 
@@ -242,17 +245,64 @@ export const propertyService = {
   // Crear una nueva propiedad
   async createProperty(propertyData) {
     try {
-      const response = await api.post('/properties/', propertyData);
+      // Preparar los datos para envío
+      const dataToSend = this.preparePropertyData(propertyData);
+      
+      console.log('Enviando datos de propiedad:', dataToSend);
+      
+      const response = await api.post('/properties/', dataToSend, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Propiedad creada exitosamente:', response.data);
       return response.data;
+      
     } catch (error) {
       console.error('Error creating property:', error);
-      // Simulación para desarrollo
+      
+      // Manejo detallado de errores
+      if (error.response) {
+        const errorData = error.response.data;
+        let errorMessage = 'Error al crear la propiedad';
+        
+        // Si hay errores de validación específicos
+        if (errorData && typeof errorData === 'object') {
+          const fieldErrors = [];
+          
+          // Recopilar errores por campo
+          Object.keys(errorData).forEach(field => {
+            if (Array.isArray(errorData[field])) {
+              fieldErrors.push(`${field}: ${errorData[field].join(', ')}`);
+            } else if (typeof errorData[field] === 'string') {
+              fieldErrors.push(`${field}: ${errorData[field]}`);
+            }
+          });
+          
+          if (fieldErrors.length > 0) {
+            errorMessage = `Errores de validación: ${fieldErrors.join('; ')}`;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+        }
+        
+        // Crear error con mensaje detallado
+        const detailedError = new Error(errorMessage);
+        detailedError.response = error.response;
+        throw detailedError;
+      }
+      
+      // Simulación para desarrollo en caso de error de red
       const newProperty = {
         ...propertyData,
         id: Math.floor(Math.random() * 10000) + 100,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+      console.warn('Usando datos simulados debido a error de red');
       SAMPLE_DATA.results.push(newProperty);
       return newProperty;
     }
@@ -261,10 +311,53 @@ export const propertyService = {
   // Actualizar una propiedad existente
   async updateProperty(id, propertyData) {
     try {
-      const response = await api.put(`/properties/${id}/`, propertyData);
+      // Preparar los datos para envío
+      const dataToSend = this.preparePropertyData(propertyData);
+      
+      console.log('Actualizando propiedad:', id, dataToSend);
+      
+      const response = await api.put(`/properties/${id}/`, dataToSend, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Propiedad actualizada exitosamente:', response.data);
       return response.data;
+      
     } catch (error) {
       console.error(`Error updating property ${id}:`, error);
+      
+      // Manejo detallado de errores similar a createProperty
+      if (error.response) {
+        const errorData = error.response.data;
+        let errorMessage = 'Error al actualizar la propiedad';
+        
+        if (errorData && typeof errorData === 'object') {
+          const fieldErrors = [];
+          
+          Object.keys(errorData).forEach(field => {
+            if (Array.isArray(errorData[field])) {
+              fieldErrors.push(`${field}: ${errorData[field].join(', ')}`);
+            } else if (typeof errorData[field] === 'string') {
+              fieldErrors.push(`${field}: ${errorData[field]}`);
+            }
+          });
+          
+          if (fieldErrors.length > 0) {
+            errorMessage = `Errores de validación: ${fieldErrors.join('; ')}`;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.details) {
+            errorMessage = errorData.details;
+          }
+        }
+        
+        const detailedError = new Error(errorMessage);
+        detailedError.response = error.response;
+        throw detailedError;
+      }
+      
       // Simulación para desarrollo
       const propertyIndex = SAMPLE_DATA.results.findIndex(p => p.id === parseInt(id));
       if (propertyIndex !== -1) {
@@ -273,6 +366,7 @@ export const propertyService = {
           ...propertyData,
           updatedAt: new Date().toISOString()
         };
+        console.warn('Usando datos simulados debido a error de red');
         return SAMPLE_DATA.results[propertyIndex];
       }
       throw error;
@@ -290,6 +384,67 @@ export const propertyService = {
       SAMPLE_DATA.results = SAMPLE_DATA.results.filter(p => p.id !== parseInt(id));
       return { success: true };
     }
+  },
+
+  // Método auxiliar para preparar datos de propiedad
+  preparePropertyData(propertyData) {
+    const prepared = { ...propertyData };
+    
+    // Asegurar que boundary_polygon sea JSON string si es un objeto
+    if (prepared.boundary_polygon && typeof prepared.boundary_polygon === 'object') {
+      prepared.boundary_polygon = JSON.stringify(prepared.boundary_polygon);
+    }
+    
+    // Convertir números a tipos correctos
+    if (prepared.price !== undefined && prepared.price !== null) {
+      prepared.price = parseFloat(prepared.price);
+    }
+    
+    if (prepared.size !== undefined && prepared.size !== null) {
+      prepared.size = parseFloat(prepared.size);
+    }
+    
+    if (prepared.latitude !== undefined && prepared.latitude !== null && prepared.latitude !== '') {
+      prepared.latitude = parseFloat(prepared.latitude);
+    } else {
+      prepared.latitude = null;
+    }
+    
+    if (prepared.longitude !== undefined && prepared.longitude !== null && prepared.longitude !== '') {
+      prepared.longitude = parseFloat(prepared.longitude);
+    } else {
+      prepared.longitude = null;
+    }
+    
+    // Mapear campos del frontend al backend
+    if (prepared.propertyType) {
+      prepared.type = prepared.propertyType;
+      delete prepared.propertyType;
+    }
+    
+    if (prepared.hasWater !== undefined) {
+      prepared.has_water = prepared.hasWater;
+      delete prepared.hasWater;
+    }
+    
+    if (prepared.hasViews !== undefined) {
+      prepared.has_views = prepared.hasViews;
+      delete prepared.hasViews;
+    }
+    
+    // Limpiar campos que no son necesarios para el backend
+    delete prepared.images;
+    delete prepared.existingImageUrls;
+    delete prepared.imagesToDelete;
+    delete prepared.tour360;
+    delete prepared.existingTourUrl;
+    delete prepared.tourToDelete;
+    delete prepared.address;
+    delete prepared.city;
+    delete prepared.state;
+    delete prepared.country;
+    
+    return prepared;
   }
 };
 

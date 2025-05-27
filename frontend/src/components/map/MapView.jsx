@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef } from 'react';
-import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert } from '@mui/material';
+import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab } from '@mui/material';
 import { propertyService, tourService } from '../../services/api';
-import Map, { Marker, NavigationControl, Popup, Source, Layer, AttributionControl } from 'react-map-gl';
+import Map, { NavigationControl, Popup, Source, Layer, AttributionControl } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import TerrainIcon from '@mui/icons-material/Terrain';
-import View3dIcon from '@mui/icons-material/ViewInAr';
-import NorthIcon from '@mui/icons-material/Navigation';
 import EditIcon from '@mui/icons-material/Edit';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
 import PropertyBoundaryDraw from './PropertyBoundaryDraw';
 import { useNavigate } from 'react-router-dom';
 import { ThemeModeContext } from '../../App';
@@ -29,66 +27,64 @@ const propertiesToGeoJSON = (properties) => ({
   }))
 });
 
-const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, initialViewState, initialGeoJsonBoundary }, ref) => {
+const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad }, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
   // Estados
   const [properties, setProperties] = useState([]);
-  const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); // NEW: GeoJSON state
+  const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [viewState, setViewState] = useState(initialViewState || {
-    longitude: -70.6693,
-    latitude: -33.4489,
-    zoom: 3,
-    pitch: 45, // SIEMPRE EN 3D - Ángulo de inclinación por defecto
-    bearing: 0, // Rotación del mapa
-  });
+
+  // Vista inicial del mapa: Movimiento libre desde el centro del globo
+  const initialMapViewState = {
+    longitude: 0, // Centro del mundo
+    latitude: 20, // Ligeramente al norte para mejor vista del globo
+    zoom: 1.2,    // Zoom para ver el globo completo
+    pitch: 0,     // Sin pitch inicial para movimiento libre
+    bearing: 0,   // Sin bearing inicial
+  };
+
+  const [viewState, setViewState] = useState(propInitialViewState || initialMapViewState);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
-  const [is3dEnabled, setIs3dEnabled] = useState(true); // SIEMPRE ACTIVADO POR DEFECTO
   const [isDrawingMode, setIsDrawingMode] = useState(editable);
   const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
+  const [autoFlyCompleted, setAutoFlyCompleted] = useState(false);
   const mapRef = useRef(null);
 
-  // Define map styles
-  const mapStyles = config.mapbox.styles;
-
-  const [currentMapStyle, setCurrentMapStyle] = useState(mapStyles[mode]);
-
-  // Update map style when theme mode changes
+  const mapStyle = config.mapbox.style;
+  
   useEffect(() => {
-    setCurrentMapStyle(mapStyles[mode]);
-    // react-map-gl will handle the mapStyle prop change and trigger Mapbox's default transition
-  }, [mode]);
+    console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
+  }, []);
 
-  // Cargar propiedades y transformar a GeoJSON
   useEffect(() => {
     const fetchProperties = async () => {
       try {
         setLoading(true);
-        const params = { ...filters }; // Ensure filters is an object
+        const params = { ...filters }; 
         const data = await propertyService.getProperties(params);
         const activeProperties = data.results || [];
         setProperties(activeProperties);
-        setPropertiesGeoJSON(propertiesToGeoJSON(activeProperties)); // NEW: Update GeoJSON
+        setPropertiesGeoJSON(propertiesToGeoJSON(activeProperties)); 
         setLoading(false);
       } catch (err) {
         console.error('Error al cargar propiedades:', err);
         setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
         setProperties([]);
-        setPropertiesGeoJSON(propertiesToGeoJSON([])); // NEW: Clear GeoJSON on error
+        setPropertiesGeoJSON(propertiesToGeoJSON([])); 
         setLoading(false);
       }
     };
 
-    if (!editable) { // Only fetch and display multiple properties if not in pure editable mode
+    if (!editable) { 
         fetchProperties();
     }
      else {
-        setLoading(false); // If editable, don't load all properties unless specifically handled
+        setLoading(false); 
         setProperties([]);
         setPropertiesGeoJSON(propertiesToGeoJSON([]));
     }
@@ -115,14 +111,13 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
     mapRef.current.flyTo({
       center: [targetLongitude, targetLatitude],
-      zoom: 15, // Zoom in closer to the property
-      pitch: 45, // Angle the view
+      zoom: 15, 
+      pitch: 60, // Mantener pitch 3D
       bearing: viewState.bearing,
-      duration: 2500, // Duration of the flight animation in milliseconds
+      duration: 2500, 
       essential: true,
     });
 
-    // Wait for the flyTo animation to be substantially complete
     setTimeout(async () => {
       try {
         const tourData = await tourService.getTours(property.id);
@@ -131,15 +126,12 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           localStorage.setItem('directTourNavigation', 'true');
           navigate(`/tour/${firstTourId}`);
         } else {
-          // If no tour, navigate to property details page or show a message
-          // For now, let's assume we always want to try to show a tour or property details
-          // You might want to navigate to a property detail page if no tour is found
           setSnackbar({
             open: true,
             message: 'No hay tours 360° disponibles para esta propiedad.',
             severity: 'info'
           });
-          navigate(`/property/${property.id}`); // Fallback to property details
+          navigate(`/property/${property.id}`); 
         }
       } catch (error) {
         console.error('Error fetching tours or navigating:', error);
@@ -148,16 +140,13 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           message: 'Error al cargar el tour o detalles de la propiedad.',
           severity: 'error'
         });
-        // Optionally navigate to property details on error too
         navigate(`/property/${property.id}`);
       } finally {
-        // Reset navigation state after a delay to allow page transition
         setTimeout(() => setNavigatingToTour(false), 500);
       }
-    }, 2600); // Start loading tour data slightly after flyTo animation starts
+    }, 2600); 
   };
 
-  // Gestionar el evento de hover sobre marcadores
   const handleMarkerHover = (property) => {
     setPopupInfo(property);
     clearTimeout(window.tooltipHideTimeout);
@@ -166,24 +155,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const handleMarkerLeave = () => {
     window.tooltipHideTimeout = setTimeout(() => {
       setPopupInfo(null);
-    }, 100); // Slightly longer delay to allow moving mouse into popup if desired
-  };
-
-  const toggle3DMode = () => {
-    setIs3dEnabled(!is3dEnabled);
-    setViewState({
-      ...viewState,
-      pitch: !is3dEnabled ? 45 : 0, // Si activamos 3D, inclinar la vista
-      transitionDuration: 1500,
-    });
-  };
-
-  const resetNorth = () => {
-    setViewState({
-      ...viewState,
-      bearing: 0,
-      transitionDuration: 1000,
-    });
+    }, 100); 
   };
 
   const toggleDrawingMode = () => {
@@ -199,44 +171,194 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
   const handleBoundariesUpdate = (boundaries) => {
     setPropertyBoundaries(boundaries);
-    // Pasar los límites al componente padre si existe onBoundariesUpdate
     if (onBoundariesUpdate) {
       onBoundariesUpdate(boundaries);
     }
     console.log('Boundaries updated:', boundaries);
   };
 
+  // Países y sus recorridos de vuelo
+  const countryFlightPaths = {
+    chile: [
+      { center: [-70.6693, -33.4489], zoom: 6, pitch: 45, bearing: 0 }, // Santiago
+      { center: [-72.6927, -45.4023], zoom: 7, pitch: 50, bearing: 30 }, // Aysén
+      { center: [-72.9895, -41.3139], zoom: 8, pitch: 55, bearing: 60 }, // Puerto Varas
+      { center: [-73.2459, -39.8142], zoom: 7, pitch: 45, bearing: 90 }, // Valdivia
+      { center: [-70.9171, -53.1638], zoom: 6, pitch: 40, bearing: 120 }, // Punta Arenas
+    ],
+    usa: [
+      { center: [-95.7129, 37.0902], zoom: 4, pitch: 30, bearing: 0 }, // Centro USA
+      { center: [-119.7871, 36.7783], zoom: 6, pitch: 45, bearing: 45 }, // California
+      { center: [-105.0178, 39.7392], zoom: 6, pitch: 50, bearing: 90 }, // Colorado
+      { center: [-87.6298, 41.8781], zoom: 7, pitch: 45, bearing: 135 }, // Chicago
+    ],
+    default: [
+      { center: [0, 20], zoom: 2, pitch: 30, bearing: 0 },
+      { center: [-70, -30], zoom: 4, pitch: 45, bearing: 60 },
+      { center: [120, 30], zoom: 4, pitch: 40, bearing: 120 },
+    ]
+  };
+
+  // Función para determinar el país basado en la ubicación
+  const getCountryFromCoords = (lat, lon) => {
+    // Chile: latitud aproximada -17 a -56, longitud -66 a -75
+    if (lat >= -56 && lat <= -17 && lon >= -75 && lon <= -66) {
+      return 'chile';
+    }
+    // USA: latitud aproximada 25 a 49, longitud -125 a -66
+    if (lat >= 25 && lat <= 49 && lon >= -125 && lon <= -66) {
+      return 'usa';
+    }
+    return 'default';
+  };
+
+  // Función para realizar vuelo automático inicial
+  const performAutoFlight = (userCountry = 'default') => {
+    if (!mapRef.current || autoFlyCompleted) return;
+
+    const flightPath = countryFlightPaths[userCountry];
+    let currentStep = 0;
+
+    const flyToNextPoint = () => {
+      if (currentStep >= flightPath.length) {
+        setAutoFlyCompleted(true);
+        return;
+      }
+
+      const point = flightPath[currentStep];
+      mapRef.current.flyTo({
+        ...point,
+        duration: currentStep === 0 ? 3000 : 4000, // Primer vuelo más rápido
+        essential: true,
+      });
+
+      currentStep++;
+      
+      // Continuar al siguiente punto después de un delay
+      setTimeout(() => {
+        flyToNextPoint();
+      }, currentStep === 1 ? 3500 : 4500); // Timing ajustado
+    };
+
+    // Empezar el vuelo después de un pequeño delay
+    setTimeout(() => {
+      flyToNextPoint();
+    }, 1500);
+  };
+
+  // Detectar ubicación del usuario y comenzar vuelo automático
+  useEffect(() => {
+    if (!autoFlyCompleted && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const userCountry = getCountryFromCoords(latitude, longitude);
+          console.log(`Ubicación detectada: ${userCountry} (${latitude}, ${longitude})`);
+          performAutoFlight(userCountry);
+        },
+        (error) => {
+          console.log('No se pudo obtener ubicación, usando vuelo por defecto');
+          performAutoFlight('default');
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 300000 // 5 minutos
+        }
+      );
+    } else if (!autoFlyCompleted) {
+      // Si no hay geolocalización, usar vuelo por defecto
+      performAutoFlight('default');
+    }
+  }, []); // Solo ejecutar una vez al montar
+
+  // Función para ir a la ubicación actual del usuario (botón manual)
+  const handleGoToMyLocation = () => {
+    if (!navigator.geolocation) {
+      setSnackbar({
+        open: true,
+        message: 'La geolocalización no está soportada en este navegador.',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: [longitude, latitude],
+            zoom: 12,
+            pitch: 45,
+            bearing: 0,
+            duration: 2000,
+            essential: true,
+          });
+        }
+        setSnackbar({
+          open: true,
+          message: 'Te llevé a tu ubicación actual',
+          severity: 'success'
+        });
+      },
+      (error) => {
+        console.error('Error obteniendo ubicación:', error);
+        setSnackbar({
+          open: true,
+          message: 'No se pudo obtener tu ubicación. Verifica los permisos.',
+          severity: 'error'
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    );
+  };
+
   const onMapLoad = () => {
     if (mapRef.current) {
       const map = mapRef.current.getMap();
+      console.log('🗺️ Mapa cargado, configurando...');
       
-      // SIEMPRE habilitar terreno 3D cuando el mapa se carga
-      if (map.getTerrain) {
-        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+      // El terreno 3D se configura directamente en el estilo del mapa (skyTerraCustomStyle)
+      // No es necesario map.setTerrain aquí si ya está en el estilo.
+      // Asegurarse que 'mapbox-dem' esté en las fuentes del estilo.
+      if (map.getSource('mapbox-dem') && map.getTerrain() === null) {
+         console.log('Aplicando configuración de terreno desde el estilo...');
+         // Esto podría ser redundante si el estilo lo define bien.
+         map.setTerrain({ source: 'mapbox-dem', exaggeration: config.mapbox.styles.dark.terrain.exaggeration || 1.5 });
+      } else if (!map.getSource('mapbox-dem')){
+         console.warn("⚠️ Fuente 'mapbox-dem' no encontrada en el estilo al cargar.")
       }
       
       map.on('error', (e) => {
-        console.error('Mapbox GL Error:', e.error ? e.error.message : e);
+        console.error('❌ Mapbox GL Error:', e.error ? e.error.message : e);
+        if (e.error && e.error.message && !e.error.message.includes('terrain')) {
+          console.error('Error crítico de Mapbox:', e.error);
+        }
       });
-    }
-  };
 
-  // Mantener terreno 3D siempre activado
-  useEffect(() => {
-    if (mapRef.current) {
-      const map = mapRef.current.getMap();
-      if (map.getTerrain) {
-        // SIEMPRE mantener el terreno 3D activado
-        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+      map.on('sourcedata', (e) => {
+        if (e.sourceId === 'composite' && e.isSourceLoaded) {
+          console.log('✅ Fuente composite cargada');
+        }
+        if (e.sourceId === 'mapbox-dem' && e.isSourceLoaded) {
+          console.log('✅ Fuente de terreno cargada');
+        }
+      });
+
+      console.log('✅ Configuración del mapa completada');
+      
+      // Llamar al callback externo si existe
+      if (onLoad) {
+        onLoad();
       }
     }
-  }, [is3dEnabled]); // Mantener la dependencia pero siempre activar
-
-  // Estilos para el twinkle de estrellas en vista de globo
-  // Eliminado para remover el fondo de estrellas completamente
-  const twinkleKeyframes = ``;
-
-  // Inside the MapView component, add this function to render property boundaries
+  };
+  
   const renderPropertyBoundaries = (property) => {
     if (property && property.boundary_polygon && property.boundary_polygon.coordinates) {
       return (
@@ -274,7 +396,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     return null;
   };
 
-  // NEW: Layer definitions for clusters and points
   const clusterLayer = {
     id: 'clusters',
     type: 'circle',
@@ -284,20 +405,20 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       'circle-color': [
         'step',
         ['get', 'point_count'],
-        '#51bbd6', // Blue, 100 points
+        '#51bbd6', 
         100,
-        '#f1f075', // Yellow, 750 points
+        '#f1f075', 
         750,
-        '#f28cb1'  // Pink
+        '#f28cb1'  
       ],
       'circle-radius': [
         'step',
         ['get', 'point_count'],
-        20, // 20px radius for <100 points
+        20, 
         100,
-        30, // 30px radius for 100-750 points
+        30, 
         750,
-        40  // 40px radius for >750 points
+        40  
       ]
     }
   };
@@ -319,7 +440,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
   const unclusteredPointLayer = {
     id: 'unclustered-point',
-    type: 'circle', // Or symbol if using icons from sprite
+    type: 'circle', 
     source: 'properties-source',
     filter: ['!', ['has', 'point_count']],
     paint: {
@@ -330,11 +451,10 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     }
   };
   
-  // NEW: Click handler for map features (clusters or points)
   const onMapClick = useCallback(event => {
     if (navigatingToTour) return;
     const features = mapRef.current.queryRenderedFeatures(event.point, {
-      layers: [unclusteredPointLayer.id, clusterLayer.id] // Check unclustered first
+      layers: [unclusteredPointLayer.id, clusterLayer.id] 
     });
 
     if (features && features.length > 0) {
@@ -356,7 +476,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     }
   }, [navigatingToTour, handleMarkerClick]);
 
-  // NEW: Hover handler for unclustered points to show popups
   const onMapMouseMove = useCallback(event => {
     if (mapRef.current) {
       const features = mapRef.current.queryRenderedFeatures(event.point, {
@@ -365,9 +484,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       mapRef.current.getCanvas().style.cursor = features && features.length > 0 ? 'pointer' : '';
       if (features && features.length > 0) {
         const feature = features[0];
-        // Create a popupInfo object similar to what was used before
-        // feature.properties should contain all original property data
-        // feature.geometry.coordinates will give [lng, lat]
         setPopupInfo({
           ...feature.properties,
           longitude: feature.geometry.coordinates[0],
@@ -377,7 +493,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         setPopupInfo(null);
       }
     }
-  }, []); // No complex dependencies, safe for useCallback
+  }, []); 
 
   const onMapMouseLeave = useCallback(() => {
     if (mapRef.current) {
@@ -386,7 +502,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     setPopupInfo(null);
   }, []);
 
-  // Exponer la instancia del mapa para el componente padre
   useImperativeHandle(ref, () => ({
     getMap: () => {
       return mapRef.current ? mapRef.current.getMap() : null;
@@ -399,66 +514,106 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   }));
 
   return (
-    <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
-      {/* Estilos para animación de estrellas - eliminados */}
-      
+    <Box sx={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}> {/* Mapa ocupa toda la pantalla y está detrás */}
       {loading && !error && (
         <Box sx={{
-          position: 'absolute', // Position over the map
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
+          position: 'absolute', 
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           display: 'flex',
-          justifyContent: 'center',
+          flexDirection: 'column',
           alignItems: 'center',
-          // backgroundColor: 'rgba(255, 255, 255, 0.0)', // Make background fully transparent
-          zIndex: 5, // Ensure it's above the map but below controls
+          zIndex: 10, // Asegurar que esté sobre el mapa
         }}>
           <CircularProgress />
-          <Typography sx={{ ml: 2 }}>Cargando propiedades...</Typography>
+          <Typography sx={{ mt: 2, color: 'white' /* O color del tema */ }}>Cargando propiedades...</Typography>
         </Box>
       )}
       {error && (
-        <Box sx={{ p: 3, backgroundColor: '#ffebee', borderRadius: 1, textAlign: 'center' }}>
-          <Typography color="error">{error}</Typography>
-          <Typography variant="body2">Asegúrese de que el backend (Django) esté funcionando.</Typography>
+        <Box sx={{ 
+            position: 'absolute', 
+            top: '50%', left: '50%', 
+            transform: 'translate(-50%, -50%)', 
+            p: 3, backgroundColor: 'rgba(255, 0, 0, 0.7)', 
+            borderRadius: 1, textAlign: 'center', zIndex: 10 
+        }}>
+          <Typography color="white">{error}</Typography>
+          <Typography variant="body2" color="white">Asegúrese de que el backend (Django) esté funcionando.</Typography>
         </Box>
       )}
       
       {!loading && !error && (
         <Map
           ref={mapRef}
-          {...viewState}
-          onMove={evt => setViewState(evt.viewState)}
+          {...viewState} // Usa el estado de vista que se actualiza
+          onMove={evt => setViewState(evt.viewState)} // Actualiza el estado de vista en movimiento
+          initialViewState={initialMapViewState} // Establece la vista inicial aquí
           onLoad={onMapLoad}
-          mapStyle={currentMapStyle}
+          mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
           style={{ width: '100%', height: '100%' }}
-          attributionControl={false}
-          terrain={{ source: 'mapbox-dem', exaggeration: 1.5 }}
-          projection={viewState.zoom < 4 ? "globe" : "mercator"}
-          onClick={onMapClick} // NEW: Added map click handler for clusters/points
-          interactiveLayerIds={[clusterLayer.id, unclusteredPointLayer.id]} // NEW: Make layers interactive
-          onMouseMove={onMapMouseMove} // NEW: Add mouse move handler for popups
-          onMouseLeave={onMapMouseLeave} // NEW: Add mouse leave handler for popups
+          attributionControl={false} // Se añadirá uno personalizado más abajo o se dejará así por minimalismo
+          projection={{ name: 'globe' }} // Esto ya está en el estilo personalizado
+          onClick={onMapClick} 
+          interactiveLayerIds={[clusterLayer.id, unclusteredPointLayer.id]} 
+          onMouseMove={onMapMouseMove} 
+          onMouseLeave={onMapMouseLeave} 
         >
-          {/* Fuente de datos de elevación para terreno 3D */}
-          <Source
-            id="mapbox-dem"
-            type="raster-dem"
-            url="mapbox://mapbox.mapbox-terrain-dem-v1"
-            tileSize={512}
-            maxzoom={14}
+          {/* La fuente mapbox-dem ya está definida en el estilo personalizado */}
+          
+          {/* Controles de Navegación Estándar Mapbox GL JS */}
+          <NavigationControl 
+            position="bottom-right" // Posición más estándar
+            showCompass={true} // Mostrar brújula
+            showZoom={true} // Mostrar controles de zoom
+            visualizePitch={true} // Mostrar indicador de pitch
+            style={{ 
+                position: 'absolute', 
+                bottom: '30px', 
+                right: '30px', 
+                zIndex: 5 
+            }}
           />
+
+          {/* Botón GPS para ir a mi ubicación */}
+          <Fab
+            size="medium"
+            color="primary"
+            onClick={handleGoToMyLocation}
+            sx={{
+              position: 'absolute',
+              bottom: '110px', // Encima de NavigationControl
+              right: '30px',
+              zIndex: 5,
+              backgroundColor: 'rgba(88, 166, 255, 0.9)',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: 'rgba(88, 166, 255, 1)',
+                transform: 'scale(1.05)',
+              },
+              transition: 'all 0.2s ease-in-out',
+            }}
+            title="Ir a mi ubicación"
+          >
+            <MyLocationIcon />
+          </Fab>
           
-          {/* Control de navegación SIN BRÚJULA */}
-          <NavigationControl position="top-right" showCompass={false} />
+          {/* Atribución personalizada si se desea mantenerla visible de forma discreta */}
+          <AttributionControl 
+            position="bottom-left" 
+            compact={true} 
+            style={{ 
+                position: 'absolute', 
+                bottom: '10px', 
+                left: '10px', 
+                zIndex: 5, 
+                backgroundColor: 'rgba(255,255,255,0.5)', 
+                padding: '2px 5px',
+                borderRadius: '4px'
+            }}
+           />
           
-          {/* Control de atribución personalizado (no eliminamos completamente para cumplir con licencia de Mapbox) */}
-          <AttributionControl position="bottom-right" compact={true} />
-          
-          {/* Herramienta de dibujo de límites de propiedad */}
           {isDrawingMode && mapRef.current && (
             <PropertyBoundaryDraw 
               map={mapRef.current.getMap()} 
@@ -467,15 +622,14 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             />
           )}
           
-          {/* NEW: GeoJSON Source and Layers for clustered properties */}
           {!editable && propertiesGeoJSON && (
             <Source 
               id="properties-source"
               type="geojson"
               data={propertiesGeoJSON}
               cluster={true}
-              clusterMaxZoom={14} // Max zoom to cluster points on
-              clusterRadius={50} // Radius of each cluster when clustering points (defaults to 50)
+              clusterMaxZoom={14} 
+              clusterRadius={50} 
             >
               <Layer {...clusterLayer} />
               <Layer {...clusterCountLayer} />
@@ -483,222 +637,33 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             </Source>
           )}
           
-          {/* Controles 3D y orientación */}
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 100, 
-            right: 16,
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: 2, // Aumentado el espaciado entre controles
-            zIndex: 10
-          }}>
+          {editable && (
             <Paper
               elevation={3}
               sx={{
+                position: 'absolute',
+                bottom: '100px', // Ajustar posición para que no choque con NavigationControl
+                right: '30px',
+                zIndex: 5,
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: 1,
                 overflow: 'hidden',
-                backgroundColor: 'white',
+                backgroundColor: 'rgba(255,255,255,0.8)', // Fondo translúcido
                 border: '1px solid rgba(0,0,0,0.12)'
               }}
             >
               <IconButton 
-                onClick={() => {
-                  // Cambiar entre diferentes ángulos de pitch en lugar de activar/desactivar 3D
-                  const newPitch = viewState.pitch >= 45 ? 60 : viewState.pitch <= 0 ? 45 : 0;
-                  setViewState({
-                    ...viewState,
-                    pitch: newPitch,
-                    transitionDuration: 1000
-                  });
-                }}
+                onClick={toggleDrawingMode}
                 sx={{ 
-                  color: '#4caf50', // SIEMPRE VERDE porque 3D está siempre activo
+                  color: isDrawingMode ? '#4caf50' : 'rgba(0,0,0,0.8)',
                   padding: 1.2
                 }}
-                title="Ajustar ángulo 3D (0°, 45°, 60°)"
+                title={isDrawingMode ? "Terminar dibujo" : "Dibujar límites de propiedad"}
               >
-                <View3dIcon />
+                <EditIcon />
               </IconButton>
             </Paper>
-            
-            <Paper
-              elevation={3}
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                borderRadius: 1,
-                overflow: 'hidden',
-                backgroundColor: 'white',
-                border: '1px solid rgba(0,0,0,0.12)'
-              }}
-            >
-              <IconButton 
-                onClick={() => {
-                  // Ciclar entre ángulos de visión: 0° -> 30° -> 45° -> 60° -> 0°
-                  let newPitch;
-                  if (viewState.pitch <= 0) newPitch = 30;
-                  else if (viewState.pitch <= 30) newPitch = 45;
-                  else if (viewState.pitch <= 45) newPitch = 60;
-                  else newPitch = 0;
-                  
-                  setViewState({
-                    ...viewState,
-                    pitch: newPitch,
-                    transitionDuration: 1000
-                  });
-                }}
-                sx={{ 
-                  color: 'rgba(0,0,0,0.8)', 
-                  padding: 1.2
-                }}
-                title={`Ángulo actual: ${Math.round(viewState.pitch)}° - Click para cambiar`}
-              >
-                <TerrainIcon />
-              </IconButton>
-            </Paper>
-            
-            <Paper
-              elevation={3}
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                borderRadius: 1,
-                overflow: 'hidden',
-                backgroundColor: 'white',
-                border: '1px solid rgba(0,0,0,0.12)'
-              }}
-            >
-              <IconButton 
-                onClick={resetNorth}
-                sx={{ 
-                  color: 'rgba(0,0,0,0.8)',
-                  padding: 1.2
-                }}
-                title="Orientar al norte"
-              >
-                <NorthIcon />
-              </IconButton>
-            </Paper>
-
-            {editable && (
-              <Paper
-                elevation={3}
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRadius: 1,
-                  overflow: 'hidden',
-                  backgroundColor: 'white',
-                  border: '1px solid rgba(0,0,0,0.12)'
-                }}
-              >
-                <IconButton 
-                  onClick={toggleDrawingMode}
-                  sx={{ 
-                    color: isDrawingMode ? '#4caf50' : 'rgba(0,0,0,0.8)',
-                    padding: 1.2
-                  }}
-                  title={isDrawingMode ? "Terminar dibujo" : "Dibujar límites de propiedad"}
-                >
-                  <EditIcon />
-                </IconButton>
-              </Paper>
-            )}
-          </Box>
-
-          {/* Capa para fondo del espacio en vista de globo - DESACTIVADO */}
-          {false && viewState.zoom < 5 && (
-            <>
-              {/* Fondo negro para el espacio */}
-              <Source id="stars-background" type="geojson" data={{
-                type: 'Feature',
-                geometry: {
-                  type: 'Point',
-                  coordinates: [0, 0]
-                }
-              }}>
-                <Layer
-                  id="sky-layer-custom"
-                  type="background"
-                  paint={{
-                    'background-color': '#000012',
-                    'background-opacity': 1
-                  }}
-                  before="mapbox-dem"
-                />
-              </Source>
-
-              {/* Estrellas para vista de globo - con más densidad y variedad */}
-              <Source
-                id="stars-custom"
-                type="geojson"
-                data={{
-                  type: 'FeatureCollection',
-                  features: [
-                    // Estrellas pequeñas (más numerosas)
-                    ...Array.from({ length: 1500 }, () => ({
-                      type: 'Feature',
-                      geometry: {
-                        type: 'Point',
-                        coordinates: [
-                          Math.random() * 360 - 180, 
-                          Math.random() * 180 - 90
-                        ]
-                      },
-                      properties: {
-                        size: Math.random() * 1.5 + 0.5,
-                        className: 'twinkle-star'
-                      }
-                    })),
-                    // Estrellas medianas
-                    ...Array.from({ length: 300 }, () => ({
-                      type: 'Feature',
-                      geometry: {
-                        type: 'Point',
-                        coordinates: [
-                          Math.random() * 360 - 180, 
-                          Math.random() * 180 - 90
-                        ]
-                      },
-                      properties: {
-                        size: Math.random() * 1 + 2,
-                        className: 'twinkle-star'
-                      }
-                    })),
-                    // Estrellas grandes (pocas)
-                    ...Array.from({ length: 50 }, () => ({
-                      type: 'Feature',
-                      geometry: {
-                        type: 'Point',
-                        coordinates: [
-                          Math.random() * 360 - 180, 
-                          Math.random() * 180 - 90
-                        ]
-                      },
-                      properties: {
-                        size: Math.random() * 1 + 3,
-                        className: 'twinkle-star'
-                      }
-                    }))
-                  ]
-                }}
-              >
-                <Layer
-                  id="stars-layer-custom"
-                  type="circle"
-                  paint={{
-                    'circle-radius': ['get', 'size'],
-                    'circle-color': '#ffffff',
-                    'circle-opacity': 0.85,
-                    'circle-blur': 0.4
-                  }}
-                  before="mapbox-dem"
-                />
-              </Source>
-            </>
           )}
 
           {popupInfo && (
@@ -709,14 +674,14 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               closeOnClick={false}
               onClose={() => setPopupInfo(null)}
               anchor="bottom"
-              offset={15} // Adjust offset for circle markers if needed
+              offset={15} 
               maxWidth="300px"
             >
               <Card sx={{ 
                 maxWidth: 280, 
-                backgroundColor: 'background.paper', 
+                backgroundColor: 'rgba(255,255,255,0.9)', // Popup ligeramente translúcido
                 border: 'none', 
-                boxShadow: 'none'
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)' // Sombra más pronunciada
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
                   <CardMedia
@@ -754,14 +719,13 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         </Map>
       )}
 
-      {/* Notificaciones */}
       <Snackbar 
         open={snackbar.open} 
         autoHideDuration={6000} 
         onClose={() => setSnackbar({...snackbar, open: false})}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSnackbar({...snackbar, open: false})} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert onClose={() => setSnackbar({...snackbar, open: false})} severity={snackbar.severity} sx={{ width: '100%', zIndex: 20 /* Sobre otros elementos flotantes */ }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

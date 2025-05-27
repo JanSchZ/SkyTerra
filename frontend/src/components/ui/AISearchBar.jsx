@@ -99,17 +99,14 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
   const [error, setError] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState(null);
-  const [searchType, setSearchType] = useState('mixed'); // 'location', 'properties', 'mixed'
   const theme = useTheme();
 
   const handleInputChange = (e) => {
     setQuery(e.target.value);
-    // Ocultar resultados cuando el usuario empieza a escribir de nuevo
     if (showResults) setShowResults(false);
     if (error) setError(null);
   };
 
-  // Función para buscar coordenadas usando Mapbox Geocoding API
   const searchLocation = async (locationQuery) => {
     try {
       const response = await fetch(
@@ -118,11 +115,7 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
         `types=country,region,district,place,locality,neighborhood,address&` +
         `limit=5`
       );
-      
-      if (!response.ok) {
-        throw new Error('Error en la búsqueda geográfica');
-      }
-      
+      if (!response.ok) throw new Error('Error en la búsqueda geográfica');
       const data = await response.json();
       return data.features || [];
     } catch (error) {
@@ -133,18 +126,14 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
-    
     setLoading(true);
     setError(null);
     setShowResults(false);
-    
     const searchTerm = query.trim().toLowerCase();
-    
+
     try {
-      // 1. Primero verificar ubicaciones predefinidas
       const predefinedLocation = PREDEFINED_LOCATIONS[searchTerm];
       if (predefinedLocation) {
-        // Volar a la ubicación predefinida
         if (onLocationSearch) {
           onLocationSearch({
             center: predefinedLocation.center,
@@ -152,445 +141,256 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
             locationName: predefinedLocation.name
           });
         }
-        
-        setSearchResult({
-          type: 'location',
-          locationName: predefinedLocation.name,
-          coordinates: predefinedLocation.center,
-          interpretation: `Volando a ${predefinedLocation.name}...`
-        });
-        setShowResults(true);
-        setLoading(false);
-        return;
+        setSearchResult({ type: 'location', locationName: predefinedLocation.name, coordinates: predefinedLocation.center, interpretation: `Volando a ${predefinedLocation.name}...` });
+        setShowResults(true); setLoading(false); return;
       }
 
-      // 2. Buscar usando Mapbox Geocoding API
       const geoResults = await searchLocation(searchTerm);
       if (geoResults.length > 0) {
         const firstResult = geoResults[0];
         const center = firstResult.center;
         const placeName = firstResult.place_name || firstResult.text;
-        
-        // Determinar el zoom basado en el tipo de lugar
         let zoom = 12;
         if (firstResult.place_type?.includes('country')) zoom = 5;
         else if (firstResult.place_type?.includes('region')) zoom = 8;
         else if (firstResult.place_type?.includes('district')) zoom = 10;
         else if (firstResult.place_type?.includes('place')) zoom = 11;
         
-        if (onLocationSearch) {
-          onLocationSearch({
-            center: center,
-            zoom: zoom,
-            locationName: placeName
-          });
-        }
-        
-        setSearchResult({
-          type: 'location',
-          locationName: placeName,
-          coordinates: center,
-          interpretation: `Volando a ${placeName}...`,
-          allResults: geoResults.map(result => ({
-            name: result.place_name || result.text,
-            center: result.center,
-            type: result.place_type?.[0] || 'place'
-          }))
-        });
-        setShowResults(true);
-        setLoading(false);
-        return;
+        if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
+        setSearchResult({ type: 'location', locationName: placeName, coordinates: center, interpretation: `Volando a ${placeName}...`, allResults: geoResults.map(r => ({ name: r.place_name || r.text, center: r.center, type: r.place_type?.[0] || 'place' })) });
+        setShowResults(true); setLoading(false); return;
       }
 
-      // 3. Si no es una ubicación, buscar propiedades con IA
-      console.log("Buscando propiedades con IA para:", searchTerm);
-      
-      // Mejorar la llamada a la API para ser más robusta con Gemini
-      const response = await api.post('ai-search/', {
-        current_query: searchTerm, // Usar current_query en lugar de query
-        conversation_history: [] // Historial vacío para búsquedas simples
-      });
-      
-      console.log("Respuesta completa de la API:", response.data);
-      
+      const response = await api.post('ai-search/', { current_query: searchTerm, conversation_history: [] });
       if (response.data && typeof response.data === 'object') {
-        // Verificar si tenemos una respuesta válida del asistente
-        const hasValidAssistantMessage = response.data.assistant_message && 
-                                       typeof response.data.assistant_message === 'string';
-        
-        const hasValidFilters = response.data.suggestedFilters && 
-                              typeof response.data.suggestedFilters === 'object';
+        const hasValidAssistantMessage = response.data.assistant_message && typeof response.data.assistant_message === 'string';
+        const hasValidFilters = response.data.suggestedFilters && typeof response.data.suggestedFilters === 'object';
         
         if (hasValidAssistantMessage || hasValidFilters) {
           const processedResult = {
             type: 'properties',
             assistant_message: response.data.assistant_message || "Búsqueda procesada",
-            suggestedFilters: response.data.suggestedFilters || {
-              propertyTypes: [],
-              priceRange: [null, null],
-              features: [],
-              locations: []
-            },
-            interpretation: response.data.assistant_message || 
-                          response.data.interpretation || 
-                          "Búsqueda de propiedades procesada",
+            suggestedFilters: response.data.suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [] },
+            interpretation: response.data.assistant_message || response.data.interpretation || "Búsqueda de propiedades procesada",
             recommendations: response.data.recommendations || []
           };
-          
           setSearchResult(processedResult);
-          
-          // Pasar los filtros al componente padre si existe
-          if (onSearch && typeof onSearch === 'function') {
-            onSearch({
-              suggestedFilters: processedResult.suggestedFilters,
-              interpretation: processedResult.interpretation,
-              recommendations: processedResult.recommendations
-            });
-          }
-          
+          if (onSearch) onSearch(processedResult);
           setShowResults(true);
         } else {
-          // Si hay un mensaje de error explícito, mostrarlo
-          if (response.data.error) {
-            throw new Error(response.data.error + (response.data.details ? `: ${response.data.details}` : ''));
-          }
-          
-          // Crear una estructura de fallback para evitar crashes
-          const fallbackResult = {
-            type: 'properties',
-            assistant_message: "No se encontraron resultados específicos para tu búsqueda.",
-            suggestedFilters: {
-              propertyTypes: [],
-              priceRange: [null, null],
-              features: [],
-              locations: []
-            },
-            interpretation: "Búsqueda procesada sin resultados específicos",
-            recommendations: []
-          };
-          
-          setSearchResult(fallbackResult);
-          if (onSearch && typeof onSearch === 'function') {
-            onSearch(fallbackResult);
-          }
+          if (response.data.error) throw new Error(response.data.error + (response.data.details ? `: ${response.data.details}` : ''));
+          const fallbackMsg = "No se encontraron ubicaciones ni propiedades específicas para esta búsqueda.";
+          setSearchResult({ type: 'properties', assistant_message: fallbackMsg, suggestedFilters: { propertyTypes: [], priceRange: [null, null], features: [], locations: [] }, interpretation: fallbackMsg, recommendations: [] });
+          if (onSearch) onSearch(searchResult);
           setShowResults(true);
-          setError('No se encontraron ubicaciones ni propiedades específicas para esta búsqueda.');
+          setError(fallbackMsg);
         }
       } else {
         throw new Error('El servidor devolvió una respuesta con formato inválido');
       }
     } catch (err) {
       console.error('Error en la búsqueda:', err);
-      
       let errorMsg = 'Error al realizar la búsqueda. Intente de nuevo.';
-      
       if (err.response?.data) {
         const errorData = err.response.data;
-        
-        if (errorData.error && errorData.details) {
-          errorMsg = `${errorData.error}: ${errorData.details}`;
-        } else if (errorData.error) {
-          errorMsg = errorData.error;
-        } else if (typeof errorData === 'string') {
-          errorMsg = errorData;
-        }
-        
-        // Agregar sugerencias específicas para errores de Gemini
-        if (errorMsg.includes('Gemini') || errorMsg.includes('API key')) {
-          errorMsg += ' Verifique la configuración de la API de Gemini.';
-        }
-        
-        if (errorData.suggestions) {
-          errorMsg += ` ${errorData.suggestions}`;
-        }
+        errorMsg = errorData.error ? (errorData.details ? `${errorData.error}: ${errorData.details}` : errorData.error) : (typeof errorData === 'string' ? errorData : errorMsg);
+        if (errorMsg.includes('Gemini') || errorMsg.includes('API key')) errorMsg += ' Verifique la configuración de la API de Gemini.';
+        if (errorData.suggestions) errorMsg += ` ${errorData.suggestions}`;
       } else if (err.message) {
-        errorMsg = err.message.includes('Network Error') 
-          ? 'Error de conexión. Verifique que el servidor esté funcionando.'
-          : `Error: ${err.message}`;
+        errorMsg = err.message.includes('Network Error') ? 'Error de conexión. Verifique que el servidor esté funcionando.' : `Error: ${err.message}`;
       }
-      
       setError(errorMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    }
-  };
-
-  const handleCloseResults = () => {
-    setShowResults(false);
-  };
+  const handleKeyPress = (e) => { if (e.key === 'Enter') handleSearch(); };
+  const handleCloseResults = () => { setShowResults(false); };
 
   const handleLocationClick = (location) => {
-    if (onLocationSearch) {
-      onLocationSearch({
-        center: location.center,
-        zoom: 12,
-        locationName: location.name
-      });
-    }
+    if (onLocationSearch) onLocationSearch({ center: location.center, zoom: 12, locationName: location.name });
     setShowResults(false);
   };
 
   return (
-    <Box 
-      sx={{ 
-        width: '100%',
-        position: 'relative'
-      }}
-    >
+    <Box sx={{ width: '100%', position: 'relative' }}>
       <TextField
         fullWidth
         variant="outlined"
-        placeholder="Buscar lugares en todo el mundo (ej: New York, Tokyo) o propiedades (ej: granja con agua, rancho barato)..."
+        placeholder="Buscar ubicación o propiedades..."
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
         InputProps={{
           startAdornment: (
-            <InputAdornment position="start">
-              <TravelExploreIcon sx={{ color: 'text.secondary' }} />
+            <InputAdornment position="start" sx={{ ml: 0.5 }}>
+              <TravelExploreIcon sx={{ color: theme.palette.text.secondary, fontSize: '20px' }} />
             </InputAdornment>
           ),
           endAdornment: (
             <InputAdornment position="end">
               {loading ? (
-                <CircularProgress size={24} color="inherit" />
+                <CircularProgress size={22} sx={{color: theme.palette.text.secondary, mr: 0.5}} />
               ) : (
-                <IconButton 
-                  onClick={handleSearch}
-                  disabled={!query.trim()}
-                  color="primary"
-                >
+                <IconButton onClick={handleSearch} disabled={!query.trim()} color="primary" sx={{mr: -0.5}}>
                   <SearchIcon />
                 </IconButton>
               )}
             </InputAdornment>
           ),
           sx: {
-            borderRadius: 2,
-            backgroundColor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-            '&:hover': {
-              backgroundColor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+            backgroundColor: 'transparent',
+            borderRadius: '50px', // Totalmente circular
+            fontSize: '0.95rem',
+            paddingLeft: '12px',
+            paddingRight: '12px',
+            color: theme.palette.text.primary,
+            '&.MuiOutlinedInput-root': {
+                '& fieldset': { 
+                  borderColor: 'transparent',
+                  borderRadius: '50px', // Mantener forma circular en fieldset
+                },
+                '&:hover fieldset': { borderColor: 'transparent' },
+                '&.Mui-focused fieldset': { borderColor: 'transparent', borderWidth: '0px !important' },
             },
-            pr: 1
-          }
-        }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            '& fieldset': {
-              borderColor: 'rgba(0, 0, 0, 0.1)',
+            '& .MuiInputBase-input': {
+                paddingTop: '12px',
+                paddingBottom: '12px',
+                paddingLeft: '8px',
+                paddingRight: '8px',
+                 '&::placeholder': {
+                    color: theme.palette.text.secondary,
+                    opacity: 0.9,
+                    fontWeight: 500,
+                },
             },
-            '&:hover fieldset': {
-              borderColor: 'primary.main',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: 'primary.main',
-            }
           }
         }}
       />
       
-      {/* Mensaje de error */}
       {error && (
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ mt: 1, px: 1 }}>
           <Typography color="error" variant="body2" sx={{ fontSize: '0.8rem' }}>
             {error}
           </Typography>
         </Box>
       )}
       
-      {/* Resultados de la búsqueda - LIMITADO EN ALTURA */}
-      <Collapse in={showResults}>
+      <Collapse in={showResults} timeout={300}>
         <Paper
-          elevation={3}
+          elevation={0}
           sx={{
             position: 'absolute', 
             width: '100%',
-            mt: 1,
-            p: 2,
-            zIndex: 1000,
-            maxHeight: '400px', // LÍMITE DE ALTURA
-            overflowY: 'auto', // SCROLL VERTICAL
-            maxWidth: '600px' // LÍMITE DE ANCHO TAMBIÉN
+            mt: 0.5,
+            backgroundColor: 'rgba(22, 27, 34, 0.9)',
+            backdropFilter: 'blur(8px)',
+            borderRadius: '16px',
+            border: `1px solid ${theme.palette.divider}`,
+            zIndex: 10,
+            maxHeight: 'calc(100vh - 200px)',
+            overflowY: 'auto',
+            boxShadow: theme.shadows[5]
           }}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight="bold">
-              {searchResult?.type === 'location' ? '📍 Ubicación encontrada' : '🤖 Búsqueda IA'}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', pt: 1, pb:0.5, px: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
+            <Typography variant="subtitle2" fontWeight="300" color="text.secondary">
+              {searchResult?.type === 'location' ? 'Ubicación Encontrada' : 'Resultados de Búsqueda IA'}
             </Typography>
-            <IconButton size="small" onClick={handleCloseResults}>
-              <CloseIcon fontSize="small" />
+            <IconButton size="small" onClick={handleCloseResults} sx={{color: theme.palette.text.secondary}}>
+              <CloseIcon fontSize="inherit" />
             </IconButton>
           </Box>
           
-          {searchResult && searchResult.type === 'location' && (
-            <>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {searchResult.interpretation}
-              </Typography>
-              
-              <Box sx={{ mb: 2 }}>
-                <Chip 
-                  label={`📍 ${searchResult.locationName}`}
-                  size="small" 
-                  color="primary"
-                  variant="outlined"
-                />
-              </Box>
-              
-              {/* Mostrar ubicaciones alternativas si las hay - CON LÍMITE */}
-              {searchResult.allResults && searchResult.allResults.length > 1 && (
-                <>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Otras ubicaciones encontradas:
-                  </Typography>
-                  <List dense sx={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {searchResult.allResults.slice(1, 4).map((location, index) => (
-                      <ListItem 
-                        key={index} 
-                        button
-                        onClick={() => handleLocationClick(location)}
-                        sx={{ py: 0.5, px: 1, borderRadius: 1, mb: 0.5 }}
-                      >
-                        <ListItemText 
-                          primary={location.name}
-                          secondary={location.type}
-                          primaryTypographyProps={{ fontSize: '0.9rem' }}
-                          secondaryTypographyProps={{ fontSize: '0.8rem' }}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </>
-              )}
-            </>
-          )}
-
-          {searchResult && searchResult.type === 'properties' && (
-            <>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {searchResult.assistant_message || searchResult.interpretation}
-              </Typography>
-              
-              {/* Mostrar filtros identificados - CON LÍMITE */}
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, maxHeight: '120px', overflowY: 'auto' }}>
-                {searchResult.suggestedFilters?.propertyTypes?.map(type => (
+          <Box sx={{p:1.5}}>
+            {searchResult && searchResult.type === 'location' && (
+              <>
+                <Typography variant="body2" color="text.primary" gutterBottom sx={{fontWeight: 300}}>
+                  {searchResult.interpretation}
+                </Typography>
+                <Box sx={{ mb: 1.5, mt: 0.5 }}>
                   <Chip 
-                    key={type} 
-                    label={type === 'farm' ? 'Granja' : 
-                           type === 'ranch' ? 'Rancho' : 
-                           type === 'forest' ? 'Bosque' : 
-                           type === 'lake' ? 'Con lago' : type} 
-                    size="small" 
+                    icon={<TravelExploreIcon fontSize="small"/>}
+                    label={`${searchResult.locationName}`}
+                    size="medium" 
                     color="primary"
-                    variant="outlined"
+                    sx={{ fontWeight: 400, borderRadius: '8px'}}
                   />
-                ))}
-                
-                {searchResult.suggestedFilters?.priceRange && 
-                  searchResult.suggestedFilters.priceRange[0] !== null && 
-                  searchResult.suggestedFilters.priceRange[1] !== null && (
-                  <Chip 
-                    label={`$${searchResult.suggestedFilters.priceRange[0]?.toLocaleString()} - $${searchResult.suggestedFilters.priceRange[1]?.toLocaleString()}`} 
-                    size="small" 
-                    color="secondary"
-                    variant="outlined"
-                  />
-                )}
-                
-                {searchResult.suggestedFilters?.features?.map(feature => (
-                  <Chip 
-                    key={feature} 
-                    label={feature === 'hasWater' ? 'Agua' : 
-                           feature === 'hasViews' ? 'Vistas' : 
-                           feature === 'has360Tour' ? 'Tour 360°' : feature} 
-                    size="small" 
-                    color="success"
-                    variant="outlined"
-                  />
-                ))}
-              </Box>
-              
-              {/* Mostrar recomendaciones si las hay - CON LÍMITE */}
-              {searchResult.recommendations && searchResult.recommendations.length > 0 && (
-                <>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    🏡 Propiedades encontradas ({searchResult.recommendations.length}):
-                  </Typography>
-                  <List dense sx={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    {searchResult.recommendations.slice(0, 5).map((property, index) => (
-                      <ListItem 
-                        key={property.id || index} 
-                        sx={{ 
-                          py: 1, 
-                          px: 1, 
-                          borderRadius: 1, 
-                          mb: 1,
-                          border: '1px solid rgba(0,0,0,0.1)',
-                          backgroundColor: 'rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        <ListItemText 
-                          primary={
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="subtitle2" fontWeight="bold">
-                                {property.name}
-                              </Typography>
-                              <Chip 
-                                label={property.type === 'farm' ? 'Granja' : 
-                                       property.type === 'ranch' ? 'Rancho' : 
-                                       property.type === 'forest' ? 'Bosque' : 
-                                       property.type === 'lake' ? 'Lago' : property.type} 
-                                size="small" 
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Box>
-                          }
-                          secondary={
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                💰 ${property.price?.toLocaleString()} • 📏 {property.size} ha
-                              </Typography>
-                              {property.has_water && (
-                                <Chip label="💧 Agua" size="small" sx={{ mr: 0.5, mt: 0.5 }} />
-                              )}
-                              {property.has_views && (
-                                <Chip label="🏔️ Vistas" size="small" sx={{ mr: 0.5, mt: 0.5 }} />
-                              )}
-                              {property.description && (
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                  {property.description}
-                                </Typography>
-                              )}
-                              {property.reason && (
-                                <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5, fontStyle: 'italic' }}>
-                                  ✨ {property.reason}
-                                </Typography>
-                              )}
-                            </Box>
-                          }
-                          primaryTypographyProps={{ fontSize: '0.9rem' }}
-                          secondaryTypographyProps={{ fontSize: '0.8rem' }}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                  
-                  {searchResult.fallback && (
-                    <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
-                      ⚠️ Búsqueda básica activada (IA temporalmente no disponible)
+                </Box>
+                {searchResult.allResults && searchResult.allResults.length > 1 && (
+                  <>
+                    <Typography variant="caption" color="text.secondary" sx={{ display:'block', mb: 0.5 }}>
+                      Otras ubicaciones:
                     </Typography>
+                    <List dense sx={{ maxHeight: '180px', overflowY: 'auto', p:0 }}>
+                      {searchResult.allResults.slice(1, 5).map((location, index) => (
+                        <ListItem 
+                          key={index} 
+                          button 
+                          onClick={() => handleLocationClick(location)}
+                          sx={{ py: 0.2, px: 1, borderRadius: 1, mb: 0.5, '&:hover': {backgroundColor: theme.palette.action.hover} }}
+                        >
+                          <ListItemText 
+                            primary={location.name}
+                            secondary={location.type}
+                            primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
+                            secondaryTypographyProps={{ fontSize: '0.75rem' }}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </>
+                )}
+              </>
+            )}
+
+            {searchResult && searchResult.type === 'properties' && (
+              <>
+                <Typography variant="body2" color="text.primary" gutterBottom sx={{fontWeight: 300, mb: 1.5}}>
+                  {searchResult.assistant_message || searchResult.interpretation}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mb: 1.5, maxHeight: '150px', overflowY: 'auto' }}>
+                  {searchResult.suggestedFilters?.propertyTypes?.map(type => (
+                    <Chip key={type} label={type.charAt(0).toUpperCase() + type.slice(1)} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                  ))}
+                  {searchResult.suggestedFilters?.priceRange?.[0] !== null && searchResult.suggestedFilters?.priceRange?.[1] !== null && (
+                    <Chip label={`$${searchResult.suggestedFilters.priceRange[0]?.toLocaleString()} - $${searchResult.suggestedFilters.priceRange[1]?.toLocaleString()}`} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
                   )}
-                </>
-              )}
-            </>
-          )}
+                  {searchResult.suggestedFilters?.features?.map(feature => (
+                    <Chip key={feature} label={feature} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                  ))}
+                  {searchResult.suggestedFilters?.locations?.map(loc => (
+                    <Chip key={loc} label={loc} icon={<TravelExploreIcon fontSize='small'/>} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                  ))}
+                </Box>
+                
+                {searchResult.recommendations && searchResult.recommendations.length > 0 && (
+                    <>
+                        <Typography variant="caption" color="text.secondary" sx={{ display:'block', mb: 0.5 }}>Recomendaciones:</Typography>
+                        <List dense sx={{ maxHeight: '150px', overflowY: 'auto', p:0}}>
+                            {searchResult.recommendations.map((rec, index) => (
+                                <ListItem key={index} sx={{ py: 0.2, px: 1, borderRadius: 1, mb: 0.5}}>
+                                    <ListItemText primary={rec.name || rec} primaryTypographyProps={{ fontSize: '0.85rem'}} />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </>
+                )}
+                <Button 
+                    variant="contained" 
+                    size="small" 
+                    onClick={() => { 
+                        if(onSearch) onSearch(searchResult); 
+                        setShowResults(false); 
+                    }}
+                    sx={{mt:1.5, width:'100%', fontWeight: 400, borderRadius: '12px', textTransform: 'none'}}
+                >
+                    Aplicar Filtros de IA
+                </Button>
+              </>
+            )}
+          </Box>
         </Paper>
       </Collapse>
     </Box>

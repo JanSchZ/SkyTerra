@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Drawer,
+  Paper,
   List,
   ListItem,
   ListItemIcon,
@@ -38,9 +38,8 @@ import AISearchBar from './AISearchBar';
 import CloseIcon from '@mui/icons-material/Close';
 
 // Componente principal de filtros
-const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, externalFilters }) => {
+const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, externalFilters, isMobile, sx }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const initialPriceRange = [0, 500000];
   const initialSizeRange = [0, 200];
@@ -324,336 +323,220 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
   const filterPanelWidth = 280;
 
   const filterContent = (
-    <Box sx={{ 
-      width: isMobile ? '100%' : (open ? filterPanelWidth : 0), // Control width for desktop collapse
-      minWidth: isMobile ? 'auto' : (open ? filterPanelWidth : 0),
-      backgroundColor: 'background.paper',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      borderRight: isMobile ? 'none' : (open ? '1px solid rgba(0, 0, 0, 0.12)' : 'none'),
-      overflow: 'hidden', // Hide content when collapsed
-      transition: 'width 0.3s, min-width 0.3s' // Smooth transition for collapse
-    }}>
-      {/* Nuevo Header del Panel de Filtros */}
-      <Box sx={{ 
-        p: 2, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', // Espacio entre icono/título y botón de cerrar
-        borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-           {/* Icono de Filtros (sin texto) - ELIMINADO */}
-          {/* <FilterListIcon sx={{ mr: 1 }} /> */}
-          {/* El texto "FILTROS" ha sido removido intencionalmente */}
-        </Box>
-       
-        {/* Botón de cerrar para desktop ELIMINADO */}
-        {/* !isMobile && (
-          <IconButton onClick={onClose} size="small">
+    <Paper 
+        elevation={isMobile ? 0 : 16}
+        sx={{
+            ...(isMobile ? {
+                height: '100vh',
+                width: '100vw',
+                borderRadius: 0,
+            } : {
+                maxHeight: 'calc(100vh - 120px)',
+                borderRadius: '20px',
+            }),
+            backgroundColor: 'rgba(22, 27, 34, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(88, 166, 255, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
+            ...sx,
+        }}
+    >
+      {isMobile && (
+        <Box 
+          sx={{ 
+            p: 1.5, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            backgroundColor: 'rgba(13, 17, 23, 0.9)',
+          }}
+        >
+          <Typography variant="h6" sx={{fontWeight: '300', letterSpacing: '0.5px'}}>Filtros</Typography>
+          <IconButton onClick={onClose} size="medium">
             <CloseIcon />
           </IconButton>
-        ) */}
+        </Box>
+      )}
+
+      <Box sx={{ px: isMobile ? 1.5 : 2.5, py: isMobile ? 1 : 2, flex: 1, overflowY: 'auto' }}>
+        <Accordion defaultExpanded={isMobile} sx={accordionStyles(theme)}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={accordionSummaryStyles}>
+            <HomeWorkIcon sx={{ mr: 1.5, color: theme.palette.text.secondary }} />
+            <Typography>Tipo de Propiedad</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0, pb: 1 }}>
+            <FormGroup>
+              {Object.entries(propertyTypes).map(([key, value]) => (
+                <FormControlLabel
+                  key={key}
+                  control={
+                    <Checkbox checked={value} onChange={handlePropertyTypeChange} name={key} size="small"/>
+                  }
+                  label={key.charAt(0).toUpperCase() + key.slice(1)}
+                  sx={{mb: -0.5}}
+                />
+              ))}
+            </FormGroup>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion defaultExpanded={isMobile} sx={accordionStyles(theme)}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={accordionSummaryStyles}>
+            <AttachMoneyIcon sx={{ mr: 1.5, color: theme.palette.text.secondary }} />
+            <Typography>Precio</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{px: 1, pt: 0.5}}>
+            <Slider
+              value={priceRange}
+              onChange={handlePriceSliderChange}
+              onChangeCommitted={handlePriceSliderChangeCommitted}
+              valueLabelDisplay="auto"
+              getAriaLabel={() => 'Rango de precios'}
+              min={0}
+              max={5000000}
+              step={10000}
+              valueLabelFormat={priceValueFormat}
+              sx={{ mt: 1, mb: 1.5, mx: 0.5, width: 'calc(100% - 8px)' }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, mb: 1 }}>
+              <TextField 
+                label="Mín."
+                name="min"
+                value={priceInput.min}
+                onChange={handlePriceInputChange}
+                onBlur={applyPriceInputChanges}
+                onKeyDown={(e) => e.key === 'Enter' && applyPriceInputChanges()}
+                size="small" type="number" variant="outlined"
+              />
+              <TextField 
+                label="Máx."
+                name="max"
+                value={priceInput.max}
+                onChange={handlePriceInputChange}
+                onBlur={applyPriceInputChanges}
+                onKeyDown={(e) => e.key === 'Enter' && applyPriceInputChanges()}
+                size="small" type="number" variant="outlined"
+              />
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion defaultExpanded={false} sx={accordionStyles(theme)}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={accordionSummaryStyles}>
+            <StraightenIcon sx={{ mr: 1.5, color: theme.palette.text.secondary }} />
+            <Typography>Tamaño (hectáreas)</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{px: 1, pt: 0.5}}>
+            <Slider
+              value={sizeRange}
+              onChange={handleSizeSliderChange}
+              onChangeCommitted={handleSizeSliderChangeCommitted}
+              valueLabelDisplay="auto"
+              getAriaLabel={() => 'Rango de tamaños'}
+              min={0}
+              max={10000}
+              step={50}
+              valueLabelFormat={sizeValueFormat}
+              sx={{ mt: 1, mb: 1.5, mx: 0.5, width: 'calc(100% - 8px)' }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, mb: 1 }}>
+              <TextField 
+                label="Mín."
+                name="min"
+                value={sizeInput.min}
+                onChange={handleSizeInputChange}
+                onBlur={applySizeInputChanges}
+                onKeyDown={(e) => e.key === 'Enter' && applySizeInputChanges()}
+                size="small" type="number" variant="outlined"
+              />
+              <TextField 
+                label="Máx."
+                name="max"
+                value={sizeInput.max}
+                onChange={handleSizeInputChange}
+                onBlur={applySizeInputChanges}
+                onKeyDown={(e) => e.key === 'Enter' && applySizeInputChanges()}
+                size="small" type="number" variant="outlined"
+              />
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion defaultExpanded={false} sx={accordionStyles(theme)}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={accordionSummaryStyles}>
+            <TuneIcon sx={{ mr: 1.5, color: theme.palette.text.secondary }} />
+            <Typography>Características</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0, pb: 1 }}>
+            <FormGroup>
+              <FormControlLabel
+                control={<Checkbox checked={features.hasWater} onChange={handleFeatureChange} name="hasWater" size="small"/>}
+                label="Acceso a Agua"
+                sx={{mb: -0.5}}
+              />
+              <FormControlLabel
+                control={<Checkbox checked={features.hasViews} onChange={handleFeatureChange} name="hasViews" size="small"/>}
+                label="Vistas Panorámicas"
+                sx={{mb: -0.5}}
+              />
+              <FormControlLabel
+                control={<Checkbox checked={features.has360Tour} onChange={handleFeatureChange} name="has360Tour" size="small"/>}
+                label="Tour 360° Disponible"
+                sx={{mb: -0.5}}
+              />
+            </FormGroup>
+          </AccordionDetails>
+        </Accordion>
       </Box>
 
-      {/* Panel de filtros tradicionales */}
-      {/* Se muestra siempre si el panel está abierto (open es true en desktop) */}
-      <Box
-        role="tabpanel"
-        // hidden={searchTab !== 0} // No longer needed
-        id="tabpanel-filters"
-        aria-labelledby="tab-filters"
-        sx={{ 
-          flex: 1, 
-          display: 'flex', // Always flex if panel is open
-          flexDirection: 'column',
-          opacity: open ? 1 : 0, // Fade content during collapse
-          transition: 'opacity 0.2s linear'
-        }}
-      >
-        {/* Header con ícono y texto "FILTROS" eliminado */}
-        {/* Eliminamos el Box que contenía el ícono y el texto "FILTROS" */}
-        
-        <Box sx={{ px: 2, flex: 1, overflowY: 'auto' }}>
-          {/* Tipo de Propiedad */}
-          <Accordion 
-            defaultExpanded={false}
-            sx={{ 
-              bgcolor: 'background.paper',
-              '&:before': { display: 'none' }, 
-              boxShadow: 'none',
-              borderRadius: 2,
-              mb: 1
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ 
-                py: 0,
-                '& .MuiAccordionSummary-content': {
-                  my: 1
-                }
-              }}
-            >
-              <HomeWorkIcon sx={{ mr: 1 }} />
-              <Typography>Property Type</Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ pt: 0 }}>
-              <FormGroup>
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={propertyTypes.farm} 
-                      onChange={handlePropertyTypeChange} 
-                      name="farm" 
-                    />
-                  }
-                  label="Farm"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={propertyTypes.ranch} 
-                      onChange={handlePropertyTypeChange} 
-                      name="ranch" 
-                    />
-                  }
-                  label="Ranch"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={propertyTypes.forest} 
-                      onChange={handlePropertyTypeChange} 
-                      name="forest" 
-                    />
-                  }
-                  label="Forest"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={propertyTypes.lake} 
-                      onChange={handlePropertyTypeChange} 
-                      name="lake" 
-                    />
-                  }
-                  label="Lake access"
-                />
-              </FormGroup>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* Precio */}
-          <Accordion 
-            defaultExpanded={false}
-            sx={{ 
-              bgcolor: 'background.paper',
-              '&:before': { display: 'none' }, 
-              boxShadow: 'none',
-              borderRadius: 2,
-              mb: 1
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ 
-                py: 0,
-                '& .MuiAccordionSummary-content': {
-                  my: 1
-                }
-              }}
-            >
-              <AttachMoneyIcon sx={{ mr: 1 }} />
-              <Typography>Price</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ px: 1 }}>
-                <Slider
-                  value={priceRange}
-                  onChange={handlePriceSliderChange}
-                  onChangeCommitted={handlePriceSliderChangeCommitted}
-                  valueLabelDisplay="auto"
-                  getAriaLabel={() => 'Rango de precios'}
-                  min={0}
-                  max={5000000}
-                  step={10000}
-                  valueLabelFormat={priceValueFormat}
-                  sx={{ mb: 1 }}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                  <TextField 
-                    label="Mín Precio"
-                    name="min"
-                    value={priceInput.min}
-                    onChange={handlePriceInputChange}
-                    onBlur={applyPriceInputChanges}
-                    onKeyDown={(e) => e.key === 'Enter' && applyPriceInputChanges()}
-                    size="small"
-                    type="number"
-                  />
-                  <TextField 
-                    label="Máx Precio"
-                    name="max"
-                    value={priceInput.max}
-                    onChange={handlePriceInputChange}
-                    onBlur={applyPriceInputChanges}
-                    onKeyDown={(e) => e.key === 'Enter' && applyPriceInputChanges()}
-                    size="small"
-                    type="number"
-                  />
-                </Box>
-              </Box>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* Tamaño de lote */}
-          <Accordion 
-            defaultExpanded={false}
-            sx={{ 
-              bgcolor: 'background.paper',
-              '&:before': { display: 'none' }, 
-              boxShadow: 'none',
-              borderRadius: 2,
-              mb: 1
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ 
-                py: 0,
-                '& .MuiAccordionSummary-content': {
-                  my: 1
-                }
-              }}
-            >
-              <StraightenIcon sx={{ mr: 1 }} />
-              <Typography>Lot Size</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ px: 1 }}>
-                <Slider
-                  value={sizeRange}
-                  onChange={handleSizeSliderChange}
-                  onChangeCommitted={handleSizeSliderChangeCommitted}
-                  valueLabelDisplay="auto"
-                  getAriaLabel={() => 'Rango de tamaño'}
-                  min={0}
-                  max={1000}
-                  step={10}
-                  valueLabelFormat={sizeValueFormat}
-                  sx={{ mb: 1 }}
-                />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                  <TextField 
-                    label="Mín Ha."
-                    name="min"
-                    value={sizeInput.min}
-                    onChange={handleSizeInputChange}
-                    onBlur={applySizeInputChanges}
-                    onKeyDown={(e) => e.key === 'Enter' && applySizeInputChanges()}
-                    size="small"
-                    type="number"
-                  />
-                  <TextField 
-                    label="Máx Ha."
-                    name="max"
-                    value={sizeInput.max}
-                    onChange={handleSizeInputChange}
-                    onBlur={applySizeInputChanges}
-                    onKeyDown={(e) => e.key === 'Enter' && applySizeInputChanges()}
-                    size="small"
-                    type="number"
-                  />
-                </Box>
-              </Box>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* Otros filtros (agua, vistas, etc.) */}
-          <Accordion 
-            defaultExpanded={false}
-            sx={{ 
-              bgcolor: 'background.paper',
-              '&:before': { display: 'none' }, 
-              boxShadow: 'none',
-              borderRadius: 2,
-              mb: 1
-            }}
-          >
-            <AccordionSummary 
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ 
-                py: 0,
-                '& .MuiAccordionSummary-content': {
-                  my: 1
-                }
-              }}
-            >
-              <TuneIcon sx={{ mr: 1 }} />
-              <Typography>More Filters</Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ pt: 0 }}>
-              <FormGroup>
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={features.hasWater} 
-                      onChange={handleFeatureChange} 
-                      name="hasWater" 
-                      icon={<WaterDropIcon />}
-                      checkedIcon={<WaterDropIcon />}
-                    />
-                  }
-                  label="Water Access"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={features.hasViews} 
-                      onChange={handleFeatureChange}
-                      name="hasViews"
-                      icon={<VisibilityIcon />}
-                      checkedIcon={<VisibilityIcon />}
-                    />
-                  }
-                  label="Panoramic Views"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={features.has360Tour} 
-                      onChange={handleFeatureChange}
-                      name="has360Tour"
-                      icon={<ViewInArIcon />}
-                      checkedIcon={<ViewInArIcon />}
-                    />
-                  }
-                  label="360° Tour Available"
-                />
-              </FormGroup>
-            </AccordionDetails>
-          </Accordion>
-        </Box>
-
-        {/* Botones de acción */}
-        <Box sx={{ 
-          p: 2, 
-          display: 'flex', 
-          justifyContent: 'space-between',
-          borderTop: '1px solid rgba(0, 0, 0, 0.12)'
-        }}>
-          <Button 
-            variant="outlined" 
-            onClick={handleResetFilters}
-            sx={{ flex: 1, mr: 1 }}
-          >
-            Reset
-          </Button>
-        </Box>
+      <Box sx={{ p: 2, borderTop: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.default }}>
+        <Button 
+          fullWidth 
+          variant="contained" 
+          color="primary" 
+          onClick={handleApplyLocalFilters} 
+          sx={{ 
+            mb: 1, 
+            fontWeight: '400', 
+            borderRadius: '12px',
+            textTransform: 'none',
+            letterSpacing: '0.5px',
+            py: 1.2,
+            backgroundColor: 'rgba(88, 166, 255, 0.9)',
+            '&:hover': {
+              backgroundColor: 'rgba(88, 166, 255, 1)',
+              transform: 'translateY(-1px)',
+            }
+          }}
+        >
+          Aplicar Filtros
+        </Button>
+        <Button 
+          fullWidth 
+          variant="outlined" 
+          onClick={handleResetFilters}
+          sx={{
+            borderColor: 'rgba(88, 166, 255, 0.3)', 
+            color: theme.palette.text.secondary,
+            fontWeight: '300',
+            borderRadius: '12px',
+            textTransform: 'none',
+            letterSpacing: '0.5px',
+            py: 1.2,
+            '&:hover': {
+              borderColor: 'rgba(88, 166, 255, 0.5)',
+              backgroundColor: 'rgba(88, 166, 255, 0.05)',
+            }
+          }}
+        >
+          Resetear
+        </Button>
       </Box>
-    </Box>
+    </Paper>
   );
 
   // En dispositivos móviles, mostramos un drawer
@@ -676,13 +559,7 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
           </IconButton>
         </Box>
         
-        <Drawer
-          anchor="left"
-          open={open} // This `open` is for the drawer on mobile
-          onClose={onClose}
-        >
-          {filterContent} 
-        </Drawer>
+        {filterContent} 
       </>
     );
   }
@@ -690,6 +567,32 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
   // En escritorio, mostramos los filtros inline
   // `open` prop for desktop is controlled by App.jsx via NavBar toggle
   return filterContent;
+};
+
+// Estilos comunes para Accordion para mantener consistencia
+const accordionStyles = (theme) => ({
+  bgcolor: 'transparent',
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: '8px !important',
+  boxShadow: 'none',
+  '&:before': { display: 'none' }, 
+  mb: 1.5,
+  '&.Mui-expanded': {
+    margin: 'auto',
+    marginBottom: '12px',
+  }
+});
+
+const accordionSummaryStyles = {
+  py: 0,
+  minHeight: '48px',
+  '& .MuiAccordionSummary-content': {
+    my: '12px',
+    alignItems: 'center',
+  },
+  '& .MuiSvgIcon-root': {
+    fontSize: '1.2rem'
+  }
 };
 
 export default FilterPanel; 

@@ -15,6 +15,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LoginIcon from '@mui/icons-material/Login';
+import CloseIcon from '@mui/icons-material/Close';
 
 // Componente de formulario de inicio de sesión
 export const LoginForm = ({ onLogin, loading, error }) => {
@@ -28,8 +29,8 @@ export const LoginForm = ({ onLogin, loading, error }) => {
   };
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 400, width: '100%', mx: 'auto' }}>
-      <Typography variant="h5" component="h1" align="center" gutterBottom>
+    <Box sx={{ width: '100%' }}>
+      <Typography variant="h5" component="h1" align="center" gutterBottom sx={{ fontWeight: 600 }}>
         Iniciar Sesión
       </Typography>
       
@@ -87,7 +88,7 @@ export const LoginForm = ({ onLogin, loading, error }) => {
           {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
         </Button>
       </Box>
-    </Paper>
+    </Box>
   );
 };
 
@@ -156,8 +157,8 @@ export const RegisterForm = ({ onRegister, loading, error }) => {
   };
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 400, width: '100%', mx: 'auto' }}>
-      <Typography variant="h5" component="h1" align="center" gutterBottom>
+    <Box sx={{ width: '100%' }}>
+      <Typography variant="h5" component="h1" align="center" gutterBottom sx={{ fontWeight: 600 }}>
         Crear Cuenta
       </Typography>
       
@@ -249,7 +250,7 @@ export const RegisterForm = ({ onRegister, loading, error }) => {
           {loading ? 'Registrando...' : 'Registrarse'}
         </Button>
       </Box>
-    </Paper>
+    </Box>
   );
 };
 
@@ -258,8 +259,45 @@ export const AuthPage = ({ onLogin, onRegister, loading, error }) => {
   const [mode, setMode] = useState('login'); // 'login' o 'register'
 
   return (
-    <Box sx={{ py: 4, px: 2 }}>
-      <Paper sx={{ p: 3, maxWidth: 400, width: '100%', mx: 'auto' }}>
+    <Box sx={{ 
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)', // Fondo oscuro semi-transparente
+      backdropFilter: 'blur(10px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 30, // Sobre el mapa y otros elementos
+      py: 4, 
+      px: 2 
+          }}>
+      <Paper sx={{ 
+        p: 4, 
+        maxWidth: 420, 
+        width: '100%', 
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '16px',
+        boxShadow: '0 24px 48px rgba(0, 0, 0, 0.3)',
+        position: 'relative',
+      }}>
+        {/* Botón de cerrar */}
+        <IconButton 
+          onClick={() => window.history.back()}
+          sx={{ 
+            position: 'absolute', 
+            top: 16, 
+            right: 16,
+            color: 'text.secondary',
+            '&:hover': { backgroundColor: 'rgba(0,0,0,0.04)' }
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+        
         {mode === 'login' ? (
           <>
             <LoginForm onLogin={onLogin} loading={loading} error={error} />

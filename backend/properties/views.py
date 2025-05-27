@@ -1,11 +1,10 @@
 from django.shortcuts import render
-from rest_framework import viewsets, filters, permissions
+from rest_framework import viewsets, filters, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Exists, OuterRef
 from rest_framework.views import APIView
-from rest_framework import status
 from django.conf import settings
 import json
 import datetime
@@ -81,7 +80,65 @@ class PropertyViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        """Crear propiedad asignando el owner al usuario autenticado"""
+        try:
+            # Asegurar que el usuario esté autenticado
+            if not self.request.user.is_authenticated:
+                logger.error("Intento de crear propiedad sin autenticación")
+                raise PermissionError("Debe estar autenticado para crear propiedades")
+            
+            # Log de los datos recibidos para debugging
+            logger.info(f"Creando propiedad para usuario: {self.request.user.username}")
+            logger.info(f"Datos recibidos: {serializer.validated_data}")
+            
+            # Guardar con el owner
+            property_instance = serializer.save(owner=self.request.user)
+            logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}")
+            
+        except Exception as e:
+            logger.error(f"Error al crear propiedad: {str(e)}", exc_info=True)
+            raise
+
+    def perform_update(self, serializer):
+        """Actualizar propiedad con validaciones adicionales"""
+        try:
+            # Verificar que el usuario sea el owner de la propiedad
+            instance = self.get_object()
+            if instance.owner != self.request.user and not self.request.user.is_staff:
+                logger.error(f"Usuario {self.request.user.username} intentó editar propiedad {instance.id} sin permisos")
+                raise PermissionError("No tiene permisos para editar esta propiedad")
+            
+            logger.info(f"Actualizando propiedad ID: {instance.id}")
+            logger.info(f"Datos recibidos: {serializer.validated_data}")
+            
+            serializer.save()
+            logger.info(f"Propiedad {instance.id} actualizada exitosamente")
+            
+        except Exception as e:
+            logger.error(f"Error al actualizar propiedad: {str(e)}", exc_info=True)
+            raise
+
+    def create(self, request, *args, **kwargs):
+        """Override create para manejo personalizado de errores"""
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error en create: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Error al crear la propiedad', 'details': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def update(self, request, *args, **kwargs):
+        """Override update para manejo personalizado de errores"""
+        try:
+            return super().update(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error en update: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Error al actualizar la propiedad', 'details': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=False, methods=['get'], url_path='my-properties', permission_classes=[permissions.IsAuthenticated])
     def my_properties(self, request):

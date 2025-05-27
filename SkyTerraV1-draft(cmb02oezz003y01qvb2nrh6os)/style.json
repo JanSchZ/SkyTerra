@@ -1,0 +1,372 @@
+{
+    "version": 8,
+    "name": "SkyTerraV1",
+    "metadata": {
+        "mapbox:autocomposite": true,
+        "mapbox:thumb": "data:image/webp;base64,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",
+        "mapbox:uiParadigm": "layers",
+        "mapbox:sdk-support": {
+            "js": "3.11.0",
+            "android": "11.12.0",
+            "ios": "11.12.0"
+        },
+        "mapbox:uiExpandedImports": [],
+        "mapbox:groups": {
+            "Buildings, built": {"name": "Buildings, built", "collapsed": true},
+            "Buildings, building-labels": {
+                "collapsed": false,
+                "name": "Buildings, building-labels"
+            }
+        },
+        "mapbox:decompiler": {
+            "id": "cmb02oezz003y01qvb2nrh6os",
+            "strata": [
+                {
+                    "id": "cmb02oezz003y01qvb2nrh6os",
+                    "order": [
+                        ["buildings", "built"],
+                        ["buildings", "extruded"],
+                        ["buildings", "building-labels"]
+                    ]
+                }
+            ],
+            "components": {"buildings": "18.0.0"},
+            "propConfig": {"buildings": {}}
+        }
+    },
+    "center": [-34, 38],
+    "zoom": 2,
+    "lights": [
+        {
+            "id": "directional",
+            "type": "directional",
+            "properties": {
+                "direction": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "dawn",
+                    ["literal", [120, 50]],
+                    "day",
+                    ["literal", [180, 20]],
+                    "dusk",
+                    ["literal", [240, 80]],
+                    "night",
+                    ["literal", [270, 20]],
+                    ["literal", [180, 20]]
+                ],
+                "color": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "dawn",
+                    "hsl(33, 98%, 77%)",
+                    "day",
+                    "hsl(0, 0%, 100%)",
+                    "dusk",
+                    "hsl(30, 98%, 76%)",
+                    "night",
+                    "hsl(0, 0%, 29%)",
+                    "hsl(0, 0%, 100%)"
+                ],
+                "intensity": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    12,
+                    [
+                        "match",
+                        ["config", "lightPreset"],
+                        "dawn",
+                        0.5,
+                        "day",
+                        0.2,
+                        "dusk",
+                        0,
+                        "night",
+                        0,
+                        0.2
+                    ],
+                    14,
+                    [
+                        "match",
+                        ["config", "lightPreset"],
+                        "dawn",
+                        0.5,
+                        "day",
+                        0.2,
+                        "dusk",
+                        0.2,
+                        "night",
+                        0.5,
+                        0.2
+                    ]
+                ],
+                "cast-shadows": true
+            }
+        },
+        {
+            "id": "ambient",
+            "type": "ambient",
+            "properties": {
+                "color": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "dawn",
+                    "hsl(28, 98%, 93%)",
+                    "day",
+                    "hsl(0, 0%, 100%)",
+                    "dusk",
+                    "hsl(228, 27%, 29%)",
+                    "night",
+                    "hsl(217, 100%, 11%)",
+                    "hsl(0, 0%, 100%)"
+                ],
+                "intensity": [
+                    "match",
+                    ["config", "lightPreset"],
+                    "dawn",
+                    0.75,
+                    "day",
+                    0.8,
+                    "dusk",
+                    0.8,
+                    "night",
+                    0.5,
+                    0.8
+                ]
+            }
+        }
+    ],
+    "terrain": {
+        "source": "mapbox-dem",
+        "exaggeration": ["interpolate", ["linear"], ["zoom"], 0, 1, 22, 1]
+    },
+    "fog": {
+        "vertical-range": [30, 120],
+        "space-color": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            4,
+            "#010b19",
+            7,
+            "#367ab9"
+        ],
+        "horizon-blend": [
+            "interpolate",
+            ["exponential", 1.2],
+            ["zoom"],
+            5,
+            0.007,
+            7,
+            [
+                "interpolate",
+                ["exponential", 1.2],
+                ["measure-light", "brightness"],
+                0.35,
+                0.03,
+                0.4,
+                0.07,
+                0.45,
+                0.03
+            ]
+        ],
+        "star-intensity": [
+            "interpolate",
+            ["exponential", 1.2],
+            ["zoom"],
+            5,
+            1,
+            7,
+            [
+                "interpolate",
+                ["exponential", 1.2],
+                ["measure-light", "brightness"],
+                0.1,
+                0.2,
+                0.3,
+                0
+            ]
+        ]
+    },
+    "imports": [
+        {
+            "id": "basemap",
+            "url": "mapbox://styles/mapbox/standard-satellite",
+            "config": {
+                "font": "Raleway",
+                "showPlaceLabels": true,
+                "showRoadsAndTransit": true,
+                "showPointOfInterestLabels": true,
+                "showPedestrianRoads": true,
+                "showRoadLabels": true,
+                "colorPlaceLabelHighlight": "hsl(5, 85%, 100%)",
+                "lightPreset": "dawn"
+            }
+        }
+    ],
+    "sources": {
+        "mapbox-dem": {
+            "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+            "type": "raster-dem",
+            "tileSize": 512
+        },
+        "composite": {
+            "url": "mapbox://mapbox.mapbox-streets-v8",
+            "type": "vector"
+        }
+    },
+    "sprite": "mapbox://sprites/janschz/cmb02oezz003y01qvb2nrh6os/draft",
+    "glyphs": "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+    "projection": {"name": "globe"},
+    "layers": [
+        {
+            "id": "building",
+            "type": "fill",
+            "metadata": {
+                "mapbox:featureComponent": "buildings",
+                "mapbox:group": "Buildings, built"
+            },
+            "source": "composite",
+            "source-layer": "building",
+            "minzoom": 15,
+            "filter": [
+                "all",
+                ["!=", ["get", "type"], "building:part"],
+                ["==", ["get", "underground"], "false"]
+            ],
+            "layout": {},
+            "paint": {
+                "fill-color": "rgb(28, 28, 28)",
+                "fill-opacity": [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    15,
+                    0,
+                    16,
+                    1
+                ],
+                "fill-outline-color": "rgba(0, 0, 0, 0.8)"
+            }
+        },
+        {
+            "id": "building-entrance",
+            "type": "symbol",
+            "metadata": {
+                "mapbox:featureComponent": "buildings",
+                "mapbox:group": "Buildings, building-labels"
+            },
+            "source": "composite",
+            "source-layer": "structure",
+            "minzoom": 18,
+            "filter": [
+                "all",
+                ["==", ["get", "class"], "entrance"],
+                [
+                    "step",
+                    ["pitch"],
+                    true,
+                    50,
+                    ["<", ["distance-from-center"], 1],
+                    60,
+                    ["<", ["distance-from-center"], 1.5],
+                    70,
+                    ["<", ["distance-from-center"], 2]
+                ]
+            ],
+            "layout": {
+                "icon-image": "marker",
+                "text-field": ["get", "ref"],
+                "text-size": 10,
+                "text-offset": [0, -0.5],
+                "text-font": ["DIN Pro Italic", "Arial Unicode MS Regular"]
+            },
+            "paint": {
+                "text-color": "rgb(128, 128, 128)",
+                "text-halo-color": "rgb(46, 46, 46)",
+                "text-halo-width": 1,
+                "icon-opacity": 0.4
+            }
+        },
+        {
+            "id": "building-number-label",
+            "type": "symbol",
+            "metadata": {
+                "mapbox:featureComponent": "buildings",
+                "mapbox:group": "Buildings, building-labels"
+            },
+            "source": "composite",
+            "source-layer": "housenum_label",
+            "minzoom": 17,
+            "filter": [
+                "step",
+                ["pitch"],
+                true,
+                50,
+                ["<", ["distance-from-center"], 1],
+                60,
+                ["<", ["distance-from-center"], 1.5],
+                70,
+                ["<", ["distance-from-center"], 2]
+            ],
+            "layout": {
+                "text-field": ["get", "house_num"],
+                "text-font": ["DIN Pro Italic", "Arial Unicode MS Regular"],
+                "text-padding": 4,
+                "text-max-width": 7,
+                "text-size": 10
+            },
+            "paint": {
+                "text-color": "rgb(128, 128, 128)",
+                "text-halo-color": "rgb(46, 46, 46)",
+                "text-halo-width": 1
+            }
+        },
+        {
+            "id": "block-number-label",
+            "type": "symbol",
+            "metadata": {
+                "mapbox:featureComponent": "buildings",
+                "mapbox:group": "Buildings, building-labels"
+            },
+            "source": "composite",
+            "source-layer": "place_label",
+            "minzoom": 16,
+            "filter": [
+                "all",
+                ["==", ["get", "class"], "settlement_subdivision"],
+                ["==", ["get", "type"], "block"],
+                [
+                    "step",
+                    ["pitch"],
+                    true,
+                    50,
+                    ["<", ["distance-from-center"], 1],
+                    60,
+                    ["<", ["distance-from-center"], 1.5],
+                    70,
+                    ["<", ["distance-from-center"], 2]
+                ]
+            ],
+            "layout": {
+                "text-field": ["get", "name"],
+                "text-font": ["DIN Pro Italic", "Arial Unicode MS Regular"],
+                "text-max-width": 7,
+                "text-size": 11
+            },
+            "paint": {
+                "text-color": "rgb(130, 130, 130)",
+                "text-halo-color": "rgb(0, 0, 0)",
+                "text-halo-width": 0.5,
+                "text-halo-blur": 0.5
+            }
+        }
+    ],
+    "created": "2025-05-23T00:38:34.223Z",
+    "modified": "2025-05-23T01:17:28.856Z",
+    "id": "cmb02oezz003y01qvb2nrh6os",
+    "owner": "janschz",
+    "visibility": "private",
+    "protected": false,
+    "draft": true
+}
