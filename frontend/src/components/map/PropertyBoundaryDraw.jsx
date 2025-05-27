@@ -205,6 +205,7 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries }) =
       console.error("Error in calculateArea with turf:", error, "Data:", data?.features?.[0]);
       setArea(0);
       if (onBoundariesUpdate) {
+        onBoundariesUpdate(null);
       }
     }
   };

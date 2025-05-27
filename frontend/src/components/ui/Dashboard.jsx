@@ -12,269 +12,407 @@ import {
   DialogTitle,
   CircularProgress,
   Alert,
-  Tabs,
-  Tab,
+  Container,
   Grid,
-  Avatar,
+  Card,
+  CardContent,
+  CardActions,
+  Fab,
+  Stack,
+  Chip,
   Divider
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import HomeIcon from '@mui/icons-material/Home';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import StraightenIcon from '@mui/icons-material/Straighten';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import TerrainIcon from '@mui/icons-material/Terrain';
 import { propertyService } from '../../services/api';
-import PropertyForm from '../property/PropertyForm';
-import PropertyCard from '../property/PropertyCard';
 import { useNavigate } from 'react-router-dom';
 
-// Panel de propiedades
-function PropertiesPanel({ user }) {
+const Dashboard = ({ user }) => {
   const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editingProperty, setEditingProperty] = useState(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [propertyToDelete, setPropertyToDelete] = useState(null);
-  const [formError, setFormError] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, property: null });
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
     const fetchProperties = async () => {
-      setLoading(true);
-      setError(null);
       try {
+        setLoading(true);
         const data = await propertyService.getUserProperties();
-        setProperties(Array.isArray(data) ? data : (data?.results && Array.isArray(data.results) ? data.results : []));
+        setProperties(Array.isArray(data) ? data : (data?.results || []));
       } catch (err) {
-        console.error('Error al cargar mis propiedades:', err);
-        if (err.response && err.response.status === 401) {
-          setError('Necesitas iniciar sesión para ver tus propiedades. Redirigiendo a login...');
-        } else {
-          setError('No se pudieron cargar tus propiedades en este momento. Intenta nuevamente más tarde.');
-        }
-        setProperties([]);
+        console.error('Error al cargar propiedades:', err);
+        setError('No se pudieron cargar tus propiedades.');
       } finally {
         setLoading(false);
       }
     };
 
-    if (user) {
-      fetchProperties();
-    } else {
-      setLoading(false);
-      setError('No hay usuario autenticado.');
-      setProperties([]);
-    }
+    fetchProperties();
   }, [user, navigate]);
 
-  const handleAddNew = () => {
-    setEditingProperty(null);
-    navigate('/property/create');
-    setFormError(null);
+  const handleDeleteClick = (property) => {
+    setDeleteDialog({ open: true, property });
   };
 
-  const handleEdit = (property) => {
-    navigate(`/property/edit/${property.id}`);
-    setFormError(null);
-  };
-
-  const handleDelete = (property) => {
-    setPropertyToDelete(property);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!propertyToDelete) return;
-    setSubmitting(true);
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.property) return;
+    
+    setDeleting(true);
     try {
-      await propertyService.deleteProperty(propertyToDelete.id);
-      setProperties(prev => prev.filter(p => p.id !== propertyToDelete.id));
-      setShowDeleteDialog(false);
-      setPropertyToDelete(null);
+      await propertyService.deleteProperty(deleteDialog.property.id);
+      setProperties(prev => prev.filter(p => p.id !== deleteDialog.property.id));
+      setDeleteDialog({ open: false, property: null });
     } catch (err) {
       console.error('Error al eliminar propiedad:', err);
       setError('No se pudo eliminar la propiedad.');
     } finally {
-      setSubmitting(false);
+      setDeleting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 5 }}>
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>Cargando tus propiedades...</Typography>
-      </Box>
-    );
-  }
-
-  if (error && properties.length === 0) {
-    return (
-      <Alert severity="error" sx={{ my: 2 }}>
-        {error}
-      </Alert>
-    );
-  }
-
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-          Mis Propiedades
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={handleAddNew}
-          sx={{ py: 1.5, px: 3, borderRadius: 2, textTransform: 'none' }}
-        >
-          Publicar Nueva Propiedad
-        </Button>
-      </Box>
-      
-      {error && properties.length > 0 && (
-         <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>
-      )}
-
-      {properties.length === 0 && !loading && !error && (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2, boxShadow:1 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Aún no has publicado propiedades.
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            ¡Comienza ahora y muestra tus terrenos al mundo!
-          </Typography>
-          <Button
-            variant="outlined"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleAddNew}
-            size="large"
-          >
-            Publicar mi primera propiedad
-          </Button>
-        </Paper>
-      )}
-
-      <Grid container spacing={3}>
-        {properties.map((property) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={property.id}>
-            <PropertyCard property={property} />
-          </Grid>
-        ))}
-      </Grid>
-      
-      <Dialog
-        open={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogTitle id="alert-dialog-title">Confirmar Eliminación</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            ¿Estás seguro de que quieres eliminar la propiedad "{propertyToDelete?.name}"? Esta acción no se puede deshacer.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowDeleteDialog(false)} color="inherit" disabled={submitting}>Cancelar</Button>
-          <Button onClick={confirmDelete} color="error" disabled={submitting} startIcon={submitting ? <CircularProgress size={16} /> : null}>
-            {submitting ? 'Eliminando...' : 'Eliminar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-}
-
-// Panel de perfil
-function ProfilePanel({ user }) {
-  return (
-    <Box>
-      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
-        Mi Perfil
-      </Typography>
-      <Paper sx={{ p:3, borderRadius:2, boxShadow:1}}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Avatar 
-              sx={{ width: 80, height: 80, mr: 3, bgcolor: 'primary.main' }}
-              alt={user?.username || 'Usuario'}
-            >
-              {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-            </Avatar>
-            <Box>
-              <Typography variant="h5">{user?.username || 'Nombre de Usuario'}</Typography>
-              <Typography variant="body1" color="text.secondary">
-                {user?.email || 'correo@ejemplo.com'}
-              </Typography>
-            </Box>
-          </Box>
-          <Divider sx={{ my: 3 }} />
-          <Typography variant="body1" gutterBottom>
-            <strong>Nombre:</strong> {user?.first_name || 'No especificado'}
-          </Typography>
-          <Typography variant="body1" gutterBottom>
-            <strong>Apellido:</strong> {user?.last_name || 'No especificado'}
-          </Typography>
-           <Typography variant="body1" gutterBottom>
-            <strong>Miembro desde:</strong> {user?.date_joined ? new Date(user.date_joined).toLocaleDateString('es-CL') : 'N/A'}
-          </Typography>
-          <Box sx={{ mt: 3 }}>
-            <Button variant="outlined" color="primary" disabled>
-              Editar Perfil (Próximamente)
-            </Button>
-          </Box>
-        </CardContent>
-      </Paper>
-    </Box>
-  );
-}
-
-// Componente principal del Dashboard
-const Dashboard = ({ user }) => {
-  const [activeTab, setActiveTab] = useState(0);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!user) {
+  const formatPrice = (price) => {
+    if (price >= 1000000000) {
+      return `$${(price / 1000000000).toFixed(1)}B`;
+    } else if (price >= 1000000) {
+      return `$${(price / 1000000).toFixed(1)}M`;
+    } else if (price >= 1000) {
+      return `$${(price / 1000).toFixed(0)}K`;
     }
-  }, [user, navigate]);
-
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
+    return `$${price?.toLocaleString()}`;
   };
 
   if (!user) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center', mt: 4 }}>
-        <Alert severity="warning" sx={{display:'inline-flex'}}>
-          <Typography>Por favor, <Button color="inherit" size="small" onClick={() => navigate('/login')}>inicia sesión</Button> para acceder a tu panel.</Typography>
-        </Alert>
+      <Box sx={{ 
+        height: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: '#0d1117'
+      }}>
+        <CircularProgress sx={{ color: '#3b82f6' }} />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 'xl', mx: 'auto' }}>
-      <Paper sx={{ mb: 3, borderRadius: 2, overflow:'hidden' }}>
-        <Tabs
-          value={activeTab}
-          onChange={handleTabChange}
-          variant="fullWidth"
-          indicatorColor="primary"
-          textColor="primary"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+    <Box sx={{ 
+      minHeight: '100vh', 
+      backgroundColor: '#0d1117',
+      py: 4
+    }}>
+      <Container maxWidth="xl">
+        {/* Header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton 
+              onClick={() => navigate('/')}
+              sx={{ 
+                mr: 2, 
+                color: 'white',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Box>
+              <Typography variant="h4" sx={{ color: 'white', fontWeight: 300 }}>
+                Mi Panel
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#8b949e' }}>
+                Bienvenido, {user.username || user.email}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/property/create')}
+            sx={{
+              backgroundColor: '#3b82f6',
+              '&:hover': { backgroundColor: '#2563eb' },
+              borderRadius: 2,
+              px: 3,
+              py: 1
+            }}
+          >
+            Nueva Propiedad
+          </Button>
+        </Box>
+
+        {/* Stats Cards */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              backgroundColor: 'rgba(22, 27, 34, 0.95)',
+              border: '1px solid rgba(30, 41, 59, 0.3)',
+              borderRadius: 2
+            }}>
+              <CardContent>
+                <Typography variant="h4" sx={{ color: '#3b82f6', fontWeight: 'bold' }}>
+                  {properties.length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                  Propiedades Publicadas
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              backgroundColor: 'rgba(22, 27, 34, 0.95)',
+              border: '1px solid rgba(30, 41, 59, 0.3)',
+              borderRadius: 2
+            }}>
+              <CardContent>
+                <Typography variant="h4" sx={{ color: '#10b981', fontWeight: 'bold' }}>
+                  {properties.reduce((acc, p) => acc + (p.size || 0), 0).toFixed(1)}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                  Hectáreas Totales
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              backgroundColor: 'rgba(22, 27, 34, 0.95)',
+              border: '1px solid rgba(30, 41, 59, 0.3)',
+              borderRadius: 2
+            }}>
+              <CardContent>
+                <Typography variant="h4" sx={{ color: '#f59e0b', fontWeight: 'bold' }}>
+                  {formatPrice(properties.reduce((acc, p) => acc + (p.price || 0), 0))}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                  Valor Total
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              backgroundColor: 'rgba(22, 27, 34, 0.95)',
+              border: '1px solid rgba(30, 41, 59, 0.3)',
+              borderRadius: 2
+            }}>
+              <CardContent>
+                <Typography variant="h4" sx={{ color: '#8b5cf6', fontWeight: 'bold' }}>
+                  {properties.filter(p => p.hasWater || p.has_water).length}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                  Con Acceso a Agua
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Properties Section */}
+        <Paper sx={{ 
+          p: 4, 
+          backgroundColor: 'rgba(22, 27, 34, 0.95)',
+          border: '1px solid rgba(30, 41, 59, 0.3)',
+          borderRadius: 3
+        }}>
+          <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 3 }}>
+            Mis Propiedades
+          </Typography>
+
+          {loading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress sx={{ color: '#3b82f6' }} />
+            </Box>
+          )}
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+
+          {!loading && !error && properties.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <HomeIcon sx={{ fontSize: 64, color: '#30363d', mb: 2 }} />
+              <Typography variant="h6" sx={{ color: '#8b949e', mb: 2 }}>
+                Aún no has publicado propiedades
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#6b7280', mb: 3 }}>
+                Comienza creando tu primera propiedad y muéstrala al mundo
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => navigate('/property/create')}
+                sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}
+              >
+                Crear Mi Primera Propiedad
+              </Button>
+            </Box>
+          )}
+
+          {!loading && !error && properties.length > 0 && (
+            <Grid container spacing={3}>
+              {properties.map((property) => (
+                <Grid item xs={12} sm={6} lg={4} key={property.id}>
+                  <Card sx={{ 
+                    backgroundColor: 'rgba(13, 17, 23, 0.8)',
+                    border: '1px solid rgba(30, 41, 59, 0.3)',
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      borderColor: 'rgba(59, 130, 246, 0.4)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ color: '#c9d1d9', mb: 1 }}>
+                        {property.name}
+                      </Typography>
+                      
+                      <Typography variant="body2" sx={{ color: '#8b949e', mb: 2, minHeight: 40 }}>
+                        {property.description?.length > 100 
+                          ? `${property.description.substring(0, 100)}...` 
+                          : property.description || 'Sin descripción'}
+                      </Typography>
+
+                      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                        <Chip 
+                          label={property.type || property.propertyType || 'Propiedad'} 
+                          size="small" 
+                          sx={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}
+                        />
+                        {(property.has_water || property.hasWater) && (
+                          <Chip 
+                            icon={<WaterDropIcon sx={{ fontSize: 14 }} />}
+                            label="Agua" 
+                            size="small" 
+                            sx={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}
+                          />
+                        )}
+                        {(property.has_views || property.hasViews) && (
+                          <Chip 
+                            icon={<TerrainIcon sx={{ fontSize: 14 }} />}
+                            label="Vistas" 
+                            size="small" 
+                            sx={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24' }}
+                          />
+                        )}
+                      </Stack>
+
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                        <Box>
+                          <Typography variant="h6" sx={{ color: '#3b82f6' }}>
+                            {formatPrice(property.price)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>
+                            Precio
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography variant="h6" sx={{ color: '#10b981' }}>
+                            {property.size?.toFixed(1) || '0'} ha
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>
+                            Tamaño
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+
+                    <CardActions sx={{ p: 2, pt: 0 }}>
+                      <Button
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => navigate(`/property/${property.id}`)}
+                        sx={{ color: '#8b949e', '&:hover': { color: '#c9d1d9' } }}
+                      >
+                        Ver
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => navigate(`/property/edit/${property.id}`)}
+                        sx={{ color: '#8b949e', '&:hover': { color: '#c9d1d9' } }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleDeleteClick(property)}
+                        sx={{ 
+                          color: '#f87171', 
+                          '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' } 
+                        }}
+                      >
+                        Eliminar
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Paper>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteDialog.open}
+          onClose={() => setDeleteDialog({ open: false, property: null })}
+          PaperProps={{
+            sx: {
+              backgroundColor: 'rgba(22, 27, 34, 0.95)',
+              border: '1px solid rgba(30, 41, 59, 0.3)',
+            }
+          }}
         >
-          <Tab label="Mis Propiedades" sx={{ py: 1.5, textTransform: 'none', fontSize: '1rem'}} />
-          <Tab label="Mi Perfil" sx={{ py: 1.5, textTransform: 'none', fontSize: '1rem' }} />
-        </Tabs>
-      </Paper>
-      
-      <Box>
-        {activeTab === 0 && <PropertiesPanel user={user} />}
-        {activeTab === 1 && <ProfilePanel user={user} />}
-      </Box>
+          <DialogTitle sx={{ color: '#c9d1d9' }}>
+            Confirmar Eliminación
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ color: '#8b949e' }}>
+              ¿Estás seguro de que quieres eliminar la propiedad "{deleteDialog.property?.name}"? 
+              Esta acción no se puede deshacer.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button 
+              onClick={() => setDeleteDialog({ open: false, property: null })}
+              sx={{ color: '#8b949e' }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleDeleteConfirm} 
+              disabled={deleting}
+              sx={{ color: '#ef4444' }}
+            >
+              {deleting ? <CircularProgress size={20} /> : 'Eliminar'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
     </Box>
   );
 };

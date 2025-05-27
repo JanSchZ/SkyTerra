@@ -5,6 +5,7 @@ import Map, { NavigationControl, Popup, Source, Layer, AttributionControl } from
 import 'mapbox-gl/dist/mapbox-gl.css';
 import EditIcon from '@mui/icons-material/Edit';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import PropertyBoundaryDraw from './PropertyBoundaryDraw';
 import { useNavigate } from 'react-router-dom';
 import { ThemeModeContext } from '../../App';
@@ -13,6 +14,7 @@ import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Link from '@mui/material/Link';
 import config from '../../config/environment';
+import { motion } from 'framer-motion';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => ({
@@ -53,7 +55,60 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
   const [autoFlyCompleted, setAutoFlyCompleted] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(true);
+  const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const mapRef = useRef(null);
+
+  // Textos descriptivos rotativos
+  const descriptiveTexts = [
+    {
+      title: "SkyTerra",
+      subtitle: "Descubre propiedades únicas desde el cielo",
+      description: "Explora terrenos y propiedades con vistas aéreas cinematográficas"
+    },
+    {
+      title: "Tecnología Inmersiva",
+      subtitle: "Tours 360° y mapas interactivos",
+      description: "Navega propiedades con la última tecnología de visualización"
+    },
+    {
+      title: "Chile y el Mundo", 
+      subtitle: "Propiedades en ubicaciones excepcionales",
+      description: "Desde la Patagonia hasta los Andes, encuentra tu lugar ideal"
+    },
+    {
+      title: "Experiencia Única",
+      subtitle: "Búsqueda inteligente con IA",
+      description: "Encuentra propiedades usando lenguaje natural y filtros avanzados"
+    }
+  ];
+
+  // Rotar texto cada 6 segundos
+  useEffect(() => {
+    if (!showOverlay) return;
+    
+    const interval = setInterval(() => {
+      setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [showOverlay, descriptiveTexts.length]);
+
+  // Ocultar overlay cuando la animación termine
+  useEffect(() => {
+    if (autoFlyCompleted) {
+      const timer = setTimeout(() => {
+        setShowOverlay(false);
+      }, 2000); // Dar 2 segundos extra después de completar la animación
+      return () => clearTimeout(timer);
+    }
+  }, [autoFlyCompleted]);
+
+  // Función para omitir la animación
+  const handleSkipAnimation = () => {
+    setAutoFlyCompleted(true);
+    setShowOverlay(false);
+  };
 
   const mapStyle = config.mapbox.style;
   
@@ -114,7 +169,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       zoom: 15, 
       pitch: 60, // Mantener pitch 3D
       bearing: viewState.bearing,
-      duration: 2500, 
+      duration: 3500, 
       essential: true,
     });
 
@@ -212,38 +267,146 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     return 'default';
   };
 
-  // Función para realizar vuelo automático inicial
-  const performAutoFlight = (userCountry = 'default') => {
+  // Función para realizar vuelo automático inicial sobre propiedades reales
+  const performAutoFlight = async (userCountry = 'default') => {
     if (!mapRef.current || autoFlyCompleted) return;
 
-    const flightPath = countryFlightPaths[userCountry];
-    let currentStep = 0;
+    try {
+      // Obtener algunas propiedades para volar sobre ellas
+      const response = await propertyService.getProperties({ page_size: 50 });
+      const availableProperties = response.results || [];
+      
+      if (availableProperties.length === 0) {
+        // Fallback a vuelo genérico si no hay propiedades
+        const flightPath = countryFlightPaths[userCountry];
+        let currentStep = 0;
 
-    const flyToNextPoint = () => {
-      if (currentStep >= flightPath.length) {
-        setAutoFlyCompleted(true);
+        const flyToNextPoint = () => {
+          if (currentStep >= flightPath.length) {
+            setAutoFlyCompleted(true);
+            return;
+          }
+
+          const point = flightPath[currentStep];
+          mapRef.current.flyTo({
+            center: point.center,
+            zoom: point.zoom,
+            pitch: point.pitch,
+            bearing: point.bearing,
+            duration: currentStep === 0 ? 5000 : 6000,
+            essential: true,
+          });
+
+          currentStep++;
+          setTimeout(() => {
+            flyToNextPoint();
+          }, currentStep === 1 ? 6000 : 7000);
+        };
+
+        setTimeout(() => {
+          flyToNextPoint();
+        }, 2000); // Retraso inicial antes de empezar el vuelo
         return;
       }
 
-      const point = flightPath[currentStep];
-      mapRef.current.flyTo({
-        ...point,
-        duration: currentStep === 0 ? 3000 : 4000, // Primer vuelo más rápido
-        essential: true,
-      });
-
-      currentStep++;
+      // Seleccionar 4-5 propiedades representativas de diferentes regiones
+      const selectedProperties = [];
       
-      // Continuar al siguiente punto después de un delay
+      // Buscar propiedades en diferentes rangos de latitud para cubrir Chile de norte a sur
+      const latRanges = [
+        { min: -35, max: -30, name: "Centro" },        // Santiago/Centro
+        { min: -40, max: -35, name: "Centro-Sur" },    // Araucanía/Los Ríos  
+        { min: -45, max: -40, name: "Sur" },           // Los Lagos
+        { min: -50, max: -45, name: "Aysén" },         // Aysén
+        { min: -55, max: -50, name: "Magallanes" }     // Magallanes
+      ];
+
+      for (const range of latRanges) {
+        const propertiesInRange = availableProperties.filter(prop => 
+          prop.latitude >= range.min && prop.latitude < range.max
+        );
+        if (propertiesInRange.length > 0) {
+          const randomProperty = propertiesInRange[Math.floor(Math.random() * propertiesInRange.length)];
+          selectedProperties.push({
+            center: [randomProperty.longitude, randomProperty.latitude],
+            zoom: Math.random() > 0.5 ? 8 : 10, // Variar zoom
+            pitch: 30 + Math.random() * 30, // Pitch entre 30-60
+            bearing: Math.random() * 360, // Bearing aleatorio
+            name: randomProperty.name
+          });
+        }
+      }
+
+      // Si no encontramos suficientes, agregar algunas propiedades al azar
+      if (selectedProperties.length < 3) {
+        const shuffled = [...availableProperties].sort(() => 0.5 - Math.random());
+        for (let i = 0; i < Math.min(3, shuffled.length); i++) {
+          const prop = shuffled[i];
+          selectedProperties.push({
+            center: [prop.longitude, prop.latitude],
+            zoom: 8 + Math.random() * 4,
+            pitch: 30 + Math.random() * 30,
+            bearing: Math.random() * 360,
+            name: prop.name
+          });
+        }
+      }
+
+      let currentStep = 0;
+      const flyToNextProperty = () => {
+        if (currentStep >= selectedProperties.length) {
+          setAutoFlyCompleted(true);
+          return;
+        }
+
+        const property = selectedProperties[currentStep];
+        console.log(`🏞️ Volando sobre: ${property.name}`);
+        
+        mapRef.current.flyTo({
+          ...property,
+          duration: currentStep === 0 ? 5000 : 6000,
+          essential: true,
+        });
+
+        currentStep++;
+        setTimeout(() => {
+          flyToNextProperty();
+        }, currentStep === 1 ? 6000 : 7000);
+      };
+
+      setTimeout(() => {
+        flyToNextProperty();
+      }, 2000); // Retraso inicial antes de empezar el vuelo
+
+    } catch (error) {
+      console.error('Error obteniendo propiedades para animación:', error);
+      // Fallback a animación original
+      const flightPath = countryFlightPaths[userCountry];
+      let currentStep = 0;
+
+      const flyToNextPoint = () => {
+        if (currentStep >= flightPath.length) {
+          setAutoFlyCompleted(true);
+          return;
+        }
+
+        const point = flightPath[currentStep];
+        mapRef.current.flyTo({
+          ...point,
+          duration: currentStep === 0 ? 5000 : 6000,
+          essential: true,
+        });
+
+        currentStep++;
+        setTimeout(() => {
+          flyToNextPoint();
+        }, currentStep === 1 ? 6000 : 7000);
+      };
+
       setTimeout(() => {
         flyToNextPoint();
-      }, currentStep === 1 ? 3500 : 4500); // Timing ajustado
-    };
-
-    // Empezar el vuelo después de un pequeño delay
-    setTimeout(() => {
-      flyToNextPoint();
-    }, 1500);
+      }, 2000); // Retraso inicial antes de empezar el vuelo
+    }
   };
 
   // Detectar ubicación del usuario y comenzar vuelo automático
@@ -413,21 +576,24 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       'circle-color': [
         'step',
         ['get', 'point_count'],
-        '#51bbd6', 
-        100,
-        '#f1f075', 
-        750,
-        '#f28cb1'  
+        '#10b981', // Verde esmeralda para pocos
+        10,
+        '#059669', // Verde medio para grupos medianos
+        50,
+        '#047857'  // Verde oscuro para muchos
       ],
       'circle-radius': [
         'step',
         ['get', 'point_count'],
-        20, 
-        100,
-        30, 
-        750,
-        40  
-      ]
+        18, 
+        10,
+        24, 
+        50,
+        32  
+      ],
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-opacity': 0.8
     }
   };
 
@@ -452,10 +618,33 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     source: 'properties-source',
     filter: ['!', ['has', 'point_count']],
     paint: {
-      'circle-color': '#11b4da',
-      'circle-radius': 6,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#fff'
+      'circle-color': '#10b981', // Verde esmeralda principal
+      'circle-radius': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 4,   // Zoom bajo = puntos pequeños
+        12, 8,  // Zoom medio = puntos medianos  
+        16, 12  // Zoom alto = puntos grandes
+      ],
+      'circle-stroke-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 1,   // Borde fino en zoom bajo
+        12, 2,  // Borde medio en zoom medio
+        16, 3   // Borde grueso en zoom alto
+      ],
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-opacity': 0.9,
+      'circle-opacity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 0.7,   // Menos opaco de lejos
+        12, 0.9,  // Más opaco cerca
+        16, 1     // Completamente opaco muy cerca
+      ]
     }
   };
   
@@ -737,6 +926,166 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Overlay descriptivo durante la animación */}
+      {showOverlay && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1 }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.15)',
+            backdropFilter: 'blur(1px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            pointerEvents: autoFlyCompleted ? 'none' : 'auto'
+          }}
+        >
+          <Box
+            sx={{
+              textAlign: 'center',
+              color: 'white',
+              maxWidth: '600px',
+              px: 4,
+              py: 3,
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '24px',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+            }}
+          >
+            <motion.div
+              key={currentTextIndex}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.6 }}
+            >
+              <Typography
+                variant="h2"
+                sx={{
+                  fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight: 700,
+                  fontSize: { xs: '2.5rem', md: '3.5rem' },
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  mb: 2,
+                  letterSpacing: '-0.02em'
+                }}
+              >
+                {descriptiveTexts[currentTextIndex].title}
+              </Typography>
+              
+              <Typography
+                variant="h5"
+                sx={{
+                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight: 300,
+                  fontSize: { xs: '1.1rem', md: '1.4rem' },
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  mb: 1,
+                  letterSpacing: '-0.01em'
+                }}
+              >
+                {descriptiveTexts[currentTextIndex].subtitle}
+              </Typography>
+              
+              <Typography
+                variant="body1"
+                sx={{
+                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight: 300,
+                  fontSize: { xs: '0.95rem', md: '1.1rem' },
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  lineHeight: 1.6,
+                  maxWidth: '400px',
+                  mx: 'auto'
+                }}
+              >
+                {descriptiveTexts[currentTextIndex].description}
+              </Typography>
+            </motion.div>
+
+            <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={handleSkipAnimation}
+                sx={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '1.1rem',
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: '16px',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.15)',
+                    transform: 'translateY(-2px)',
+                  },
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+                startIcon={<TravelExploreIcon />}
+              >
+                Explorar Ahora
+              </Button>
+              
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={handleSkipAnimation}
+                sx={{
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight: 400,
+                  fontSize: '1rem',
+                  px: 3,
+                  py: 1.5,
+                  borderRadius: '16px',
+                  textTransform: 'none',
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.4)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  },
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                Saltar animación
+              </Button>
+            </Box>
+
+            {/* Indicador de progreso */}
+            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 1 }}>
+              {descriptiveTexts.map((_, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: index === currentTextIndex ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.25)',
+                    transition: 'all 0.3s ease',
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+        </motion.div>
+      )}
     </Box>
   );
 });

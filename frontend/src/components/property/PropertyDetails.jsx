@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -151,9 +151,14 @@ const PropertyDetails = () => {
     fetchPropertyData();
   }, [id]);
 
-  // Detectar ubicación del usuario y comenzar vuelo automático
+  // Detectar ubicación del usuario y comenzar vuelo automático SOLO en PropertyDetails
   useEffect(() => {
-    if (!autoFlyCompleted && property && mapRef.current) {
+    // Solo ejecutar animación si estamos realmente en PropertyDetails y no en otras páginas
+    const isPropertyDetailsPage = window.location.pathname.includes('/property/') && 
+                                   !window.location.pathname.includes('/create') && 
+                                   !window.location.pathname.includes('/edit');
+    
+    if (!autoFlyCompleted && property && mapRef.current && isPropertyDetailsPage) {
       // Esperar un poco para asegurar que el mapa esté completamente inicializado
       const timer = setTimeout(() => {
         if (navigator.geolocation) {

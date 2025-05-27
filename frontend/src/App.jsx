@@ -280,7 +280,7 @@ function App() {
   };
 
   const toggleFilterPanel = () => {
-    setIsFilterPanelOpen(!isFilterPanelOpen);
+        setIsFilterPanelOpen(!isFilterPanelOpen);
   };
   
   // Para el menú de usuario flotante
@@ -295,9 +295,19 @@ function App() {
 
   return (
     <Router>
-      <Box sx={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>
-        {/* MapView siempre de fondo y pantalla completa */}
-        <MapView ref={mapRef} filters={globalFilters} />
+      <Routes>
+        {/* Rutas que NO deben tener mapa de fondo */}
+        <Route path="/property/create" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
+        <Route path="/property/edit/:propertyId" element={<ProtectedRoute user={user} element={<CreateProperty editMode={true} />} />} />
+        <Route path="/dashboard" element={<ProtectedRoute user={user} element={<Dashboard user={user} />} />} />
+        <Route path="/login" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
+        <Route path="/register" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
+        
+        {/* Rutas que SÍ deben tener mapa de fondo */}
+        <Route path="/*" element={
+          <Box sx={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>
+            {/* MapView siempre de fondo y pantalla completa */}
+            <MapView ref={mapRef} filters={globalFilters} />
 
         {/* Logo SkyTerra Flotante */}
         <Typography
@@ -476,23 +486,18 @@ function App() {
           }}
         />
         
-        {/* Rutas para otras páginas (Auth, PropertyDetails, etc.) */}
-        {/* Estas rutas ahora renderizarán sus componentes sobre el mapa si no tienen su propio fondo */}
-        <Box sx={{position: 'relative', zIndex: 20}}> {/* Contenedor para rutas que deben estar sobre todo */}
-            <Routes>
-            {/* La ruta principal "/" ya está cubierta por MapView como fondo */}
-            <Route path="/property/:id" element={<PropertyDetails />} />
-            <Route path="/tour/:id" element={<TourViewer />} />
-            <Route path="/login" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
-            <Route path="/register" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
-            <Route path="/dashboard" element={<ProtectedRoute user={user} element={<Dashboard />} />} />
-            <Route path="/create-property" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
-            {/* Puedes agregar una ruta para "/" si necesitas un componente específico además del mapa */}
-            {/* <Route path="/" element={<HomePageContent />} /> */}
-            </Routes>
-        </Box>
-
+            {/* Rutas que van sobre el mapa */}
+            <Box sx={{position: 'relative', zIndex: 20}}>
+        <Routes>
+                <Route path="/" element={<></>} />
+          <Route path="/property/:id" element={<PropertyDetails />} />
+                <Route path="/tour/:id" element={<TourViewer />} />
+        </Routes>
       </Box>
+
+          </Box>
+        } />
+      </Routes>
     </Router>
   );
 }

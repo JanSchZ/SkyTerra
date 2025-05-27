@@ -11,9 +11,9 @@ export const api = axios.create({
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('auth_token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization = `Token ${token}`;
     }
     console.log('[API Request]', {
       url: config.url,
@@ -231,6 +231,17 @@ export const propertyService = {
     }
   },
 
+  // Obtener detalle de una propiedad para edición
+  async getPropertyDetails(id) {
+    try {
+      const response = await api.get(`/properties/${id}/`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching property details ${id}:`, error);
+      throw error;
+    }
+  },
+
   // Obtener propiedades del usuario actual
   async getUserProperties() {
     try {
@@ -238,7 +249,40 @@ export const propertyService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching user properties:', error);
-      return SAMPLE_DATA; // Datos de muestra en caso de error
+      throw error; // Lanzar error para que el componente pueda manejarlo
+    }
+  },
+
+  // Crear nueva propiedad
+  async createProperty(propertyData) {
+    try {
+      const response = await api.post('/properties/', propertyData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating property:', error);
+      throw error;
+    }
+  },
+
+  // Actualizar propiedad existente
+  async updateProperty(id, propertyData) {
+    try {
+      const response = await api.put(`/properties/${id}/`, propertyData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating property:', error);
+      throw error;
+    }
+  },
+
+  // Eliminar propiedad
+  async deleteProperty(id) {
+    try {
+      await api.delete(`/properties/${id}/`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      throw error;
     }
   },
 

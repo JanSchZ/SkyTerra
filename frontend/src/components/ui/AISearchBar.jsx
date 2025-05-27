@@ -250,39 +250,42 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
             </InputAdornment>
           ),
           sx: {
-            backgroundColor: 'rgba(22, 27, 34, 0.7)',
+            backgroundColor: 'rgba(22, 27, 34, 0.85)',
             borderRadius: '50px',
             fontSize: '0.9rem',
             color: '#c9d1d9',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            backdropFilter: 'blur(16px)',
+            border: 'none !important',
+            outline: 'none !important',
+            backdropFilter: 'blur(20px)',
             fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
             '&.MuiOutlinedInput-root': {
                 '& fieldset': { 
                   border: 'none !important',
-                  borderRadius: '50px',
+                  outline: 'none !important',
                 },
                 '&:hover fieldset': { 
                   border: 'none !important',
+                  outline: 'none !important',
                 },
                 '&.Mui-focused fieldset': { 
                   border: 'none !important',
+                  outline: 'none !important',
                 },
                 '&:hover': {
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  backgroundColor: 'rgba(22, 27, 34, 0.8)',
+                  backgroundColor: 'rgba(22, 27, 34, 0.9)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.16)',
                 },
                 '&.Mui-focused': {
-                  borderColor: 'rgba(255, 255, 255, 0.3)',
-                  backgroundColor: 'rgba(22, 27, 34, 0.85)',
-                  boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.08)',
+                  backgroundColor: 'rgba(22, 27, 34, 0.95)',
+                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)',
                 },
             },
             '& .MuiInputBase-input': {
-                padding: '12px 8px',
+                padding: '14px 12px',
                 color: '#c9d1d9',
                 fontWeight: 300,
-                fontSize: '0.9rem',
+                fontSize: '0.95rem',
                 '&::placeholder': {
                     color: '#8b949e',
                     opacity: 1,
