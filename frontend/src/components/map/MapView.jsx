@@ -36,12 +36,12 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Vista inicial del mapa: Chile por defecto (asumiendo dominio .cl)
+  // Vista inicial del mapa: Chile por defecto (asumiendo dominio .cl) pero más alejada
   const initialMapViewState = {
     longitude: -71.5430, // Centro de Chile
     latitude: -35.6751,  // Centro de Chile
-    zoom: 5.5,           // Zoom para ver Chile completo
-    pitch: 45,           // Vista cinematográfica con inclinación
+    zoom: 3.5,           // Zoom más alejado para luego hacer el tour cinematográfico
+    pitch: 30,           // Vista cinematográfica inicial suave
     bearing: 0,          // Sin rotación inicial
   };
 
@@ -248,27 +248,35 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {
-    if (!autoFlyCompleted && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const userCountry = getCountryFromCoords(latitude, longitude);
-          console.log(`Ubicación detectada: ${userCountry} (${latitude}, ${longitude})`);
-          performAutoFlight(userCountry);
-        },
-        (error) => {
-          console.log('No se pudo obtener ubicación, usando Chile como país por defecto');
-          performAutoFlight('chile'); // Chile por defecto en lugar de 'default'
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 5000,
-          maximumAge: 300000 // 5 minutos
+    if (!autoFlyCompleted) {
+      // Esperar un poco para que el mapa se inicialice completamente
+      const initTimer = setTimeout(() => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              const userCountry = getCountryFromCoords(latitude, longitude);
+              console.log(`🌍 Ubicación detectada: ${userCountry} (${latitude}, ${longitude})`);
+              console.log(`🚁 Iniciando vuelo automático para ${userCountry}`);
+              performAutoFlight(userCountry);
+            },
+            (error) => {
+              console.log('📍 No se pudo obtener ubicación, usando Chile como país por defecto');
+              performAutoFlight('chile');
+            },
+            {
+              enableHighAccuracy: false,
+              timeout: 3000,
+              maximumAge: 300000
+            }
+          );
+        } else {
+          console.log('🌐 Geolocalización no disponible, usando Chile por defecto');
+          performAutoFlight('chile');
         }
-      );
-    } else if (!autoFlyCompleted) {
-      // Si no hay geolocalización, usar Chile por defecto
-      performAutoFlight('chile'); // Chile por defecto
+      }, 1500); // Esperar 1.5 segundos para inicialización del mapa
+
+      return () => clearTimeout(initTimer);
     }
   }, []); // Solo ejecutar una vez al montar
 
