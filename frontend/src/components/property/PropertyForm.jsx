@@ -255,8 +255,42 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
       }
       if (onSave) onSave(savedProperty);
     } catch (err) {
-      console.error('Error guardando propiedad:', err);
-      setFormErrors({ submit: err.message || 'Error al guardar.' });
+      console.error('Error guardando propiedad:', err, err.response);
+      let displayError = 'Error al guardar. Intente nuevamente.';
+      if (err.response && err.response.data) {
+        if (err.response.data.error && err.response.data.details) {
+          displayError = `${err.response.data.error}: ${err.response.data.details}`;
+        } else if (typeof err.response.data === 'string') {
+          displayError = err.response.data;
+        } else if (err.response.data.detail) { 
+          displayError = err.response.data.detail;
+        } else if (err.response.data.message) { // Some custom errors might use "message"
+          displayError = err.response.data.message;
+        } else {
+          // Fallback for other DRF validation errors (typically an object with field names as keys)
+          const fieldErrorKeys = Object.keys(err.response.data);
+          if (fieldErrorKeys.length > 0) {
+            // Prioritize common non-field errors or specific file errors if named explicitly
+            if (err.response.data.non_field_errors) {
+              displayError = err.response.data.non_field_errors.join(' ');
+            } else if (err.response.data.new_images) {
+              displayError = `Error en imágenes: ${err.response.data.new_images.join(' ')}`;
+            } else if (err.response.data.new_tour_file) {
+              displayError = `Error en archivo de tour: ${err.response.data.new_tour_file.join(' ')}`;
+            } else {
+              // Generic message for other field-specific errors
+              displayError = `Error de validación. Por favor, revise los campos. (${fieldErrorKeys.join(', ')})`;
+              // Or try to concatenate them (can be long)
+              // displayError = fieldErrorKeys.map(key => `${key}: ${err.response.data[key].join(' ')}`).join('; ');
+            }
+          }
+        }
+      } else if (err.message) {
+        displayError = err.message;
+      }
+      setFormErrors({ submit: displayError });
+      // If you had a snackbar:
+      // setSnackbar({ open: true, message: displayError, severity: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -273,8 +307,8 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="Property form tabs" variant="scrollable" scrollButtons="auto">
           <Tab label="Información General" icon={<TerrainIcon />} iconPosition="start" id="property-tab-0" aria-controls="property-tabpanel-0" />
           <Tab label="Ubicación y Límites" icon={<MapIcon />} iconPosition="start" id="property-tab-1" aria-controls="property-tabpanel-1" />
-          <Tab label="Imágenes" icon={<ImageIcon />} iconPosition="start" id="property-tab-2" aria-controls="property-tabpanel-2" />
-          <Tab label="Tour Virtual 360" icon={<GpsFixedIcon />} iconPosition="start" id="property-tab-3" aria-controls="property-tabpanel-3" />
+          <Tab label="Imágenes y Tour" icon={<ImageIcon />} iconPosition="start" id="property-tab-2" aria-controls="property-tabpanel-2" />
+          <Tab label="Previsualizar Tour (Si aplica)" icon={<GpsFixedIcon />} iconPosition="start" id="property-tab-3" aria-controls="property-tabpanel-3" />
         </Tabs>
       </Box>
 
@@ -382,16 +416,28 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
-          <Typography variant="h6" gutterBottom>Tour Virtual 360°</Typography>
-          <PropertyBoundaryDraw
-            initialCenter={property?.latitude && property?.longitude ? [property.longitude, property.latitude] : [-70.65, -33.45]}
-            initialZoom={property ? 14 : 5}
-            onBoundariesUpdate={handleBoundariesUpdate}
-            initialGeoJson={formData.boundary_polygon?.geojson || formData.boundary_polygon}
-            map={mapboxMapInstance}
-            existingBoundaries={formData.boundary_polygon}
-            propertyId={property?.id}
-          />
+          <Typography variant="h6" gutterBottom>Previsualizar Tour Virtual</Typography>
+          {/* 
+            The PropertyBoundaryDraw component was incorrectly placed here.
+            Tab 2 handles tour uploads. This tab is for viewing if applicable.
+          */}
+          {formData.existingTourUrl ? (
+            <Typography variant="body1">
+              Visualización del tour virtual no implementada en este formulario. URL del Tour: {' '}
+              <a href={formData.existingTourUrl} target="_blank" rel="noopener noreferrer">
+                {formData.existingTourUrl}
+              </a>
+            </Typography>
+          ) : tourPreviewName ? (
+            <Typography variant="body1">
+              El tour virtual '{tourPreviewName}' está listo para ser subido. La previsualización no está disponible aquí.
+            </Typography>
+          ) : (
+            <Typography variant="body1">
+              Sube un archivo de tour virtual en la pestaña 'Imágenes y Tour'.
+              Si el tour es un enlace web o puede ser embebido, su previsualización podría aparecer aquí.
+            </Typography>
+          )}
         </TabPanel>
 
         <Divider sx={{ my: 4 }} />

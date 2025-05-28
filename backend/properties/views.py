@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, filters, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Exists, OuterRef
 from rest_framework.views import APIView
@@ -33,6 +34,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'size', 'created_at']
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser] # Explicitly set parsers
     
     def get_serializer_class(self):
         if self.action == 'list' or self.action == 'my_properties':
