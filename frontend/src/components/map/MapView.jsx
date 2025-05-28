@@ -34,28 +34,30 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const { mode, theme } = useContext(ThemeModeContext);
   // Estados
   const [properties, setProperties] = useState([]);
-  const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); 
+  const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([]));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Vista inicial del mapa: Chile por defecto (asumiendo dominio .cl) pero más alejada
-  const initialMapViewState = {
+  // Vista inicial del mapa
+  const defaultInitialMapViewState = {
     longitude: -71.5430, // Centro de Chile
     latitude: -35.6751,  // Centro de Chile
-    zoom: 3.5,           // Zoom más alejado para luego hacer el tour cinematográfico
-    pitch: 30,           // Vista cinematográfica inicial suave
-    bearing: 0,          // Sin rotación inicial
+    zoom: editable ? 5 : 3.5, // Zoom más cercano si es editable, más alejado para tour
+    pitch: editable ? 0 : 30,   // Sin pitch si es editable
+    bearing: 0,
   };
 
-  const [viewState, setViewState] = useState(propInitialViewState || initialMapViewState);
+  const [viewState, setViewState] = useState(propInitialViewState || defaultInitialMapViewState);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
   const [isDrawingMode, setIsDrawingMode] = useState(editable);
   const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
-  const [autoFlyCompleted, setAutoFlyCompleted] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(true);
+  // Inicializar autoFlyCompleted a true si estamos en modo editable para evitar la animación
+  const [autoFlyCompleted, setAutoFlyCompleted] = useState(editable);
+  // No mostrar overlay en modo de edición
+  const [showOverlay, setShowOverlay] = useState(!editable);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const mapRef = useRef(null);
 
@@ -411,8 +413,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {
-    if (!autoFlyCompleted) {
-      // Esperar un poco para que el mapa se inicialice completamente
+    // MODIFIED: Only perform auto flight if not editable and not already completed
+    if (!editable && !autoFlyCompleted) {
       const initTimer = setTimeout(() => {
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
@@ -437,11 +439,11 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           console.log('🌐 Geolocalización no disponible, usando Chile por defecto');
           performAutoFlight('chile');
         }
-      }, 1500); // Esperar 1.5 segundos para inicialización del mapa
+      }, 1500);
 
       return () => clearTimeout(initTimer);
     }
-  }, []); // Solo ejecutar una vez al montar
+  }, [editable, autoFlyCompleted]); // MODIFIED: Added editable and autoFlyCompleted to dependency array
 
   // Función para ir a la ubicación actual del usuario (botón manual)
   const handleGoToMyLocation = () => {
@@ -745,7 +747,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           ref={mapRef}
           {...viewState} // Usa el estado de vista que se actualiza
           onMove={evt => setViewState(evt.viewState)} // Actualiza el estado de vista en movimiento
-          initialViewState={initialMapViewState} // Establece la vista inicial aquí
+          initialViewState={defaultInitialMapViewState} // Establece la vista inicial aquí
           onLoad={onMapLoad}
           mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
@@ -1090,4 +1092,4 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   );
 });
 
-export default MapView; 
+export default MapView;
