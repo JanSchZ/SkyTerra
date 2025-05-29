@@ -241,21 +241,6 @@ const skyTerraCustomStyle = {
         "line-opacity": 0.5
       }
     },
-    // Buildings (simplificado para performance en vista global)
-    {
-      id: "building-3d",
-      type: "fill-extrusion",
-      source: "composite",
-      "source-layer": "building",
-      minzoom: 14, // Visibles solo con mucho zoom
-      filter: ["all", ["!=", ["get", "type"], "building:part"], ["==", ["get", "underground"], "false"]],
-      paint: {
-        "fill-extrusion-color": "#333",
-        "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15, ["get", "height"]],
-        "fill-extrusion-base": ["get", "min_height"],
-        "fill-extrusion-opacity": 0.7
-      }
-    },
     // Place labels - NOMBRES DE PAÍSES MÁS GRANDES Y VISIBLES
     {
       id: "country-labels",

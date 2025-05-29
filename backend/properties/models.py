@@ -43,6 +43,11 @@ class Property(models.Model):
         ('forest', 'Forest'),
         ('lake', 'Lake'),
     ]
+    PUBLICATION_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
     
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='properties', null=True, blank=True)
     name = models.CharField(max_length=255)
@@ -60,6 +65,12 @@ class Property(models.Model):
     description = models.TextField(blank=True)
     has_water = models.BooleanField(default=False)
     has_views = models.BooleanField(default=False)
+    publication_status = models.CharField(
+        max_length=10,
+        choices=PUBLICATION_STATUS_CHOICES,
+        default='pending',
+        help_text='Estado de publicación de la propiedad'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

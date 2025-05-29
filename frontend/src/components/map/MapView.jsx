@@ -29,7 +29,7 @@ const propertiesToGeoJSON = (properties) => ({
   }))
 });
 
-const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad }, ref) => {
+const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad, disableIntroAnimation = false }, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
   // Estados
@@ -54,10 +54,16 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
-  const [autoFlyCompleted, setAutoFlyCompleted] = useState(false);
-  const [showOverlay, setShowOverlay] = useState(true);
+  const [autoFlyCompleted, setAutoFlyCompleted] = useState(disableIntroAnimation);
+  const [showOverlay, setShowOverlay] = useState(!disableIntroAnimation);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const mapRef = useRef(null);
+  const flightTimeoutIdRef = useRef(null); // Ref para el ID del timeout de la animación
+  const userInteractedRef = useRef(false); // Ref para rastrear interacción del usuario
+
+  // Para evitar múltiples ejecuciones del efecto de autoflight
+  const autoFlightAttemptedRef = useRef(false);
 
   // Textos descriptivos rotativos
   const descriptiveTexts = [
@@ -85,30 +91,42 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
   // Rotar texto cada 6 segundos
   useEffect(() => {
-    if (!showOverlay) return;
+    if (!showOverlay || disableIntroAnimation) return;
     
     const interval = setInterval(() => {
       setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
     }, 6000);
 
     return () => clearInterval(interval);
-  }, [showOverlay, descriptiveTexts.length]);
+  }, [showOverlay, descriptiveTexts.length, disableIntroAnimation]);
 
-  // Ocultar overlay cuando la animación termine
+  // Ocultar overlay cuando la animación termine O el usuario interactúe
   useEffect(() => {
-    if (autoFlyCompleted) {
+    if (autoFlyCompleted || userInteractedRef.current) {
       const timer = setTimeout(() => {
-        setShowOverlay(false);
-      }, 2000); // Dar 2 segundos extra después de completar la animación
+        if (!disableIntroAnimation) setShowOverlay(false);
+      }, 500); // Reducido el tiempo para ocultar más rápido tras interacción
       return () => clearTimeout(timer);
     }
-  }, [autoFlyCompleted]);
+  }, [autoFlyCompleted, userInteractedRef.current, disableIntroAnimation]);
 
-  // Función para omitir la animación
-  const handleSkipAnimation = () => {
-    setAutoFlyCompleted(true);
-    setShowOverlay(false);
-  };
+  // Función para detener/omitir la animación de forma controlada
+  const stopAndSkipAnimation = useCallback(() => {
+    if (flightTimeoutIdRef.current) {
+      clearTimeout(flightTimeoutIdRef.current);
+      flightTimeoutIdRef.current = null;
+      console.log('🚁 Futuros vuelos de animación cancelados por usuario.');
+    }
+    
+    userInteractedRef.current = true; 
+    setAutoFlyCompleted(true); 
+    setShowOverlay(false); // Ocultar overlay inmediatamente
+
+    // Ya NO llamamos a map.stop() ni a map.easeTo() aquí.
+    // La interacción del usuario (si ocurre) o la finalización natural del segmento actual de flyTo
+    // se encargarán de detener el movimiento.
+
+  }, [setAutoFlyCompleted, setShowOverlay]);
 
   const mapStyle = config.mapbox.style;
   
@@ -116,21 +134,26 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
   }, []);
 
+  // Serializar filters para la dependencia del useEffect
+  const serializedFilters = JSON.stringify(filters);
+
   useEffect(() => {
     const fetchProperties = async () => {
       try {
         setLoading(true);
+        // Usar filters directamente aquí, ya que serializedFilters es para la dependencia
         const params = { ...filters }; 
         const data = await propertyService.getProperties(params);
         const activeProperties = data.results || [];
         setProperties(activeProperties);
         setPropertiesGeoJSON(propertiesToGeoJSON(activeProperties)); 
-        setLoading(false);
+        setError(null); // Limpiar errores previos si la carga es exitosa
       } catch (err) {
         console.error('Error al cargar propiedades:', err);
         setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
         setProperties([]);
         setPropertiesGeoJSON(propertiesToGeoJSON([])); 
+      } finally {
         setLoading(false);
       }
     };
@@ -143,7 +166,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         setProperties([]);
         setPropertiesGeoJSON(propertiesToGeoJSON([]));
     }
-  }, [filters, editable]);
+  }, [serializedFilters, editable]); // Usar serializedFilters en el array de dependencias
 
   const MAPBOX_TOKEN = config.mapbox.accessToken;
 
@@ -268,180 +291,156 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   };
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
-  const performAutoFlight = async (userCountry = 'default') => {
-    if (!mapRef.current || autoFlyCompleted) return;
+  const performAutoFlight = useCallback(async (userCountry = 'default') => {
+    if (!mapRef.current || !isMapLoaded || userInteractedRef.current || autoFlyCompleted) {
+      console.warn('Intento de iniciar auto-vuelo pero el mapa no está listo, o usuario ya interactuó, o ya completó.');
+      if (!userInteractedRef.current) setAutoFlyCompleted(true); // Si no fue por interacción, marcar como completado
+      return;
+    }
+    
+    console.log(`🚁 Iniciando vuelo automático para ${userCountry}`);
 
+    let flightPerformed = false;
     try {
-      // Obtener algunas propiedades para volar sobre ellas
-      const response = await propertyService.getProperties({ page_size: 50 });
-      const availableProperties = response.results || [];
-      
-      if (availableProperties.length === 0) {
-        // Fallback a vuelo genérico si no hay propiedades
-        const flightPath = countryFlightPaths[userCountry];
+      if (properties.length > 0 && !userInteractedRef.current) {
+        const selectedProperties = [];
+        const latRanges = [
+          { min: -35, max: -30, name: "Centro" },
+          { min: -40, max: -35, name: "Centro-Sur" },
+          { min: -45, max: -40, name: "Sur" },
+          { min: -50, max: -45, name: "Aysén" },
+          { min: -55, max: -50, name: "Magallanes" }
+        ];
+
+        for (const range of latRanges) {
+          const propertiesInRange = properties.filter(prop => 
+            prop.latitude >= range.min && prop.latitude < range.max
+          );
+          if (propertiesInRange.length > 0) {
+            const randomProperty = propertiesInRange[Math.floor(Math.random() * propertiesInRange.length)];
+            selectedProperties.push({
+              center: [randomProperty.longitude, randomProperty.latitude],
+              zoom: Math.random() > 0.5 ? 8 : 10,
+              pitch: 30 + Math.random() * 30,
+              bearing: Math.random() * 360,
+              name: randomProperty.name
+            });
+          }
+        }
+
+        if (selectedProperties.length < 3 && properties.length > 0) {
+          const shuffled = [...properties].sort(() => 0.5 - Math.random());
+          for (let i = 0; i < Math.min(3, shuffled.length); i++) {
+            const prop = shuffled[i];
+            if (!selectedProperties.find(p => p.name === prop.name)) { // Evitar duplicados si ya se añadieron por rango
+              selectedProperties.push({
+                center: [prop.longitude, prop.latitude],
+                zoom: 8 + Math.random() * 4,
+                pitch: 30 + Math.random() * 30,
+                bearing: Math.random() * 360,
+                name: prop.name
+              });
+            }
+          }
+        }
+        
+        if (selectedProperties.length > 0) {
+          let currentStep = 0;
+          const flyToNextSelectedProperty = () => {
+            if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= selectedProperties.length) {
+              if (!userInteractedRef.current) setAutoFlyCompleted(true);
+              console.log('Secuencia de propiedades terminada o interrumpida (modo paseo lento).');
+              return;
+            }
+            const property = selectedProperties[currentStep];
+            console.log(`🏞️ Volando sobre: ${property.name} (animación pausada, duración: ${currentStep === 0 ? 7000 : 8000}ms)`);
+            
+            mapRef.current.flyTo({
+              ...property,
+              duration: currentStep === 0 ? 7000 : 8000,
+              essential: true,
+            });
+
+            currentStep++;
+            flightTimeoutIdRef.current = setTimeout(() => {
+              flyToNextSelectedProperty();
+            }, currentStep === 1 ? 8000 : 9000);
+          };
+          if (!userInteractedRef.current) {
+            flightTimeoutIdRef.current = setTimeout(() => flyToNextSelectedProperty(), 500);
+            flightPerformed = true;
+          }
+        }
+      }
+
+      if (!flightPerformed && !userInteractedRef.current) {
+        console.log('No hay propiedades para el vuelo cinematográfico o fue interrumpido, usando vuelo genérico por país.');
+        const flightPath = countryFlightPaths[userCountry] || countryFlightPaths['default'];
         let currentStep = 0;
 
-        const flyToNextPoint = () => {
-          if (currentStep >= flightPath.length) {
-            setAutoFlyCompleted(true);
+        const flyToNextGenericPoint = () => {
+          if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= flightPath.length) {
+            if (!userInteractedRef.current) setAutoFlyCompleted(true);
+            console.log('Secuencia genérica terminada o interrumpida (modo paseo lento).');
             return;
           }
-
           const point = flightPath[currentStep];
+          console.log(`🌎 Volando a punto genérico (animación pausada, duración: ${currentStep === 0 ? 7000 : 8000}ms)`);
           mapRef.current.flyTo({
-            center: point.center,
-            zoom: point.zoom,
-            pitch: point.pitch,
-            bearing: point.bearing,
-            duration: currentStep === 0 ? 5000 : 6000,
+            ...point,
+            duration: currentStep === 0 ? 7000 : 8000,
             essential: true,
           });
 
           currentStep++;
-          setTimeout(() => {
-            flyToNextPoint();
-          }, currentStep === 1 ? 6000 : 7000);
+          flightTimeoutIdRef.current = setTimeout(() => {
+            flyToNextGenericPoint();
+          }, currentStep === 1 ? 8000 : 9000);
         };
-
-        setTimeout(() => {
-          flyToNextPoint();
-        }, 2000); // Retraso inicial antes de empezar el vuelo
-        return;
-      }
-
-      // Seleccionar 4-5 propiedades representativas de diferentes regiones
-      const selectedProperties = [];
-      
-      // Buscar propiedades en diferentes rangos de latitud para cubrir Chile de norte a sur
-      const latRanges = [
-        { min: -35, max: -30, name: "Centro" },        // Santiago/Centro
-        { min: -40, max: -35, name: "Centro-Sur" },    // Araucanía/Los Ríos  
-        { min: -45, max: -40, name: "Sur" },           // Los Lagos
-        { min: -50, max: -45, name: "Aysén" },         // Aysén
-        { min: -55, max: -50, name: "Magallanes" }     // Magallanes
-      ];
-
-      for (const range of latRanges) {
-        const propertiesInRange = availableProperties.filter(prop => 
-          prop.latitude >= range.min && prop.latitude < range.max
-        );
-        if (propertiesInRange.length > 0) {
-          const randomProperty = propertiesInRange[Math.floor(Math.random() * propertiesInRange.length)];
-          selectedProperties.push({
-            center: [randomProperty.longitude, randomProperty.latitude],
-            zoom: Math.random() > 0.5 ? 8 : 10, // Variar zoom
-            pitch: 30 + Math.random() * 30, // Pitch entre 30-60
-            bearing: Math.random() * 360, // Bearing aleatorio
-            name: randomProperty.name
-          });
+        if (!userInteractedRef.current) {
+          flightTimeoutIdRef.current = setTimeout(() => flyToNextGenericPoint(), 500);
         }
       }
-
-      // Si no encontramos suficientes, agregar algunas propiedades al azar
-      if (selectedProperties.length < 3) {
-        const shuffled = [...availableProperties].sort(() => 0.5 - Math.random());
-        for (let i = 0; i < Math.min(3, shuffled.length); i++) {
-          const prop = shuffled[i];
-          selectedProperties.push({
-            center: [prop.longitude, prop.latitude],
-            zoom: 8 + Math.random() * 4,
-            pitch: 30 + Math.random() * 30,
-            bearing: Math.random() * 360,
-            name: prop.name
-          });
-        }
-      }
-
-      let currentStep = 0;
-      const flyToNextProperty = () => {
-        if (currentStep >= selectedProperties.length) {
-          setAutoFlyCompleted(true);
-          return;
-        }
-
-        const property = selectedProperties[currentStep];
-        console.log(`🏞️ Volando sobre: ${property.name}`);
-        
-        mapRef.current.flyTo({
-          ...property,
-          duration: currentStep === 0 ? 5000 : 6000,
-          essential: true,
-        });
-
-        currentStep++;
-        setTimeout(() => {
-          flyToNextProperty();
-        }, currentStep === 1 ? 6000 : 7000);
-      };
-
-      setTimeout(() => {
-        flyToNextProperty();
-      }, 2000); // Retraso inicial antes de empezar el vuelo
 
     } catch (error) {
-      console.error('Error obteniendo propiedades para animación:', error);
-      // Fallback a animación original
-      const flightPath = countryFlightPaths[userCountry];
-      let currentStep = 0;
-
-      const flyToNextPoint = () => {
-        if (currentStep >= flightPath.length) {
-          setAutoFlyCompleted(true);
-          return;
-        }
-
-        const point = flightPath[currentStep];
-        mapRef.current.flyTo({
-          ...point,
-          duration: currentStep === 0 ? 5000 : 6000,
-          essential: true,
-        });
-
-        currentStep++;
-        setTimeout(() => {
-          flyToNextPoint();
-        }, currentStep === 1 ? 6000 : 7000);
-      };
-
-      setTimeout(() => {
-        flyToNextPoint();
-      }, 2000); // Retraso inicial antes de empezar el vuelo
+      console.error('Error durante la animación de vuelo automático:', error);
+      if (!userInteractedRef.current) setAutoFlyCompleted(true);
     }
-  };
+  }, [isMapLoaded, properties, countryFlightPaths, autoFlyCompleted, setAutoFlyCompleted]);
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {
-    if (!autoFlyCompleted) {
-      // Esperar un poco para que el mapa se inicialice completamente
-      const initTimer = setTimeout(() => {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const { latitude, longitude } = position.coords;
-              const userCountry = getCountryFromCoords(latitude, longitude);
-              console.log(`🌍 Ubicación detectada: ${userCountry} (${latitude}, ${longitude})`);
-              console.log(`🚁 Iniciando vuelo automático para ${userCountry}`);
-              performAutoFlight(userCountry);
-            },
-            (error) => {
-              console.log('📍 No se pudo obtener ubicación, usando Chile como país por defecto');
-              performAutoFlight('chile');
-            },
-            {
-              enableHighAccuracy: false,
-              timeout: 3000,
-              maximumAge: 300000
-            }
-          );
-        } else {
-          console.log('🌐 Geolocalización no disponible, usando Chile por defecto');
-          performAutoFlight('chile');
-        }
-      }, 1500); // Esperar 1.5 segundos para inicialización del mapa
-
-      return () => clearTimeout(initTimer);
+    if (editable || autoFlightAttemptedRef.current || disableIntroAnimation || userInteractedRef.current || autoFlyCompleted) {
+      if (editable || disableIntroAnimation || userInteractedRef.current) {
+          if (!userInteractedRef.current) setAutoFlyCompleted(true); // Asegurar que se marque como completado
+          setShowOverlay(false);
+      }
+      return;
     }
-  }, []); // Solo ejecutar una vez al montar
+
+    if (isMapLoaded && !loading) {
+      autoFlightAttemptedRef.current = true;
+      
+      let userCountry = 'default';
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log(`🌍 Ubicación detectada: ${getCountryFromCoords(latitude, longitude)} (${latitude}, ${longitude})`);
+            userCountry = getCountryFromCoords(latitude, longitude);
+            performAutoFlight(userCountry);
+          },
+          () => {
+            console.warn('No se pudo obtener la ubicación del usuario, usando vuelo por defecto.');
+            performAutoFlight('default'); 
+          }
+        );
+      } else {
+        console.warn('Geolocalización no soportada, usando vuelo por defecto.');
+        performAutoFlight('default');
+      }
+    } 
+  }, [isMapLoaded, loading, properties, editable, autoFlyCompleted, getCountryFromCoords, performAutoFlight, disableIntroAnimation]);
 
   // Función para ir a la ubicación actual del usuario (botón manual)
   const handleGoToMyLocation = () => {
@@ -489,10 +488,12 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     );
   };
 
-  const onMapLoad = () => {
+  const onMapLoad = useCallback(() => {
+    console.log('🗺️ Mapa cargado, configurando...');
+    setIsMapLoaded(true);
+
     if (mapRef.current) {
       const map = mapRef.current.getMap();
-      console.log('🗺️ Mapa cargado, configurando...');
       
       // El terreno 3D se configura directamente en el estilo del mapa (skyTerraCustomStyle)
       // No es necesario map.setTerrain aquí si ya está en el estilo.
@@ -525,11 +526,11 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       
       // Llamar al callback externo si existe
       if (onLoad) {
-        onLoad();
+        onLoad(mapRef.current);
       }
     }
-  };
-  
+  }, [onLoad]);
+
   const renderPropertyBoundaries = (property) => {
     if (property && property.boundary_polygon && property.boundary_polygon.coordinates) {
       return (
@@ -649,9 +650,30 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   };
   
   const onMapClick = useCallback(event => {
-    if (navigatingToTour) return;
-    const features = mapRef.current.queryRenderedFeatures(event.point, {
-      layers: [unclusteredPointLayer.id, clusterLayer.id] 
+    if (!userInteractedRef.current && !autoFlyCompleted) {
+      console.log('Interacción de click en mapa, deteniendo animación intro.');
+      stopAndSkipAnimation();
+    }
+    if (navigatingToTour || !mapRef.current) return;
+
+    const map = mapRef.current.getMap();
+    if (!map) return;
+
+    // Check if layers exist before querying
+    const unclusteredLayerExists = map.getLayer(unclusteredPointLayer.id);
+    const clusterLayerExists = map.getLayer(clusterLayer.id);
+
+    if (!unclusteredLayerExists && !clusterLayerExists) {
+      // console.warn('Attempted to query features, but target layers do not exist.');
+      return;
+    }
+
+    const queryLayers = [];
+    if (unclusteredLayerExists) queryLayers.push(unclusteredPointLayer.id);
+    if (clusterLayerExists) queryLayers.push(clusterLayer.id);
+
+    const features = map.queryRenderedFeatures(event.point, {
+      layers: queryLayers 
     });
 
     if (features && features.length > 0) {
@@ -671,14 +693,29 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         });
       }
     }
-  }, [navigatingToTour, handleMarkerClick]);
+  }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted]);
+
+  const handleUserInteraction = useCallback((event) => {
+    // Detectar si es una interacción genuina del usuario
+    if (event.originalEvent && !userInteractedRef.current && !autoFlyCompleted) {
+        console.log('Interacción de movimiento en mapa, deteniendo animación intro.');
+        stopAndSkipAnimation();
+    }
+  }, [stopAndSkipAnimation, autoFlyCompleted]);
 
   const onMapMouseMove = useCallback(event => {
-    if (mapRef.current) {
-      const features = mapRef.current.queryRenderedFeatures(event.point, {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    if (!map) return;
+
+    // Check if layer exists before querying
+    const unclusteredLayerExists = map.getLayer(unclusteredPointLayer.id);
+
+    if (unclusteredLayerExists) {
+      const features = map.queryRenderedFeatures(event.point, {
         layers: [unclusteredPointLayer.id]
       });
-      mapRef.current.getCanvas().style.cursor = features && features.length > 0 ? 'pointer' : '';
+      map.getCanvas().style.cursor = features && features.length > 0 ? 'pointer' : '';
       if (features && features.length > 0) {
         const feature = features[0];
         setPopupInfo({
@@ -689,6 +726,10 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       } else {
         setPopupInfo(null);
       }
+    } else {
+      // If layer doesn't exist, ensure cursor is default and no popup
+      map.getCanvas().style.cursor = '';
+      setPopupInfo(null);
     }
   }, []); 
 
@@ -700,18 +741,27 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   }, []);
 
   useImperativeHandle(ref, () => ({
-    getMap: () => {
-      return mapRef.current ? mapRef.current.getMap() : null;
-    },
     flyTo: (options) => {
-      if (mapRef.current) {
+      if (mapRef.current && isMapLoaded) {
         mapRef.current.flyTo(options);
+      } else {
+        console.warn('Intento de flyTo pero el mapa no está listo o la referencia es nula.');
       }
-    }
+    },
+    getMapInstance: () => mapRef.current
   }));
 
+  // Si se está cargando y no es editable, muestra el spinner
+  if (loading && !editable) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}> {/* Mapa ocupa toda la pantalla y está detrás */}
+    <Box sx={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
       {loading && !error && (
         <Box sx={{
           position: 'absolute', 
@@ -724,7 +774,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           zIndex: 10, // Asegurar que esté sobre el mapa
         }}>
           <CircularProgress />
-          <Typography sx={{ mt: 2, color: 'white' /* O color del tema */ }}>Cargando propiedades...</Typography>
+          <Typography sx={{ mt: 2, color: 'white' }}>Cargando propiedades...</Typography>
         </Box>
       )}
       {error && (
@@ -743,28 +793,38 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       {!loading && !error && (
         <Map
           ref={mapRef}
-          {...viewState} // Usa el estado de vista que se actualiza
-          onMove={evt => setViewState(evt.viewState)} // Actualiza el estado de vista en movimiento
-          initialViewState={initialMapViewState} // Establece la vista inicial aquí
+          {...viewState}
+          onMove={evt => {
+            setViewState(evt.viewState);
+            handleUserInteraction(evt); // Llamar aquí para detectar interacción
+          }}
+          initialViewState={initialMapViewState}
           onLoad={onMapLoad}
           mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
-          style={{ width: '100%', height: '100%' }}
-          attributionControl={false} // Se añadirá uno personalizado más abajo o se dejará así por minimalismo
-          projection={{ name: 'globe' }} // Esto ya está en el estilo personalizado
-          onClick={onMapClick} 
-          interactiveLayerIds={[clusterLayer.id, unclusteredPointLayer.id]} 
+          attributionControl={false}
+          projection={{ name: 'globe' }}
+          onClick={(e) => {
+            onMapClick(e); // Llama a la función onMapClick existente
+            // Aquí también podrías llamar a stopAndSkipAnimation si es un clic genérico en el mapa
+            // y no fue manejado por onMapClick para un feature específico.
+            if (!e.features || e.features.length === 0) {
+                if (!userInteractedRef.current && !autoFlyCompleted) {
+                    console.log('Click genérico en mapa, deteniendo animación intro.');
+                    stopAndSkipAnimation();
+                }
+            }
+          }}
+          interactiveLayerIds={!editable ? [clusterLayer.id, unclusteredPointLayer.id] : []} 
           onMouseMove={onMapMouseMove} 
           onMouseLeave={onMapMouseLeave} 
+          preserveDrawingBuffer={true}
         >
-          {/* La fuente mapbox-dem ya está definida en el estilo personalizado */}
-          
-          {/* Controles de Navegación Estándar Mapbox GL JS */}
           <NavigationControl 
-            position="bottom-right" // Posición más estándar
-            showCompass={true} // Mostrar brújula
-            showZoom={true} // Mostrar controles de zoom
-            visualizePitch={true} // Mostrar indicador de pitch
+            position="bottom-right"
+            showCompass={true}
+            showZoom={true}
+            visualizePitch={true}
             style={{ 
                 position: 'absolute', 
                 bottom: '30px', 
@@ -772,31 +832,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 zIndex: 5 
             }}
           />
-
-          {/* Botón GPS para ir a mi ubicación */}
-          <Fab
-            size="medium"
-            color="primary"
-            onClick={handleGoToMyLocation}
-            sx={{
-              position: 'absolute',
-              bottom: '110px', // Encima de NavigationControl
-              right: '30px',
-              zIndex: 5,
-              backgroundColor: 'rgba(88, 166, 255, 0.9)',
-              color: 'white',
-              '&:hover': {
-                backgroundColor: 'rgba(88, 166, 255, 1)',
-                transform: 'scale(1.05)',
-              },
-              transition: 'all 0.2s ease-in-out',
-            }}
-            title="Ir a mi ubicación"
-          >
-            <MyLocationIcon />
-          </Fab>
-          
-          {/* Atribución personalizada si se desea mantenerla visible de forma discreta */}
           <AttributionControl 
             position="bottom-left" 
             compact={true} 
@@ -808,9 +843,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 backgroundColor: 'rgba(255,255,255,0.5)', 
                 padding: '2px 5px',
                 borderRadius: '4px'
-            }}
-           />
-          
+             }}
+          />
           {isDrawingMode && mapRef.current && (
             <PropertyBoundaryDraw 
               map={mapRef.current.getMap()} 
@@ -818,7 +852,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               existingBoundaries={propertyBoundaries}
             />
           )}
-          
           {!editable && propertiesGeoJSON && (
             <Source 
               id="properties-source"
@@ -833,20 +866,19 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               <Layer {...unclusteredPointLayer} />
             </Source>
           )}
-          
           {editable && (
             <Paper
               elevation={3}
               sx={{
                 position: 'absolute',
-                bottom: '100px', // Ajustar posición para que no choque con NavigationControl
+                bottom: '100px',
                 right: '30px',
                 zIndex: 5,
                 display: 'flex',
                 flexDirection: 'column',
                 borderRadius: 1,
                 overflow: 'hidden',
-                backgroundColor: 'rgba(255,255,255,0.8)', // Fondo translúcido
+                backgroundColor: 'rgba(255,255,255,0.8)',
                 border: '1px solid rgba(0,0,0,0.12)'
               }}
             >
@@ -862,7 +894,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               </IconButton>
             </Paper>
           )}
-
           {popupInfo && (
             <Popup
               longitude={popupInfo.longitude}
@@ -876,9 +907,9 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             >
               <Card sx={{ 
                 maxWidth: 280, 
-                backgroundColor: 'rgba(255,255,255,0.9)', // Popup ligeramente translúcido
+                backgroundColor: 'rgba(255,255,255,0.9)',
                 border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)' // Sombra más pronunciada
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
                   <CardMedia
@@ -922,19 +953,14 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         onClose={() => setSnackbar({...snackbar, open: false})}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSnackbar({...snackbar, open: false})} severity={snackbar.severity} sx={{ width: '100%', zIndex: 20 /* Sobre otros elementos flotantes */ }}>
+        <Alert onClose={() => setSnackbar({...snackbar, open: false})} severity={snackbar.severity} sx={{ width: '100%', zIndex: 20 }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
 
-      {/* Overlay descriptivo durante la animación */}
-      {showOverlay && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1 }}
-          style={{
+      {!disableIntroAnimation && showOverlay && (
+        <Box
+          sx={{
             position: 'absolute',
             top: 0,
             left: 0,
@@ -1018,7 +1044,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               <Button
                 variant="contained"
                 size="large"
-                onClick={handleSkipAnimation}
+                onClick={stopAndSkipAnimation}
                 sx={{
                   backgroundColor: 'rgba(255, 255, 255, 0.15)',
                   color: 'rgba(255, 255, 255, 0.95)',
@@ -1042,33 +1068,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               >
                 Explorar Ahora
               </Button>
-              
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={handleSkipAnimation}
-                sx={{
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  borderColor: 'rgba(255, 255, 255, 0.15)',
-                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
-                  fontWeight: 400,
-                  fontSize: '1rem',
-                  px: 3,
-                  py: 1.5,
-                  borderRadius: '16px',
-                  textTransform: 'none',
-                  '&:hover': {
-                    borderColor: 'rgba(255, 255, 255, 0.4)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  },
-                  transition: 'all 0.3s ease',
-                }}
-              >
-                Saltar animación
-              </Button>
             </Box>
 
-            {/* Indicador de progreso */}
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center', gap: 1 }}>
               {descriptiveTexts.map((_, index) => (
                 <Box
@@ -1084,7 +1085,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               ))}
             </Box>
           </Box>
-        </motion.div>
+        </Box>
       )}
     </Box>
   );

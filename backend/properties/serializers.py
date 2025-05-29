@@ -1,6 +1,15 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model # Import get_user_model
+from django.conf import settings # Alternative for AUTH_USER_MODEL
 from .models import Property, Tour, Image
 import json
+
+User = get_user_model()
+
+class BasicUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,12 +25,14 @@ class PropertySerializer(serializers.ModelSerializer):
     images = ImageSerializer(many=True, read_only=True)
     tours = TourSerializer(many=True, read_only=True)
     boundary_polygon = serializers.JSONField(required=False, allow_null=True)
+    owner_details = BasicUserSerializer(source='owner', read_only=True)
 
     class Meta:
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
-                 'created_at', 'updated_at', 'images', 'tours']
+                 'created_at', 'updated_at', 'images', 'tours', 'publication_status',
+                 'owner_details']
         
     def validate_boundary_polygon(self, value):
         """Validar que boundary_polygon sea un GeoJSON válido"""
@@ -66,8 +77,10 @@ class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer para listar propiedades con menos detalles"""
     image_count = serializers.IntegerField(source='image_count_annotation', read_only=True)
     has_tour = serializers.BooleanField(source='has_tour_annotation', read_only=True)
+    owner_details = BasicUserSerializer(source='owner', read_only=True)
     
     class Meta:
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
-                 'boundary_polygon', 'has_water', 'has_views', 'image_count', 'has_tour'] 
+                 'boundary_polygon', 'has_water', 'has_views', 'image_count', 'has_tour',
+                 'publication_status', 'owner_details', 'created_at'] 

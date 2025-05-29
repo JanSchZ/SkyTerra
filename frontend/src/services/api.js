@@ -12,9 +12,13 @@ export const api = axios.create({
 api.interceptors.request.use(
   config => {
     const token = localStorage.getItem('auth_token');
+    
+    // Siempre enviar el token si está disponible. 
+    // El backend determinará si es necesario y si el usuario tiene los permisos adecuados.
     if (token) {
       config.headers.Authorization = `Token ${token}`;
     }
+    
     console.log('[API Request]', {
       url: config.url,
       method: config.method,
@@ -47,48 +51,36 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message
     });
+
+    // Manejo global de error 401: limpiar localStorage y redirigir a login
+    if (error.response && error.response.status === 401) {
+      // Evitar bucles de redirección si ya estamos en /login o la petición es de login
+      const isLoginAttempt = error.config?.url?.endsWith('/auth/login/');
+      const isCurrentlyOnLoginPage = window.location.pathname === '/login';
+
+      if (!isLoginAttempt && !isCurrentlyOnLoginPage) {
+        console.warn('[401 Unauthorized]', 'Token inválido o expirado. Limpiando sesión y redirigiendo a login.');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        
+        // Para asegurar que la redirección ocurra después de que el estado se actualice
+        // y evitar problemas con el router dentro del interceptor, usamos un pequeño delay.
+        // Idealmente, esto se manejaría con un sistema de pub/sub o un estado global
+        // que indique que la sesión ha expirado y los componentes reaccionen a ello.
+        setTimeout(() => {
+          // Asegurarse de que solo redirigimos si no estamos ya en login
+          if (window.location.pathname !== '/login') {
+             window.location.href = '/login'; // Redirección completa para limpiar estado de la app
+          }
+        }, 100);
+      } else if (isLoginAttempt) {
+        console.error('[Login Failed]', 'Intento de login fallido con 401.', error.response.data);
+      }
+    }
+
     return Promise.reject(error);
   }
 );
-
-// Datos de muestra para cuando la API no responde
-const SAMPLE_DATA = {
-  results: [
-    {
-      id: 1,
-      name: "Hacienda Los Andes",
-      price: 250000,
-      size: 168.5,
-      latitude: -33.4489,
-      longitude: -70.6693,
-      description: "Hermosa propiedad con vistas panorámicas a la cordillera",
-      hasWater: true,
-      hasViews: true
-    },
-    {
-      id: 2,
-      name: "Rancho El Valle",
-      price: 150000,
-      size: 85.2,
-      latitude: -33.5489,
-      longitude: -70.7693,
-      description: "Excelente para agricultura y ganadería",
-      hasWater: true,
-      hasViews: false
-    },
-    {
-      id: 3,
-      name: "Parque Laguna Azul",
-      price: 200000,
-      size: 120.7,
-      latitude: -33.3489,
-      longitude: -70.5693,
-      description: "Con acceso a lago y bosque nativo",
-      hasWater: true,
-      hasViews: true
-    }
-  ]
-};
 
 // Servicio de autenticación
 export const authService = {
@@ -126,16 +118,15 @@ export const authService = {
       return response.data;
     } catch (error) {
       console.error('Error during registration:', error);
-      // Si la API no responde, simular registro con datos de muestra
-      const mockUser = {
-        id: 1,
-        username: userData.username,
-        email: userData.email,
-        token: 'sample_token_12345'
-      };
-      localStorage.setItem('auth_token', 'sample_token_12345');
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      return { user: mockUser, token: 'sample_token_12345' };
+      // Lanzar el error real en lugar de simular
+      if (error.response && error.response.data) {
+        const errorMessages = Object.values(error.response.data).flat().join(' ');
+        throw new Error(errorMessages || 'Error en el registro.');
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Error de conexión con el servidor durante el registro.');
+      }
     }
   },
 
@@ -179,6 +170,7 @@ export const authService = {
 // Servicio de propiedades
 export const propertyService = {
   // Obtener todas las propiedades (con filtros opcionales)
+  // Para admin, el backend ya devuelve todas si el token es de un staff user.
   async getProperties(filters = {}) {
     try {
       console.log('Aplicando filtros:', filters);
@@ -186,37 +178,8 @@ export const propertyService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching properties:', error);
-      // Simular filtrado con datos de muestra si hay error de backend
-      if (filters && Object.keys(filters).length > 0) {
-        return {
-          ...SAMPLE_DATA,
-          results: SAMPLE_DATA.results.filter(property => {
-            let match = true;
-            
-            // Filtrar por precio
-            if (filters.priceMin !== undefined && property.price < filters.priceMin) match = false;
-            if (filters.priceMax !== undefined && property.price > filters.priceMax) match = false;
-            
-            // Filtrar por tamaño
-            if (filters.sizeMin !== undefined && property.size < filters.sizeMin) match = false;
-            if (filters.sizeMax !== undefined && property.size > filters.sizeMax) match = false;
-            
-            // Filtrar por tipo de propiedad
-            if (filters.propertyTypes && filters.propertyTypes.length > 0 && 
-                !filters.propertyTypes.includes(property.propertyType)) {
-              match = false;
-            }
-            
-            // Filtrar por características
-            if (filters.hasWater && !property.hasWater) match = false;
-            if (filters.hasViews && !property.hasViews) match = false;
-            if (filters.has360Tour && !property.has360Tour) match = false;
-            
-            return match;
-          })
-        };
-      }
-      return SAMPLE_DATA; // Datos de muestra en caso de error
+      // Propagar el error para que el componente lo maneje
+      throw error;
     }
   },
 
@@ -227,7 +190,8 @@ export const propertyService = {
       return response.data;
     } catch (error) {
       console.error(`Error fetching property ${id}:`, error);
-      return SAMPLE_DATA.results.find(p => p.id === parseInt(id)) || SAMPLE_DATA.results[0];
+      // Propagar el error
+      throw error;
     }
   },
 
@@ -254,39 +218,6 @@ export const propertyService = {
   },
 
   // Crear nueva propiedad
-  async createProperty(propertyData) {
-    try {
-      const response = await api.post('/properties/', propertyData);
-      return response.data;
-    } catch (error) {
-      console.error('Error creating property:', error);
-      throw error;
-    }
-  },
-
-  // Actualizar propiedad existente
-  async updateProperty(id, propertyData) {
-    try {
-      const response = await api.put(`/properties/${id}/`, propertyData);
-      return response.data;
-    } catch (error) {
-      console.error('Error updating property:', error);
-      throw error;
-    }
-  },
-
-  // Eliminar propiedad
-  async deleteProperty(id) {
-    try {
-      await api.delete(`/properties/${id}/`);
-      return true;
-    } catch (error) {
-      console.error('Error deleting property:', error);
-      throw error;
-    }
-  },
-
-  // Crear una nueva propiedad
   async createProperty(propertyData) {
     try {
       // Preparar los datos para envío
@@ -339,79 +270,51 @@ export const propertyService = {
         throw detailedError;
       }
       
-      // Simulación para desarrollo en caso de error de red
-      const newProperty = {
-        ...propertyData,
-        id: Math.floor(Math.random() * 10000) + 100,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      console.warn('Usando datos simulados debido a error de red');
-      SAMPLE_DATA.results.push(newProperty);
-      return newProperty;
+      // Si no es un error de respuesta HTTP (ej. error de red), relanzar el original
+      throw error;
     }
   },
 
-  // Actualizar una propiedad existente
+  // Actualizar datos y/o imágenes de una propiedad
   async updateProperty(id, propertyData) {
     try {
       // Preparar los datos para envío
-      const dataToSend = this.preparePropertyData(propertyData);
+      const dataToSend = this.preparePropertyData(propertyData, true); // true para indicar que es update
       
-      console.log('Actualizando propiedad:', id, dataToSend);
-      
+      console.log(`Actualizando propiedad ${id} con datos:`, dataToSend);
+
       const response = await api.put(`/properties/${id}/`, dataToSend, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json' 
         }
       });
-      
-      console.log('Propiedad actualizada exitosamente:', response.data);
       return response.data;
-      
     } catch (error) {
       console.error(`Error updating property ${id}:`, error);
-      
-      // Manejo detallado de errores similar a createProperty
-      if (error.response) {
-        const errorData = error.response.data;
-        let errorMessage = 'Error al actualizar la propiedad';
-        
-        if (errorData && typeof errorData === 'object') {
-          const fieldErrors = [];
-          
-          Object.keys(errorData).forEach(field => {
-            if (Array.isArray(errorData[field])) {
-              fieldErrors.push(`${field}: ${errorData[field].join(', ')}`);
-            } else if (typeof errorData[field] === 'string') {
-              fieldErrors.push(`${field}: ${errorData[field]}`);
-            }
-          });
-          
-          if (fieldErrors.length > 0) {
-            errorMessage = `Errores de validación: ${fieldErrors.join('; ')}`;
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
-          } else if (errorData.details) {
-            errorMessage = errorData.details;
-          }
-        }
-        
-        const detailedError = new Error(errorMessage);
-        detailedError.response = error.response;
-        throw detailedError;
+      // Propagar el error con más detalles si es posible
+      if (error.response && error.response.data) {
+        const errorMessages = Object.values(error.response.data).flat().join(' ');
+        throw new Error(errorMessages || 'Error al actualizar la propiedad.');
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Error de conexión con el servidor al actualizar la propiedad.');
       }
-      
-      // Simulación para desarrollo
-      const propertyIndex = SAMPLE_DATA.results.findIndex(p => p.id === parseInt(id));
-      if (propertyIndex !== -1) {
-        SAMPLE_DATA.results[propertyIndex] = {
-          ...SAMPLE_DATA.results[propertyIndex],
-          ...propertyData,
-          updatedAt: new Date().toISOString()
-        };
-        console.warn('Usando datos simulados debido a error de red');
-        return SAMPLE_DATA.results[propertyIndex];
+    }
+  },
+
+  // Nueva función para que el admin cambie el estado de publicación
+  async setPropertyStatus(propertyId, publicationStatus) {
+    try {
+      console.log(`Admin: Setting property ${propertyId} status to ${publicationStatus}`);
+      const response = await api.post(`/properties/${propertyId}/set-status/`, { status: publicationStatus });
+      console.log('Set property status successful:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error setting property ${propertyId} status to ${publicationStatus}:`, error);
+      if (error.response && error.response.data) {
+        const errorMessage = error.response.data.error || error.response.data.detail || 'Error al cambiar el estado de la propiedad.';
+        throw new Error(errorMessage);
       }
       throw error;
     }
@@ -421,17 +324,16 @@ export const propertyService = {
   async deleteProperty(id) {
     try {
       await api.delete(`/properties/${id}/`);
-      return { success: true };
+      return { success: true }; // Mantener esto para que el Dashboard funcione como espera
     } catch (error) {
       console.error(`Error deleting property ${id}:`, error);
-      // Simulación para desarrollo
-      SAMPLE_DATA.results = SAMPLE_DATA.results.filter(p => p.id !== parseInt(id));
-      return { success: true };
+      // Propagar el error
+      throw error;
     }
   },
 
   // Método auxiliar para preparar datos de propiedad
-  preparePropertyData(propertyData) {
+  preparePropertyData(propertyData, isUpdate = false) {
     const prepared = { ...propertyData };
     
     // Asegurar que boundary_polygon sea JSON string si es un objeto

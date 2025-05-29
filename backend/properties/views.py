@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Exists, OuterRef
 from rest_framework.views import APIView
 from django.conf import settings
+from django.core.mail import send_mail
 import json
 import datetime
 import requests
@@ -30,9 +31,19 @@ class PropertyViewSet(viewsets.ModelViewSet):
     serializer_class = PropertySerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['price', 'size', 'has_water', 'has_views']
-    search_fields = ['name', 'description']
+    search_fields = ['name', 'description', 'location_name']
     ordering_fields = ['price', 'size', 'created_at']
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_permissions(self):
+        """
+        Permite lectura (list, retrieve) a cualquiera.
+        Requiere autenticación para otras acciones (create, update, delete, my_properties).
+        """
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
     
     def get_serializer_class(self):
         if self.action == 'list' or self.action == 'my_properties':
@@ -40,7 +51,10 @@ class PropertyViewSet(viewsets.ModelViewSet):
         return PropertySerializer
     
     def get_queryset(self):
-        """Permite filtrar propiedades por rango de precio y tamaño y anota conteos relacionados."""
+        """
+        Permite filtrar propiedades por rango de precio y tamaño y anota conteos relacionados.
+        Los usuarios staff ven todas las propiedades, los demás solo las aprobadas.
+        """
         queryset = super().get_queryset()
         
         # Annotations for N+1 optimization
@@ -50,6 +64,10 @@ class PropertyViewSet(viewsets.ModelViewSet):
             has_tour_annotation=Exists(tour_exists)
         )
         
+        # Filter by publication_status for non-staff users
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(publication_status='approved')
+
         # Filtros adicionales por rango
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
@@ -80,23 +98,50 @@ class PropertyViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        """Crear propiedad asignando el owner al usuario autenticado"""
+        """Crear propiedad asignando el owner al usuario autenticado y enviar email de notificación."""
         try:
-            # Asegurar que el usuario esté autenticado
             if not self.request.user.is_authenticated:
                 logger.error("Intento de crear propiedad sin autenticación")
-                raise PermissionError("Debe estar autenticado para crear propiedades")
-            
-            # Log de los datos recibidos para debugging
+                # This should ideally be caught by permission_classes, but as a safeguard:
+                return Response({"detail": "Debe estar autenticado para crear propiedades."}, status=status.HTTP_401_UNAUTHORIZED)
+
             logger.info(f"Creando propiedad para usuario: {self.request.user.username}")
             logger.info(f"Datos recibidos: {serializer.validated_data}")
             
-            # Guardar con el owner
             property_instance = serializer.save(owner=self.request.user)
-            logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}")
+            logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}, Estado: {property_instance.publication_status}")
+
+            # Enviar email de notificación si la propiedad está pendiente de revisión
+            if property_instance.publication_status == 'pending':
+                try:
+                    subject = f"Nueva Propiedad Enviada para Revisión: {property_instance.name}"
+                    message_body = f"""
+                    Una nueva propiedad ha sido enviada para revisión:
+
+                    Nombre: {property_instance.name}
+                    Tipo: {property_instance.get_type_display()}
+                    Precio: {property_instance.price}
+                    Tamaño: {property_instance.size} ha
+                    Enviada por: {self.request.user.username} (ID: {self.request.user.id})
+                    
+                    ID de Propiedad: {property_instance.id}
+
+                    Por favor, revísala en el panel de administración. 
+                    (Enlace al detalle en API: /api/properties/{property_instance.id}/ ) 
+                    """
+                    # Asegúrate que DEFAULT_FROM_EMAIL está configurado en settings.py
+                    from_email = settings.DEFAULT_FROM_EMAIL
+                    recipient_list = ['skyedits.cl@gmail.com'] 
+                    
+                    send_mail(subject, message_body, from_email, recipient_list, fail_silently=False)
+                    logger.info(f"Email de notificación enviado a {recipient_list} para propiedad ID: {property_instance.id}")
+                except Exception as email_error:
+                    logger.error(f"Error al enviar email de notificación para propiedad ID: {property_instance.id}: {str(email_error)}", exc_info=True)
+                    # No relanzar el error para no impedir la creación de la propiedad, solo loggearlo.
             
         except Exception as e:
             logger.error(f"Error al crear propiedad: {str(e)}", exc_info=True)
+            # El error ya se maneja en el método create, aquí solo relanzamos para que create lo capture
             raise
 
     def perform_update(self, serializer):
@@ -132,6 +177,11 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         """Override update para manejo personalizado de errores"""
         try:
+            # Validar permisos antes de llamar a super().update
+            instance = self.get_object()
+            if instance.owner != self.request.user and not self.request.user.is_staff:
+                logger.warning(f"Permiso denegado: Usuario {request.user} intentando actualizar propiedad {instance.id} de {instance.owner}")
+                return Response({"detail": "No tiene permisos para editar esta propiedad."}, status=status.HTTP_403_FORBIDDEN)
             return super().update(request, *args, **kwargs)
         except Exception as e:
             logger.error(f"Error en update: {str(e)}", exc_info=True)
@@ -157,12 +207,48 @@ class PropertyViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(user_properties, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='set-status', permission_classes=[permissions.IsAdminUser])
+    def set_publication_status(self, request, pk=None):
+        """Permite a un administrador cambiar el estado de publicación de una propiedad."""
+        property_instance = self.get_object()
+        new_status = request.data.get('status')
+
+        if not new_status:
+            return Response({'error': 'El campo "status" es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_statuses = [choice[0] for choice in Property.PUBLICATION_STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response(
+                {'error': f'Estado inválido. Opciones válidas: {", ".join(valid_statuses)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            property_instance.publication_status = new_status
+            property_instance.save(update_fields=['publication_status', 'updated_at'])
+            logger.info(f"Usuario {request.user.username} actualizó estado de propiedad ID {property_instance.id} a {new_status}")
+            serializer = self.get_serializer(property_instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error al actualizar estado de propiedad ID {property_instance.id}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Error interno al actualizar el estado.', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class TourViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar tours virtuales"""
     queryset = Tour.objects.all()
     serializer_class = TourSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['property', 'type']
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
 class ImageViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar imágenes de propiedades"""
@@ -180,6 +266,13 @@ class ImageViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(property_id=property_id)
             
         return queryset.order_by('order')
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AISearchView(APIView):

@@ -67,7 +67,8 @@ const CreateProperty = ({ editMode = false }) => {
     terrain: 'flat',
     access: 'paved',
     utilities: [],
-    legalStatus: 'clear'
+    legalStatus: 'clear',
+    publication_status: 'pending'
   };
   const [propertyData, setPropertyData] = useState(initialPropertyData);
 
@@ -140,8 +141,8 @@ const CreateProperty = ({ editMode = false }) => {
         return;
       }
     } else if (activeStep === 1) {
-      if (!propertyData.boundary_polygon) {
-        setSnackbar({ open: true, message: 'Por favor marque la ubicación en el mapa.', severity: 'error' });
+      if (!propertyData.latitude || !propertyData.longitude) {
+        setSnackbar({ open: true, message: 'Por favor ingresa la latitud y longitud.', severity: 'error' });
         return;
       }
     }
@@ -166,6 +167,11 @@ const CreateProperty = ({ editMode = false }) => {
     
     if (payload.boundary_polygon && typeof payload.boundary_polygon !== 'string') {
       payload.boundary_polygon = JSON.stringify(payload.boundary_polygon);
+    }
+
+    // Asegurar publication_status
+    if (!payload.publication_status) {
+      payload.publication_status = 'pending';
     }
 
     try {
@@ -268,19 +274,23 @@ const CreateProperty = ({ editMode = false }) => {
 
           {/* Step Content */}
           {activeStep === 0 && (
-            <Stack spacing={4}>
-              <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 2 }}>
-                Información Básica
-              </Typography>
-              
-                             <Grid container spacing={3}>
-                 <Grid item xs={12} md={8}>
-                  <TextField 
-                    fullWidth 
-                    label="Nombre de la propiedad" 
-                    value={propertyData.name} 
-                    onChange={handleInputChange('name')} 
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Información Principal</Typography>
+              <Grid container spacing={3}>
+                <Grid size={12}>
+                  <TextField
+                    label="Nombre de la Propiedad"
+                    fullWidth
+                    value={propertyData.name}
+                    onChange={handleInputChange('name')}
                     required
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <HomeWorkIcon sx={{ color: '#8b949e' }} />
+                        </InputAdornment>
+                      ),
+                    }}
                     sx={{ 
                       '& .MuiInputLabel-root': { color: '#8b949e' },
                       '& .MuiOutlinedInput-root': { 
@@ -290,13 +300,22 @@ const CreateProperty = ({ editMode = false }) => {
                     }}
                   />
                 </Grid>
-                                 <Grid item xs={12} md={4}>
-                  <TextField 
-                    fullWidth 
-                    select 
-                    label="Tipo de propiedad" 
-                    value={propertyData.propertyType} 
-                    onChange={handleInputChange('propertyType')}
+                <Grid size={12}>
+                  <TextField
+                    label="Descripción"
+                    fullWidth
+                    multiline
+                    rows={4}
+                    value={propertyData.description}
+                    onChange={handleInputChange('description')}
+                    required
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <DescriptionIcon sx={{ color: '#8b949e' }} />
+                        </InputAdornment>
+                      ),
+                    }}
                     sx={{ 
                       '& .MuiInputLabel-root': { color: '#8b949e' },
                       '& .MuiOutlinedInput-root': { 
@@ -304,23 +323,10 @@ const CreateProperty = ({ editMode = false }) => {
                         '& fieldset': { borderColor: '#30363d' }
                       }
                     }}
-                  >
-                    <MenuItem value="farm">Parcela/Granja</MenuItem>
-                    <MenuItem value="ranch">Rancho</MenuItem>
-                    <MenuItem value="forest">Bosque</MenuItem>
-                    <MenuItem value="lake">Terreno con Lago</MenuItem>
-                  </TextField>
+                  />
                 </Grid>
-              </Grid>
-
-              <Box>
-                <Typography variant="h6" sx={{ color: '#c9d1d9', mb: 2 }}>
-                  Precio (CLP)
-                </Typography>
-                <Card sx={{ p: 3, backgroundColor: 'rgba(13, 17, 23, 0.8)', border: '1px solid #30363d' }}>
-                  <Typography variant="h4" sx={{ color: '#3b82f6', mb: 2, textAlign: 'center' }}>
-                    {formatPrice(propertyData.price)}
-                  </Typography>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography gutterBottom sx={{ color: '#8b949e' }}>Precio (CLP)</Typography>
                   <Slider
                     value={propertyData.price}
                     onChange={handlePriceChange}
@@ -340,17 +346,9 @@ const CreateProperty = ({ editMode = false }) => {
                     <Typography variant="caption" sx={{ color: '#8b949e' }}>$10M</Typography>
                     <Typography variant="caption" sx={{ color: '#8b949e' }}>$1B</Typography>
                   </Box>
-                </Card>
-              </Box>
-
-              <Box>
-                <Typography variant="h6" sx={{ color: '#c9d1d9', mb: 2 }}>
-                  Tamaño (Hectáreas)
-                </Typography>
-                <Card sx={{ p: 3, backgroundColor: 'rgba(13, 17, 23, 0.8)', border: '1px solid #30363d' }}>
-                  <Typography variant="h4" sx={{ color: '#10b981', mb: 2, textAlign: 'center' }}>
-                    {propertyData.size.toFixed(1)} ha
-                  </Typography>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography gutterBottom sx={{ color: '#8b949e' }}>Tamaño (Hectáreas)</Typography>
                   <Slider
                     value={propertyData.size}
                     onChange={handleSizeChange}
@@ -370,146 +368,264 @@ const CreateProperty = ({ editMode = false }) => {
                     <Typography variant="caption" sx={{ color: '#8b949e' }}>0.1 ha</Typography>
                     <Typography variant="caption" sx={{ color: '#8b949e' }}>1,000 ha</Typography>
                   </Box>
-                </Card>
-              </Box>
-
-              <TextField 
-                fullWidth 
-                multiline 
-                rows={4}
-                label="Descripción de la propiedad" 
-                value={propertyData.description} 
-                onChange={handleInputChange('description')} 
-                required
-                sx={{ 
-                  '& .MuiInputLabel-root': { color: '#8b949e' },
-                  '& .MuiOutlinedInput-root': { 
-                    color: '#c9d1d9',
-                    '& fieldset': { borderColor: '#30363d' }
-                  }
-                }}
-              />
-            </Stack>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    label="Tipo de propiedad"
+                    value={propertyData.propertyType}
+                    onChange={handleInputChange('propertyType')}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  >
+                    <MenuItem value="farm">Parcela/Granja</MenuItem>
+                    <MenuItem value="ranch">Rancho</MenuItem>
+                    <MenuItem value="forest">Bosque</MenuItem>
+                    <MenuItem value="lake">Terreno con Lago</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    label="Tipo de Terreno"
+                    value={propertyData.terrain}
+                    onChange={handleInputChange('terrain')}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  >
+                    <MenuItem value="flat">Plano</MenuItem>
+                    <MenuItem value="hills">Colinas</MenuItem>
+                    <MenuItem value="mountains">Montañoso</MenuItem>
+                    <MenuItem value="mixed">Mixto</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControlLabel
+                    control={<Checkbox checked={propertyData.hasWater} onChange={handleCheckboxChange('hasWater')} sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#10b981' } }} />}
+                    label="Acceso a agua"
+                    sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControlLabel
+                    control={<Checkbox checked={propertyData.hasViews} onChange={handleCheckboxChange('hasViews')} sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#10b981' } }} />}
+                    label="Vistas panorámicas"
+                    sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
           )}
 
           {activeStep === 1 && (
-            <Stack spacing={4}>
-              <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 2 }}>
-                Ubicación y Límites
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 2 }}>
+                Ubicación de la Propiedad
               </Typography>
-              
-              <Typography variant="body1" sx={{ color: '#8b949e' }}>
-                Usa las herramientas del mapa para marcar la ubicación y delimitar tu propiedad.
+              <Typography variant="body2" sx={{ color: '#8b949e', mb: 3 }}>
+                Ingresa la latitud y longitud de la propiedad. Puedes obtener tu ubicación actual automáticamente.
               </Typography>
-
-              <Box sx={{ 
-                height: 500, 
-                width: '100%', 
-                borderRadius: 2, 
-                overflow: 'hidden',
-                border: '1px solid #30363d'
-              }}>
-                <MapView
-                  editable={true}
-                  onBoundariesUpdate={handleBoundariesUpdate}
-                  initialViewState={{
-                    longitude: parseFloat(propertyData.longitude) || -70.6693,
-                    latitude: parseFloat(propertyData.latitude) || -33.4489,
-                    zoom: 10,
-                  }}
-                  initialGeoJsonBoundary={propertyData.boundary_polygon}
-                />
-              </Box>
-            </Stack>
+              <Grid container spacing={3} sx={{ mb: 3, maxWidth: 600 }}>
+                <Grid size={12}>
+                  <TextField
+                    label="Latitud"
+                    fullWidth
+                    value={propertyData.latitude || ''}
+                    onChange={handleInputChange('latitude')}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LocationOnIcon sx={{ color: '#8b949e' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ 
+                      '& .MuiInputLabel-root': { color: '#8b949e' },
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid size={12}>
+                  <TextField
+                    label="Longitud"
+                    fullWidth
+                    value={propertyData.longitude || ''}
+                    onChange={handleInputChange('longitude')}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LocationOnIcon sx={{ color: '#8b949e' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ 
+                      '& .MuiInputLabel-root': { color: '#8b949e' },
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid size={12}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (position) => {
+                            setPropertyData(prev => ({
+                              ...prev,
+                              latitude: position.coords.latitude.toFixed(6),
+                              longitude: position.coords.longitude.toFixed(6)
+                            }));
+                            setSnackbar({ open: true, message: 'Ubicación obtenida correctamente.', severity: 'success' });
+                          },
+                          () => setSnackbar({ open: true, message: 'No se pudo obtener la ubicación.', severity: 'error' })
+                        );
+                      } else {
+                        setSnackbar({ open: true, message: 'Geolocalización no soportada.', severity: 'warning' });
+                      }
+                    }}
+                    sx={{ mt: 1, color: '#3b82f6', borderColor: '#3b82f6' }}
+                  >
+                    Obtener mi ubicación
+                  </Button>
+                </Grid>
+              </Grid>
+              <Typography variant="caption" sx={{ color: '#8b949e' }}>
+                Podrás ajustar la ubicación y límites exactos más adelante desde el panel de administración.
+              </Typography>
+            </Box>
           )}
 
           {activeStep === 2 && (
-            <Stack spacing={4}>
-              <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 2 }}>
-                Características
-              </Typography>
-
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ color: '#c9d1d9' }}>Detalles Adicionales</Typography>
               <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Card sx={{ p: 3, backgroundColor: 'rgba(13, 17, 23, 0.8)', border: '1px solid #30363d' }}>
-                    <Typography variant="h6" sx={{ color: '#c9d1d9', mb: 2 }}>
-                      Recursos Naturales
-                    </Typography>
-                    <Stack spacing={2}>
-                      <FormControlLabel
-                        control={<Checkbox checked={propertyData.hasWater} onChange={handleCheckboxChange('hasWater')} />}
-                        label="Acceso a agua"
-                        sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={propertyData.hasViews} onChange={handleCheckboxChange('hasViews')} />}
-                        label="Vistas panorámicas"
-                        sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
-                      />
-                    </Stack>
-                  </Card>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    label="Estado Legal (ej: saneado, con hipoteca)"
+                    value={propertyData.legalStatus}
+                    onChange={handleInputChange('legalStatus')}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  >
+                    <MenuItem value="clear">Saneado</MenuItem>
+                    <MenuItem value="mortgaged">Con hipoteca</MenuItem>
+                  </TextField>
                 </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <Card sx={{ p: 3, backgroundColor: 'rgba(13, 17, 23, 0.8)', border: '1px solid #30363d' }}>
-                    <Typography variant="h6" sx={{ color: '#c9d1d9', mb: 2 }}>
-                      Tipo de Terreno
-                    </Typography>
-                    <TextField 
-                      fullWidth 
-                      select 
-                      value={propertyData.terrain} 
-                      onChange={handleInputChange('terrain')}
-                      sx={{ 
-                        '& .MuiOutlinedInput-root': { 
-                          color: '#c9d1d9',
-                          '& fieldset': { borderColor: '#30363d' }
-                        }
-                      }}
-                    >
-                      <MenuItem value="flat">Plano</MenuItem>
-                      <MenuItem value="hills">Colinas</MenuItem>
-                      <MenuItem value="mountains">Montañoso</MenuItem>
-                      <MenuItem value="mixed">Mixto</MenuItem>
-                    </TextField>
-                  </Card>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    label="Acceso"
+                    value={propertyData.access}
+                    onChange={handleInputChange('access')}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  >
+                    <MenuItem value="paved">Pavimentado</MenuItem>
+                    <MenuItem value="unpaved">No pavimentado</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    label="Servicios"
+                    SelectProps={{
+                      multiple: true,
+                      value: propertyData.utilities,
+                      onChange: (e) => {
+                        const value = e.target.value;
+                        setPropertyData(prev => ({ ...prev, utilities: typeof value === 'string' ? value.split(',') : value }));
+                      },
+                      renderValue: (selected) =>
+                        selected.length === 0 ? 'Ninguno' : selected.map(val => {
+                          switch(val) {
+                            case 'water': return 'Agua';
+                            case 'electricity': return 'Electricidad';
+                            case 'internet': return 'Internet';
+                            case 'phone': return 'Teléfono';
+                            default: return val;
+                          }
+                        }).join(', ')
+                    }}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  >
+                    <MenuItem value="water">Agua</MenuItem>
+                    <MenuItem value="electricity">Electricidad</MenuItem>
+                    <MenuItem value="internet">Internet</MenuItem>
+                    <MenuItem value="phone">Teléfono</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    label="Terreno"
+                    value={propertyData.terrain}
+                    onChange={handleInputChange('terrain')}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#c9d1d9',
+                        '& fieldset': { borderColor: '#30363d' }
+                      }
+                    }}
+                  >
+                    <MenuItem value="flat">Plano</MenuItem>
+                    <MenuItem value="hills">Colinas</MenuItem>
+                    <MenuItem value="mountains">Montañoso</MenuItem>
+                    <MenuItem value="mixed">Mixto</MenuItem>
+                  </TextField>
                 </Grid>
               </Grid>
-            </Stack>
+            </Box>
           )}
 
           {activeStep === 3 && (
-            <Stack spacing={4}>
-              <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 2 }}>
-                Revisar Información
-              </Typography>
-
-              <Card sx={{ p: 3, backgroundColor: 'rgba(13, 17, 23, 0.8)', border: '1px solid #30363d' }}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h6" sx={{ color: '#3b82f6', mb: 2 }}>
-                      {propertyData.name}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#8b949e', mb: 2 }}>
-                      {propertyData.description}
-                    </Typography>
-                    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                      <Chip label={propertyData.propertyType} size="small" />
-                      {propertyData.hasWater && <Chip label="Con agua" size="small" color="primary" />}
-                      {propertyData.hasViews && <Chip label="Con vistas" size="small" color="secondary" />}
-                    </Stack>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="h4" sx={{ color: '#3b82f6', mb: 1 }}>
-                      {formatPrice(propertyData.price)}
-                    </Typography>
-                    <Typography variant="h6" sx={{ color: '#10b981' }}>
-                      {propertyData.size.toFixed(1)} hectáreas
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Card>
-            </Stack>
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Revisar y Guardar</Typography>
+              <Grid container spacing={2} sx={{ color: '#c9d1d9' }}>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Nombre:</strong> {propertyData.name}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Tipo:</strong> {propertyData.propertyType}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Precio:</strong> {formatPrice(propertyData.price)}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Tamaño:</strong> {propertyData.size} ha</Typography></Grid>
+                <Grid size={12}><Typography><strong>Descripción:</strong> {propertyData.description}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Agua:</strong> {propertyData.hasWater ? 'Sí' : 'No'}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Vistas:</strong> {propertyData.hasViews ? 'Sí' : 'No'}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Latitud:</strong> {propertyData.latitude || 'No especificada'}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Longitud:</strong> {propertyData.longitude || 'No especificada'}</Typography></Grid>
+                <Grid size={12}><Typography><strong>Límites (GeoJSON):</strong> {propertyData.boundary_polygon ? 'Definidos' : 'No definidos'}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Terreno:</strong> {propertyData.terrain}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Acceso:</strong> {propertyData.access}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Servicios:</strong> {propertyData.utilities?.join(', ') || 'Ninguno'}</Typography></Grid>
+                <Grid size={{ xs: 12, sm: 6 }}><Typography><strong>Estado Legal:</strong> {propertyData.legalStatus}</Typography></Grid>
+              </Grid>
+            </Box>
           )}
 
           {/* Navigation Buttons */}

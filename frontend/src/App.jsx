@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   CssBaseline,
   ThemeProvider,
@@ -12,40 +12,38 @@ import {
   MenuItem,
   useTheme as useMuiTheme,
   useMediaQuery,
-  Paper, // Para los elementos flotantes
-  Fab, // Para el botón de filtros flotante
-  CircularProgress, // Para el loading state
+  Paper,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import MapView from './components/map/MapView';
-import FilterPanel from './components/ui/FilterPanel';
 import PropertyDetails from './components/property/PropertyDetails';
 import TourViewer from './components/tours/TourViewer';
-import AuthPage, { LoginForm, RegisterForm } from './components/ui/AuthForms';
+import AuthPage from './components/ui/AuthForms';
 import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import CreateProperty from './components/property/CreateProperty';
-import { authService } from './services/api'; // propertyService y tourService ya no se usan aquí directamente
+import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
+import AdminPublicationsPage from './components/admin/AdminPublicationsPage';
+import { authService } from './services/api';
 import './App.css';
 
-// Create a context for theme mode
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
   mode: 'light',
 });
 
-// Main App component that provides the theme
 const AppWrapper = () => {
-  const mode = 'dark'; // Always dark mode
+  const mode = 'dark';
 
   const themeMode = useMemo(
     () => ({
-      toggleThemeMode: () => {
-        // No-op: theme is always dark
-      },
+      toggleThemeMode: () => {},
       mode,
     }),
     [mode],
@@ -60,18 +58,18 @@ const AppWrapper = () => {
         palette: {
           mode: 'dark',
           primary: {
-            main: '#58a6ff', // Azul vibrante
+            main: '#58a6ff',
             light: '#7FBFFF',
             dark: '#005DB3',
             contrastText: '#ffffff',
           },
           secondary: {
-            main: '#f6d55c', // Amarillo/naranja
+            main: '#f6d55c',
             contrastText: '#000000',
           },
           background: {
-            default: '#0d1117', // Fondo Github dark
-            paper: '#161b22', // Papel Github dark
+            default: '#0d1117',
+            paper: '#161b22',
           },
           text: {
             primary: '#c9d1d9',
@@ -91,7 +89,7 @@ const AppWrapper = () => {
           h4: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' },
           h5: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' },
           h6: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0.01em' },
-          body1: { fontWeight: 300, lineHeight: 1.65 }, // Peso más delgado
+          body1: { fontWeight: 300, lineHeight: 1.65 },
           body2: { fontWeight: 300, lineHeight: 1.55 },
           button: { fontWeight: 400, textTransform: 'none', letterSpacing: '0.02em', fontSize: '0.9rem' },
         },
@@ -99,8 +97,8 @@ const AppWrapper = () => {
           MuiButton: {
             styleOverrides: {
               root: {
-                borderRadius: 8, // Bordes ligeramente menos redondeados
-                padding: '8px 20px', // Padding ajustado
+                borderRadius: 8,
+                padding: '8px 20px',
                 boxShadow: 'none',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
@@ -110,25 +108,21 @@ const AppWrapper = () => {
               },
             },
           },
-          MuiPaper: { // Estilo base para todos los papeles, incluyendo los flotantes
+          MuiPaper: {
             styleOverrides: {
               root: {
                 borderRadius: 12,
                 border: '1px solid #30363d',
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-                // Transparencia y blur para elementos flotantes (se puede aplicar específicamente)
-                // backgroundColor: mode === 'dark' ? 'rgba(22, 27, 34, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-                // backdropFilter: 'blur(10px)', 
               },
             },
           },
-          // AppBar ya no se usa globalmente, se elimina su MuiAppBar override
           MuiTextField: {
             styleOverrides: {
               root: {
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 8,
-                  backgroundColor: 'rgba(13, 17, 23, 0.7)', // Fondo translúcido para inputs
+                  backgroundColor: 'rgba(13, 17, 23, 0.7)',
                   backdropFilter: 'blur(5px)',
                   '& fieldset': {
                     borderColor: '#30363d',
@@ -145,12 +139,11 @@ const AppWrapper = () => {
               },
             },
           },
-          MuiCard: { // Ajustes para popups de mapa y otros cards
+          MuiCard: {
             styleOverrides: {
               root: {
                 borderRadius: 12,
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                // No hover effect by default on all cards, apply specifically if needed
               }
             }
           },
@@ -158,12 +151,11 @@ const AppWrapper = () => {
         shape: {
           borderRadius: 8,
         },
-        // Sombras actualizadas para modo oscuro
         shadows: Array(25).fill('none').map((_, index) => {
           if (index === 0) return 'none';
           const y = index;
           const blur = index * 2.5;
-          const alpha = 0.2 + index * 0.02; // Sombras para modo oscuro
+          const alpha = 0.2 + index * 0.02;
           return `0 ${y}px ${blur}px rgba(0,0,0, ${Math.min(alpha, 0.7)})`;
         }),
       }),
@@ -174,14 +166,12 @@ const AppWrapper = () => {
     <ThemeModeContext.Provider value={themeMode}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <App /> {/* El componente App ahora manejará el layout minimalista */}
+        <App />
       </ThemeProvider>
     </ThemeModeContext.Provider>
   );
 };
 
-
-// Ruta protegida que redirige a login si no hay usuario autenticado
 const ProtectedRoute = ({ user, element }) => {
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -189,47 +179,37 @@ const ProtectedRoute = ({ user, element }) => {
   return element;
 };
 
-// Nuevo Layout principal para el diseño minimalista
 function App() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  // const [authError, setAuthError] = useState(null); // No parece usarse
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false); // Filtros cerrados por defecto
 
-  const { mode } = useContext(ThemeModeContext); // Obtener modo del contexto (siempre dark)
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const mapRef = React.useRef(null);
 
-  const [globalFilters, setGlobalFilters] = useState({
-    priceMin: 0, priceMax: 500000, sizeMin: 0, sizeMax: 200,
-    propertyTypes: [], hasWater: false, hasViews: false, has360Tour: false,
-  });
+  // Estado para el Snackbar
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
+    if (currentUser) {
+      setUser(currentUser);
+      // No mostramos snackbar aquí para evitarlo en cada carga si ya está logueado
+    }
     setLoadingAuth(false);
   }, []);
   
   const handleAISearch = (aiGeneratedFilters) => {
     if (!aiGeneratedFilters) return;
-    console.log('AI search response:', aiGeneratedFilters);
-    const suggestedFilters = aiGeneratedFilters.suggestedFilters || {};
-    const newFilters = {
-      ...globalFilters,
-      priceMin: suggestedFilters.priceRange ? suggestedFilters.priceRange[0] : globalFilters.priceMin,
-      priceMax: suggestedFilters.priceRange ? suggestedFilters.priceRange[1] : globalFilters.priceMax,
-      propertyTypes: suggestedFilters.propertyTypes || globalFilters.propertyTypes,
-      hasWater: suggestedFilters.features?.includes('hasWater') ?? globalFilters.hasWater,
-      hasViews: suggestedFilters.features?.includes('hasViews') ?? globalFilters.hasViews,
-      has360Tour: suggestedFilters.features?.includes('has360Tour') ?? globalFilters.has360Tour,
-      aiResponse: aiGeneratedFilters,
-    };
-    setGlobalFilters(newFilters);
-    // Abrir filtros si se hizo una búsqueda AI y no están abiertos (opcional)
-    // if (!isFilterPanelOpen) setIsFilterPanelOpen(true);
+    console.log('AI search response (filters removed):', aiGeneratedFilters);
+    if (aiGeneratedFilters.flyToLocation) {
+        handleLocationSearch(aiGeneratedFilters.flyToLocation);
+    }
   };
 
   const handleLocationSearch = (locationData) => {
@@ -251,254 +231,257 @@ function App() {
   const handleLogin = async (credentials) => {
     try {
       const userData = await authService.login(credentials);
-      setUser(userData.user || userData); // Manejar ambos formatos de respuesta
-      console.log('Login successful, redirecting...');
-      window.location.href = '/'; // Redirigir a la página principal
+      setUser(userData.user || userData);
+      setSnackbarMessage('¡Inicio de sesión exitoso! Bienvenido.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      navigate('/');
     } catch (error) {
       console.error("Login failed:", error);
-      alert("Error de inicio de sesión: " + error.message);
+      setSnackbarMessage(error.message || 'Error al iniciar sesión. Inténtalo de nuevo.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      // No navegamos en caso de error, el usuario permanece en la página de login
     }
   };
 
   const handleRegister = async (userData) => {
     try {
       await authService.register(userData);
-      // setAuthError(null);
-      alert('Registration successful! Please login.');
-      window.location.href = '/login';
+      setSnackbarMessage('¡Registro exitoso! Por favor, inicia sesión.');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      navigate('/login');
     } catch (error) {
       console.error("Registration failed:", error);
-      // setAuthError(error.message || 'Failed to register');
-       alert("Registration failed: " + (JSON.stringify(error.response?.data) || error.message || 'Unknown error'));
+      const errorMessage = typeof error.response?.data === 'string' ? error.response.data : (error.response?.data?.detail || error.message || 'Error desconocido durante el registro.');
+      setSnackbarMessage(errorMessage);
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     }
   };
 
   const handleLogout = () => {
     authService.logout();
     setUser(null);
-    window.location.href = '/login';
+    setSnackbarMessage('Has cerrado sesión.');
+    setSnackbarSeverity('info');
+    setSnackbarOpen(true);
+    navigate('/login');
   };
 
-  const toggleFilterPanel = () => {
-        setIsFilterPanelOpen(!isFilterPanelOpen);
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
   };
-  
-  // Para el menú de usuario flotante
+
   const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
   const handleUserMenuOpen = (event) => setUserMenuAnchorEl(event.currentTarget);
   const handleUserMenuClose = () => setUserMenuAnchorEl(null);
 
-
   if (loadingAuth) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
+  const pageVariants = {
+    initial: {
+      opacity: 0,
+      // x: "-100vw"
+    },
+    in: {
+      opacity: 1,
+      // x: 0
+    },
+    out: {
+      opacity: 0,
+      // x: "100vw"
+    }
+  };
+
+  const pageTransition = {
+    type: "tween",
+    ease: "easeInOut",
+    duration: 0.4
+  };
+
+  // Determine if the top bar should be shown
+  const showTopBar = !location.pathname.startsWith('/dashboard') && !location.pathname.startsWith('/admin'); // Hide on /admin routes too
+
   return (
-    <Router>
-      <Routes>
-        {/* Rutas que NO deben tener mapa de fondo */}
-        <Route path="/property/create" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
-        <Route path="/property/edit/:propertyId" element={<ProtectedRoute user={user} element={<CreateProperty editMode={true} />} />} />
-        <Route path="/dashboard" element={<ProtectedRoute user={user} element={<Dashboard user={user} />} />} />
-        <Route path="/login" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
-        <Route path="/register" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
-        
-        {/* Rutas que SÍ deben tener mapa de fondo */}
-        <Route path="/*" element={
-          <Box sx={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>
-            {/* MapView siempre de fondo y pantalla completa */}
-            <MapView ref={mapRef} filters={globalFilters} />
-
-        {/* Logo SkyTerra Flotante */}
-        <Typography
-          variant="h4"
-          sx={{
-            position: 'absolute',
-            top: isMobile ? '16px' : '24px',
-            left: isMobile ? '16px' : '24px',
-            zIndex: 10,
-            color: '#ffffff', // Siempre blanco para contraste con el mapa
-            fontWeight: 'bold',
-            textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-            cursor: 'pointer',
-          }}
-          onClick={() => window.location.href = '/'}
-        >
-          SKYTERRA
-        </Typography>
-
-        {/* Barra de Búsqueda AI Flotante (Estilo Google Earth) */}
+    <>
+      {/* UI principal siempre visible (Header Minimalista, etc.) */}
+      {/* Condición para no mostrar en property, tour, o dashboard */}
+      {!location.pathname.startsWith('/property/') && 
+       !location.pathname.startsWith('/tour/') && 
+       location.pathname !== '/dashboard' && (
         <Box
           sx={{
-            position: 'absolute',
-            top: isMobile ? '60px' : '24px', // Más abajo en mobile para no tapar el logo
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: isMobile ? 'calc(100% - 32px)' : 'clamp(400px, 50vw, 700px)', // Ancho adaptable
-            zIndex: 10,
-            transition: 'all 0.3s ease-in-out',
+            position: 'absolute', top: 0, left: 0, right: 0, p: isMobile ? 1 : 2,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1200,
           }}
         >
-          <Paper 
-            elevation={12} 
-            sx={{ 
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '50px', // Totalmente circular
-              padding: '4px 8px', // Padding ajustado para forma circular
-              border: '1px solid rgba(88, 166, 255, 0.3)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          <Typography 
+            variant={isMobile ? "h6" : "h5"}
+            component="div" 
+            onClick={() => navigate('/')}
+            sx={{
+              color: '#e0e0e0',
+              fontFamily: 'Poppins, sans-serif',
+              fontWeight: 300,
+              letterSpacing: '0.05em',
+              cursor: 'pointer',
+              userSelect: 'none',
+              paddingRight: 2,
+              paddingLeft: isMobile ? 1 : 3,
+              transition: 'color 0.3s ease-in-out',
+              '&:hover': {
+                color: '#ffffff',
+              }
             }}
           >
-            <AISearchBar onSearch={handleAISearch} onLocationSearch={handleLocationSearch} />
-          </Paper>
-        </Box>
+            SkyTerra
+          </Typography>
 
-        {/* Controles de Usuario y Tema Flotantes */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: isMobile ? '16px' : '24px',
-            right: isMobile ? '16px' : '24px',
-            zIndex: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: isMobile ? 1 : 1.5,
-          }}
-        >
-          {user ? (
-            <>
-              <IconButton onClick={handleUserMenuOpen} sx={{ color: 'white', backgroundColor: 'rgba(0,0,0,0.3)', '&:hover': { backgroundColor: 'rgba(0,0,0,0.5)'} }}>
-                <AccountCircleIcon />
-              </IconButton>
-              <Menu
-                anchorEl={userMenuAnchorEl}
-                open={Boolean(userMenuAnchorEl)}
-                onClose={handleUserMenuClose}
-                MenuListProps={{ sx: { backgroundColor: '#161b22'} }}
-              >
-                <MenuItem onClick={() => { handleUserMenuClose(); window.location.href = '/dashboard'; }}>Mi Panel</MenuItem>
-                <MenuItem onClick={handleLogout}>Cerrar Sesión</MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <Button 
-              variant="contained" 
-              onClick={() => window.location.href = '/login'}
-              sx={{ 
-                color: 'white',
-                backgroundColor: 'rgba(88, 166, 255, 0.7)',
-                backdropFilter: 'blur(5px)',
-                '&:hover': {
-                  backgroundColor: 'rgba(88, 166, 255, 0.9)',
-                },
-                padding: '6px 12px',
-                fontSize: '0.8rem',
-              }}
-            >
-              Sign In
-            </Button>
-          )}
-        </Box>
-
-        {/* Botón Flotante para Abrir/Cerrar Filtros */}
-        {!isMobile && ( // En desktop, un Fab más pequeño y elegante
-             <Fab 
-                size="medium"
-                aria-label="filters" 
-                onClick={toggleFilterPanel}
-                sx={{
-                    position: 'absolute',
-                    bottom: '30px',
-                    left: '30px',
-                    zIndex: 10,
-                    width: '48px',
-                    height: '48px',
-                    backgroundColor: 'rgba(22, 27, 34, 0.85)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(88, 166, 255, 0.2)',
-                    color: '#c9d1d9',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-                    '&:hover': {
-                       backgroundColor: 'rgba(22, 27, 34, 0.95)',
-                       borderColor: 'rgba(88, 166, 255, 0.4)',
-                       transform: 'scale(1.05)',
-                    },
-                    transition: 'all 0.2s ease-in-out'
-                }}
-            >
-                {isFilterPanelOpen ? <CloseIcon sx={{ fontSize: '20px' }} /> : <FilterListIcon sx={{ fontSize: '20px' }} />}
-            </Fab>
-        )}
-        {isMobile && ( // En mobile, más pequeño y elegante
-             <IconButton 
-                aria-label="filters" 
-                onClick={toggleFilterPanel}
-                sx={{
-                    position: 'absolute',
-                    bottom: '20px',
-                    left: '20px',
-                    zIndex: 10,
-                    width: '44px',
-                    height: '44px',
-                    backgroundColor: 'rgba(22, 27, 34, 0.85)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(88, 166, 255, 0.2)',
-                    color: '#c9d1d9',
-                    borderRadius: '50%',
-                    '&:hover': {
-                       backgroundColor: 'rgba(22, 27, 34, 0.95)',
-                       borderColor: 'rgba(88, 166, 255, 0.4)',
-                    }
-                }}
-            >
-                {isFilterPanelOpen ? <CloseIcon sx={{ fontSize: '18px' }} /> : <FilterListIcon sx={{ fontSize: '18px' }} />}
-            </IconButton>
-        )}
-
-
-        {/* Panel de Filtros Flotante */}
-        <FilterPanel
-          onApplyFilters={(newFilters) => {
-            setGlobalFilters(newFilters);
-            if (isMobile && isFilterPanelOpen) setIsFilterPanelOpen(false); // Cerrar en mobile después de aplicar
-          }}
-          open={isFilterPanelOpen}
-          onClose={toggleFilterPanel} // Reutilizar toggleFilterPanel
-          onOpen={toggleFilterPanel}  // Reutilizar toggleFilterPanel
-          currentFilters={globalFilters}
-          externalFilters={globalFilters.aiResponse}
-          isMobile={isMobile} // Pasar prop para estilos condicionales dentro del panel
-          sx={{ // Estilos para hacerlo flotante
-            position: 'absolute',
-            top: isMobile ? 0 : 'auto', // Ocupa toda la pantalla en mobile si está abierto
-            bottom: isMobile ? 'auto' : (isFilterPanelOpen ? '90px' : '-100vh'), // Animación y posición en desktop
-            left: isMobile ? 0 : '30px', // Posición en desktop
-            width: isMobile ? '100vw' : 'clamp(320px, 25vw, 400px)',
-            height: isMobile ? '100vh' : 'auto',
-            maxHeight: isMobile ? '100vh' : 'calc(100vh - 180px)', // Altura máxima en desktop
-            zIndex: 15, // Sobre el mapa y otros controles flotantes bajos
-            transition: 'transform 0.3s ease-in-out, opacity 0.3s ease-in-out',
-            transform: isFilterPanelOpen ? 'translateY(0)' : (isMobile ? 'translateY(100vh)' : 'translateY(calc(100% + 90px))'),
-            opacity: isFilterPanelOpen ? 1 : 0,
-            pointerEvents: isFilterPanelOpen ? 'auto' : 'none',
-            // El Paper dentro de FilterPanel debería tener el backdropFilter y backgroundColor
-          }}
-        />
-        
-            {/* Rutas que van sobre el mapa */}
-            <Box sx={{position: 'relative', zIndex: 20}}>
-        <Routes>
-                <Route path="/" element={<></>} />
-          <Route path="/property/:id" element={<PropertyDetails />} />
-                <Route path="/tour/:id" element={<TourViewer />} />
-        </Routes>
-      </Box>
-
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1: 2 }}>
+            <Box sx={{ width: '100%', maxWidth: '700px' }}>
+              <AISearchBar 
+                onSearch={handleAISearch} 
+                onLocationSearch={handleLocationSearch}
+              />
+            </Box>
           </Box>
-        } />
-      </Routes>
-    </Router>
+
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {user ? (
+              <>
+                <IconButton
+                  onClick={handleUserMenuOpen}
+                  sx={{
+                    backgroundColor: 'rgba(22, 27, 34, 0.9)', backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(30, 41, 59, 0.3)', color: '#c9d1d9',
+                    '&:hover': { backgroundColor: 'rgba(30, 41, 59, 0.95)' },
+                  }}
+                >
+                  <AccountCircleIcon />
+                </IconButton>
+                <Menu
+                  anchorEl={userMenuAnchorEl}
+                  open={Boolean(userMenuAnchorEl)}
+                  onClose={handleUserMenuClose}
+                  MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d' } }}
+                >
+                  <MenuItem onClick={() => { navigate('/dashboard'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Dashboard</MenuItem>
+                  <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
+                  {user && user.is_staff && (
+                    <MenuItem onClick={() => { navigate('/admin/publications'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>
+                      Panel de Admin
+                    </MenuItem>
+                  )}
+                  <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Logout</MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/login')}
+                sx={{
+                  borderColor: 'rgba(30, 58, 138, 0.7)', color: '#60a5fa', fontWeight: 300,
+                  padding: '6px 12px', fontSize: '0.8rem',
+                  backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
+                  '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
+                }}
+              >
+                Login
+              </Button>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* Snackbar para notificaciones */}
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route
+            path="/"
+            element={
+              <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                <MapView ref={mapRef} />
+              </motion.div>
+            }
+          />
+          <Route
+            path="/property/:id"
+            element={
+              <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                <PropertyDetails />
+              </motion.div>
+            }
+          />
+          <Route path="/tour/:id" element={
+            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+              <TourViewer />
+            </motion.div>
+          } />
+          <Route path="/login" element={
+            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+              <AuthPage formType="login" onLogin={handleLogin} />
+            </motion.div>
+          } />
+          <Route path="/register" element={
+            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+              <AuthPage formType="register" onRegister={handleRegister} />
+            </motion.div>
+          } />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute
+                user={user}
+                element={
+                  <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                    <Dashboard user={user} />
+                  </motion.div>
+                }
+              />
+            }
+          />
+          <Route
+            path="/create-property"
+            element={
+              <ProtectedRoute user={user} element={
+                  <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                    <CreateProperty />
+                  </motion.div>
+                }
+              />
+            }
+          />
+          <Route path="/edit-property/:id" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
+          <Route 
+            path="/admin/publications"
+            element={<AdminProtectedRoute element={<AdminPublicationsPage />} />} 
+          />
+          <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
+        </Routes>
+      </AnimatePresence>
+    </>
   );
 }
 

@@ -50,13 +50,14 @@ const Dashboard = ({ user }) => {
     }
     
     const fetchProperties = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
         const data = await propertyService.getUserProperties();
         setProperties(Array.isArray(data) ? data : (data?.results || []));
       } catch (err) {
         console.error('Error al cargar propiedades:', err);
-        setError('No se pudieron cargar tus propiedades.');
+        setError('No se pudieron cargar tus propiedades. Intenta recargar la página.');
       } finally {
         setLoading(false);
       }
@@ -96,16 +97,51 @@ const Dashboard = ({ user }) => {
     return `$${price?.toLocaleString()}`;
   };
 
-  if (!user) {
+  if (!user && !loading) {
     return (
-      <Box sx={{ 
-        height: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#0d1117'
-      }}>
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1117'}}>
         <CircularProgress sx={{ color: '#3b82f6' }} />
+      </Box>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        backgroundColor: '#0d1117',
+        color: '#c9d1d9'
+      }}>
+        <CircularProgress color="primary" size={50} sx={{mb: 2}} />
+        <Typography variant="h6" sx={{ fontWeight: 300 }}>
+          Cargando tu panel...
+        </Typography>
+      </Box>
+    );
+  }
+  
+  if (error && !loading) {
+    return (
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        backgroundColor: '#0d1117',
+        color: '#c9d1d9',
+        p: 3
+      }}>
+        <Alert severity="error" sx={{mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373'}}>
+          {error}
+        </Alert>
+        <Button variant="outlined" onClick={() => window.location.reload()} sx={{color: '#58a6ff', borderColor: '#58a6ff'}}>
+          Reintentar Carga
+        </Button>
       </Box>
     );
   }
@@ -159,7 +195,7 @@ const Dashboard = ({ user }) => {
 
         {/* Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid xs={12} sm={6} md={3}>
             <Card sx={{ 
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
@@ -176,7 +212,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Grid>
           
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid xs={12} sm={6} md={3}>
             <Card sx={{ 
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
@@ -193,7 +229,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid xs={12} sm={6} md={3}>
             <Card sx={{ 
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
@@ -210,7 +246,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid xs={12} sm={6} md={3}>
             <Card sx={{ 
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
@@ -274,7 +310,7 @@ const Dashboard = ({ user }) => {
           {!loading && !error && properties.length > 0 && (
             <Grid container spacing={3}>
               {properties.map((property) => (
-                <Grid item xs={12} sm={6} lg={4} key={property.id}>
+                <Grid xs={12} sm={6} lg={4} key={property.id}>
                   <Card sx={{ 
                     backgroundColor: 'rgba(13, 17, 23, 0.8)',
                     border: '1px solid rgba(30, 41, 59, 0.3)',

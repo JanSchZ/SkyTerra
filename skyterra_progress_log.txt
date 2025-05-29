@@ -1,6 +1,8 @@
 ## SkyTerra Project - Progress and Issue Log
 
-**Fecha de Última Actualización:** 2024-08-02
+**NOTA PARA EL USUARIO/DESARROLLADOR:** Por favor, actualiza este archivo a medida que se completan las tareas o surgen nuevos problemas. Esto ayudará a mantener un seguimiento claro del progreso y facilitará la colaboración, incluso si trabajas con diferentes asistentes de IA o en diferentes sesiones. Marca las tareas completadas con `[COMPLETADO]` o `[RESUELTO]`.
+
+**Fecha de Última Actualización:** 2025-05-28
 
 ### I. Funcionalidad del Asistente de IA Conversacional ("Sky")
 
@@ -97,4 +99,225 @@
 ### III. Log General del Proyecto
 
 *   Este archivo (`skyterra_progress_log.txt`) ha sido creado para rastrear el progreso y los problemas.
-*   Se incluirán fragmentos de código relevantes al discutir errores. 
+*   Se incluirán fragmentos de código relevantes al discutir errores.
+
+### IV. Preparación para Producción y Rediseño de UI (Sesión Actual)
+
+**Objetivo General:** Estabilizar la aplicación, solucionar errores pendientes y rediseñar las interfaces de usuario de gestión de propiedades (`Dashboard.jsx`, `CreateProperty.jsx`) con un enfoque minimalista, moderno y oscuro/transparente.
+
+**Estado Actual y Tareas Pendientes:**
+
+1.  **Errores de Consola Frontend (Basado en la última captura):**
+    *   **`MUI Grid: The 'item' prop has been removed...` (y `xs`, `sm`, `md` props):**
+        *   **Problema:** Material-UI Grid v1 props están siendo usadas. Se necesita migrar a Grid v2.
+        *   **Acción:** Revisar todos los componentes que usan `<Grid item ...>` y actualizar a la sintaxis de Grid v2 (ej. `<Grid xs={...}>` directamente en el componente hijo o usando `<Grid container spacing={...}>` y luego `<Grid xs={...}>`).
+        *   **Archivos Potenciales:** `CreateProperty.jsx`, `Dashboard.jsx`, `PropertyCard.jsx`, y cualquier otro que use `Grid`.
+        *   **Referencia:** [MUI Grid v2 migration](https://mui.com/material-ui/migration/upgrade-to-grid-v2/)
+        *   **Estado:** PENDIENTE
+    *   **`Failed to load resource: the server responded with a status of 401 (Unauthorized)` para `/api/properties/my-properties/`:**
+        *   **Problema:** A pesar de los cambios en `api.js` para no enviar token a `/api/properties/`, la ruta `/my-properties/` sí requiere autenticación y parece que no se está enviando un token válido o el usuario no está logueado al momento de esta petición.
+        *   **Contexto:** Este error aparece usualmente en el `Dashboard` o al intentar ver propiedades del usuario.
+        *   **Acción:**
+            1.  Verificar que el `localStorage.getItem('auth_token')` realmente contenga un token válido cuando se accede a rutas protegidas.
+            2.  Asegurar que el flujo de login establezca correctamente el `auth_token`.
+            3.  Revisar la lógica en `api.js` para asegurar que el token SÍ se envía a `/api/properties/my-properties/`.
+            4.  En el backend (`views.py`), confirmar que `MyPropertiesView` o la acción `my_properties` en `PropertyViewSet` tenga los permisos correctos (debería ser `IsAuthenticated`).
+            5.  **[RESUELTO]** Se implementó un interceptor de respuestas en `api.js` para detectar errores 401, limpiar `localStorage` (token y usuario) y redirigir a `/login` automáticamente. Esto previene que tokens inválidos persistan y causen problemas.
+        *   **Estado:** RESUELTO
+    *   **`Error fetching user properties: AxiosError` y `Error al cargar propiedades: AxiosError`:**
+        *   **Problema:** Estos son probablemente la consecuencia directa del error 401 anterior.
+        *   **Acción:** Resolver el problema del 401.
+        *   **Estado:** RESUELTO (al resolverse el 401)
+    *   **Mapbox: `Failed to evaluate expression ... "label_rank" evaluated to null but was expected to be of type number.`:**
+        *   **Problema:** Un estilo de Mapbox (probablemente el de las etiquetas de ciudades/lugares) espera que la propiedad `label_rank` de alguna _feature_ sea un número, pero está encontrando `null`.
+        *   **Contexto:** Esto usualmente ocurre con los estilos base de Mapbox si alguna _feature_ en sus datos no tiene el `label_rank` esperado. Puede ser intermitente o depender del nivel de zoom/área visualizada.
+        *   **Acción:**
+            1.  Este error es más difícil de controlar directamente ya que depende de los datos de Mapbox.
+            2.  Se podría investigar si hay formas de proveer _fallbacks_ en las expresiones de estilo de Mapbox o si se puede actualizar el estilo de mapa a una versión más reciente que maneje esto mejor.
+            3.  Por ahora, se considera de baja prioridad si no rompe la funcionalidad principal del mapa.
+        *   **Estado:** PENDIENTE (Baja Prioridad)
+
+2.  **Rediseño UI - `Dashboard.jsx` y `CreateProperty.jsx`:**
+    *   **Objetivo:** Implementar una interfaz minimalista, moderna, elegante, con temática oscura/transparente. Mejorar la UX.
+    *   **`Dashboard.jsx` (Listado de "Mis Propiedades"):**
+        *   **Diseño Actual:** Asumo que es una tabla o lista simple.
+        *   **Nuevo Diseño Propuesto:**
+            *   Usar Cards para cada propiedad, similar a como se muestran en el mapa o en los resultados de búsqueda, pero con acciones de "Editar", "Eliminar", "Ver Tour (si existe)".
+            *   Diseño limpio, con buena tipografía (ej. "Inter" o similar).
+            *   Fondo oscuro/semitransparente para los cards.
+            *   Paginación si hay muchas propiedades.
+            *   Un botón prominente para "Crear Nueva Propiedad".
+        *   **Estado:** PENDIENTE
+    *   **`CreateProperty.jsx` (Formulario de Creación/Edición):**
+        *   **Diseño Actual:** Stepper con muchos campos.
+        *   **Nuevo Diseño Propuesto:**
+            *   Mantener el Stepper si la cantidad de información lo justifica, pero mejorar el estilo de cada paso.
+            *   Agrupar campos de forma lógica y visualmente atractiva.
+            *   Usar controles de MUI modernos y bien espaciados.
+            *   Considerar una sección de "Arrastrar y Soltar" para imágenes más intuitiva.
+            *   Mapa interactivo para definir la ubicación y, si es posible en esta fase, los límites (boundary_polygon).
+            *   Feedback visual claro durante la carga y al guardar.
+            *   Estilo general minimalista y oscuro.
+        *   **Estado:** PENDIENTE
+
+3.  **Preparación para Producción (General):**
+    *   **Eliminar Datos de Prueba Hardcodeados:**
+        *   **Acción:** Ya se hizo en `api.js` (eliminación de `SAMPLE_DATA`). Verificar si quedan otros vestigios en el frontend.
+        *   **Estado:** MAYORMENTE COMPLETADO (Revisar por si acaso)
+    *   **Manejo de Errores:**
+        *   **Acción:** Mejorar la presentación de errores al usuario (ej. con Snackbars o modales en lugar de solo `console.log`).
+        *   **Estado:** PENDIENTE
+    *   **Variables de Entorno:**
+        *   **Acción:** Mover `MAPBOX_TOKEN` de `MapView.jsx` a una variable de entorno (ej. `REACT_APP_MAPBOX_TOKEN` en un archivo `.env` en el frontend).
+        *   **Estado:** PENDIENTE (Requiere acción manual del usuario para crear/actualizar su `.env`)
+    *   **Optimización:**
+        *   **Acción:** Revisar _bundles_ de producción, optimizar imágenes si es necesario. (Esto es más para una etapa final).
+        *   **Estado:** PENDIENTE (Baja Prioridad por ahora)
+    *   **Seguridad:**
+        *   **Acción:** Revisar `CSRF`, `XSS`, `CORS` (aunque `django-cors-headers` ayuda mucho). Asegurar que las vistas sensibles estén protegidas.
+        *   **Backend:** `AISearchView` y `PropertyViewSet` (list y retrieve) son públicos, el resto requiere autenticación. Confirmar que esto sea lo deseado.
+        *   **Estado:** PENDIENTE (Revisión)
+
+**Siguientes Pasos Inmediatos (Sugeridos):**
+
+1.  **[COMPLETADO]** ~~Resolver el error 401 en `/api/properties/my-properties/`.~~ (Bloqueante para el Dashboard).
+2.  **Corregir los errores de MUI Grid v2.** (Impacta la presentación de UI).
+3.  **Comenzar el rediseño de `Dashboard.jsx`.** 
+
+### V. Estabilización y Rediseño de Formulario de Creación de Propiedades (Sesión Actual - Continuación)
+
+**Objetivo:** Permitir la creación exitosa de propiedades, simplificando y estabilizando el formulario `CreateProperty.jsx`, y mejorar la experiencia de visualización en `PropertyDetails.jsx`.
+
+**Estado Actual y Tareas Pendientes:**
+
+1.  **MUI Grid v1 warnings (`item`, `xs`, `sm`, `md` props):**
+    *   **[RESUELTO PARCIALMENTE en `CreateProperty.jsx`]**
+    *   **Acción Pendiente:** Verificar y corregir en `PropertyCard.jsx`, `Dashboard.jsx`, etc.
+
+2.  **`null` value warning para inputs de Latitud/Longitud en `CreateProperty.jsx`:**
+    *   **[RESUELTO]**
+
+3.  **Errores de Mapbox (`unclustered-point` layer not found) en `MapView.jsx` (Impacto Original en `CreateProperty.jsx`):**
+    *   **[MITIGADO EN `CreateProperty.jsx`]** Se eliminó el mapa del formulario.
+    *   **[MEJORADO EN `MapView.jsx`]** Se añadieron verificaciones de existencia de capas antes de `queryRenderedFeatures`.
+
+4.  **Paso "Ubicación" en `CreateProperty.jsx`:**
+    *   **[REDISEÑADO Y SIMPLIFICADO]**
+
+5.  **Campo "Servicios" (`utilities`) en `CreateProperty.jsx`:**
+    *   **[RESUELTO]**
+
+6.  **Error `NOT NULL constraint failed: properties_property.publication_status` al crear propiedad:**
+    *   **[RESUELTO]** Se sincronizó el modelo `Property` y `PropertySerializer` con la migración existente.
+
+7.  **Vista de Detalles de Propiedad (`PropertyDetails.jsx`):**
+    *   **Objetivo:** Al ver una propiedad, animar el mapa a su ubicación y mostrar automáticamente el tour 360°.
+    *   **Cambios Realizados:**
+        *   **Carga de Tours:** Modificado para cargar tours reales desde `tourService` en lugar de datos simulados.
+        *   **Animación de Vuelo (`performAutoFlight`):**
+            *   Se eliminó la dependencia de geolocalización del usuario y `countryFlightPaths` para esta vista.
+            *   Implementada animación de tres tramos: Vista general de Chile -> Vista regional de la propiedad -> Zoom final a la propiedad.
+            *   Ajustadas duraciones y niveles de zoom para una experiencia más suave.
+        *   **Integración de Tour 360°:**
+            *   Se añadió estado `activeTourUrl`.
+            *   El tour 360 (URL del primer tour disponible) se carga en un `iframe` después de la animación de vuelo.
+            *   El panel de detalles se oculta cuando el tour está activo.
+            *   Se añadió botón para cerrar el tour y volver a la vista de detalles/mapa.
+            *   Clic en tours en la pestaña "Tours 360°" ahora carga el tour en el iframe.
+        *   **Control de Animación de `MapView`:**
+            *   Se añadió prop `disableIntroAnimation` a `MapView.jsx`.
+            *   `PropertyDetails.jsx` pasa `disableIntroAnimation={true}` a `MapView` para evitar la animación introductoria general del mapa.
+    *   **Problema Persistente (Visual):** Edificios 3D en Mapbox se muestran oscuros/negros.
+        *   **Intento de Solución:** Se añadió código en `onMapLoad` de `MapView.jsx` para intentar eliminar capas comunes de edificios (`building`, `3d-buildings`, `building-extrusion`).
+        *   **Estado del Problema Visual:** PENDIENTE DE VERIFICACIÓN (si la eliminación de capas fue efectiva). Se recomienda ajustar el estilo en Mapbox Studio si persiste.
+    *   **Estado General de la Funcionalidad:** Implementado, pendiente de pruebas finales y ajustes de la animación/visualización. 
+
+**Próximos Pasos Inmediatos:**
+
+1.  **Verificar solución para edificios 3D oscuros.** Si la eliminación de capas no funcionó, priorizar el ajuste en Mapbox Studio.
+2.  **Refinar la animación de vuelo en `PropertyDetails.jsx`** si aún marea o no es fluida (ajustar zooms, duraciones, pitch).
+3.  Continuar con el rediseño de los pasos restantes ("Características" y "Revisar") en `CreateProperty.jsx`.
+4.  Abordar los warnings restantes de MUI Grid v2 en otros componentes.
+
+*   **Mejoras en la Animación Introductoria del Mapa (`frontend/src/components/map/MapView.jsx`):**
+    *   **Objetivo:** Mejorar la fluidez y el control de la animación de "paseo" inicial sobre las propiedades.
+    *   **Interrupción por el Usuario:**
+        *   **[RESUELTO]** Se implementó la lógica para que la secuencia de vuelo automático se detenga si el usuario interactúa con el mapa (movimiento, clic) o si presiona el botón "Explorar Ahora" en el overlay.
+        *   **[RESUELTO]** La detención de la animación ahora es más suave: en lugar de un corte brusco, el segmento de vuelo actual se completa y los siguientes se cancelan, o la interacción directa del usuario toma el control de forma natural. Se eliminó un intento previo de `easeTo` que causaba un zoom out no deseado.
+        *   **[RESUELTO]** El botón "Saltar animación" del overlay fue eliminado, dejando solo "Explorar Ahora" con la funcionalidad de detención mejorada.
+    *   **Ritmo de la Animación:**
+        *   **[RESUELTO]** Se ralentizó la animación de "paseo" entre propiedades aumentando la `duration` de cada vuelo y el `setTimeout` de espera entre ellos, para una experiencia menos mareante y más pausada.
+        *   **[RESUELTO]** Actualizados los `console.log` para reflejar las nuevas duraciones y el modo "paseo lento".
+    *   **Próximos Pasos (MapView):**
+        *   Continuar monitorizando la fluidez y posibles artefactos visuales (`preserveDrawingBuffer` ya fue añadido).
+        *   Investigar errores de consola `label_rank` relacionados con el estilo de Mapbox (actualmente baja prioridad). 
+
+### VI. Flujo de Revisión de Publicaciones y Panel de Administración
+
+**Objetivo:** Implementar un sistema donde las propiedades enviadas por usuarios requieran aprobación de un administrador antes de ser públicas, con notificaciones por email y un panel para la gestión.
+
+**Backend (`backend/properties/views.py` y `models.py`):**
+
+*   **Modelo `Property` (`models.py`):**
+    *   **[CONFIRMADO]** Se confirmó la existencia del campo `publication_status` con las `choices` adecuadas (`pending`, `approved`, `rejected`) y `default='pending'`. Esto servirá como base para el flujo de revisión.
+*   **Visibilidad de Propiedades (`PropertyViewSet` en `views.py`):**
+    *   **[RESUELTO]** Modificado `get_queryset` para que los usuarios no staff (`is_staff=False`) solo vean propiedades con `publication_status='approved'`.
+    *   **[RESUELTO]** Los usuarios staff (`is_staff=True`) pueden ver todas las propiedades, independientemente de su `publication_status`.
+*   **Actualización de Estado de Publicación (`PropertyViewSet` en `views.py`):**
+    *   **[RESUELTO]** Añadida nueva acción `@action(detail=True, methods=['post'], url_path='set-status', permission_classes=[permissions.IsAdminUser]) def set_publication_status(self, request, pk=None)`.
+    *   Esta acción permite a los usuarios administradores (staff) cambiar el `publication_status` de una propiedad (ej. a 'approved', 'rejected').
+*   **Notificación por Email (`PropertyViewSet` en `views.py`):**
+    *   **[RESUELTO]** Integrado el envío de email usando `django.core.mail.send_mail` dentro del método `perform_create`.
+    *   Cuando se crea una nueva propiedad y su estado es `pending`, se envía un email a `skyedits.cl@gmail.com`.
+    *   El email incluye detalles de la propiedad y el usuario que la envió.
+    *   **[NOTA]** Requiere configuración de `EMAIL_*` y `DEFAULT_FROM_EMAIL` en `settings.py` (acción manual del usuario, usar variables de entorno para credenciales).
+*   **Permisos de Edición (`PropertyViewSet` en `views.py`):**
+    *   **[REFORZADO]** Se añadió una comprobación explícita de permisos en el método `update` para asegurar que solo el propietario o un usuario staff pueda editar la propiedad, devolviendo un 403 si no se cumple.
+
+**Próximos Pasos (Flujo de Revisión y Admin):**
+
+*   **Pruebas Exhaustivas (General):**
+    *   **[PENDIENTE]** Probar el flujo completo: creación de propiedad por usuario normal, recepción de email de notificación, revisión y cambio de estado por usuario admin, visibilidad correcta de propiedades para ambos roles.
+    *   **[PENDIENTE]** Verificar la correcta visualización de `owner_details` en el panel de admin.
+    *   **[PENDIENTE]** Configurar y probar el envío de emails (configuración SMTP en `settings.py` es acción manual del usuario).
+*   **Backend:**
+    *   **[PENDIENTE]** Crear usuarios administradores (`is_staff=True`) para pruebas si aún no existen.
+*   **Frontend (Mejoras Potenciales):**
+    *   **[PENDIENTE]** Paginación para la tabla de admin si la lista de propiedades es muy larga.
+    *   **[PENDIENTE]** Funcionalidad de filtros o búsqueda dentro del panel de `AdminPublicationsPage.jsx`.
+    *   **[PENDIENTE]** Considerar UI más rica para las acciones de cambio de estado (ej. botones con iconos, modales de confirmación para acciones destructivas si se añaden).
+
+**Serializers (`serializers.py`):**
+
+*   **[RESUELTO]** Creado `BasicUserSerializer` para serializar información básica del usuario (id, username, email).
+*   **[RESUELTO]** Añadido campo `owner_details` (usando `BasicUserSerializer`) a `PropertySerializer` y `PropertyListSerializer` para incluir detalles del propietario en las respuestas de la API.
+*   **[RESUELTO]** Asegurado que `PropertyListSerializer` también incluya `publication_status` y `created_at` para su uso en el panel de administración.
+
+**Frontend (`App.jsx`, `AdminProtectedRoute.jsx`, `AdminPublicationsPage.jsx`, `services/api.js`):**
+
+*   **Rutas y Protección (`App.jsx`, `AdminProtectedRoute.jsx`):**
+    *   **[RESUELTO]** Creado componente `AdminProtectedRoute` para verificar si el usuario es staff (`currentUser.is_staff`).
+    *   **[RESUELTO]** Añadida la ruta `/admin/publications` en `App.jsx`, protegida por `AdminProtectedRoute`.
+    *   **[RESUELTO]** Añadido enlace "Panel de Admin" en el menú de usuario en `App.jsx`, visible solo para usuarios staff.
+    *   **[RESUELTO]** Ajustada la lógica `showTopBar` en `App.jsx` para ocultar la barra superior en rutas `/admin`.
+*   **Servicios API (`services/api.js`):**
+    *   **[RESUELTO]** Modificado el interceptor de requests para enviar siempre el token de autenticación si está disponible. Esto permite al backend identificar usuarios staff en endpoints generales como `/api/properties/`.
+    *   **[RESUELTO]** Añadida la función `propertyService.setPropertyStatus(propertyId, status)` para llamar al endpoint del backend `POST /api/properties/{id}/set-status/`.
+*   **Panel de Administración de Publicaciones (`AdminPublicationsPage.jsx`):**
+    *   **[RESUELTO]** Implementada la página para listar todas las propiedades obtenidas a través de `propertyService.getProperties()`.
+    *   **[RESUELTO]** Muestra las propiedades en una tabla MUI (`Table`) con columnas relevantes: ID, Nombre (con enlace a detalles), Propietario (email/username), Tipo, Precio, Tamaño, Estado Actual, Fecha Creación.
+    *   **[RESUELTO]** Implementada la funcionalidad para cambiar el `publication_status` de cada propiedad usando un componente `Select` de MUI en la columna de acciones, llamando a `propertyService.setPropertyStatus()`.
+    *   **[RESUELTO]** Incluye manejo de estados de carga y error, y feedback al usuario mediante `Snackbar` para las acciones de cambio de estado.
+
+**Próximos Pasos (Flujo de Revisión y Admin):**
+
+*   **Pruebas Exhaustivas (General):**
+    *   **[PENDIENTE]** Probar el flujo completo: creación de propiedad por usuario normal, recepción de email de notificación, revisión y cambio de estado por usuario admin, visibilidad correcta de propiedades para ambos roles.
+    *   **[PENDIENTE]** Verificar la correcta visualización de `owner_details` en el panel de admin.
+    *   **[PENDIENTE]** Configurar y probar el envío de emails (configuración SMTP en `settings.py` es acción manual del usuario).
+*   **Backend:**
+    *   **[PENDIENTE]** Crear usuarios administradores (`is_staff=True`) para pruebas si aún no existen.
+*   **Frontend (Mejoras Potenciales):**
+    *   **[PENDIENTE]** Paginación para la tabla de admin si la lista de propiedades es muy larga.
+    *   **[PENDIENTE]** Funcionalidad de filtros o búsqueda dentro del panel de `AdminPublicationsPage.jsx`.
+    *   **[PENDIENTE]** Considerar UI más rica para las acciones de cambio de estado (ej. botones con iconos, modales de confirmación para acciones destructivas si se añaden). 
