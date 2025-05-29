@@ -1,0 +1,75 @@
+SkyTerra - Sugerencias de Mejoras Técnicas
+===========================================
+
+Prioridad: Alta (⭐), Media (◉), Baja (○)
+
+1. Optimización de Rendimiento del Mapa
+---------------------------------------
+- Prioridad: ⭐⭐
+- Archivos relacionados:
+  frontend/src/components/map/MapView.jsx
+  frontend/src/services/api.js
+- Acciones sugeridas:
+  * Implementar lazy loading para animaciones (MapView.jsx ~línea 450)
+  * Agregar sistema de priorización basado en conexión del usuario
+  * Optimizar renderizado de clusters con virtualización
+- Dependencias: React.memo, useMemo
+
+2. Mejora de Accesibilidad
+--------------------------
+- Prioridad: ⭐⭐
+- Archivos relacionados:
+  frontend/src/components/ui/*
+  frontend/src/components/property/PropertyCard.jsx
+- Acciones sugeridas:
+  * Agregar ARIA labels a controles del mapa
+  * Implementar navegación por tabulación en popups
+  * Añadir texto alternativo descriptivo para imágenes
+- Dependencias: eslint-plugin-jsx-a11y
+
+3. Gestión de Errores Robustecida
+---------------------------------
+- Prioridad: ⭐
+- Archivos relacionados:
+  frontend/src/services/api.js
+  backend/properties/services.py
+- Acciones sugeridas:
+  * Implementar reintentos con backoff exponencial
+  * Crear componentes de UI para estados de error
+  * Integrar Sentry/Rollbar para monitoreo
+- Dependencias: axios-retry, sentry-sdk
+
+4. Optimización de Carga de Datos
+---------------------------------
+- Prioridad: ⭐⭐
+- Archivos relacionados:
+  frontend/src/App.jsx
+  backend/properties/views.py
+- Acciones sugeridas:
+  * Implementar carga prioritaria de recursos críticos
+  * Usar paginación en API para grandes conjuntos de datos
+  * Agregar indicadores de carga progresiva
+- Dependencias: React.lazy, SWR
+
+5. Experiencia en Dispositivos Táctiles
+--------------------------------------
+- Prioridad: ◉
+- Archivos relacionados:
+  frontend/src/components/map/MapView.jsx
+  frontend/src/components/ui/FilterPanel.jsx
+- Acciones sugeridas:
+  * Agregar gestos para zoom/rotación
+  * Mejorar targets táctiles en controles
+  * Implementar soporte para stylus/dibujo
+- Dependencias: react-use-gesture
+
+Próximos Pasos Recomendados:
+----------------------------
+1. Priorizar mejora #1 (Rendimiento) por mayor impacto en UX
+2. Realizar pruebas de carga con herramienta como Lighthouse
+3. Crear issues en GitHub para cada mejora con etiquetas
+4. Asignar estimaciones de tiempo por punto
+
+Nota: Revisar configuración actual en:
+- frontend/src/config/environment.js
+- backend/skyterra_backend/settings.py
