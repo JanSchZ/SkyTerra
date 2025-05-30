@@ -28,26 +28,37 @@ const AdminPublicationsPage = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const navigate = useNavigate();
 
-  const fetchProperties = useCallback(async () => {
-    setLoading(true);
+  // State for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingPage, setLoadingPage] = useState(false);
+
+  const fetchProperties = useCallback(async (page = 1) => {
+    setLoadingPage(true);
+    if (page === 1) setLoading(true); // Full loading state only for first page
     setError(null);
     try {
-      // Para admin, getProperties() del backend ya debería devolver todas.
-      const response = await propertyService.getProperties(); 
-      // Asegurarse de que response sea un array o que response.results sea el array
-      const propertiesData = Array.isArray(response) ? response : response.results || [];
-      setProperties(propertiesData);
+      const response = await propertyService.getPaginatedProperties(page); 
+      setProperties(response.results || []);
+      setCurrentPage(page);
+      // Assuming page_size is the one set in backend (e.g., 12)
+      // You might need to get page_size from settings or define it here
+      const pageSize = 12; // This should ideally match the backend page_size
+      setTotalPages(Math.ceil(response.count / pageSize));
     } catch (err) {
       console.error("Error fetching properties for admin:", err);
       setError(err.message || 'Error al cargar las propiedades. Asegúrese de tener permisos de administrador.');
+      setProperties([]);
+      setTotalPages(1);
     } finally {
-      setLoading(false);
+      setLoadingPage(false);
+      if (page === 1) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchProperties();
-  }, [fetchProperties]);
+    fetchProperties(currentPage);
+  }, [fetchProperties, currentPage]);
 
   const handleChangeStatus = async (propertyId, newStatus) => {
     try {
@@ -81,6 +92,12 @@ const AdminPublicationsPage = () => {
     return statusMap[statusValue] || statusValue;
   };
 
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
@@ -93,7 +110,7 @@ const AdminPublicationsPage = () => {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-        <Button variant="outlined" onClick={fetchProperties}>Reintentar</Button>
+        <Button variant="outlined" onClick={() => fetchProperties(currentPage)}>Reintentar</Button>
       </Container>
     );
   }
@@ -105,7 +122,9 @@ const AdminPublicationsPage = () => {
           Panel de Administración de Publicaciones
         </Typography>
         
-        {properties.length === 0 && !loading && (
+        {loadingPage && <Box sx={{display: 'flex', justifyContent: 'center', my:2}}><CircularProgress size={24} /></Box>}
+        
+        {properties.length === 0 && !loading && !loadingPage && (
           <Typography variant="body1">No hay propiedades para mostrar.</Typography>
         )}
 
@@ -158,6 +177,29 @@ const AdminPublicationsPage = () => {
               </TableBody>
             </Table>
           </TableContainer>
+        )}
+
+        {/* Pagination Controls */} 
+        {totalPages > 1 && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 3 }}>
+            <Button 
+              onClick={() => handlePageChange(currentPage - 1)} 
+              disabled={currentPage === 1 || loadingPage}
+              sx={{mr: 1}}
+            >
+              Anterior
+            </Button>
+            <Typography sx={{mx:1}}>
+              Página {currentPage} de {totalPages}
+            </Typography>
+            <Button 
+              onClick={() => handlePageChange(currentPage + 1)} 
+              disabled={currentPage === totalPages || loadingPage}
+              sx={{ml: 1}}
+            >
+              Siguiente
+            </Button>
+          </Box>
         )}
       </Paper>
 

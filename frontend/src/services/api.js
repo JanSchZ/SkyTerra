@@ -183,6 +183,24 @@ export const propertyService = {
     }
   },
 
+  // NUEVA FUNCIÓN PARA OBTENER PROPIEDADES PAGINADAS
+  async getPaginatedProperties(page = 1, filters = {}) {
+    try {
+      const params = { ...filters, page };
+      console.log('Fetching paginated properties with params:', params);
+      const response = await api.get('/properties/', { params });
+      // La respuesta de DRF con PageNumberPagination incluye:
+      // response.data.count
+      // response.data.next (URL or null)
+      // response.data.previous (URL or null)
+      // response.data.results (array of items)
+      return response.data; 
+    } catch (error) {
+      console.error('Error fetching paginated properties:', error);
+      throw error;
+    }
+  },
+
   // Obtener detalle de una propiedad
   async getProperty(id) {
     try {

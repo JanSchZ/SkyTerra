@@ -180,7 +180,7 @@ const Dashboard = ({ user }) => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => navigate('/property/create')}
+            onClick={() => navigate('/create-property')}
             sx={{
               backgroundColor: '#3b82f6',
               '&:hover': { backgroundColor: '#2563eb' },
@@ -196,7 +196,7 @@ const Dashboard = ({ user }) => {
         {/* Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{ 
+            <Card sx={{
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
               borderRadius: 2
@@ -211,9 +211,8 @@ const Dashboard = ({ user }) => {
               </CardContent>
             </Card>
           </Grid>
-          
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{ 
+            <Card sx={{
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
               borderRadius: 2
@@ -228,9 +227,8 @@ const Dashboard = ({ user }) => {
               </CardContent>
             </Card>
           </Grid>
-
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{ 
+            <Card sx={{
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
               borderRadius: 2
@@ -245,9 +243,8 @@ const Dashboard = ({ user }) => {
               </CardContent>
             </Card>
           </Grid>
-
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{ 
+            <Card sx={{
               backgroundColor: 'rgba(22, 27, 34, 0.95)',
               border: '1px solid rgba(30, 41, 59, 0.3)',
               borderRadius: 2
@@ -299,7 +296,7 @@ const Dashboard = ({ user }) => {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/property/create')}
+                onClick={() => navigate('/create-property')}
                 sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}
               >
                 Crear Mi Primera Propiedad
@@ -310,8 +307,9 @@ const Dashboard = ({ user }) => {
           {!loading && !error && properties.length > 0 && (
             <Grid container spacing={3}>
               {properties.map((property) => (
-                <Grid xs={12} sm={6} lg={4} key={property.id}>
-                  <Card sx={{ 
+                <Grid xs={12} sm={6} md={4} lg={3} key={property.id}>
+                  <Card sx={{
+                    height: '100%',
                     backgroundColor: 'rgba(13, 17, 23, 0.8)',
                     border: '1px solid rgba(30, 41, 59, 0.3)',
                     borderRadius: 2,
@@ -321,89 +319,104 @@ const Dashboard = ({ user }) => {
                       transform: 'translateY(-2px)'
                     }
                   }}>
-                    <CardContent>
-                      <Typography variant="h6" sx={{ color: '#c9d1d9', mb: 1 }}>
-                        {property.name}
-                      </Typography>
-                      
-                      <Typography variant="body2" sx={{ color: '#8b949e', mb: 2, minHeight: 40 }}>
-                        {property.description?.length > 100 
-                          ? `${property.description.substring(0, 100)}...` 
-                          : property.description || 'Sin descripción'}
-                      </Typography>
-
-                      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                        <Chip 
-                          label={property.type || property.propertyType || 'Propiedad'} 
-                          size="small" 
-                          sx={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}
-                        />
-                        {(property.has_water || property.hasWater) && (
-                          <Chip 
-                            icon={<WaterDropIcon sx={{ fontSize: 14 }} />}
-                            label="Agua" 
-                            size="small" 
-                            sx={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}
-                          />
-                        )}
-                        {(property.has_views || property.hasViews) && (
-                          <Chip 
-                            icon={<TerrainIcon sx={{ fontSize: 14 }} />}
-                            label="Vistas" 
-                            size="small" 
-                            sx={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24' }}
-                          />
-                        )}
-                      </Stack>
-
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Box>
-                          <Typography variant="h6" sx={{ color: '#3b82f6' }}>
-                            {formatPrice(property.price)}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#8b949e' }}>
-                            Precio
-                          </Typography>
-                        </Box>
-                        <Box sx={{ textAlign: 'right' }}>
-                          <Typography variant="h6" sx={{ color: '#10b981' }}>
-                            {property.size?.toFixed(1) || '0'} ha
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#8b949e' }}>
-                            Tamaño
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </CardContent>
-
-                    <CardActions sx={{ p: 2, pt: 0 }}>
-                      <Button
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => navigate(`/property/${property.id}`)}
-                        sx={{ color: '#8b949e', '&:hover': { color: '#c9d1d9' } }}
-                      >
-                        Ver
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<EditIcon />}
-                        onClick={() => navigate(`/property/edit/${property.id}`)}
-                        sx={{ color: '#8b949e', '&:hover': { color: '#c9d1d9' } }}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="small"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => handleDeleteClick(property)}
-                        sx={{ 
-                          color: '#f87171', 
-                          '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' } 
+                    {property.images && property.images.length > 0 ? (
+                      <img
+                        src={property.images[0].url}
+                        alt={property.name}
+                        style={{
+                          width: '100%',
+                          height: 180,
+                          objectFit: 'cover',
+                          borderTopLeftRadius: '8px',
+                          borderTopRightRadius: '8px'
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: 180,
+                          backgroundColor: '#30363d', // Dark placeholder
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderTopLeftRadius: '8px',
+                          borderTopRightRadius: '8px'
                         }}
                       >
-                        Eliminar
-                      </Button>
+                        <HomeIcon sx={{ fontSize: 60, color: '#8b949e' }} />
+                      </Box>
+                    )}
+                    <CardContent sx={{ flexGrow: 1, p: 2 }}>
+                      <Typography variant="h6" component="div" noWrap sx={{ fontWeight: 600, color: 'white', mb: 0.5 }}>
+                        {property.name}
+                      </Typography>
+
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: '#8b949e', mb: 1 }}>
+                          <AttachMoneyIcon sx={{ fontSize: '1rem' }} />
+                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#adbac7' }}>
+                              {property.price ? formatPrice(Number(property.price)) : 'N/A'}
+                          </Typography>
+                      </Stack>
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: '#8b949e', mb: 1 }}>
+                          <StraightenIcon sx={{ fontSize: '1rem' }} />
+                          <Typography variant="body2" sx={{ color: '#adbac7' }}>
+                             {property.size ? `${Number(property.size).toLocaleString('es-CL')} ha` : 'N/A'}
+                          </Typography>
+                      </Stack>
+                      
+                      <Stack direction="row" spacing={1} sx={{mt: 1.5, flexWrap: 'wrap', gap: 0.5}}>
+                          {property.type && (
+                              <Chip 
+                                  label={property.type === 'plot' ? 'Parcela' : property.type === 'farm' ? 'Campo' : property.type} 
+                                  size="small" 
+                                  variant="outlined" 
+                                  sx={{borderColor: '#30363d', color: '#8b949e'}} 
+                              />
+                          )}
+                          {property.has_water && <Chip icon={<WaterDropIcon fontSize="small" />} label="Agua" size="small" variant="filled" sx={{backgroundColor: 'rgba(56,139,253,0.2)', color: '#79c0ff'}} />}
+                          {property.has_views && <Chip icon={<TerrainIcon fontSize="small" />} label="Vistas" size="small" variant="filled" sx={{backgroundColor: 'rgba(35,134,54,0.2)', color: '#56d364'}}/>}
+                           {property.publication_status && (
+                            <Chip 
+                              label={property.publication_status === 'pending' ? 'Pendiente' : property.publication_status === 'approved' ? 'Aprobado' : 'Rechazado'}
+                              size="small"
+                              variant="filled"
+                              sx={{
+                                  backgroundColor: property.publication_status === 'pending' ? 'rgba(212,162,0,0.2)' : property.publication_status === 'approved' ? 'rgba(35,134,54,0.2)' : 'rgba(248,81,73,0.2)',
+                                  color: property.publication_status === 'pending' ? '#d4a200' : property.publication_status === 'approved' ? '#56d364' : '#f85149',
+                                  fontWeight: 500
+                              }}
+                            />
+                          )}
+                      </Stack>
+
+                    </CardContent>
+                    <Divider sx={{borderColor: '#30363d'}} />
+                    <CardActions sx={{ justifyContent: 'flex-end', backgroundColor: 'rgba(22, 27, 34, 0.7)', p:1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => navigate(`/property/${property.id}`)}
+                        sx={{ color: '#58a6ff', '&:hover': {backgroundColor: 'rgba(88,166,255,0.1)'} }}
+                        title="Ver Detalles"
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => navigate(`/property/edit/${property.id}`)}
+                        sx={{ color: '#a5d6ff', '&:hover': {backgroundColor: 'rgba(165,214,255,0.1)'} }}
+                         title="Editar"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteClick(property)}
+                        sx={{ color: '#f85149', '&:hover': {backgroundColor: 'rgba(248,81,73,0.1)'} }}
+                        title="Eliminar"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
                     </CardActions>
                   </Card>
                 </Grid>

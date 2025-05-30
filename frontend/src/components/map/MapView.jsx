@@ -38,6 +38,12 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Nuevos estados para paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalProperties, setTotalProperties] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(true);
+
   // Vista inicial del mapa: Chile por defecto (asumiendo dominio .cl) pero más alejada
   const initialMapViewState = {
     longitude: -71.5430, // Centro de Chile
@@ -58,9 +64,35 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const [showOverlay, setShowOverlay] = useState(!disableIntroAnimation);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [connectionType, setConnectionType] = useState('4g');
   const mapRef = useRef(null);
-  const flightTimeoutIdRef = useRef(null); // Ref para el ID del timeout de la animación
-  const userInteractedRef = useRef(false); // Ref para rastrear interacción del usuario
+  const flightTimeoutIdRef = useRef(null);
+  const userInteractedRef = useRef(false);
+  const lastLoadViewportRef = useRef(null);
+  const debounceTimeoutRef = useRef(null);
+  const lastFetchedPage1FiltersRef = useRef(null);
+
+  // Detectar tipo de conexión del usuario
+  useEffect(() => {
+    const updateConnectionType = () => {
+      const connection = navigator.connection;
+      if (connection) {
+        setConnectionType(connection.effectiveType);
+        console.log(`🌐 Connection type: ${connection.effectiveType}`);
+      }
+    };
+
+    if (navigator.connection) {
+      updateConnectionType();
+      navigator.connection.addEventListener('change', updateConnectionType);
+    }
+
+    return () => {
+      if (navigator.connection) {
+        navigator.connection.removeEventListener('change', updateConnectionType);
+      }
+    };
+  }, []);
 
   // Para evitar múltiples ejecuciones del efecto de autoflight
   const autoFlightAttemptedRef = useRef(false);
@@ -137,36 +169,90 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   // Serializar filters para la dependencia del useEffect
   const serializedFilters = JSON.stringify(filters);
 
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        setLoading(true);
-        // Usar filters directamente aquí, ya que serializedFilters es para la dependencia
-        const params = { ...filters }; 
-        const data = await propertyService.getProperties(params);
-        const activeProperties = data.results || [];
-        setProperties(activeProperties);
-        setPropertiesGeoJSON(propertiesToGeoJSON(activeProperties)); 
-        setError(null); // Limpiar errores previos si la carga es exitosa
-      } catch (err) {
-        console.error('Error al cargar propiedades:', err);
-        setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
+  // Memoized fetchProperties function
+  const fetchProperties = useCallback(async (pageToFetch = 1, currentFilters) => {
+    if (pageToFetch === 1) {
+      setLoading(true);
+      // When filters change (pageToFetch === 1), we should reset properties
+      setProperties([]); 
+      setPropertiesGeoJSON(propertiesToGeoJSON([]));
+    } else {
+      setLoadingMore(true);
+    }
+    setError(null);
+    try {
+      const params = { ...currentFilters }; // Use passed filters
+      const data = await propertyService.getPaginatedProperties(pageToFetch, params);
+      
+      setProperties(prev => pageToFetch === 1 ? data.results : [...prev, ...data.results]);
+      // Update GeoJSON with the potentially new set of properties
+      setPropertiesGeoJSON(currentProps => propertiesToGeoJSON(pageToFetch === 1 ? data.results : [...currentProps.features.map(f => f.properties), ...data.results]));
+
+      setTotalProperties(data.count);
+      setCurrentPage(pageToFetch);
+      setHasNextPage(data.next !== null);
+
+      if (mapRef.current && pageToFetch === 1) { // After initial load or filter change
+        const map = mapRef.current.getMap();
+        if (map) {
+          lastLoadViewportRef.current = {
+            center: map.getCenter(),
+            zoom: map.getZoom(),
+            bounds: map.getBounds()
+          };
+        }
+      }
+
+    } catch (err) {
+      console.error('Error al cargar propiedades:', err);
+      setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
+      if (pageToFetch === 1) {
         setProperties([]);
         setPropertiesGeoJSON(propertiesToGeoJSON([])); 
-      } finally {
-        setLoading(false);
       }
-    };
+    } finally {
+      if (pageToFetch === 1) {
+        setLoading(false);
+      } else {
+        setLoadingMore(false);
+      }
+    }
+  }, [ // Dependencies for fetchProperties
+    setLoading, setLoadingMore, setError, setProperties, 
+    setPropertiesGeoJSON, setTotalProperties, setCurrentPage, setHasNextPage
+    // `filters` (via currentFilters param) and `editable` are handled by the calling useEffect
+  ]);
 
-    if (!editable) { 
-        fetchProperties();
+  useEffect(() => {
+    if (editable) {
+      // Reset state when switching to editable mode
+      setLoading(false); 
+      setProperties([]);
+      setPropertiesGeoJSON(propertiesToGeoJSON([]));
+      setHasNextPage(false);
+      setCurrentPage(1);
+      setTotalProperties(0); // Ensure totalProperties is reset
+      lastFetchedPage1FiltersRef.current = null; // Clear the ref, so next non-editable will fetch
+      return; // Don't fetch if editable
     }
-     else {
-        setLoading(false); 
-        setProperties([]);
-        setPropertiesGeoJSON(propertiesToGeoJSON([]));
+
+    // Not editable: Fetch properties if filters changed or if it's the first load for these filters
+    // (i.e., lastFetchedPage1FiltersRef.current doesn't match current serializedFilters)
+    if (serializedFilters !== lastFetchedPage1FiltersRef.current) {
+      console.log('MapView: Filters changed or first non-editable load for current filters. Fetching page 1.');
+      fetchProperties(1, filters); // Call with current filters
+      lastFetchedPage1FiltersRef.current = serializedFilters; // Record that these filters have been fetched for page 1
     }
-  }, [serializedFilters, editable]); // Usar serializedFilters en el array de dependencias
+    // If serializedFilters === lastFetchedPage1FiltersRef.current, it means we've already fetched page 1
+    // for these filters, so we don't do it again here. Infinite scroll will handle subsequent pages.
+
+  }, [serializedFilters, editable, fetchProperties, filters]); // Removed properties.length from dependencies
+
+  const handleLoadMore = useCallback(() => { // This function can now call the memoized fetchProperties
+    if (hasNextPage && !loadingMore) {
+      fetchProperties(currentPage + 1, filters); // Pass current filters
+    }
+  }, [hasNextPage, loadingMore, currentPage, fetchProperties, filters]);
 
   const MAPBOX_TOKEN = config.mapbox.accessToken;
 
@@ -292,9 +378,16 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
+    // Skip animation for slow connections
+    if (['slow-2g', '2g', '3g'].includes(connectionType)) {
+      console.log(`Conexión lenta (${connectionType}), omitiendo animación de vuelo automático.`);
+      if (!autoFlyCompleted) setAutoFlyCompleted(true);
+      return;
+    }
+
     if (!mapRef.current || !isMapLoaded || userInteractedRef.current || autoFlyCompleted) {
       console.warn('Intento de iniciar auto-vuelo pero el mapa no está listo, o usuario ya interactuó, o ya completó.');
-      if (!userInteractedRef.current) setAutoFlyCompleted(true); // Si no fue por interacción, marcar como completado
+      if (!userInteractedRef.current) setAutoFlyCompleted(true);
       return;
     }
     
@@ -406,7 +499,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       console.error('Error durante la animación de vuelo automático:', error);
       if (!userInteractedRef.current) setAutoFlyCompleted(true);
     }
-  }, [isMapLoaded, properties, countryFlightPaths, autoFlyCompleted, setAutoFlyCompleted]);
+  }, [isMapLoaded, properties, countryFlightPaths, autoFlyCompleted, setAutoFlyCompleted, connectionType]);
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {
@@ -531,6 +624,43 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     }
   }, [onLoad]);
 
+  // Infinite scroll logic on map move
+  const handleMapMoveEnd = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (!mapRef.current || loadingMore || !hasNextPage || editable || loading) return;
+
+      const map = mapRef.current.getMap();
+      const currentViewport = {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        bounds: map.getBounds()
+      };
+
+      let shouldLoad = false;
+      if (lastLoadViewportRef.current) {
+        const prev = lastLoadViewportRef.current;
+        const distance = currentViewport.center.distanceTo(prev.center);
+        const zoomThreshold = 0.5; 
+        const distanceThreshold = 200000 / (Math.pow(2, currentViewport.zoom) / Math.pow(2, prev.zoom)); // Adjusted for zoom change
+
+        if (Math.abs(currentViewport.zoom - prev.zoom) > zoomThreshold || distance > distanceThreshold * 2 ) { // Increased distance tolerance a bit
+          shouldLoad = true;
+        }
+      } else {
+        shouldLoad = true; 
+      }
+
+      if (shouldLoad) {
+        console.log('🗺️ Map moved, attempting to load more properties via handleLoadMore...');
+        lastLoadViewportRef.current = currentViewport; // Update viewport ref before loading
+        handleLoadMore(); // Call the memoized and stable handleLoadMore
+      }
+    }, 750); 
+  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore]); // Added loading and handleLoadMore
+
   const renderPropertyBoundaries = (property) => {
     if (property && property.boundary_polygon && property.boundary_polygon.coordinates) {
       return (
@@ -568,56 +698,10 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     return null;
   };
 
-  const clusterLayer = {
-    id: 'clusters',
-    type: 'circle',
-    source: 'properties-source',
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': [
-        'step',
-        ['get', 'point_count'],
-        '#10b981', // Verde esmeralda para pocos
-        10,
-        '#059669', // Verde medio para grupos medianos
-        50,
-        '#047857'  // Verde oscuro para muchos
-      ],
-      'circle-radius': [
-        'step',
-        ['get', 'point_count'],
-        18, 
-        10,
-        24, 
-        50,
-        32  
-      ],
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-opacity': 0.8
-    }
-  };
-
-  const clusterCountLayer = {
-    id: 'cluster-count',
-    type: 'symbol',
-    source: 'properties-source',
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-      'text-size': 12
-    },
-    paint: {
-        'text-color': '#ffffff'
-    }
-  };
-
   const unclusteredPointLayer = {
     id: 'unclustered-point',
-    type: 'circle', 
+    type: 'circle',
     source: 'properties-source',
-    filter: ['!', ['has', 'point_count']],
     paint: {
       'circle-color': '#10b981', // Verde esmeralda principal
       'circle-radius': [
@@ -661,16 +745,13 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
     // Check if layers exist before querying
     const unclusteredLayerExists = map.getLayer(unclusteredPointLayer.id);
-    const clusterLayerExists = map.getLayer(clusterLayer.id);
 
-    if (!unclusteredLayerExists && !clusterLayerExists) {
+    if (!unclusteredLayerExists) {
       // console.warn('Attempted to query features, but target layers do not exist.');
       return;
     }
 
-    const queryLayers = [];
-    if (unclusteredLayerExists) queryLayers.push(unclusteredPointLayer.id);
-    if (clusterLayerExists) queryLayers.push(clusterLayer.id);
+    const queryLayers = [unclusteredPointLayer.id];
 
     const features = map.queryRenderedFeatures(event.point, {
       layers: queryLayers 
@@ -680,17 +761,6 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       const feature = features[0];
       if (feature.layer.id === unclusteredPointLayer.id) {
         handleMarkerClick(feature.properties);
-      } else if (feature.layer.id === clusterLayer.id && feature.properties.cluster) {
-        const clusterId = feature.properties.cluster_id;
-        const source = mapRef.current.getSource('properties-source');
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err) return;
-          mapRef.current.easeTo({
-            center: feature.geometry.coordinates,
-            zoom: zoom,
-            duration: 750
-          });
-        });
       }
     }
   }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted]);
@@ -804,10 +874,9 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           mapboxAccessToken={MAPBOX_TOKEN}
           attributionControl={false}
           projection={{ name: 'globe' }}
+          onMoveEnd={handleMapMoveEnd}
           onClick={(e) => {
-            onMapClick(e); // Llama a la función onMapClick existente
-            // Aquí también podrías llamar a stopAndSkipAnimation si es un clic genérico en el mapa
-            // y no fue manejado por onMapClick para un feature específico.
+            onMapClick(e); 
             if (!e.features || e.features.length === 0) {
                 if (!userInteractedRef.current && !autoFlyCompleted) {
                     console.log('Click genérico en mapa, deteniendo animación intro.');
@@ -815,7 +884,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 }
             }
           }}
-          interactiveLayerIds={!editable ? [clusterLayer.id, unclusteredPointLayer.id] : []} 
+          interactiveLayerIds={!editable ? [unclusteredPointLayer.id] : []} 
           onMouseMove={onMapMouseMove} 
           onMouseLeave={onMapMouseLeave} 
           preserveDrawingBuffer={true}
@@ -831,6 +900,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 right: '30px', 
                 zIndex: 5 
             }}
+            aria-label="Controles de navegación del mapa"
           />
           <AttributionControl 
             position="bottom-left" 
@@ -857,12 +927,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               id="properties-source"
               type="geojson"
               data={propertiesGeoJSON}
-              cluster={true}
-              clusterMaxZoom={14} 
-              clusterRadius={50} 
+              cluster={false}
             >
-              <Layer {...clusterLayer} />
-              <Layer {...clusterCountLayer} />
               <Layer {...unclusteredPointLayer} />
             </Source>
           )}
@@ -889,6 +955,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   padding: 1.2
                 }}
                 title={isDrawingMode ? "Terminar dibujo" : "Dibujar límites de propiedad"}
+                aria-label={isDrawingMode ? "Terminar dibujo de límites" : "Iniciar dibujo de límites de propiedad"}
               >
                 <EditIcon />
               </IconButton>
@@ -1091,4 +1158,4 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   );
 });
 
-export default MapView; 
+export default MapView;

@@ -41,14 +41,6 @@ export const ThemeModeContext = React.createContext({
 const AppWrapper = () => {
   const mode = 'dark';
 
-  const themeMode = useMemo(
-    () => ({
-      toggleThemeMode: () => {},
-      mode,
-    }),
-    [mode],
-  );
-
   const baseFontFamily = '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
   const titleFontFamily = '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
@@ -160,6 +152,15 @@ const AppWrapper = () => {
         }),
       }),
     [mode],
+  );
+
+  const themeMode = useMemo(
+    () => ({
+      toggleThemeMode: () => {},
+      mode,
+      theme,
+    }),
+    [mode, theme],
   );
 
   return (
@@ -311,15 +312,21 @@ function App() {
   };
 
   // Determine if the top bar should be shown
-  const showTopBar = !location.pathname.startsWith('/dashboard') && !location.pathname.startsWith('/admin'); // Hide on /admin routes too
+  const showTopBar = 
+    !location.pathname.startsWith('/property/') &&
+    !location.pathname.startsWith('/tour/') &&
+    !location.pathname.startsWith('/dashboard') &&
+    !location.pathname.startsWith('/admin') &&
+    location.pathname !== '/login' &&
+    location.pathname !== '/register' &&
+    location.pathname !== '/create-property' &&
+    !location.pathname.startsWith('/edit-property/');
 
   return (
     <>
       {/* UI principal siempre visible (Header Minimalista, etc.) */}
       {/* Condición para no mostrar en property, tour, o dashboard */}
-      {!location.pathname.startsWith('/property/') && 
-       !location.pathname.startsWith('/tour/') && 
-       location.pathname !== '/dashboard' && (
+      {showTopBar && (
         <Box
           sx={{
             position: 'absolute', top: 0, left: 0, right: 0, p: isMobile ? 1 : 2,
@@ -474,6 +481,7 @@ function App() {
             }
           />
           <Route path="/edit-property/:id" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
+          <Route path="/property/edit/:id" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
           <Route 
             path="/admin/publications"
             element={<AdminProtectedRoute element={<AdminPublicationsPage />} />} 

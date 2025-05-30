@@ -14,6 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import logging
 import traceback
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Property, Tour, Image
 from .serializers import (
@@ -25,10 +26,16 @@ from .services import GeminiService, GeminiServiceError
 # Create your views here.
 logger = logging.getLogger(__name__)
 
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 12 # Default page size
+    page_size_query_param = 'page_size' # Allow client to override page_size
+    max_page_size = 100 # Maximum page size
+
 class PropertyViewSet(viewsets.ModelViewSet):
     """Viewset para la gestión de propiedades inmobiliarias"""
     queryset = Property.objects.all().order_by('-created_at')
     serializer_class = PropertySerializer
+    pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['price', 'size', 'has_water', 'has_views']
     search_fields = ['name', 'description', 'location_name']
@@ -53,7 +60,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Permite filtrar propiedades por rango de precio y tamaño y anota conteos relacionados.
-        Los usuarios staff ven todas las propiedades, los demás solo las aprobadas.
+        # Los usuarios staff ven todas las propiedades, los demás solo las aprobadas. # Comentado para mostrar todas
         """
         queryset = super().get_queryset()
         
@@ -64,9 +71,9 @@ class PropertyViewSet(viewsets.ModelViewSet):
             has_tour_annotation=Exists(tour_exists)
         )
         
-        # Filter by publication_status for non-staff users
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(publication_status='approved')
+        # Filter by publication_status for non-staff users # Comentado para mostrar todas
+        # if not self.request.user.is_staff:
+        #     queryset = queryset.filter(publication_status='approved')
 
         # Filtros adicionales por rango
         min_price = self.request.query_params.get('min_price')

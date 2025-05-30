@@ -29,6 +29,7 @@ import TerrainIcon from '@mui/icons-material/Terrain';
 import { propertyService } from '../../services/api';
 import MapView from '../map/MapView';
 import PropertyBoundaryDraw from '../map/PropertyBoundaryDraw';
+import VirtualTourEditor from '../map/VirtualTourEditor';
 
 // Componente para el Panel de Tabs
 function TabPanel(props) {
@@ -200,6 +201,10 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     e.target.value = null;
   };
 
+  const handleTourUpdate = (tourData) => {
+    setFormData(prev => ({ ...prev, tour360: tourData }));
+  };
+
   const handleRemoveTour = () => {
     setFormData(prev => ({ ...prev, tour360: null, tourToDelete: !!prev.existingTourUrl }));
     setTourPreviewName('');
@@ -281,10 +286,10 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
       <form onSubmit={handleSubmit} noValidate>
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
+            <Grid xs={12} md={8}>
               <TextField fullWidth label="Nombre de la propiedad" name="name" value={formData.name} onChange={handleChange} error={!!formErrors.name} helperText={formErrors.name} required />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <TextField fullWidth label="Tipo" name="propertyType" select SelectProps={{ native: true }} value={formData.propertyType} onChange={handleChange}>
                 <option value="farm">Parcela/Granja</option>
                 <option value="ranch">Rancho</option>
@@ -292,31 +297,31 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
                 <option value="lake">Terreno con Lago/Río</option>
               </TextField>
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <TextField fullWidth label="Precio (CLP)" name="price" type="number" value={formData.price} onChange={handleChange} error={!!formErrors.price} helperText={formErrors.price} required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
+            <Grid xs={12} sm={6} md={4}>
+              <TextField fullWidth label="Precio (CLP)" name="price" type="number" value={formData.price} onChange={handleChange} error={!!formErrors.price} helperText={formErrors.price || 'En CLP'} required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
             </Grid>
-            <Grid item xs={12} sm={6} md={4}>
+            <Grid xs={12} sm={6} md={4}>
               <TextField fullWidth label="Tamaño" name="size" type="number" value={formData.size} onChange={handleChange} error={!!formErrors.size} helperText={formErrors.size || 'En hectáreas'} required InputProps={{ endAdornment: <InputAdornment position="end">ha</InputAdornment> }} />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid xs={12} sm={6}>
               <TextField fullWidth label="Latitud (Opcional)" name="latitude" type="number" value={formData.latitude} onChange={handleChange} error={!!formErrors.latitude} helperText={formErrors.latitude || 'Ej: -33.4489'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid xs={12} sm={6}>
               <TextField fullWidth label="Longitud (Opcional)" name="longitude" type="number" value={formData.longitude} onChange={handleChange} error={!!formErrors.longitude} helperText={formErrors.longitude || 'Ej: -70.6693'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
             </Grid>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <TextField fullWidth label="Descripción detallada" name="description" value={formData.description} onChange={handleChange} multiline rows={5} />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControlLabel control={<Switch checked={formData.hasWater} onChange={handleChange} name="hasWater" />} label="Acceso a agua" />
+            <Grid xs={12} sm={6}>
+              <TextField fullWidth label="Latitud (Opcional)" name="latitude" type="number" value={formData.latitude} onChange={handleChange} error={!!formErrors.latitude} helperText={formErrors.latitude || 'Ej: -33.4489'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControlLabel control={<Switch checked={formData.hasViews} onChange={handleChange} name="hasViews" />} label="Vistas panorámicas" />
+            <Grid xs={12} sm={6}>
+              <TextField fullWidth label="Longitud (Opcional)" name="longitude" type="number" value={formData.longitude} onChange={handleChange} error={!!formErrors.longitude} helperText={formErrors.longitude || 'Ej: -70.6693'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
             </Grid>
             {formData.boundary_polygon?.area && (
-              <Grid item xs={12}>
+              <Grid xs={12}>
                 <Alert severity="info" icon={<MapIcon fontSize="inherit" />}>
                   Límites definidos en el mapa: {parseFloat(formData.boundary_polygon.area).toFixed(2)} hectáreas.
                 </Alert>
@@ -352,7 +357,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
           <Typography variant="h6" gutterBottom>Imágenes de la Propiedad (máx. 5)</Typography>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {imagePreviews.map((preview, index) => (
-              <Grid item xs={6} sm={4} md={3} key={index}>
+              <Grid xs={6} sm={4} md={3} key={index}>
                 <Paper elevation={1} sx={{ position: 'relative', aspectRatio: '16/9', overflow:'hidden' }}>
                   <img src={preview.url} alt={`Preview ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <IconButton size="small" onClick={() => handleRemoveImage(index)} sx={{ position: 'absolute', top: 4, right: 4, bgcolor: 'rgba(0,0,0,0.6)', color:'white', '&:hover': {bgcolor: 'rgba(0,0,0,0.8)'} }}><DeleteIcon fontSize="small" /></IconButton>
@@ -360,7 +365,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
               </Grid>
             ))}
             {imagePreviews.length < 5 && (
-              <Grid item xs={6} sm={4} md={3}>
+              <Grid xs={6} sm={4} md={3}>
                 <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />} sx={{ width:'100%', aspectRatio: '16/9', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
                   Subir Imagen
                   <input type="file" hidden multiple accept="image/*" onChange={handleImageUpload} />
@@ -383,15 +388,13 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
 
         <TabPanel value={tabValue} index={3}>
           <Typography variant="h6" gutterBottom>Tour Virtual 360°</Typography>
-          <PropertyBoundaryDraw
-            initialCenter={property?.latitude && property?.longitude ? [property.longitude, property.latitude] : [-70.65, -33.45]}
-            initialZoom={property ? 14 : 5}
-            onBoundariesUpdate={handleBoundariesUpdate}
-            initialGeoJson={formData.boundary_polygon?.geojson || formData.boundary_polygon}
-            map={mapboxMapInstance}
-            existingBoundaries={formData.boundary_polygon}
-            propertyId={property?.id}
-          />
+            <VirtualTourEditor
+              initialTourData={formData.tour360}
+              onTourUpdate={handleTourUpdate}
+              map={mapboxMapInstance}
+              propertyId={property?.id}
+              onBoundariesUpdate={handleBoundariesUpdate}
+            />
         </TabPanel>
 
         <Divider sx={{ my: 4 }} />
@@ -415,4 +418,4 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
   );
 };
 
-export default PropertyForm; 
+export default PropertyForm;
