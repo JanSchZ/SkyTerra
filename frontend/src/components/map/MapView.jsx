@@ -312,7 +312,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   };
 
   const handleMarkerHover = (property) => {
-    setPopupInfo(property);
+    setPopupInfo({ ...property, country: getCountryFromCoords(property.latitude, property.longitude) });
     clearTimeout(window.tooltipHideTimeout);
   };
 
@@ -703,32 +703,33 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     type: 'circle',
     source: 'properties-source',
     paint: {
-      'circle-color': '#10b981', // Verde esmeralda principal
+      'circle-color': '#10b981', // Mantener el color base, pero ajustaremos la opacidad
       'circle-radius': [
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 4,   // Zoom bajo = puntos pequeños
-        12, 8,  // Zoom medio = puntos medianos  
-        16, 12  // Zoom alto = puntos grandes
+        8, 5,   // Aumentar ligeramente el radio base
+        12, 10, // Aumentar el radio en zoom medio
+        16, 15  // Aumentar el radio en zoom alto
       ],
-      'circle-stroke-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        8, 1,   // Borde fino en zoom bajo
-        12, 2,  // Borde medio en zoom medio
-        16, 3   // Borde grueso en zoom alto
-      ],
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-opacity': 0.9,
+      'circle-stroke-width': 0, // Quitar el borde
+      'circle-stroke-color': '#ffffff', // No visible al quitar el borde
+      'circle-stroke-opacity': 0,     // Asegurar que el borde sea transparente
       'circle-opacity': [
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 0.7,   // Menos opaco de lejos
-        12, 0.9,  // Más opaco cerca
+        8, 0.6,   // Aumentar opacidad de lejos
+        12, 0.8,  // Aumentar opacidad cerca
         16, 1     // Completamente opaco muy cerca
+      ],
+      'circle-blur': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 0.4, // Menor difuminado de lejos
+        12, 0.25, // Menor difuminado medio
+        16, 0.1 // Menor difuminado de cerca
       ]
     }
   };
@@ -965,48 +966,45 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             <Popup
               longitude={popupInfo.longitude}
               latitude={popupInfo.latitude}
+              anchor="bottom"
+              onClose={() => setPopupInfo(null)}
               closeButton={false}
               closeOnClick={false}
-              onClose={() => setPopupInfo(null)}
-              anchor="bottom"
-              offset={15} 
               maxWidth="300px"
+              className="skyterra-map-popup"
             >
-              <Card sx={{ 
-                maxWidth: 280, 
-                backgroundColor: 'rgba(255,255,255,0.9)',
-                border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-              }}>
-                {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
+              <Card elevation={3}>
+                {popupInfo.images && popupInfo.images.length > 0 && (
                   <CardMedia
                     component="img"
-                    height="120"
-                    image={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
-                    alt={`Imagen de ${popupInfo.name}`}
+                    height="100"
+                    image={popupInfo.images[0].image}
+                    alt={popupInfo.name}
                     sx={{ objectFit: 'cover' }}
                   />
-                ) : null}
-                <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
+                )}
+                <CardContent sx={{ padding: '10px', '&:last-child': { paddingBottom: '10px' } }}>
+                  <Typography variant="subtitle2" component="div" sx={{ fontWeight: 'bold' }}>
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5}}>
-                    Precio: {formatPrice(popupInfo.price)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Tamaño: {popupInfo.size} ha
-                  </Typography>
-                  <Box sx={{mt: 1}}>
-                      <Link 
-                          component="button" 
-                          variant="body2" 
-                          onClick={() => handleMarkerClick(popupInfo)} 
-                          sx={{cursor: 'pointer'}}
-                      >
-                          Ver detalles / Tour 360°
-                      </Link>
-                  </Box>
+                  {popupInfo.country && (
+                    <Typography variant="caption" color="text.secondary" component="div">
+                      País: {popupInfo.country.toUpperCase()}
+                    </Typography>
+                  )}
+                  {popupInfo.price && (
+                    <Typography variant="body2" color="text.secondary">
+                      Precio: {formatPrice(popupInfo.price)}
+                    </Typography>
+                  )}
+                  <Link 
+                    component="button"
+                    variant="body2" 
+                    onClick={() => navigate(`/property/${popupInfo.id}`)}
+                    sx={{ mt: 0.5, display: 'block' }}
+                  >
+                    Ver Detalles
+                  </Link>
                 </CardContent>
               </Card>
             </Popup>

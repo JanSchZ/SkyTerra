@@ -137,3 +137,4 @@
 *   2025-05-29: Añadida "Desarrollo de Aplicaciones Móviles Nativas (Android & iOS)" a Fase 4 con consideraciones iniciales.
 *   2025-05-29: Re-priorizadas otras tareas según el nuevo enfoque estratégico.
 *   2025-05-30: Actualizado el estado de los puntos 3 y 4 de la Fase 0 (edificios 3D resuelto, error de update depth pospuesto/no prioritario).
+*   2025-05-30: **[COMPLETADO]** Eliminada la restricción en el backend para que todas las propiedades sean visibles en el mapa, independientemente del estado de publicación o si el usuario está autenticado/staff. Código pusheado a GitHub.

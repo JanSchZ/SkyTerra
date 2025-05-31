@@ -241,58 +241,159 @@ const skyTerraCustomStyle = {
         "line-opacity": 0.5
       }
     },
-    // Place labels - NOMBRES DE PAÍSES MÁS GRANDES Y VISIBLES
+    // Países
     {
       id: "country-labels",
       type: "symbol",
       source: "composite",
       "source-layer": "place_label",
-      minzoom: 0, // Visibles desde el zoom más bajo
-      filter: ["all",
-          ["==", ["get", "type"], "country"],
-          ["<=", ["get", "label_rank"], 2] // Solo los países más importantes al inicio
-      ],
+      minzoom: 0,
+      filter: ["==", ["get", "type"], "country"],
       layout: {
-        "text-field": ["get", "name_es"], // Usar nombres en español si están disponibles
+        "text-field": ["get", "name_es"],
         "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
-          0, 8,   // Tamaño pequeño pero legible muy alejado
-          2, 10,
-          4, 14, // Tamaño más grande al acercarse
-          6, 18
+          0, 10,
+          2, 12,
+          4, 16,
+          6, 20
         ],
         "text-transform": "uppercase",
         "text-letter-spacing": 0.05,
-        "text-max-width": 10 // Para que los nombres largos se ajusten
+        "text-max-width": 10
       },
       paint: {
         "text-color": "hsl(0, 0%, 95%)",
-        "text-halo-color": "hsla(0, 0%, 5%, 0.85)", // Halo más opaco para contraste
+        "text-halo-color": "hsla(0, 0%, 5%, 0.85)",
         "text-halo-width": 1.5,
         "text-halo-blur": 0.5
       }
     },
-    { // Etiquetas para ciudades importantes, visibles más tarde
+    // Ciudades principales (desde lejos)
+    {
       id: "city-labels-major",
       type: "symbol",
       source: "composite",
       "source-layer": "place_label",
-      minzoom: 4, // Visibles al acercarse un poco
+      minzoom: 2, // Bajar minzoom para que aparezcan antes
       filter: ["all",
         ["==", ["get", "type"], "city"],
-        ["<=", ["get", "label_rank"], 5] // Ciudades importantes
+        ["<=", ["get", "label_rank"], 10] // Relajar filtro de label_rank
       ],
       layout: {
-        "text-field": ["get", "name_es"],
+        "text-field": ["get", "name"], // Usar 'name' temporalmente para asegurar visibilidad
         "text-font": ["Open Sans Semibold", "Arial Unicode MS Regular"],
-        "text-size": [ "interpolate", ["linear"], ["zoom"], 4, 10, 8, 14 ],
+        "text-size": [
+          "interpolate", ["linear"], ["zoom"],
+          2, 9,  // Ajustar tamaño para nuevo minzoom
+          5, 12,
+          8, 16
+        ],
         "text-anchor": "center"
       },
       paint: {
         "text-color": "hsl(0, 0%, 90%)",
         "text-halo-color": "hsla(0, 0%, 5%, 0.8)",
         "text-halo-width": 1.2
+      }
+    },
+    // Más ciudades y pueblos (al acercarse)
+    {
+      id: "city-labels-minor",
+      type: "symbol",
+      source: "composite",
+      "source-layer": "place_label",
+      minzoom: 7,
+      filter: ["all",
+        ["==", ["get", "type"], "city"],
+        [">", ["get", "label_rank"], 5], // Este filtro se mantiene como estaba
+        ["<=", ["get", "label_rank"], 15]
+      ],
+      layout: {
+        "text-field": ["get", "name_es"],
+        "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-size": [
+          "interpolate", ["linear"], ["zoom"],
+          7, 9,
+          12, 14
+        ],
+        "text-anchor": "center"
+      },
+      paint: {
+        "text-color": "hsl(0, 0%, 85%)",
+        "text-halo-color": "hsla(0, 0%, 5%, 0.7)",
+        "text-halo-width": 1
+      }
+    },
+    // POIs principales (aeropuertos, hospitales, universidades, parques nacionales)
+    {
+      id: "poi-major",
+      type: "symbol",
+      source: "composite",
+      "source-layer": "poi_label",
+      minzoom: 10,
+      filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], true, false],
+      layout: {
+        "text-field": ["get", "name_es"],
+        "text-font": ["Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-size": [
+          "interpolate", ["linear"], ["zoom"],
+          10, 10,
+          16, 16
+        ],
+        "text-anchor": "top"
+      },
+      paint: {
+        "text-color": "#e0e0e0",
+        "text-halo-color": "#222",
+        "text-halo-width": 1
+      }
+    },
+    // POIs secundarios (restaurantes, tiendas, etc.)
+    {
+      id: "poi-minor",
+      type: "symbol",
+      source: "composite",
+      "source-layer": "poi_label",
+      minzoom: 13,
+      filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], false, true],
+      layout: {
+        "text-field": ["get", "name_es"],
+        "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-size": [
+          "interpolate", ["linear"], ["zoom"],
+          13, 9,
+          16, 13
+        ],
+        "text-anchor": "top"
+      },
+      paint: {
+        "text-color": "#cccccc",
+        "text-halo-color": "#222",
+        "text-halo-width": 0.8
+      }
+    },
+    // Nueva capa para carreteras secundarias y primarias
+    {
+      id: "road-secondary-primary",
+      type: "line",
+      source: "composite",
+      "source-layer": "road",
+      minzoom: 9, // Visibles a partir de un zoom más cercano
+      filter: ["in", ["get", "class"], ["literal", ["primary", "secondary", "tertiary", "street"]]],
+      layout: {
+        "line-join": "round",
+        "line-cap": "round"
+      },
+      paint: {
+        "line-color": "hsl(0, 0%, 65%)", // Un color ligeramente más claro o diferente que las principales
+        "line-width": [ "interpolate", ["linear"], ["zoom"], 
+          9, 0.3, 
+          12, 0.8, 
+          16, 2 
+        ],
+        "line-opacity": 0.4 // Ligeramente más sutiles que las principales
       }
     }
     // Se han eliminado capas de edificios 2D y carreteras secundarias/terciarias por defecto
