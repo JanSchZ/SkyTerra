@@ -101,16 +101,16 @@ const AppWrapper = () => {
           },
           MuiButton: {
             styleOverrides: {
-              root: {
-                borderRadius: theme.shape.borderRadius, // Consistent border radius
-                padding: '8px 20px', // Keep padding
-                boxShadow: 'none', // No shadow by default
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth transition
+              root: ({ theme }) => ({
+                borderRadius: theme.shape.borderRadius,
+                padding: '8px 20px',
+                boxShadow: 'none',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
-                  transform: 'translateY(-2px)', // Slightly more lift
-                  boxShadow: theme.shadows[3], // Use theme shadow for hover
+                  transform: 'translateY(-2px)',
+                  boxShadow: theme.shadows[3],
                 }
-              },
+              }),
               containedPrimary: ({ theme }) => ({
                 '&:hover': {
                   backgroundColor: alpha(theme.palette.primary.main, 0.9),
@@ -160,28 +160,27 @@ const AppWrapper = () => {
           },
           MuiTextField: {
             styleOverrides: {
-              root: {
+              root: ({ theme }) => ({
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: theme.shape.borderRadius, // Consistent radius
-                  backgroundColor: alpha(theme.palette.background.paper, 0.75), // Theme-aware background
-                  backdropFilter: 'blur(8px)', // Standardized blur
+                  borderRadius: theme.shape.borderRadius,
+                  backgroundColor: alpha(theme.palette.background.paper, 0.75),
+                  backdropFilter: 'blur(8px)',
                   '& fieldset': {
                     borderColor: theme.palette.divider,
                     borderWidth: '1px',
                   },
                   '&:hover fieldset': {
-                    borderColor: theme.palette.primary.light, // Lighter primary for hover
+                    borderColor: theme.palette.primary.light,
                   },
                   '&.Mui-focused fieldset': {
                     borderColor: theme.palette.primary.main,
                     borderWidth: '2px',
                   },
-                  // Ensure the input text itself is readable
                   '& .MuiInputBase-input': {
                     color: theme.palette.text.primary,
                   }
                 },
-              },
+              }),
             },
           },
           MuiCard: {

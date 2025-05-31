@@ -250,51 +250,51 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
               )}
             </InputAdornment>
           ),
-          sx: (theme) => ({ // Make sx theme-aware
-            backgroundColor: muiAlpha(theme.palette.background.paper, 0.80), // Use theme color
-            borderRadius: '50px',
-            fontSize: '0.9rem',
-            color: theme.palette.text.primary,
-            border: 'none !important',
-            outline: 'none !important',
-            backdropFilter: 'blur(12px)', // Standardized blur
-            fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            boxShadow: theme.shadows[2], // Use theme shadow
-            '&.MuiOutlinedInput-root': {
-                '& fieldset': {
-                  border: 'none !important',
-                  outline: 'none !important',
-                },
-                '&:hover fieldset': {
-                  border: 'none !important',
-                  outline: 'none !important',
-                },
-                '&.Mui-focused fieldset': {
-                  border: 'none !important',
-                  outline: 'none !important',
-                },
-                '&:hover': {
-                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.85), // Slightly more opaque on hover
-                  boxShadow: theme.shadows[3],
-                },
-                '&.Mui-focused': {
-                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.90), // Even more opaque on focus
-                  boxShadow: `0 0 0 2px ${muiAlpha(theme.palette.primary.main, 0.5)}`, // Focus ring with theme color
-                },
-            },
-            '& .MuiInputBase-input': {
-                padding: '14px 12px',
-                color: theme.palette.text.primary,
-                fontWeight: 300,
-                fontSize: '0.95rem',
-                '&::placeholder': {
-                    color: '#8b949e',
-                    opacity: 1,
-                    fontWeight: 300,
-                },
-            },
-          }
         }}
+        sx={(theme) => ({
+          backgroundColor: muiAlpha(theme.palette.background.paper, 0.80),
+          borderRadius: '50px',
+          fontSize: '0.9rem',
+          color: theme.palette.text.primary,
+          border: 'none !important',
+          outline: 'none !important',
+          backdropFilter: 'blur(12px)',
+          fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          boxShadow: theme.shadows[2],
+          '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                border: 'none !important',
+                outline: 'none !important',
+              },
+              '&:hover fieldset': {
+                border: 'none !important',
+                outline: 'none !important',
+              },
+              '&.Mui-focused fieldset': {
+                border: 'none !important',
+                outline: 'none !important',
+              },
+              '&:hover': {
+                backgroundColor: muiAlpha(theme.palette.background.paper, 0.85),
+                boxShadow: theme.shadows[3],
+              },
+              '&.Mui-focused': {
+                backgroundColor: muiAlpha(theme.palette.background.paper, 0.90),
+                boxShadow: `0 0 0 2px ${muiAlpha(theme.palette.primary.main, 0.5)}`,
+              },
+          },
+          '& .MuiInputBase-input': {
+              padding: '14px 12px',
+              color: theme.palette.text.primary,
+              fontWeight: 300,
+              fontSize: '0.95rem',
+              '&::placeholder': {
+                  color: '#8b949e',
+                  opacity: 1,
+                  fontWeight: 300,
+              },
+          },
+        })}
       />
       
       {error && (
