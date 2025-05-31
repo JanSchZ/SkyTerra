@@ -215,10 +215,10 @@ const CreateProperty = ({ editMode = false }) => {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        backgroundColor: '#0d1117'
+        backgroundColor: theme.palette.background.default // Theme
       }}>
-        <CircularProgress sx={{ color: '#3b82f6' }} />
-        <Typography sx={{ ml: 2, color: 'white' }}>Cargando...</Typography>
+        <CircularProgress sx={{ color: theme.palette.primary.main }} />
+        <Typography sx={{ ml: 2, color: theme.palette.text.primary }}>Cargando...</Typography>
       </Box>
     );
   }
@@ -226,7 +226,7 @@ const CreateProperty = ({ editMode = false }) => {
   return (
     <Box sx={{ 
       minHeight: '100vh', 
-      backgroundColor: '#0d1117',
+      backgroundColor: theme.palette.background.default, // Theme
       py: 4
     }}>
       <Container maxWidth="lg">
@@ -236,14 +236,14 @@ const CreateProperty = ({ editMode = false }) => {
             onClick={() => navigate('/dashboard')}
             sx={{ 
               mr: 2, 
-              color: 'white',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+              color: theme.palette.text.primary, // Theme
+              backgroundColor: theme.palette.action.hover, // Theme
+              '&:hover': { backgroundColor: theme.palette.action.selected } // Theme
             }}
           >
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h4" sx={{ color: 'white', fontWeight: 300 }}>
+          <Typography variant="h4" sx={{ color: theme.palette.text.primary, fontWeight: 300 }}> {/* Theme */}
             {propertyId ? 'Editar Propiedad' : 'Nueva Propiedad'}
           </Typography>
         </Box>
@@ -252,10 +252,10 @@ const CreateProperty = ({ editMode = false }) => {
           elevation={3} 
           sx={{ 
             p: 4, 
-            borderRadius: 3,
-            backgroundColor: 'rgba(22, 27, 34, 0.95)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(30, 41, 59, 0.3)',
+            borderRadius: 3, // Keep custom, or use theme.shape.borderRadius * N
+            backgroundColor: theme.palette.background.paper, // Updated from rgba
+            backdropFilter: 'blur(20px)', // Keep if desired
+            border: `1px solid ${theme.palette.divider}`, // Updated from rgba
           }}
         >
           {/* Stepper */}
@@ -263,9 +263,11 @@ const CreateProperty = ({ editMode = false }) => {
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel sx={{ 
-                  '& .MuiStepLabel-label': { color: '#8b949e' },
-                  '& .MuiStepLabel-label.Mui-active': { color: '#3b82f6' },
-                  '& .MuiStepLabel-label.Mui-completed': { color: '#10b981' }
+                  '& .MuiStepLabel-label': { color: theme.palette.text.secondary },
+                  '& .MuiStepLabel-label.Mui-active': { color: theme.palette.primary.main },
+                  '& .MuiStepLabel-label.Mui-completed': { color: theme.palette.success.main },
+                  '& .MuiStepIcon-root.Mui-active': { color: theme.palette.primary.main },
+                  '& .MuiStepIcon-root.Mui-completed': { color: theme.palette.success.main }
                 }}>
                   {label}
                 </StepLabel>
@@ -276,7 +278,7 @@ const CreateProperty = ({ editMode = false }) => {
           {/* Step Content */}
           {activeStep === 0 && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Información Principal</Typography>
+              <Typography variant="h5" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 400, mb: 3 }}>Información Principal</Typography>
               <Grid container spacing={3}>
                 <Grid xs={12}>
                   <TextField
@@ -288,17 +290,11 @@ const CreateProperty = ({ editMode = false }) => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <HomeWorkIcon sx={{ color: '#8b949e' }} />
+                          <HomeWorkIcon sx={{ color: theme.palette.text.secondary }} />
                         </InputAdornment>
                       ),
                     }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed to use global MuiTextField theme
                   />
                 </Grid>
                 <Grid xs={12}>
@@ -313,75 +309,51 @@ const CreateProperty = ({ editMode = false }) => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <DescriptionIcon sx={{ color: '#8b949e' }} />
+                          <DescriptionIcon sx={{ color: theme.palette.text.secondary }} />
                         </InputAdornment>
                       ),
                     }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   />
                 </Grid>
                 <Grid xs={12} md={6}>
-                  <Typography gutterBottom sx={{ color: '#8b949e' }}>Precio (CLP)</Typography>
+                  <Typography gutterBottom sx={{ color: theme.palette.text.secondary }}>Precio (CLP)</Typography>
                   <Slider
                     value={propertyData.price}
                     onChange={handlePriceChange}
-                    min={10000000} // 10M
-                    max={1000000000} // 1B
-                    step={5000000} // 5M
-                    sx={{
-                      color: '#3b82f6',
-                      '& .MuiSlider-track': { backgroundColor: '#3b82f6' },
-                      '& .MuiSlider-thumb': { 
-                        backgroundColor: '#3b82f6',
-                        '&:hover': { boxShadow: '0 0 0 8px rgba(59, 130, 246, 0.16)' }
-                      }
-                    }}
+                    min={10000000}
+                    max={1000000000}
+                    step={5000000}
+                    color="primary" // Use theme color
                   />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>$10M</Typography>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>$1B</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>$10M</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>$1B</Typography>
                   </Box>
                 </Grid>
                 <Grid xs={12} md={6}>
-                  <Typography gutterBottom sx={{ color: '#8b949e' }}>Tamaño (Hectáreas)</Typography>
+                  <Typography gutterBottom sx={{ color: theme.palette.text.secondary }}>Tamaño (Hectáreas)</Typography>
                   <Slider
                     value={propertyData.size}
                     onChange={handleSizeChange}
                     min={0.1}
                     max={1000}
                     step={0.1}
-                    sx={{
-                      color: '#10b981',
-                      '& .MuiSlider-track': { backgroundColor: '#10b981' },
-                      '& .MuiSlider-thumb': { 
-                        backgroundColor: '#10b981',
-                        '&:hover': { boxShadow: '0 0 0 8px rgba(16, 185, 129, 0.16)' }
-                      }
-                    }}
+                    sx={{ color: theme.palette.success.main }} // Use theme success color
                   />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>0.1 ha</Typography>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>1,000 ha</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>0.1 ha</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>1,000 ha</Typography>
                   </Box>
                 </Grid>
                 <Grid xs={12} md={6}>
                   <TextField
                     select
+                    fullWidth // Added for consistency
                     label="Tipo de propiedad"
                     value={propertyData.propertyType}
                     onChange={handleInputChange('propertyType')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   >
                     <MenuItem value="farm">Parcela/Granja</MenuItem>
                     <MenuItem value="ranch">Rancho</MenuItem>
@@ -391,16 +363,16 @@ const CreateProperty = ({ editMode = false }) => {
                 </Grid>
                 <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
                   <FormControlLabel
-                    control={<Checkbox checked={propertyData.hasWater} onChange={handleCheckboxChange('hasWater')} sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#10b981' } }} />}
+                    control={<Checkbox checked={propertyData.hasWater} onChange={handleCheckboxChange('hasWater')} color="primary" />} // Theme color
                     label="Acceso a agua"
-                    sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
+                    sx={{ '& .MuiFormControlLabel-label': { color: theme.palette.text.primary } }} // Theme
                   />
                 </Grid>
                 <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
                   <FormControlLabel
-                    control={<Checkbox checked={propertyData.hasViews} onChange={handleCheckboxChange('hasViews')} sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#10b981' } }} />}
+                    control={<Checkbox checked={propertyData.hasViews} onChange={handleCheckboxChange('hasViews')} color="primary" />} // Theme color
                     label="Vistas panorámicas"
-                    sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
+                    sx={{ '& .MuiFormControlLabel-label': { color: theme.palette.text.primary } }} // Theme
                   />
                 </Grid>
               </Grid>
@@ -409,10 +381,10 @@ const CreateProperty = ({ editMode = false }) => {
 
           {activeStep === 1 && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 2 }}>
+              <Typography variant="h5" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 400, mb: 2 }}>
                 Ubicación de la Propiedad
               </Typography>
-              <Typography variant="body2" sx={{ color: '#8b949e', mb: 3 }}>
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 3 }}>
                 Ingresa la latitud y longitud de la propiedad. Puedes obtener tu ubicación actual automáticamente.
               </Typography>
               <Grid container spacing={3} sx={{ mb: 3, maxWidth: 600 }}>
@@ -425,17 +397,11 @@ const CreateProperty = ({ editMode = false }) => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LocationOnIcon sx={{ color: '#8b949e' }} />
+                          <LocationOnIcon sx={{ color: theme.palette.text.secondary }} />
                         </InputAdornment>
                       ),
                     }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   />
                 </Grid>
                 <Grid xs={12} md={6}>
@@ -447,22 +413,17 @@ const CreateProperty = ({ editMode = false }) => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LocationOnIcon sx={{ color: '#8b949e' }} />
+                          <LocationOnIcon sx={{ color: theme.palette.text.secondary }} />
                         </InputAdornment>
                       ),
                     }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   />
                 </Grid>
                 <Grid xs={12}>
                   <Button
                     variant="outlined"
+                    color="primary" // Theme color
                     onClick={() => {
                       if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(
@@ -480,13 +441,13 @@ const CreateProperty = ({ editMode = false }) => {
                         setSnackbar({ open: true, message: 'Geolocalización no soportada.', severity: 'warning' });
                       }
                     }}
-                    sx={{ mt: 1, color: '#3b82f6', borderColor: '#3b82f6' }}
+                    sx={{ mt: 1 }} // Keep margin
                   >
                     Obtener mi ubicación
                   </Button>
                 </Grid>
               </Grid>
-              <Typography variant="caption" sx={{ color: '#8b949e' }}>
+              <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                 Podrás ajustar la ubicación y límites exactos más adelante desde el panel de administración.
               </Typography>
             </Box>
@@ -494,20 +455,16 @@ const CreateProperty = ({ editMode = false }) => {
 
           {activeStep === 2 && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Detalles Adicionales y Características</Typography>
+              <Typography variant="h5" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 400, mb: 3 }}>Detalles Adicionales y Características</Typography>
               <Grid container spacing={3}>
                 <Grid xs={12} md={6}>
                   <TextField
                     select
+                    fullWidth // Added
                     label="Estado Legal (ej: saneado, con hipoteca)"
                     value={propertyData.legalStatus}
                     onChange={handleInputChange('legalStatus')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   >
                     <MenuItem value="clear">Saneado</MenuItem>
                     <MenuItem value="mortgaged">Con hipoteca</MenuItem>
@@ -516,27 +473,24 @@ const CreateProperty = ({ editMode = false }) => {
                 <Grid xs={12} md={6}>
                   <TextField
                     select
+                    fullWidth // Added
                     label="Acceso"
                     value={propertyData.access}
                     onChange={handleInputChange('access')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   >
                     <MenuItem value="paved">Pavimentado</MenuItem>
                     <MenuItem value="unpaved">No pavimentado</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid xs={12}>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#c9d1d9', mt: 2, mb: 1, fontWeight: 300 }}>Servicios Disponibles</Typography>
+                  <Typography variant="h6" gutterBottom sx={{ color: theme.palette.text.primary, mt: 2, mb: 1, fontWeight: 300 }}>Servicios Disponibles</Typography>
                   <Grid container spacing={1}>
                     {['water', 'electricity', 'internet', 'phone', 'septic_tank', 'well_water'].map(utility => (
                       <Grid xs={6} sm={4} md={3} key={utility}>
                         <FormControlLabel
                           control={<Checkbox
+                            color="primary" // Theme
                             checked={propertyData.utilities?.includes(utility)}
                             onChange={() => {
                               const currentUtilities = propertyData.utilities || [];
@@ -554,7 +508,7 @@ const CreateProperty = ({ editMode = false }) => {
                             }}
                           />}
                           label={utility.charAt(0).toUpperCase() + utility.slice(1).replace('_', ' ')}
-                          sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9', fontSize: '0.9rem' } }}
+                          sx={{ '& .MuiFormControlLabel-label': { color: theme.palette.text.primary, fontSize: '0.9rem' } }} // Theme
                         />
                       </Grid>
                     ))}
@@ -563,15 +517,11 @@ const CreateProperty = ({ editMode = false }) => {
                 <Grid xs={12} md={6}>
                   <TextField
                     select
+                    fullWidth // Added
                     label="Terreno"
                     value={propertyData.terrain}
                     onChange={handleInputChange('terrain')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
+                    // sx removed
                   >
                     <MenuItem value="flat">Plano</MenuItem>
                     <MenuItem value="hills">Colinas</MenuItem>
@@ -585,18 +535,18 @@ const CreateProperty = ({ editMode = false }) => {
 
           {activeStep === 3 && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Revisar y Guardar</Typography>
+              <Typography variant="h5" gutterBottom sx={{ color: theme.palette.text.primary, fontWeight: 400, mb: 3 }}>Revisar y Guardar</Typography>
               
               {/* Información Principal Card */}
-              <Card sx={{ mb: 3, backgroundColor: 'rgba(30, 41, 59, 0.6)', p: 2.5, borderRadius: 2 }}>
+              <Card sx={{ mb: 3, backgroundColor: alpha(theme.palette.background.paper, 0.7), p: 2.5, borderRadius: 2 }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#58a6ff' }}>Información Principal</Typography>
-                    <IconButton size="small" onClick={() => setActiveStep(0)} sx={{ color: '#8b949e' }} aria-label="Editar Información Principal">
+                    <Typography variant="h6" sx={{ color: theme.palette.primary.light }}>Información Principal</Typography>
+                    <IconButton size="small" onClick={() => setActiveStep(0)} sx={{ color: theme.palette.text.secondary }} aria-label="Editar Información Principal">
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                  <Grid container spacing={1.5} sx={{ color: '#c9d1d9' }}>
+                  <Grid container spacing={1.5} sx={{ color: theme.palette.text.primary }}>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Nombre:</strong> {propertyData.name || 'No especificado'}</Typography></Grid>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Tipo:</strong> {propertyData.propertyType ? propertyData.propertyType.charAt(0).toUpperCase() + propertyData.propertyType.slice(1) : 'No especificado'}</Typography></Grid>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Precio:</strong> {formatPrice(propertyData.price)}</Typography></Grid>
@@ -609,15 +559,15 @@ const CreateProperty = ({ editMode = false }) => {
               </Card>
 
               {/* Ubicación Card */}
-              <Card sx={{ mb: 3, backgroundColor: 'rgba(30, 41, 59, 0.6)', p: 2.5, borderRadius: 2 }}>
+              <Card sx={{ mb: 3, backgroundColor: alpha(theme.palette.background.paper, 0.7), p: 2.5, borderRadius: 2 }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#58a6ff' }}>Ubicación</Typography>
-                    <IconButton size="small" onClick={() => setActiveStep(1)} sx={{ color: '#8b949e' }} aria-label="Editar Ubicación">
+                    <Typography variant="h6" sx={{ color: theme.palette.primary.light }}>Ubicación</Typography>
+                    <IconButton size="small" onClick={() => setActiveStep(1)} sx={{ color: theme.palette.text.secondary }} aria-label="Editar Ubicación">
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                  <Grid container spacing={1.5} sx={{ color: '#c9d1d9' }}>
+                  <Grid container spacing={1.5} sx={{ color: theme.palette.text.primary }}>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Latitud:</strong> {propertyData.latitude || 'No especificada'}</Typography></Grid>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Longitud:</strong> {propertyData.longitude || 'No especificada'}</Typography></Grid>
                     <Grid xs={12} sx={{mt: 1}}><Typography variant="body2"><strong>Límites (GeoJSON):</strong> {propertyData.boundary_polygon ? 'Definidos' : 'No definidos'}</Typography></Grid>
@@ -626,15 +576,15 @@ const CreateProperty = ({ editMode = false }) => {
               </Card>
 
               {/* Características Adicionales Card */}
-              <Card sx={{ backgroundColor: 'rgba(30, 41, 59, 0.6)', p: 2.5, borderRadius: 2 }}>
+              <Card sx={{ backgroundColor: alpha(theme.palette.background.paper, 0.7), p: 2.5, borderRadius: 2 }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#58a6ff' }}>Características Adicionales</Typography>
-                    <IconButton size="small" onClick={() => setActiveStep(2)} sx={{ color: '#8b949e' }} aria-label="Editar Características Adicionales">
+                    <Typography variant="h6" sx={{ color: theme.palette.primary.light }}>Características Adicionales</Typography>
+                    <IconButton size="small" onClick={() => setActiveStep(2)} sx={{ color: theme.palette.text.secondary }} aria-label="Editar Características Adicionales">
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                  <Grid container spacing={1.5} sx={{ color: '#c9d1d9' }}>
+                  <Grid container spacing={1.5} sx={{ color: theme.palette.text.primary }}>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Terreno:</strong> {propertyData.terrain ? propertyData.terrain.charAt(0).toUpperCase() + propertyData.terrain.slice(1) : 'No especificado'}</Typography></Grid>
                     <Grid xs={12} sm={6}><Typography variant="body2"><strong>Acceso:</strong> {propertyData.access ? propertyData.access.charAt(0).toUpperCase() + propertyData.access.slice(1) : 'No especificado'}</Typography></Grid>
                     <Grid xs={12} sx={{mt: 1}}><Typography variant="body2"><strong>Servicios:</strong> {propertyData.utilities && propertyData.utilities.length > 0 ? propertyData.utilities.map(u => u.charAt(0).toUpperCase() + u.slice(1).replace('_', ' ')).join(', ') : 'Ninguno especificado'}</Typography></Grid>
@@ -650,18 +600,16 @@ const CreateProperty = ({ editMode = false }) => {
             <Button 
               disabled={activeStep === 0} 
               onClick={handleBack}
-              sx={{ color: '#8b949e' }}
+              sx={{ color: theme.palette.text.secondary }} // Theme
             >
               Atrás
             </Button>
             {activeStep < steps.length - 1 && (
               <Button 
                 variant="contained" 
+                color="primary" // Theme
                 onClick={handleNext}
-                sx={{ 
-                  backgroundColor: '#3b82f6',
-                  '&:hover': { backgroundColor: '#2563eb' }
-                }}
+                // sx removed for primary contained button
               >
                 Siguiente
               </Button>
@@ -672,9 +620,9 @@ const CreateProperty = ({ editMode = false }) => {
                 onClick={handleSubmit} 
                 disabled={loading}
                 startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-                sx={{ 
-                  backgroundColor: '#10b981',
-                  '&:hover': { backgroundColor: '#059669' }
+                sx={{  // Using success colors directly
+                  backgroundColor: theme.palette.success.main,
+                  '&:hover': { backgroundColor: theme.palette.success.dark }
                 }}
               >
                 {loading ? 'Guardando...' : (propertyId ? 'Actualizar' : 'Crear Propiedad')}
@@ -691,6 +639,7 @@ const CreateProperty = ({ editMode = false }) => {
           <Alert 
             onClose={() => setSnackbar(prev => ({...prev, open: false}))} 
             severity={snackbar.severity}
+            // MuiAlert is already styled by theme overrides
           >
             {snackbar.message}
           </Alert>

@@ -250,16 +250,16 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
               )}
             </InputAdornment>
           ),
-          sx: (theme) => ({ // Make sx theme-aware
-            backgroundColor: muiAlpha(theme.palette.background.paper, 0.80), // Use theme color
+          sx: (theme) => ({
+            backgroundColor: 'transparent', // Blend with top bar
             borderRadius: '50px',
             fontSize: '0.9rem',
             color: theme.palette.text.primary,
-            border: 'none !important',
+            border: 'none !important', // Keep borderless look
             outline: 'none !important',
-            backdropFilter: 'blur(12px)', // Standardized blur
+            backdropFilter: 'none', // Remove individual blur, rely on top bar's blur
             fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            boxShadow: theme.shadows[2], // Use theme shadow
+            boxShadow: 'none', // No shadow for the input field itself
             '&.MuiOutlinedInput-root': {
                 '& fieldset': {
                   border: 'none !important',
@@ -269,17 +269,17 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
                   border: 'none !important',
                   outline: 'none !important',
                 },
-                '&.Mui-focused fieldset': {
+                '&.Mui-focused fieldset': { // Still allow focus indication if needed, but border is none
                   border: 'none !important',
                   outline: 'none !important',
                 },
                 '&:hover': {
-                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.85), // Slightly more opaque on hover
-                  boxShadow: theme.shadows[3],
+                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.15), // Subtle hover, less than previous
+                  // boxShadow: theme.shadows[1], // Optional: very subtle shadow on hover
                 },
                 '&.Mui-focused': {
-                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.90), // Even more opaque on focus
-                  boxShadow: `0 0 0 2px ${muiAlpha(theme.palette.primary.main, 0.5)}`, // Focus ring with theme color
+                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.25), // Subtle focus background
+                  boxShadow: `0 0 0 2px ${muiAlpha(theme.palette.primary.main, 0.5)}`, // Keep focus ring
                 },
             },
             '& .MuiInputBase-input': {

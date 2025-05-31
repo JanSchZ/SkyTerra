@@ -972,41 +972,41 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
               onClose={() => setPopupInfo(null)}
               anchor="bottom"
               offset={15} 
-              maxWidth="300px"
+              maxWidth="240px" // Adjusted to fit smaller card
             >
               <Card sx={{ 
-                maxWidth: 280, 
+                maxWidth: '220px', // Reduced card width
                 backgroundColor: alpha(theme.palette.background.paper, 0.9),
                 border: 'none', 
-                boxShadow: theme.shadows[3] // Use theme shadow
+                boxShadow: theme.shadows[3]
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
                   <CardMedia
                     component="img"
-                    height="120"
+                    height="100px" // Reduced media height
                     image={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
                     alt={`Imagen de ${popupInfo.name}`}
                     sx={{ objectFit: 'cover' }}
                   />
                 ) : null}
-                <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold', color: theme.palette.text.primary}}>
+                <CardContent sx={{p: 1.25, '&:last-child': { pb: 1.25 } }}> {/* Reduced padding */}
+                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '0.9rem', fontWeight: 'bold', color: theme.palette.text.primary, mb: 0.5}}> {/* Reduced font size and margin */}
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5, color: theme.palette.text.secondary}}>
+                  <Typography variant="body2" sx={{mb: 0.5, color: theme.palette.text.secondary, fontSize: '0.8rem'}}> {/* Reduced font size */}
                     Precio: {formatPrice(popupInfo.price)}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{color: theme.palette.text.secondary}}>
+                  <Typography variant="body2" sx={{color: theme.palette.text.disabled, fontSize: '0.75rem'}}> {/* Reduced font size and lighter color */}
                     Tamaño: {popupInfo.size} ha
                   </Typography>
-                  <Box sx={{mt: 1}}>
+                  <Box sx={{mt: 0.75}}> {/* Reduced margin top */}
                       <Link 
                           component="button" 
                           variant="body2" 
                           onClick={() => handleMarkerClick(popupInfo)} 
-                          sx={{cursor: 'pointer', color: theme.palette.primary.light}}
+                          sx={{cursor: 'pointer', color: theme.palette.primary.main, fontSize: '0.75rem'}} // Adjusted color and font size
                       >
-                          Ver detalles / Tour 360°
+                          Details / 360° Tour
                       </Link>
                   </Box>
                 </CardContent>
