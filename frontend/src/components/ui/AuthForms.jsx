@@ -11,7 +11,9 @@ import {
   Alert,
   IconButton,
   InputAdornment,
-  Fade
+  Fade,
+  useTheme, // Import useTheme
+  alpha // Import alpha
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -19,41 +21,42 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LoginIcon from '@mui/icons-material/Login';
 import CloseIcon from '@mui/icons-material/Close';
 
-// Estilos comunes para los TextField
-const commonTextFieldStyles = {
+// Estilos comunes para los TextField, now a function of theme
+const commonTextFieldStyles = (theme) => ({
   '& .MuiInputLabel-root': {
-    color: '#8b949e', 
+    color: theme.palette.text.secondary,
     fontWeight: 300,
   },
   '& .MuiInputLabel-root.Mui-focused': {
-    color: '#58a6ff',
+    color: theme.palette.primary.main,
   },
   '& .MuiOutlinedInput-root': {
-    backgroundColor: 'rgba(13, 17, 23, 0.85)',
-    color: '#c9d1d9',
-    borderRadius: '8px',
+    backgroundColor: alpha(theme.palette.background.paper, 0.85), // theme-aware
+    color: theme.palette.text.primary,
+    borderRadius: '8px', // Or theme.shape.borderRadius
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
     '& fieldset': {
-      borderColor: 'rgba(88, 166, 255, 0.2)',
+      borderColor: alpha(theme.palette.primary.main, 0.3), // theme-aware
       borderWidth: '1px',
     },
     '&:hover fieldset': {
-      borderColor: 'rgba(88, 166, 255, 0.4)',
+      borderColor: alpha(theme.palette.primary.main, 0.5), // theme-aware
     },
     '&.Mui-focused fieldset': {
-      borderColor: '#58a6ff',
-      borderWidth: '1px',
+      borderColor: theme.palette.primary.main, // theme-aware
+      borderWidth: '1px', // Keep consistent or use 2px if preferred from global theme
     },
   },
   '& .MuiFormHelperText-root': {
-    color: '#e57373',
+    color: theme.palette.error.light, // theme-aware
     fontSize: '0.75rem',
     fontWeight: 300,
   }
-};
+});
 
 // Componente de formulario de inicio de sesión
 export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose }) => {
+  const theme = useTheme(); // Get theme for applying styles
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -89,7 +92,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           margin="normal"
           autoFocus
           disabled={loading}
-          sx={commonTextFieldStyles}
+          sx={commonTextFieldStyles(theme)}
         />
         
         <TextField
@@ -101,11 +104,11 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           onChange={(e) => setPassword(e.target.value)}
           margin="normal"
           disabled={loading}
-          sx={commonTextFieldStyles}
+          sx={commonTextFieldStyles(theme)}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>
+                <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: theme.palette.text.secondary }}>
                   {showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}
                 </IconButton>
               </InputAdornment>
@@ -118,22 +121,22 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           variant="contained"
           fullWidth
           sx={{ 
-            mt: 3, mb: 2, py: 1.5, borderRadius: '8px',
-            backgroundColor: '#58a6ff', 
+            mt: 3, mb: 2, py: 1.5, borderRadius: theme.shape.borderRadius, // Use theme border radius
+            backgroundColor: theme.palette.primary.main,
             fontWeight: 400,
             letterSpacing: '0.02em',
             textTransform: 'none',
-            '&:hover': { backgroundColor: '#4a90e2' }
+            '&:hover': { backgroundColor: theme.palette.primary.dark }
           }}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {loading ? 'Iniciando...' : 'Iniciar Sesión'}
         </Button>
-        <Divider sx={{ my: 2, borderColor: 'rgba(88, 166, 255, 0.1)' }} />
-        <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
+        <Divider sx={{ my: 2, borderColor: alpha(theme.palette.primary.main, 0.2) }} />
+        <Typography variant="body2" align="center" sx={{ color: theme.palette.text.secondary, fontWeight: 300 }}>
           ¿No tienes una cuenta?
-          <Button onClick={onSwitchToRegister} sx={{ color: '#58a6ff', fontWeight: 400, textTransform: 'none', p:0.5 }}>
+          <Button onClick={onSwitchToRegister} sx={{ color: theme.palette.primary.light, fontWeight: 400, textTransform: 'none', p:0.5 }}>
             Crear cuenta
           </Button>
         </Typography>
@@ -144,6 +147,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
 
 // Componente de formulario de registro
 export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose }) => {
+  const theme = useTheme(); // Get theme for applying styles
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -196,18 +200,18 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
       )}
       
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 0 }}>
-        <TextField label="Correo Electrónico" type="email" name="email" fullWidth required value={formData.email} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.email} helperText={formErrors.email} sx={commonTextFieldStyles} />
-        <TextField label="Nombre de Usuario" type="text" name="username" fullWidth required value={formData.username} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.username} helperText={formErrors.username} sx={commonTextFieldStyles} />
-        <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
-        <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles} />
+        <TextField label="Correo Electrónico" type="email" name="email" fullWidth required value={formData.email} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.email} helperText={formErrors.email} sx={commonTextFieldStyles(theme)} />
+        <TextField label="Nombre de Usuario" type="text" name="username" fullWidth required value={formData.username} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.username} helperText={formErrors.username} sx={commonTextFieldStyles(theme)} />
+        <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles(theme)} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: theme.palette.text.secondary }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
+        <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles(theme)} />
         
-        <Button type="submit" variant="contained" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', backgroundColor: '#58a6ff', fontWeight: 400, letterSpacing: '0.02em', textTransform: 'none', '&:hover': { backgroundColor: '#4a90e2' } }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
+        <Button type="submit" variant="contained" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: theme.shape.borderRadius, backgroundColor: theme.palette.primary.main, fontWeight: 400, letterSpacing: '0.02em', textTransform: 'none', '&:hover': { backgroundColor: theme.palette.primary.dark } }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
           {loading ? 'Registrando...' : 'Crear Cuenta'}
         </Button>
-        <Divider sx={{ my: 2, borderColor: 'rgba(88, 166, 255, 0.1)' }} />
-        <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
+        <Divider sx={{ my: 2, borderColor: alpha(theme.palette.primary.main, 0.2) }} />
+        <Typography variant="body2" align="center" sx={{ color: theme.palette.text.secondary, fontWeight: 300 }}>
           ¿Ya tienes una cuenta?
-          <Button onClick={onSwitchToLogin} sx={{ color: '#58a6ff', fontWeight: 400, textTransform: 'none', p: 0.5 }}>
+          <Button onClick={onSwitchToLogin} sx={{ color: theme.palette.primary.light, fontWeight: 400, textTransform: 'none', p: 0.5 }}>
             Iniciar sesión
           </Button>
         </Typography>
@@ -219,6 +223,7 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
 // Main AuthPage component that acts as a modal-like container
 const AuthPage = ({ formType, onLogin, onRegister }) => {
   // formType can be 'login' or 'register'
+  const theme = useTheme(); // Get theme for main page container styles
   const [currentForm, setCurrentForm] = useState(formType || 'login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -264,7 +269,7 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'rgba(13, 17, 23, 0.7)',
+          backgroundColor: alpha(theme.palette.background.default, 0.7), // theme-aware backdrop
           backdropFilter: 'blur(10px)',
           zIndex: 1300,
         }}
@@ -276,10 +281,10 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
             p: 0,
             width: '100%',
             maxWidth: '420px',
-            borderRadius: '16px',
-            backgroundColor: '#101418',
-            border: '1px solid rgba(88, 166, 255, 0.15)',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            borderRadius: '16px', // Or theme.shape.borderRadius * 2
+            backgroundColor: theme.palette.background.paper, // theme-aware background
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`, // theme-aware border
+            boxShadow: theme.shadows[10], // Use a theme shadow
             overflow: 'hidden',
           }}
         >
@@ -289,11 +294,11 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
               position: 'absolute', 
               top: 12, 
               right: 12, 
-              color: '#8b949e',
-              backgroundColor: 'rgba(255,255,255,0.05)',
+              color: theme.palette.text.secondary,
+              backgroundColor: alpha(theme.palette.background.default, 0.5), // theme-aware bg for button
               '&:hover': { 
-                color: '#c9d1d9',
-                backgroundColor: 'rgba(255,255,255,0.1)',
+                color: theme.palette.text.primary,
+                backgroundColor: alpha(theme.palette.background.paper, 0.7),
               } 
             }}
           >

@@ -1,35 +1,80 @@
 /* Estilos globales mejorados para SkyTerra */
-body, html {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Oxygen", sans-serif;
-  background-color: #0d1117;
+/*
+  Base body, html styling is handled by index.css and MUI's CssBaseline.
+  Redundant body, html styles removed from App.css.
+*/
+
+/* Define theme variables at root for broader use if needed, or scope them */
+:root {
+  /* MUI Theme values (from App.jsx, for reference in CSS) */
+  /* theme.typography.fontFamily: "SF Pro Text", ... */
+  /* theme.typography.h1.fontFamily: "SF Pro Display", ... */
+  /* theme.palette.background.paper: #12181f */
+  /* theme.palette.background.default: #0a0f14 */
+  /* theme.palette.divider: #30363d */
+  /* theme.palette.primary.main: #2563eb */
+  /* theme.palette.text.primary: #e2e8f0 */
+  /* theme.palette.text.secondary: #94a3b8 */
+  /* theme.shape.borderRadius: 8px (MuiCard is 16px) */
+  /* theme.shadows[1] (cards default), theme.shadows[5] (cards hover) */
+
+  /* CSS variables derived from MUI theme for global use */
+  --mui-typography-font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mui-typography-font-family-titles: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+  --mui-palette-background-paper: #12181f;
+  --mui-palette-background-default: #0a0f14;
+  --mui-palette-divider: #30363d;
+  --mui-palette-primary-main: #2563eb;
+  --mui-palette-primary-light: #3b82f6; /* Added for scrollbar */
+  --mui-palette-text-primary: #e2e8f0;
+  --mui-palette-text-secondary: #94a3b8;
+
+  --mui-shape-border-radius: 8px;
+  --mui-card-border-radius: 16px; /* Specific for cards */
+
+  /* Example for shadows (actual values depend on theme generation) */
+  /* These are illustrative; actual theme.shadows array is complex. */
+  /* Consider defining more specific shadow variables if frequently used. */
+  /* These are illustrative; actual theme.shadows array is complex */
+  --mui-shadows-1: 0 1px 3px rgba(0,0,0,0.2);
+  --mui-shadows-5: 0 5px 15px rgba(0,0,0,0.3);
+
+  /* For Mapbox Popups & other custom elements needing similar styling */
+  --bg-paper-alpha-85: rgba(18, 24, 31, 0.85); /* #12181f with 85% alpha */
+  --divider-alpha-50: rgba(48, 54, 61, 0.5); /* #30363d with 50% alpha */
+
+  /* Fallback variables (less critical now with MUI theme alignment) */
+  --fallback-bg-primary: var(--mui-palette-background-paper);
+  --fallback-border-light: var(--mui-palette-divider);
 }
+
 
 /* Estilos para el contenedor principal */
 #root {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #0d1117;
+  /* background-color is handled by body style from index.css / CssBaseline */
 }
 
 /* Estilos mejorados para los popups de mapbox */
 .mapboxgl-popup-content {
   padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(30, 58, 95, 0.15);
-  border: 1px solid var(--border-light);
-  background: var(--bg-primary);
+  border-radius: var(--mui-card-border-radius); /* Consistent with MuiCard */
+  box-shadow: var(--mui-shadows-5); /* Stronger shadow like MuiCard hover */
+  background: var(--bg-paper-alpha-85); /* Use new variable name */
+  border: 1px solid var(--divider-alpha-50); /* Use new variable name */
   font-family: 'Inter', sans-serif;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .property-popup .mapboxgl-popup-close-button {
   font-size: 20px;
   right: 12px;
   top: 12px;
-  color: var(--text-secondary);
+  color: var(--mui-palette-text-secondary); /* Use theme variable */
   background: none;
   border: none;
   cursor: pointer;
@@ -43,70 +88,72 @@ body, html {
 }
 
 .property-popup .mapboxgl-popup-close-button:hover {
-  color: var(--navy-primary);
-  background-color: rgba(30, 58, 95, 0.05);
+  color: var(--mui-palette-primary-main); /* Use theme variable */
+  background-color: rgba(37, 99, 235, 0.08); /* alpha(theme.palette.primary.main, 0.08) */
 }
 
 .property-popup .mapboxgl-popup-content {
-  padding: 20px;
-  border-radius: 16px;
-  max-width: 350px;
+  padding: 20px; /* Keep padding */
+  border-radius: var(--mui-card-border-radius); /* Ensure consistency if this popup is card-like */
+  max-width: 350px; /* Keep max-width */
 }
 
 /* Estilos mejorados para marcadores personalizados */
+/* Consider if these custom components should also use theme variables */
 .property-marker {
   display: flex;
   flex-direction: column;
   align-items: center;
-  filter: drop-shadow(0 4px 8px rgba(30, 58, 95, 0.2));
+  /* filter: drop-shadow(0 4px 8px rgba(30, 58, 95, 0.2)); */ /* Consider theme.shadows */
 }
 
 .property-marker-price {
-  background: linear-gradient(135deg, var(--navy-primary) 0%, var(--navy-medium) 100%);
-  color: var(--text-white);
+  /* background: linear-gradient(135deg, var(--navy-primary) 0%, var(--navy-medium) 100%); */ /* Consider theme.palette.primary gradients */
+  /* color: var(--text-white); */ /* Consider theme.palette.primary.contrastText */
   padding: 6px 12px;
-  border-radius: 12px;
+  border-radius: var(--mui-shape-border-radius);
   font-size: 0.75rem;
   font-weight: 600;
   margin-bottom: 4px;
-  box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2);
+  /* box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2); */ /* Consider theme.shadows */
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1); /* This is a light border, may need adjustment */
   font-family: 'Inter', sans-serif;
 }
 
 .property-marker-icon {
-  color: var(--navy-primary);
+  /* color: var(--navy-primary); */ /* Consider theme.palette.primary.main */
   font-size: 32px;
-  filter: drop-shadow(0 2px 4px rgba(30, 58, 95, 0.3));
+  /* filter: drop-shadow(0 2px 4px rgba(30, 58, 95, 0.3)); */
   transition: all 0.2s ease;
 }
 
 .property-marker:hover .property-marker-icon {
-  color: var(--navy-medium);
+  /* color: var(--navy-medium); */ /* Consider theme.palette.primary.dark */
   transform: scale(1.1);
 }
 
 /* Estilos mejorados para el panel de filtros */
 .filter-panel {
   width: 320px; 
-  background: var(--bg-primary);
+  background: var(--mui-palette-background-paper);
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-light);
+  border-right: 1px solid var(--mui-palette-divider);
   z-index: 10;
-  box-shadow: 2px 0 12px rgba(30, 58, 95, 0.08);
+  box-shadow: var(--mui-shadows-1); /* Example shadow */
   backdrop-filter: blur(8px);
 }
 
 /* Estilos mejorados para el visor de tours */
+/* These components seem highly custom; review if theme variables apply or keep as is */
 .tour-viewer {
   width: 100%;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%);
+  /* background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-primary) 100%); */
 }
 
 .tour-viewer-header {
@@ -114,18 +161,18 @@ body, html {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: rgba(10, 22, 40, 0.9);
-  color: var(--text-white);
+  background: rgba(10, 22, 40, 0.9); /* Custom dark background */
+  color: var(--mui-palette-text-primary); /* Use theme text */
   position: relative;
   z-index: 10;
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--divider-alpha-50); /* Use theme-derived divider */
 }
 
 .tour-viewer-container {
   flex-grow: 1;
   position: relative;
-  background: var(--navy-dark);
+  /* background: var(--navy-dark); */ /* Custom */
   border-radius: 0 0 24px 24px;
   overflow: hidden;
 }
@@ -134,14 +181,14 @@ body, html {
   position: absolute;
   bottom: 24px;
   left: 24px;
-  background: rgba(10, 22, 40, 0.9);
+  background: rgba(10, 22, 40, 0.9); /* Custom dark background */
   padding: 16px;
-  border-radius: 12px;
-  color: var(--text-white);
+  border-radius: var(--mui-shape-border-radius);
+  color: var(--mui-palette-text-primary);
   max-width: 320px;
   font-size: 0.875rem;
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--divider-alpha-50);
   font-family: 'Inter', sans-serif;
 }
 
@@ -261,20 +308,20 @@ body, html {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(10, 22, 40, 0.8);
+  /* background: rgba(10, 22, 40, 0.8); */ /* This will be handled by MuiDialog backdrop styleOverrides */
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1200;
-  backdrop-filter: blur(8px);
+  /* backdrop-filter: blur(8px); */ /* This will be handled by MuiDialog root styleOverrides */
   animation: fadeIn 0.3s ease;
 }
 
 .modal-content {
-  background: var(--bg-primary);
-  border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(30, 58, 95, 0.3);
-  border: 1px solid var(--border-light);
+  /* background: var(--bg-primary); */ /* This will be handled by MuiDialog paper styleOverrides */
+  /* border-radius: 24px; */ /* Handled by MuiDialog paper styleOverrides */
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); /* Adjusted shadow */
+  /* border: 1px solid var(--border-light); */ /* Handled by MuiDialog paper styleOverrides */
   max-width: 90vw;
   max-height: 90vh;
   overflow: auto;
@@ -329,23 +376,27 @@ body, html {
 }
 
 /* Estilos de tarjeta mejorados */
+/* General .card class - align with MuiCard or define as distinct */
 .card {
-  padding: 2em;
-  background: var(--bg-primary);
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(30, 58, 95, 0.08);
-  border: 1px solid var(--border-light);
+  padding: 2em; /* Keep custom padding if needed */
+  background: var(--mui-palette-background-paper);
+  border-radius: var(--mui-card-border-radius); /* Use 16px consistent with MuiCard */
+  box-shadow: var(--mui-shadows-1); /* Default MuiCard shadow */
+  border: 1px solid var(--mui-palette-divider);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Optional: add backdrop filter if these cards can appear over dynamic content */
+  /* background: var(--bg-paper-alpha-85); */
+  /* backdrop-filter: blur(5px); */
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(30, 58, 95, 0.15);
+  transform: translateY(-4px); /* Consistent with MuiCard hover */
+  box-shadow: var(--mui-shadows-5); /* Consistent with MuiCard hover */
 }
 
 /* Texto informativo mejorado */
 .read-the-docs {
-  color: var(--text-secondary);
+  color: var(--mui-palette-text-secondary); /* Use theme variable */
   font-family: 'Inter', sans-serif;
   font-weight: 400;
 }
@@ -354,68 +405,80 @@ body, html {
 .skyterra-brand {
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  color: var(--navy-primary);
+  color: var(--mui-palette-primary-main); /* Use theme variable */
   letter-spacing: -0.02em;
 }
 
-.search-container {
-  background: var(--bg-primary);
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(30, 58, 95, 0.12);
-  border: 1px solid var(--border-light);
-  backdrop-filter: blur(16px);
-}
+/* .search-container is mostly styled by AISearchBar.jsx itself now */
 
+/* .property-card: If this is meant to be an MuiCard, these rules will be overridden by MuiCard styles. */
+/* If it's a custom card that should look different, these styles can be adjusted. */
+/* For now, assuming it should look like an MuiCard, so commenting out conflicting properties. */
 .property-card {
-  background: var(--bg-primary);
-  border-radius: 16px;
+  /* background: var(--mui-palette-background-paper); */ /* Handled by MuiCard */
+  border-radius: var(--mui-card-border-radius); /* Handled by MuiCard */
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-light);
-  box-shadow: 0 4px 20px rgba(30, 58, 95, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Handled by MuiCard */
+  /* border: 1px solid var(--mui-palette-divider); */ /* Handled by MuiCard */
+  /* box-shadow: var(--mui-shadows-1); */ /* Handled by MuiCard */
 }
 
 .property-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 16px 48px rgba(30, 58, 95, 0.15);
+  /* transform: translateY(-8px); */ /* MuiCard has -4px, adjust if needed more lift */
+  /* box-shadow: var(--mui-shadows-5); */ /* MuiCard has its own hover shadow */
 }
+/* If .property-card requires glassmorphism and is NOT an MuiCard, uncomment and adjust: */
+/*
+.property-card {
+  background: var(--bg-paper-alpha-85);
+  backdrop-filter: blur(5px);
+  border: 1px solid var(--divider-alpha-50);
+  border-radius: var(--mui-card-border-radius);
+  box-shadow: var(--mui-shadows-1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.property-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--mui-shadows-5);
+}
+*/
 
 .price-tag {
-  background: linear-gradient(135deg, var(--navy-primary) 0%, var(--navy-medium) 100%);
-  color: var(--text-white);
+  /* background: linear-gradient(135deg, var(--mui-palette-primary-main) 0%, var(--mui-palette-primary-dark) 100%); */
+  color: var(--mui-palette-text-primary); /* Or primary.contrastText if background is primary */
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
   padding: 8px 16px;
-  border-radius: 12px;
+  border-radius: var(--mui-shape-border-radius);
   font-size: 1.125rem;
-  box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2);
+  /* box-shadow: var(--mui-shadows-2); */
 }
 
 .filter-section {
-  background: var(--bg-primary);
-  border-radius: 12px;
+  background: var(--mui-palette-background-paper);
+  border-radius: var(--mui-shape-border-radius); /* Smaller radius for sections within panels */
   padding: 20px;
   margin-bottom: 16px;
-  border: 1px solid var(--border-light);
-  box-shadow: 0 2px 8px rgba(30, 58, 95, 0.05);
+  border: 1px solid var(--mui-palette-divider);
+  box-shadow: var(--mui-shadows-1);
 }
 
 .navigation-item {
-  color: var(--text-secondary);
+  color: var(--mui-palette-text-secondary);
   transition: all 0.2s ease;
   font-weight: 500;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--mui-shape-border-radius);
 }
 
 .navigation-item:hover {
-  color: var(--navy-primary);
-  background-color: rgba(30, 58, 95, 0.05);
+  color: var(--mui-palette-primary-main);
+  background-color: rgba(37, 99, 235, 0.08); /* alpha(theme.palette.primary.main, 0.08) */
 }
 
 .navigation-item.active {
-  color: var(--navy-primary);
-  background-color: rgba(30, 58, 95, 0.1);
+  color: var(--mui-palette-primary-main);
+  background-color: rgba(37, 99, 235, 0.12); /* alpha(theme.palette.primary.main, 0.12) */
   font-weight: 600;
 }
 

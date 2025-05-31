@@ -14,7 +14,8 @@ import {
   InputAdornment,
   IconButton,
   Collapse,
-  Button
+  Button,
+  alpha as muiAlpha // Import alpha for use with theme colors
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
@@ -249,41 +250,41 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
               )}
             </InputAdornment>
           ),
-          sx: {
-            backgroundColor: 'rgba(22, 27, 34, 0.85)',
+          sx: (theme) => ({ // Make sx theme-aware
+            backgroundColor: muiAlpha(theme.palette.background.paper, 0.80), // Use theme color
             borderRadius: '50px',
             fontSize: '0.9rem',
-            color: '#c9d1d9',
+            color: theme.palette.text.primary,
             border: 'none !important',
             outline: 'none !important',
-            backdropFilter: 'blur(20px)',
+            backdropFilter: 'blur(12px)', // Standardized blur
             fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            boxShadow: theme.shadows[2], // Use theme shadow
             '&.MuiOutlinedInput-root': {
-                '& fieldset': { 
+                '& fieldset': {
                   border: 'none !important',
                   outline: 'none !important',
                 },
-                '&:hover fieldset': { 
+                '&:hover fieldset': {
                   border: 'none !important',
                   outline: 'none !important',
                 },
-                '&.Mui-focused fieldset': { 
+                '&.Mui-focused fieldset': {
                   border: 'none !important',
                   outline: 'none !important',
                 },
                 '&:hover': {
-                  backgroundColor: 'rgba(22, 27, 34, 0.9)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.16)',
+                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.85), // Slightly more opaque on hover
+                  boxShadow: theme.shadows[3],
                 },
                 '&.Mui-focused': {
-                  backgroundColor: 'rgba(22, 27, 34, 0.95)',
-                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)',
+                  backgroundColor: muiAlpha(theme.palette.background.paper, 0.90), // Even more opaque on focus
+                  boxShadow: `0 0 0 2px ${muiAlpha(theme.palette.primary.main, 0.5)}`, // Focus ring with theme color
                 },
             },
             '& .MuiInputBase-input': {
                 padding: '14px 12px',
-                color: '#c9d1d9',
+                color: theme.palette.text.primary,
                 fontWeight: 300,
                 fontSize: '0.95rem',
                 '&::placeholder': {
@@ -307,25 +308,25 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
       <Collapse in={showResults} timeout={300}>
         <Paper
           elevation={0}
-          sx={{
-            position: 'absolute', 
+          sx={(theme) => ({ // Make sx theme-aware
+            position: 'absolute',
             width: '100%',
             mt: 0.5,
-            backgroundColor: 'rgba(22, 27, 34, 0.95)',
-            backdropFilter: 'blur(20px)',
+            backgroundColor: muiAlpha(theme.palette.background.paper, 0.90), // Use theme color
+            backdropFilter: 'blur(12px)', // Standardized blur
             borderRadius: '16px',
-            border: '1px solid rgba(30, 41, 59, 0.3)',
+            border: `1px solid ${muiAlpha(theme.palette.divider, 0.3)}`, // Use theme color
             zIndex: 10,
             maxHeight: 'calc(100vh - 200px)',
             overflowY: 'auto',
-            boxShadow: theme.shadows[5]
-          }}
+            boxShadow: theme.shadows[5] // Use theme shadow
+          })}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', pt: 1, pb:0.5, px: 2, borderBottom: '1px solid rgba(30, 41, 59, 0.2)' }}>
-            <Typography variant="subtitle2" fontWeight="300" sx={{ color: '#c9d1d9' }}>
+          <Box sx={(theme) => ({ display: 'flex', justifyContent: 'space-between', alignItems:'center', pt: 1, pb:0.5, px: 2, borderBottom: `1px solid ${muiAlpha(theme.palette.divider, 0.2)}` })}>
+            <Typography variant="subtitle2" fontWeight="300" sx={{ color: (theme) => theme.palette.text.primary }}>
               {searchResult?.type === 'location' ? 'Ubicación Encontrada' : 'Resultados de Búsqueda IA'}
             </Typography>
-            <IconButton size="small" onClick={handleCloseResults} sx={{color: '#8b949e'}}>
+            <IconButton size="small" onClick={handleCloseResults} sx={{color: (theme) => theme.palette.text.secondary}}>
               <CloseIcon fontSize="inherit" />
             </IconButton>
           </Box>
@@ -333,7 +334,7 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
           <Box sx={{p:1.5}}>
             {searchResult && searchResult.type === 'location' && (
               <>
-                <Typography variant="body2" sx={{ color: '#c9d1d9', fontWeight: 300 }} gutterBottom>
+                <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.primary, fontWeight: 300 }} gutterBottom>
                   {searchResult.interpretation}
                 </Typography>
                 <Box sx={{ mb: 1.5, mt: 0.5 }}>
@@ -341,18 +342,18 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
                     icon={<TravelExploreIcon fontSize="small"/>}
                     label={`${searchResult.locationName}`}
                     size="medium"
-                    sx={{ 
+                    sx={(theme) => ({
                       fontWeight: 300,
                       borderRadius: '8px',
-                      backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(30, 58, 138, 0.3)',
-                    }}
+                      backgroundColor: muiAlpha(theme.palette.primary.dark, 0.15),
+                      color: theme.palette.primary.light,
+                      border: `1px solid ${muiAlpha(theme.palette.primary.dark, 0.3)}`,
+                    })}
                   />
                 </Box>
                 {searchResult.allResults && searchResult.allResults.length > 1 && (
                   <>
-                    <Typography variant="caption" sx={{ color: '#8b949e', display:'block', mb: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: (theme) => theme.palette.text.secondary, display:'block', mb: 0.5 }}>
                       Otras ubicaciones:
                     </Typography>
                     <List dense sx={{ maxHeight: '180px', overflowY: 'auto', p:0 }}>
@@ -361,13 +362,13 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
                           key={index} 
                           button 
                           onClick={() => handleLocationClick(location)}
-                          sx={{ py: 0.2, px: 1, borderRadius: 1, mb: 0.5, '&:hover': {backgroundColor: 'rgba(30, 41, 59, 0.3)'} }}
+                          sx={(theme) => ({ py: 0.2, px: 1, borderRadius: 1, mb: 0.5, '&:hover': {backgroundColor: muiAlpha(theme.palette.action.hover, 0.6)} })}
                         >
                           <ListItemText 
                             primary={location.name}
                             secondary={location.type}
-                            primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 300, color: '#c9d1d9' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: '#8b949e' }}
+                            primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 300, color: (theme) => theme.palette.text.primary }}
+                            secondaryTypographyProps={{ fontSize: '0.75rem', color: (theme) => theme.palette.text.secondary }}
                           />
                         </ListItem>
                       ))}
@@ -379,31 +380,31 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
 
             {searchResult && searchResult.type === 'properties' && (
               <>
-                <Typography variant="body2" sx={{ color: '#c9d1d9', fontWeight: 300, mb: 1.5 }} gutterBottom>
+                <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.primary, fontWeight: 300, mb: 1.5 }} gutterBottom>
                   {searchResult.assistant_message || searchResult.interpretation}
                 </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mb: 1.5, maxHeight: '150px', overflowY: 'auto' }}>
                   {searchResult.suggestedFilters?.propertyTypes?.map(type => (
-                    <Chip key={type} label={type.charAt(0).toUpperCase() + type.slice(1)} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                    <Chip key={type} label={type.charAt(0).toUpperCase() + type.slice(1)} size="small" variant="outlined" sx={(theme) => ({borderRadius: '6px', borderColor: theme.palette.divider, color: theme.palette.text.secondary})}/>
                   ))}
                   {searchResult.suggestedFilters?.priceRange?.[0] !== null && searchResult.suggestedFilters?.priceRange?.[1] !== null && (
-                    <Chip label={`$${searchResult.suggestedFilters.priceRange[0]?.toLocaleString()} - $${searchResult.suggestedFilters.priceRange[1]?.toLocaleString()}`} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                    <Chip label={`$${searchResult.suggestedFilters.priceRange[0]?.toLocaleString()} - $${searchResult.suggestedFilters.priceRange[1]?.toLocaleString()}`} size="small" variant="outlined" sx={(theme) => ({borderRadius: '6px', borderColor: theme.palette.divider, color: theme.palette.text.secondary})}/>
                   )}
                   {searchResult.suggestedFilters?.features?.map(feature => (
-                    <Chip key={feature} label={feature} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                    <Chip key={feature} label={feature} size="small" variant="outlined" sx={(theme) => ({borderRadius: '6px', borderColor: theme.palette.divider, color: theme.palette.text.secondary})}/>
                   ))}
                   {searchResult.suggestedFilters?.locations?.map(loc => (
-                    <Chip key={loc} label={loc} icon={<TravelExploreIcon fontSize='small'/>} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
+                    <Chip key={loc} label={loc} icon={<TravelExploreIcon fontSize='small'/>} size="small" variant="outlined" sx={(theme) => ({borderRadius: '6px', borderColor: theme.palette.divider, color: theme.palette.text.secondary})}/>
                   ))}
                 </Box>
                 
                 {searchResult.recommendations && searchResult.recommendations.length > 0 && (
                     <>
-                        <Typography variant="caption" sx={{ color: '#8b949e', display:'block', mb: 0.5 }}>Recomendaciones:</Typography>
+                        <Typography variant="caption" sx={{ color: (theme) => theme.palette.text.secondary, display:'block', mb: 0.5 }}>Recomendaciones:</Typography>
                         <List dense sx={{ maxHeight: '150px', overflowY: 'auto', p:0}}>
                             {searchResult.recommendations.map((rec, index) => (
                                 <ListItem key={index} sx={{ py: 0.2, px: 1, borderRadius: 1, mb: 0.5}}>
-                                    <ListItemText primary={rec.name || rec} primaryTypographyProps={{ fontSize: '0.85rem', color: '#c9d1d9', fontWeight: 300}} />
+                                    <ListItemText primary={rec.name || rec} primaryTypographyProps={{ fontSize: '0.85rem', color: (theme) => theme.palette.text.primary, fontWeight: 300}} />
                                 </ListItem>
                             ))}
                         </List>
@@ -416,17 +417,17 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
                         if(onSearch) onSearch(searchResult); 
                         setShowResults(false); 
                     }}
-                    sx={{
+                    sx={(theme) => ({
                       mt:1.5, 
                       width:'100%', 
                       fontWeight: 300, 
                       borderRadius: '12px', 
                       textTransform: 'none',
-                      backgroundColor: 'rgba(30, 58, 138, 0.9)',
+                      backgroundColor: muiAlpha(theme.palette.primary.dark, 0.9),
                       '&:hover': {
-                        backgroundColor: 'rgba(30, 58, 138, 1)',
+                        backgroundColor: theme.palette.primary.dark,
                       }
-                    }}
+                    })}
                 >
                     Aplicar Filtros de IA
                 </Button>
@@ -439,4 +440,4 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
   );
 };
 
-export default AISearchBar; 
+export default AISearchBar;

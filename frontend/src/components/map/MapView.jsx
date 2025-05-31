@@ -8,7 +8,8 @@ import MyLocationIcon from '@mui/icons-material/MyLocation';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import PropertyBoundaryDraw from './PropertyBoundaryDraw';
 import { useNavigate } from 'react-router-dom';
-import { ThemeModeContext } from '../../App';
+import { ThemeModeContext } from '../../App'; // Assuming this context provides theme
+import { useTheme, alpha } from '@mui/material/styles'; // Import useTheme and alpha
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
@@ -31,7 +32,8 @@ const propertiesToGeoJSON = (properties) => ({
 
 const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad, disableIntroAnimation = false }, ref) => {
   const navigate = useNavigate();
-  const { mode, theme } = useContext(ThemeModeContext);
+  // const { mode, theme: contextTheme } = useContext(ThemeModeContext); // Using useTheme instead for direct access
+  const theme = useTheme(); // Use MUI's useTheme hook
   // Estados
   const [properties, setProperties] = useState([]);
   const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); 
@@ -824,7 +826,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   // Si se está cargando y no es editable, muestra el spinner
   if (loading && !editable) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: theme.palette.background.default }}>
         <CircularProgress />
       </Box>
     );
@@ -834,17 +836,17 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     <Box sx={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
       {loading && !error && (
         <Box sx={{
-          position: 'absolute', 
+          position: 'absolute',
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          zIndex: 10, // Asegurar que esté sobre el mapa
+          zIndex: 10,
         }}>
           <CircularProgress />
-          <Typography sx={{ mt: 2, color: 'white' }}>Cargando propiedades...</Typography>
+          <Typography sx={{ mt: 2, color: theme.palette.text.primary }}>Cargando propiedades...</Typography>
         </Box>
       )}
       {error && (
@@ -852,11 +854,11 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             position: 'absolute', 
             top: '50%', left: '50%', 
             transform: 'translate(-50%, -50%)', 
-            p: 3, backgroundColor: 'rgba(255, 0, 0, 0.7)', 
+            p: 3, backgroundColor: alpha(theme.palette.error.main, 0.7),
             borderRadius: 1, textAlign: 'center', zIndex: 10 
         }}>
-          <Typography color="white">{error}</Typography>
-          <Typography variant="body2" color="white">Asegúrese de que el backend (Django) esté funcionando.</Typography>
+          <Typography color={theme.palette.error.contrastText}>{error}</Typography>
+          <Typography variant="body2" color={theme.palette.error.contrastText}>Asegúrese de que el backend (Django) esté funcionando.</Typography>
         </Box>
       )}
       
@@ -910,7 +912,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 bottom: '10px', 
                 left: '10px', 
                 zIndex: 5, 
-                backgroundColor: 'rgba(255,255,255,0.5)', 
+                backgroundColor: alpha(theme.palette.background.paper, 0.5),
                 padding: '2px 5px',
                 borderRadius: '4px'
              }}
@@ -974,9 +976,9 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             >
               <Card sx={{ 
                 maxWidth: 280, 
-                backgroundColor: 'rgba(255,255,255,0.9)',
+                backgroundColor: alpha(theme.palette.background.paper, 0.9),
                 border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                boxShadow: theme.shadows[3] // Use theme shadow
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
                   <CardMedia
@@ -988,13 +990,13 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   />
                 ) : null}
                 <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
+                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold', color: theme.palette.text.primary}}>
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5}}>
+                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5, color: theme.palette.text.secondary}}>
                     Precio: {formatPrice(popupInfo.price)}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary" sx={{color: theme.palette.text.secondary}}>
                     Tamaño: {popupInfo.size} ha
                   </Typography>
                   <Box sx={{mt: 1}}>
@@ -1002,7 +1004,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                           component="button" 
                           variant="body2" 
                           onClick={() => handleMarkerClick(popupInfo)} 
-                          sx={{cursor: 'pointer'}}
+                          sx={{cursor: 'pointer', color: theme.palette.primary.light}}
                       >
                           Ver detalles / Tour 360°
                       </Link>
@@ -1033,8 +1035,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.15)',
-            backdropFilter: 'blur(1px)',
+            backgroundColor: alpha(theme.palette.background.default, 0.15),
+            backdropFilter: 'blur(1px)', // Keep subtle blur for this overlay
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1045,15 +1047,15 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           <Box
             sx={{
               textAlign: 'center',
-              color: 'white',
+              color: theme.palette.text.primary, // Use theme text color
               maxWidth: '600px',
               px: 4,
               py: 3,
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.1), // Theme aware background
               borderRadius: '24px',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(20px)', // Keep stronger blur for focus box
+              border: `1px solid ${alpha(theme.palette.divider, 0.2)}`, // Theme aware border
+              boxShadow: theme.shadows[6], // Use theme shadow
             }}
           >
             <motion.div
@@ -1069,7 +1071,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 700,
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
-                  color: 'rgba(255, 255, 255, 0.95)',
+                  color: theme.palette.common.white, // Explicitly white for this overlay
                   mb: 2,
                   letterSpacing: '-0.02em'
                 }}
@@ -1083,7 +1085,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 300,
                   fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: 'rgba(255, 255, 255, 0.8)',
+                  color: alpha(theme.palette.common.white, 0.8), // Slightly transparent white
                   mb: 1,
                   letterSpacing: '-0.01em'
                 }}
@@ -1097,7 +1099,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 300,
                   fontSize: { xs: '0.95rem', md: '1.1rem' },
-                  color: 'rgba(255, 255, 255, 0.65)',
+                  color: alpha(theme.palette.common.white, 0.65), // More transparent white
                   lineHeight: 1.6,
                   maxWidth: '400px',
                   mx: 'auto'
@@ -1113,8 +1115,8 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 size="large"
                 onClick={stopAndSkipAnimation}
                 sx={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  color: 'rgba(255, 255, 255, 0.95)',
+                  backgroundColor: alpha(theme.palette.common.white, 0.15),
+                  color: theme.palette.common.white,
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 500,
                   fontSize: '1.1rem',
@@ -1122,11 +1124,11 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   py: 1.5,
                   borderRadius: '16px',
                   textTransform: 'none',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: theme.shadows[2],
+                  border: `1px solid ${alpha(theme.palette.common.white, 0.2)}`,
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.15)',
+                    backgroundColor: alpha(theme.palette.common.white, 0.25),
+                    boxShadow: theme.shadows[4],
                     transform: 'translateY(-2px)',
                   },
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1145,7 +1147,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    backgroundColor: index === currentTextIndex ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.25)',
+                    backgroundColor: index === currentTextIndex ? alpha(theme.palette.common.white, 0.8) : alpha(theme.palette.common.white, 0.25),
                     transition: 'all 0.3s ease',
                   }}
                 />

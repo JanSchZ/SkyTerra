@@ -10,81 +10,41 @@
   padding: 0;
 }
 
-:root {
-  /* Navy Blue Color Palette */
-  --navy-dark: #0a1628;
-  --navy-primary: #1e3a5f;
-  --navy-medium: #2c5282;
-  --navy-light: #4a90c2;
-  --navy-lightest: #e2f4ff;
-  
-  /* Accent Colors */
-  --accent-gold: #f6d55c;
-  --accent-light: #ffffff;
-  --accent-gray: #64748b;
-  --accent-light-gray: #f8fafc;
-  
-  /* Text Colors */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-light: #94a3b8;
-  --text-white: #ffffff;
-  
-  /* Background Colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-dark: var(--navy-dark);
-  
-  /* Border Colors */
-  --border-light: #e2e8f0;
-  --border-medium: #cbd5e1;
-}
+/*
+  Old :root variables removed.
+  Theme-derived CSS variables are now primarily managed in App.css
+  to be closer to MUI theme integration.
+*/
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif;
+  /* MUI's CssBaseline will set the base font from theme.typography.fontFamily */
+  /* This 'Inter' can be a fallback or for non-MUI elements if SF Pro Text is primary */
+  font-family: var(--mui-typography-font-family, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif);
   font-weight: 400;
   line-height: 1.6;
-  color: var(--text-primary);
-  background-color: #0d1117;
+  color: var(--mui-palette-text-primary, #e2e8f0); /* Use theme variable */
+  background-color: var(--mui-palette-background-default, #0a0f14); /* Use theme variable */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  font-size: 14px;
+  font-size: 14px; /* Base size, MUI components will use theme typography scale */
 }
 
-/* Typography improvements */
+/* Typography improvements for non-MUI elements if needed */
+/* MUI Typography components should be preferred for h1-h6 */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 600;
-  color: var(--navy-primary);
+  font-family: var(--mui-typography-font-family-titles, 'Poppins', sans-serif); /* Use theme title font */
+  font-weight: 600; /* Default weight, MUI theme can override for specific variants */
+  color: var(--mui-palette-text-primary, #e2e8f0); /* Use theme text color */
   line-height: 1.4;
 }
 
-/* Configuración de mapbox-gl */
-.mapboxgl-popup-content {
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(30, 58, 95, 0.15);
-  max-width: 320px;
-  border: 1px solid var(--border-light);
-  font-family: 'Inter', sans-serif;
-}
+/*
+  Removed .mapboxgl-popup-content and .mapboxgl-popup-close-button styles.
+  These are now themed and defined in App.css using MUI-derived variables.
+*/
 
-.mapboxgl-popup-close-button {
-  font-size: 20px;
-  padding: 8px;
-  color: var(--text-secondary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.mapboxgl-popup-close-button:hover {
-  color: var(--navy-primary);
-}
-
-/* Animaciones globales */
+/* Animaciones globales - Kept */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -125,7 +85,8 @@ iframe {
 /* Mejoras para scroll en contenedores con desbordamiento */
 .scroll-container {
   scrollbar-width: thin;
-  scrollbar-color: var(--navy-light) transparent;
+  /* Consider using theme colors for scrollbar if possible, e.g., primary.light */
+  scrollbar-color: var(--mui-palette-primary-light, #3b82f6) transparent;
 }
 
 .scroll-container::-webkit-scrollbar {
@@ -138,15 +99,15 @@ iframe {
 }
 
 .scroll-container::-webkit-scrollbar-thumb {
-  background-color: var(--navy-light);
+  background-color: var(--mui-palette-primary-light, #3b82f6); /* Use theme color */
   border-radius: 3px;
 }
 
 .scroll-container::-webkit-scrollbar-thumb:hover {
-  background-color: var(--navy-medium);
+  background-color: var(--mui-palette-primary-main, #2563eb); /* Darker theme color on hover */
 }
 
-/* Optimizaciones para dispositivos móviles */
+/* Optimizaciones para dispositivos móviles - Kept */
 @media (max-width: 768px) {
   .mapboxgl-popup-content {
     max-width: 280px;
@@ -154,80 +115,19 @@ iframe {
   }
   
   body {
-    font-size: 13px;
+    font-size: 13px; /* MUI typography will also handle responsive font sizes */
   }
 }
 
-/* Transiciones suaves generales */
+/* Transiciones suaves generales - Kept */
 .transition-all {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Button styles */
-.btn-primary {
-  background-color: var(--navy-primary);
-  color: var(--text-white);
-  border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-  background-color: var(--navy-medium);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2);
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: var(--navy-primary);
-  border: 1px solid var(--navy-primary);
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background-color: var(--navy-primary);
-  color: var(--text-white);
-}
-
-/* Card styles */
-.card {
-  background: var(--bg-primary);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(30, 58, 95, 0.08);
-  border: 1px solid var(--border-light);
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  box-shadow: 0 8px 25px rgba(30, 58, 95, 0.12);
-  transform: translateY(-2px);
-}
-
-/* Input styles */
-.input-field {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid var(--border-medium);
-  border-radius: 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  transition: all 0.2s ease;
-}
-
-.input-field:focus {
-  outline: none;
-  border-color: var(--navy-primary);
-  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
-}
+/*
+  Removed custom .btn-primary, .btn-secondary, .card, and .input-field styles.
+  These should be handled by Material-UI Button, Card, and TextField components
+  and their respective theme overrides defined in App.jsx.
+  If custom non-MUI versions are truly needed, they should be named distinctively
+  to avoid confusion and styled harmoniously with the theme.
+*/

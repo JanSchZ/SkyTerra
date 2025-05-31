@@ -20,7 +20,9 @@ import {
   Fab,
   Stack,
   Chip,
-  Divider
+  Divider,
+  useTheme, // Import useTheme
+  alpha // Import alpha
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -37,6 +39,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
+  const theme = useTheme(); // Hook to get theme object
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -99,8 +102,8 @@ const Dashboard = ({ user }) => {
 
   if (!user && !loading) {
     return (
-      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1117'}}>
-        <CircularProgress sx={{ color: '#3b82f6' }} />
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: theme.palette.background.default}}>
+        <CircularProgress sx={{ color: theme.palette.primary.main }} />
       </Box>
     );
   }
@@ -113,8 +116,8 @@ const Dashboard = ({ user }) => {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        backgroundColor: '#0d1117',
-        color: '#c9d1d9'
+        backgroundColor: theme.palette.background.default,
+        color: theme.palette.text.primary
       }}>
         <CircularProgress color="primary" size={50} sx={{mb: 2}} />
         <Typography variant="h6" sx={{ fontWeight: 300 }}>
@@ -132,14 +135,14 @@ const Dashboard = ({ user }) => {
         alignItems: 'center',
         justifyContent: 'center',
         height: '100vh',
-        backgroundColor: '#0d1117',
-        color: '#c9d1d9',
+        backgroundColor: theme.palette.background.default,
+        color: theme.palette.text.primary,
         p: 3
       }}>
-        <Alert severity="error" sx={{mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373'}}>
+        <Alert severity="error" sx={{mb: 2, backgroundColor: alpha(theme.palette.error.main, 0.1), color: theme.palette.error.light}}>
           {error}
         </Alert>
-        <Button variant="outlined" onClick={() => window.location.reload()} sx={{color: '#58a6ff', borderColor: '#58a6ff'}}>
+        <Button variant="outlined" onClick={() => window.location.reload()} sx={{color: theme.palette.primary.light, borderColor: theme.palette.primary.light}}>
           Reintentar Carga
         </Button>
       </Box>
@@ -149,7 +152,7 @@ const Dashboard = ({ user }) => {
   return (
     <Box sx={{ 
       minHeight: '100vh', 
-      backgroundColor: '#0d1117',
+      backgroundColor: theme.palette.background.default,
       py: 4
     }}>
       <Container maxWidth="xl">
@@ -160,18 +163,18 @@ const Dashboard = ({ user }) => {
               onClick={() => navigate('/')}
               sx={{ 
                 mr: 2, 
-                color: 'white',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+                color: theme.palette.common.white,
+                backgroundColor: alpha(theme.palette.common.white, 0.1),
+                '&:hover': { backgroundColor: alpha(theme.palette.common.white, 0.2) }
               }}
             >
               <ArrowBackIcon />
             </IconButton>
             <Box>
-              <Typography variant="h4" sx={{ color: 'white', fontWeight: 300 }}>
+              <Typography variant="h4" sx={{ color: theme.palette.common.white, fontWeight: 300 }}>
                 Mi Panel
               </Typography>
-              <Typography variant="body1" sx={{ color: '#8b949e' }}>
+              <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
                 Bienvenido, {user.username || user.email}
               </Typography>
             </Box>
@@ -182,8 +185,8 @@ const Dashboard = ({ user }) => {
             startIcon={<AddIcon />}
             onClick={() => navigate('/create-property')}
             sx={{
-              backgroundColor: '#3b82f6',
-              '&:hover': { backgroundColor: '#2563eb' },
+              backgroundColor: theme.palette.primary.main,
+              '&:hover': { backgroundColor: theme.palette.primary.dark },
               borderRadius: 2,
               px: 3,
               py: 1
@@ -197,15 +200,15 @@ const Dashboard = ({ user }) => {
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid xs={12} sm={6} md={3}>
             <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.95),
+              border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
               borderRadius: 2
             }}>
               <CardContent>
-                <Typography variant="h4" sx={{ color: '#3b82f6', fontWeight: 'bold' }}>
+                <Typography variant="h4" sx={{ color: theme.palette.primary.light, fontWeight: 'bold' }}>
                   {properties.length}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                   Propiedades Publicadas
                 </Typography>
               </CardContent>
@@ -213,15 +216,15 @@ const Dashboard = ({ user }) => {
           </Grid>
           <Grid xs={12} sm={6} md={3}>
             <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.95),
+              border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
               borderRadius: 2
             }}>
               <CardContent>
-                <Typography variant="h4" sx={{ color: '#10b981', fontWeight: 'bold' }}>
+                <Typography variant="h4" sx={{ color: theme.palette.success.light, fontWeight: 'bold' }}>
                   {properties.reduce((acc, p) => acc + (p.size || 0), 0).toFixed(1)}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                   Hectáreas Totales
                 </Typography>
               </CardContent>
@@ -229,15 +232,15 @@ const Dashboard = ({ user }) => {
           </Grid>
           <Grid xs={12} sm={6} md={3}>
             <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.95),
+              border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
               borderRadius: 2
             }}>
               <CardContent>
-                <Typography variant="h4" sx={{ color: '#f59e0b', fontWeight: 'bold' }}>
+                <Typography variant="h4" sx={{ color: theme.palette.warning.light, fontWeight: 'bold' }}>
                   {formatPrice(properties.reduce((acc, p) => acc + (p.price || 0), 0))}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                   Valor Total
                 </Typography>
               </CardContent>
@@ -245,15 +248,15 @@ const Dashboard = ({ user }) => {
           </Grid>
           <Grid xs={12} sm={6} md={3}>
             <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.95),
+              border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
               borderRadius: 2
             }}>
               <CardContent>
-                <Typography variant="h4" sx={{ color: '#8b5cf6', fontWeight: 'bold' }}>
+                <Typography variant="h4" sx={{ color: theme.palette.info.light, fontWeight: 'bold' }}>
                   {properties.filter(p => p.hasWater || p.has_water).length}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                   Con Acceso a Agua
                 </Typography>
               </CardContent>
@@ -264,40 +267,40 @@ const Dashboard = ({ user }) => {
         {/* Properties Section */}
         <Paper sx={{ 
           p: 4, 
-          backgroundColor: 'rgba(22, 27, 34, 0.95)',
-          border: '1px solid rgba(30, 41, 59, 0.3)',
+          backgroundColor: alpha(theme.palette.background.paper, 0.95),
+          border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
           borderRadius: 3
         }}>
-          <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 3 }}>
+          <Typography variant="h5" sx={{ color: theme.palette.text.primary, mb: 3 }}>
             Mis Propiedades
           </Typography>
 
           {loading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress sx={{ color: '#3b82f6' }} />
+              <CircularProgress sx={{ color: theme.palette.primary.main }} />
             </Box>
           )}
 
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert severity="error" sx={{ mb: 3 }}> {/* MuiAlert already styled by theme */}
               {error}
             </Alert>
           )}
 
           {!loading && !error && properties.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 6 }}>
-              <HomeIcon sx={{ fontSize: 64, color: '#30363d', mb: 2 }} />
-              <Typography variant="h6" sx={{ color: '#8b949e', mb: 2 }}>
+              <HomeIcon sx={{ fontSize: 64, color: theme.palette.divider, mb: 2 }} />
+              <Typography variant="h6" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
                 Aún no has publicado propiedades
               </Typography>
-              <Typography variant="body2" sx={{ color: '#6b7280', mb: 3 }}>
+              <Typography variant="body2" sx={{ color: theme.palette.text.disabled, mb: 3 }}>
                 Comienza creando tu primera propiedad y muéstrala al mundo
               </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => navigate('/create-property')}
-                sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}
+                sx={{ backgroundColor: theme.palette.primary.main, '&:hover': { backgroundColor: theme.palette.primary.dark } }}
               >
                 Crear Mi Primera Propiedad
               </Button>
@@ -310,12 +313,12 @@ const Dashboard = ({ user }) => {
                 <Grid xs={12} sm={6} md={4} lg={3} key={property.id}>
                   <Card sx={{
                     height: '100%',
-                    backgroundColor: 'rgba(13, 17, 23, 0.8)',
-                    border: '1px solid rgba(30, 41, 59, 0.3)',
+                    backgroundColor: alpha(theme.palette.background.default, 0.8),
+                    border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
                     borderRadius: 2,
                     transition: 'all 0.2s ease',
                     '&:hover': {
-                      borderColor: 'rgba(59, 130, 246, 0.4)',
+                      borderColor: alpha(theme.palette.primary.light, 0.4),
                       transform: 'translateY(-2px)'
                     }
                   }}>
@@ -336,7 +339,7 @@ const Dashboard = ({ user }) => {
                         sx={{
                           width: '100%',
                           height: 180,
-                          backgroundColor: '#30363d', // Dark placeholder
+                          backgroundColor: theme.palette.divider,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -344,23 +347,23 @@ const Dashboard = ({ user }) => {
                           borderTopRightRadius: '8px'
                         }}
                       >
-                        <HomeIcon sx={{ fontSize: 60, color: '#8b949e' }} />
+                        <HomeIcon sx={{ fontSize: 60, color: theme.palette.text.secondary }} />
                       </Box>
                     )}
                     <CardContent sx={{ flexGrow: 1, p: 2 }}>
-                      <Typography variant="h6" component="div" noWrap sx={{ fontWeight: 600, color: 'white', mb: 0.5 }}>
+                      <Typography variant="h6" component="div" noWrap sx={{ fontWeight: 600, color: theme.palette.text.primary, mb: 0.5 }}>
                         {property.name}
                       </Typography>
 
-                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: '#8b949e', mb: 1 }}>
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: theme.palette.text.secondary, mb: 1 }}>
                           <AttachMoneyIcon sx={{ fontSize: '1rem' }} />
-                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#adbac7' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500, color: theme.palette.text.primary }}>
                               {property.price ? formatPrice(Number(property.price)) : 'N/A'}
                           </Typography>
                       </Stack>
-                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: '#8b949e', mb: 1 }}>
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: theme.palette.text.secondary, mb: 1 }}>
                           <StraightenIcon sx={{ fontSize: '1rem' }} />
-                          <Typography variant="body2" sx={{ color: '#adbac7' }}>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.primary }}>
                              {property.size ? `${Number(property.size).toLocaleString('es-CL')} ha` : 'N/A'}
                           </Typography>
                       </Stack>
@@ -371,19 +374,19 @@ const Dashboard = ({ user }) => {
                                   label={property.type === 'plot' ? 'Parcela' : property.type === 'farm' ? 'Campo' : property.type} 
                                   size="small" 
                                   variant="outlined" 
-                                  sx={{borderColor: '#30363d', color: '#8b949e'}} 
+                                  sx={{borderColor: theme.palette.divider, color: theme.palette.text.secondary}}
                               />
                           )}
-                          {property.has_water && <Chip icon={<WaterDropIcon fontSize="small" />} label="Agua" size="small" variant="filled" sx={{backgroundColor: 'rgba(56,139,253,0.2)', color: '#79c0ff'}} />}
-                          {property.has_views && <Chip icon={<TerrainIcon fontSize="small" />} label="Vistas" size="small" variant="filled" sx={{backgroundColor: 'rgba(35,134,54,0.2)', color: '#56d364'}}/>}
+                          {property.has_water && <Chip icon={<WaterDropIcon fontSize="small" />} label="Agua" size="small" variant="filled" sx={{backgroundColor: alpha(theme.palette.info.main,0.2), color: theme.palette.info.light}} />}
+                          {property.has_views && <Chip icon={<TerrainIcon fontSize="small" />} label="Vistas" size="small" variant="filled" sx={{backgroundColor: alpha(theme.palette.success.main,0.2), color: theme.palette.success.light}}/>}
                            {property.publication_status && (
                             <Chip 
                               label={property.publication_status === 'pending' ? 'Pendiente' : property.publication_status === 'approved' ? 'Aprobado' : 'Rechazado'}
                               size="small"
                               variant="filled"
                               sx={{
-                                  backgroundColor: property.publication_status === 'pending' ? 'rgba(212,162,0,0.2)' : property.publication_status === 'approved' ? 'rgba(35,134,54,0.2)' : 'rgba(248,81,73,0.2)',
-                                  color: property.publication_status === 'pending' ? '#d4a200' : property.publication_status === 'approved' ? '#56d364' : '#f85149',
+                                  backgroundColor: property.publication_status === 'pending' ? alpha(theme.palette.warning.main, 0.2) : property.publication_status === 'approved' ? alpha(theme.palette.success.main, 0.2) : alpha(theme.palette.error.main, 0.2),
+                                  color: property.publication_status === 'pending' ? theme.palette.warning.light : property.publication_status === 'approved' ? theme.palette.success.light : theme.palette.error.light,
                                   fontWeight: 500
                               }}
                             />
@@ -391,12 +394,12 @@ const Dashboard = ({ user }) => {
                       </Stack>
 
                     </CardContent>
-                    <Divider sx={{borderColor: '#30363d'}} />
-                    <CardActions sx={{ justifyContent: 'flex-end', backgroundColor: 'rgba(22, 27, 34, 0.7)', p:1 }}>
+                    <Divider sx={{borderColor: theme.palette.divider}} />
+                    <CardActions sx={{ justifyContent: 'flex-end', backgroundColor: alpha(theme.palette.background.paper, 0.7), p:1 }}>
                       <IconButton
                         size="small"
                         onClick={() => navigate(`/property/${property.id}`)}
-                        sx={{ color: '#58a6ff', '&:hover': {backgroundColor: 'rgba(88,166,255,0.1)'} }}
+                        sx={{ color: theme.palette.primary.light, '&:hover': {backgroundColor: alpha(theme.palette.primary.light,0.1)} }}
                         title="Ver Detalles"
                       >
                         <VisibilityIcon />
@@ -404,7 +407,7 @@ const Dashboard = ({ user }) => {
                       <IconButton
                         size="small"
                         onClick={() => navigate(`/property/edit/${property.id}`)}
-                        sx={{ color: '#a5d6ff', '&:hover': {backgroundColor: 'rgba(165,214,255,0.1)'} }}
+                        sx={{ color: theme.palette.info.light, '&:hover': {backgroundColor: alpha(theme.palette.info.light,0.1)} }}
                          title="Editar"
                       >
                         <EditIcon />
@@ -412,7 +415,7 @@ const Dashboard = ({ user }) => {
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteClick(property)}
-                        sx={{ color: '#f85149', '&:hover': {backgroundColor: 'rgba(248,81,73,0.1)'} }}
+                        sx={{ color: theme.palette.error.light, '&:hover': {backgroundColor: alpha(theme.palette.error.light,0.1)} }}
                         title="Eliminar"
                       >
                         <DeleteIcon />
@@ -429,18 +432,19 @@ const Dashboard = ({ user }) => {
         <Dialog
           open={deleteDialog.open}
           onClose={() => setDeleteDialog({ open: false, property: null })}
-          PaperProps={{
+          PaperProps={{ // Dialog Paper is already styled by MuiDialog in theme
             sx: {
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
+              // No need to repeat here if global MuiDialog is sufficient
+              // backgroundColor: alpha(theme.palette.background.paper, 0.95),
+              // border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
             }
           }}
         >
-          <DialogTitle sx={{ color: '#c9d1d9' }}>
+          <DialogTitle sx={{ color: theme.palette.text.primary }}>
             Confirmar Eliminación
           </DialogTitle>
           <DialogContent>
-            <DialogContentText sx={{ color: '#8b949e' }}>
+            <DialogContentText sx={{ color: theme.palette.text.secondary }}>
               ¿Estás seguro de que quieres eliminar la propiedad "{deleteDialog.property?.name}"? 
               Esta acción no se puede deshacer.
             </DialogContentText>
@@ -448,14 +452,14 @@ const Dashboard = ({ user }) => {
           <DialogActions>
             <Button 
               onClick={() => setDeleteDialog({ open: false, property: null })}
-              sx={{ color: '#8b949e' }}
+              sx={{ color: theme.palette.text.secondary }}
             >
               Cancelar
             </Button>
             <Button 
               onClick={handleDeleteConfirm} 
               disabled={deleting}
-              sx={{ color: '#ef4444' }}
+              sx={{ color: theme.palette.error.main }}
             >
               {deleting ? <CircularProgress size={20} /> : 'Eliminar'}
             </Button>

@@ -20,7 +20,8 @@ import {
   Fade,
   useTheme,
   useMediaQuery,
-  Fab
+  Fab,
+  alpha // Import alpha
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -272,9 +273,9 @@ const PropertyDetails = () => {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        backgroundColor: '#0d1117'
+        backgroundColor: theme.palette.background.default
       }}>
-        <CircularProgress sx={{ color: '#3b82f6' }} />
+        <CircularProgress sx={{ color: theme.palette.primary.main }} />
       </Box>
     );
   }
@@ -286,14 +287,14 @@ const PropertyDetails = () => {
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
-        backgroundColor: '#0d1117',
-        color: 'white',
+        backgroundColor: theme.palette.background.default,
+        color: theme.palette.text.primary,
         textAlign: 'center',
         p: 3
       }}>
         <Box>
           <Typography variant="h6" gutterBottom>{error}</Typography>
-          <Button variant="contained" onClick={handleGoBack} sx={{ mt: 2 }}>
+          <Button variant="contained" onClick={handleGoBack} sx={{ mt: 2, backgroundColor: theme.palette.primary.main }}>
             Volver al mapa
           </Button>
         </Box>
@@ -344,13 +345,13 @@ const PropertyDetails = () => {
               position: 'absolute', 
               top: isMobile ? '20px' : '30px', 
               right: isMobile ? '20px' : '30px', 
-              zIndex: 21, // Encima del iframe
-              backgroundColor: 'rgba(22, 27, 34, 0.8)',
+              zIndex: 21,
+              backgroundColor: alpha(theme.palette.background.paper, 0.8),
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
-              color: '#c9d1d9',
+              border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+              color: theme.palette.text.primary,
               '&:hover': {
-                backgroundColor: 'rgba(22, 27, 34, 0.95)',
+                backgroundColor: alpha(theme.palette.background.paper, 0.95),
               }
             }}
             aria-label="Cerrar Tour"
@@ -369,13 +370,13 @@ const PropertyDetails = () => {
             top: isMobile ? '20px' : '30px',
             right: isMobile ? '20px' : '30px',
             zIndex: 10,
-            backgroundColor: 'rgba(22, 27, 34, 0.9)',
+            backgroundColor: alpha(theme.palette.background.paper, 0.9),
             backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(30, 41, 59, 0.3)',
-            color: '#c9d1d9',
+            border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+            color: theme.palette.text.primary,
             '&:hover': {
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              borderColor: 'rgba(30, 58, 138, 0.5)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.95),
+              borderColor: alpha(theme.palette.primary.main, 0.5),
             }
           }}
         >
@@ -394,9 +395,9 @@ const PropertyDetails = () => {
               left: isMobile ? '20px' : '30px',
               width: isMobile ? 'calc(100vw - 40px)' : '420px',
               maxHeight: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 60px)',
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
+              backgroundColor: alpha(theme.palette.background.paper, 0.95),
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
+              border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
               borderRadius: '20px',
               overflow: 'hidden',
               zIndex: 10,
@@ -407,7 +408,7 @@ const PropertyDetails = () => {
             {/* Header del panel */}
             <Box sx={{ 
               p: 3, 
-              borderBottom: '1px solid rgba(30, 41, 59, 0.2)',
+              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
               position: 'relative'
             }}>
               <IconButton
@@ -416,8 +417,8 @@ const PropertyDetails = () => {
                   position: 'absolute',
                   top: '12px',
                   right: '12px',
-                  color: '#8b949e',
-                  '&:hover': { color: '#c9d1d9' }
+                  color: theme.palette.text.secondary,
+                  '&:hover': { color: theme.palette.text.primary }
                 }}
               >
                 <CloseIcon fontSize="small" />
@@ -427,9 +428,9 @@ const PropertyDetails = () => {
                 variant="h5" 
                 sx={{ 
                   fontWeight: 300, 
-                  color: '#c9d1d9',
+                  color: theme.palette.text.primary,
                   mb: 1,
-                  pr: 5 // Espacio para el botón cerrar
+                  pr: 5
                 }}
               >
                 {property?.name}
@@ -440,7 +441,7 @@ const PropertyDetails = () => {
                   variant="h6" 
                   sx={{ 
                     fontWeight: 400, 
-                    color: '#3b82f6' 
+                    color: theme.palette.primary.light
                   }}
                 >
                   {formatPrice(property?.price)}
@@ -448,7 +449,7 @@ const PropertyDetails = () => {
                 <Typography 
                   variant="body2" 
                   sx={{ 
-                    color: '#8b949e',
+                    color: theme.palette.text.secondary,
                     fontWeight: 300
                   }}
                 >
@@ -462,34 +463,34 @@ const PropertyDetails = () => {
                   label={property?.type || 'Propiedad'} 
                   size="small" 
                   sx={{ 
-                    backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                    color: '#60a5fa',
-                    border: '1px solid rgba(30, 58, 138, 0.3)',
+                    backgroundColor: alpha(theme.palette.primary.dark, 0.25),
+                    color: theme.palette.primary.light,
+                    border: `1px solid ${alpha(theme.palette.primary.dark, 0.4)}`,
                     fontWeight: 300
                   }}
                 />
                 {property?.has_water && (
                   <Chip 
-                    icon={<WaterDropIcon sx={{ fontSize: '16px !important' }} />}
+                    icon={<WaterDropIcon sx={{ fontSize: '16px !important', color: theme.palette.primary.light }} />}
                     label="Agua" 
                     size="small" 
                     sx={{ 
-                      backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(30, 58, 138, 0.3)',
+                      backgroundColor: alpha(theme.palette.primary.dark, 0.25),
+                      color: theme.palette.primary.light,
+                      border: `1px solid ${alpha(theme.palette.primary.dark, 0.4)}`,
                       fontWeight: 300
                     }}
                   />
                 )}
                 {property?.has_views && (
                   <Chip 
-                    icon={<VisibilityIcon sx={{ fontSize: '16px !important' }} />}
+                    icon={<VisibilityIcon sx={{ fontSize: '16px !important', color: theme.palette.primary.light }} />}
                     label="Vistas" 
                     size="small" 
                     sx={{ 
-                      backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(30, 58, 138, 0.3)',
+                      backgroundColor: alpha(theme.palette.primary.dark, 0.25),
+                      color: theme.palette.primary.light,
+                      border: `1px solid ${alpha(theme.palette.primary.dark, 0.4)}`,
                       fontWeight: 300
                     }}
                   />
@@ -504,18 +505,18 @@ const PropertyDetails = () => {
               variant="scrollable"
               scrollButtons="auto"
               sx={{ 
-                borderBottom: '1px solid rgba(30, 41, 59, 0.2)',
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
                 '& .MuiTab-root': {
-                  color: '#8b949e',
+                  color: theme.palette.text.secondary,
                   fontWeight: 300,
                   textTransform: 'none',
                   minHeight: '48px',
                   '&.Mui-selected': {
-                    color: '#3b82f6'
+                    color: theme.palette.primary.light
                   }
                 },
                 '& .MuiTabs-indicator': {
-                  backgroundColor: '#3b82f6'
+                  backgroundColor: theme.palette.primary.light
                 }
               }}
             >
@@ -531,7 +532,7 @@ const PropertyDetails = () => {
                   <Typography 
                     variant="body2" 
                     sx={{ 
-                      color: '#8b949e', 
+                      color: theme.palette.text.secondary,
                       mb: 3, 
                       lineHeight: 1.6,
                       fontWeight: 300
@@ -543,7 +544,7 @@ const PropertyDetails = () => {
                   <List sx={{ p: 0 }}>
                     <ListItem sx={{ px: 0, py: 1 }}>
                       <ListItemIcon sx={{ minWidth: '40px' }}>
-                        <LocationOnIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        <LocationOnIcon sx={{ color: theme.palette.primary.light, fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
                         primary="Coordenadas"
@@ -551,18 +552,18 @@ const PropertyDetails = () => {
                         primaryTypographyProps={{ 
                           fontSize: '0.9rem', 
                           fontWeight: 300, 
-                          color: '#c9d1d9' 
+                          color: theme.palette.text.primary
                         }}
                         secondaryTypographyProps={{ 
                           fontSize: '0.8rem', 
-                          color: '#8b949e' 
+                          color: theme.palette.text.secondary
                         }}
                       />
                     </ListItem>
                     
                     <ListItem sx={{ px: 0, py: 1 }}>
                       <ListItemIcon sx={{ minWidth: '40px' }}>
-                        <SquareFootIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        <SquareFootIcon sx={{ color: theme.palette.primary.light, fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
                         primary="Superficie"
@@ -570,18 +571,18 @@ const PropertyDetails = () => {
                         primaryTypographyProps={{ 
                           fontSize: '0.9rem', 
                           fontWeight: 300, 
-                          color: '#c9d1d9' 
+                          color: theme.palette.text.primary
                         }}
                         secondaryTypographyProps={{ 
                           fontSize: '0.8rem', 
-                          color: '#8b949e' 
+                          color: theme.palette.text.secondary
                         }}
                       />
                     </ListItem>
                     
                     <ListItem sx={{ px: 0, py: 1 }}>
                       <ListItemIcon sx={{ minWidth: '40px' }}>
-                        <AttachMoneyIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        <AttachMoneyIcon sx={{ color: theme.palette.primary.light, fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
                         primary="Precio total"
@@ -589,11 +590,11 @@ const PropertyDetails = () => {
                         primaryTypographyProps={{ 
                           fontSize: '0.9rem', 
                           fontWeight: 300, 
-                          color: '#c9d1d9' 
+                          color: theme.palette.text.primary
                         }}
                         secondaryTypographyProps={{ 
                           fontSize: '0.8rem', 
-                          color: '#8b949e' 
+                          color: theme.palette.text.secondary
                         }}
                       />
                     </ListItem>
@@ -606,7 +607,7 @@ const PropertyDetails = () => {
                   {tours.length === 0 ? (
                     <Typography 
                       variant="body2" 
-                      sx={{ color: '#8b949e', textAlign: 'center', py: 4 }}
+                      sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 4 }}
                     >
                       No hay tours disponibles
                     </Typography>
@@ -616,14 +617,14 @@ const PropertyDetails = () => {
                         <Card 
                           key={tour.id}
                           sx={{ 
-                            backgroundColor: 'rgba(13, 17, 23, 0.8)',
-                            border: '1px solid rgba(30, 41, 59, 0.2)',
+                            backgroundColor: alpha(theme.palette.background.default, 0.8),
+                            border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
                             borderRadius: '12px',
                             overflow: 'hidden',
                             cursor: 'pointer',
                             transition: 'all 0.2s ease',
                             '&:hover': {
-                              borderColor: 'rgba(30, 58, 138, 0.4)',
+                              borderColor: alpha(theme.palette.primary.dark, 0.4),
                               transform: 'translateY(-2px)'
                             }
                           }}
@@ -642,7 +643,7 @@ const PropertyDetails = () => {
                             <Typography 
                               variant="subtitle2" 
                               sx={{ 
-                                color: '#c9d1d9', 
+                                color: theme.palette.text.primary,
                                 fontWeight: 300,
                                 mb: 1
                               }}
@@ -654,13 +655,13 @@ const PropertyDetails = () => {
                               size="small"
                               startIcon={<ViewInArIcon />}
                               sx={{ 
-                                borderColor: 'rgba(30, 58, 138, 0.4)',
-                                color: '#60a5fa',
+                                borderColor: alpha(theme.palette.primary.dark, 0.4),
+                                color: theme.palette.primary.light,
                                 fontWeight: 300,
                                 textTransform: 'none',
                                 '&:hover': {
-                                  borderColor: 'rgba(30, 58, 138, 0.6)',
-                                  backgroundColor: 'rgba(30, 58, 138, 0.1)'
+                                  borderColor: alpha(theme.palette.primary.dark, 0.6),
+                                  backgroundColor: alpha(theme.palette.primary.dark, 0.1)
                                 }
                               }}
                             >
@@ -679,7 +680,7 @@ const PropertyDetails = () => {
                   <Typography 
                     variant="body2" 
                     sx={{ 
-                      color: '#8b949e', 
+                      color: theme.palette.text.secondary,
                       mb: 2,
                       fontWeight: 300
                     }}
@@ -690,19 +691,19 @@ const PropertyDetails = () => {
                   
                   <Box sx={{ 
                     p: 2, 
-                    backgroundColor: 'rgba(13, 17, 23, 0.8)',
+                    backgroundColor: alpha(theme.palette.background.default, 0.8),
                     borderRadius: '12px',
-                    border: '1px solid rgba(30, 41, 59, 0.2)'
+                    border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
                   }}>
                     <Typography 
                       variant="caption" 
-                      sx={{ color: '#8b949e', display: 'block', mb: 1 }}
+                      sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}
                     >
                       Coordenadas GPS
                     </Typography>
                     <Typography 
                       variant="body2" 
-                      sx={{ color: '#c9d1d9', fontWeight: 300 }}
+                      sx={{ color: theme.palette.text.primary, fontWeight: 300 }}
                     >
                       {property?.latitude?.toFixed(6)}, {property?.longitude?.toFixed(6)}
                     </Typography>
@@ -712,19 +713,19 @@ const PropertyDetails = () => {
             </Box>
 
             {/* Botón de contacto */}
-            <Box sx={{ p: 3, borderTop: '1px solid rgba(30, 41, 59, 0.2)' }}>
+            <Box sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}` }}>
               <Button 
                 variant="contained" 
                 fullWidth
                 sx={{ 
-                  backgroundColor: 'rgba(30, 58, 138, 0.9)',
-                  color: 'white',
+                  backgroundColor: theme.palette.primary.main,
+                  color: theme.palette.primary.contrastText,
                   fontWeight: 400,
                   textTransform: 'none',
                   borderRadius: '12px',
                   py: 1.5,
                   '&:hover': {
-                    backgroundColor: 'rgba(30, 58, 138, 1)',
+                    backgroundColor: theme.palette.primary.dark,
                     transform: 'translateY(-1px)'
                   }
                 }}

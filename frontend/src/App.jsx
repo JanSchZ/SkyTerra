@@ -17,6 +17,7 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles'; // Import alpha
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,26 +49,28 @@ const AppWrapper = () => {
     () =>
       createTheme({
         palette: {
-          mode: 'dark',
+          mode: 'dark', // Confirmed
           primary: {
-            main: '#58a6ff',
-            light: '#7FBFFF',
-            dark: '#005DB3',
+            main: '#2563eb', // Deeper blue
+            light: '#3b82f6', // Adjusted light
+            dark: '#1e40af', // Adjusted dark
             contrastText: '#ffffff',
           },
           secondary: {
-            main: '#f6d55c',
-            contrastText: '#000000',
+            main: '#64748b', // Muted slate color
+            light: '#94a3b8', // Adjusted light
+            dark: '#475569', // Adjusted dark
+            contrastText: '#ffffff', // Text on secondary should be light now
           },
           background: {
-            default: '#0d1117',
-            paper: '#161b22',
+            default: '#0a0f14', // Darker shade
+            paper: '#12181f', // Slightly lighter dark shade
           },
           text: {
-            primary: '#c9d1d9',
-            secondary: '#8b949e',
+            primary: '#e2e8f0', // Lighter primary text
+            secondary: '#94a3b8', // Adjusted secondary text
           },
-          divider: '#30363d',
+          divider: '#30363d', // Keep as is, seems reasonable
           action: {
             hover: 'rgba(88, 166, 255, 0.12)',
             selected: 'rgba(88, 166, 255, 0.20)',
@@ -75,70 +78,172 @@ const AppWrapper = () => {
         },
         typography: {
           fontFamily: baseFontFamily,
-          h1: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.02em' },
-          h2: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.01em' },
-          h3: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '-0.01em' },
-          h4: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' },
-          h5: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' },
-          h6: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0.01em' },
-          body1: { fontWeight: 300, lineHeight: 1.65 },
-          body2: { fontWeight: 300, lineHeight: 1.55 },
-          button: { fontWeight: 400, textTransform: 'none', letterSpacing: '0.02em', fontSize: '0.9rem' },
+          h1: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.02em' }, // Keep
+          h2: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.01em' }, // Keep
+          h3: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.005em' }, // Lighter
+          h4: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' }, // Keep
+          h5: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' }, // Keep
+          h6: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0.01em' }, // Keep
+          body1: { fontWeight: 400, lineHeight: 1.65 }, // More readable
+          body2: { fontWeight: 400, lineHeight: 1.55 }, // More readable
+          button: { fontWeight: 400, textTransform: 'none', letterSpacing: '0.02em', fontSize: '0.9rem' }, // Keep
         },
         components: {
+          MuiAppBar: {
+            styleOverrides: {
+              root: ({ theme }) => ({
+                backgroundColor: theme.palette.background.paper, // Default, can be overridden by specific instances
+                // Example for blurred AppBar, if needed:
+                // backgroundColor: alpha(theme.palette.background.paper, 0.7),
+                // backdropFilter: 'blur(10px)',
+              }),
+            },
+          },
           MuiButton: {
             styleOverrides: {
               root: {
-                borderRadius: 8,
-                padding: '8px 20px',
-                boxShadow: 'none',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                borderRadius: theme.shape.borderRadius, // Consistent border radius
+                padding: '8px 20px', // Keep padding
+                boxShadow: 'none', // No shadow by default
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth transition
                 '&:hover': {
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+                  transform: 'translateY(-2px)', // Slightly more lift
+                  boxShadow: theme.shadows[3], // Use theme shadow for hover
                 }
               },
+              containedPrimary: ({ theme }) => ({
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.9),
+                  boxShadow: theme.shadows[4],
+                }
+              }),
+              outlinedPrimary: ({ theme }) => ({
+                borderWidth: '1px', // Ensure outlined buttons have a clear border
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                  borderWidth: '1px',
+                }
+              }),
             },
           },
           MuiPaper: {
             styleOverrides: {
-              root: {
+              root: ({ theme }) => ({
+                backgroundColor: theme.palette.background.paper,
                 borderRadius: 12,
-                border: '1px solid #30363d',
+                border: `1px solid ${theme.palette.divider}`,
                 boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
-              },
+              }),
+            },
+          },
+          MuiDialog: {
+            styleOverrides: {
+              root: ({ theme }) => ({
+                backdropFilter: 'blur(8px)',
+              }),
+              paper: ({ theme }) => ({
+                backgroundColor: alpha(theme.palette.background.paper, 0.85),
+                borderRadius: 12, // Ensure consistency with MuiPaper
+                border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+              }),
+            },
+          },
+          MuiMenu: {
+            styleOverrides: {
+              paper: ({ theme }) => ({
+                backgroundColor: alpha(theme.palette.background.paper, 0.85),
+                backdropFilter: 'blur(10px)', // May have limited effect without a true backdrop for menu itself
+                borderRadius: 8, // Standard menu radius
+                border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+              }),
             },
           },
           MuiTextField: {
             styleOverrides: {
               root: {
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: 8,
-                  backgroundColor: 'rgba(13, 17, 23, 0.7)',
-                  backdropFilter: 'blur(5px)',
+                  borderRadius: theme.shape.borderRadius, // Consistent radius
+                  backgroundColor: alpha(theme.palette.background.paper, 0.75), // Theme-aware background
+                  backdropFilter: 'blur(8px)', // Standardized blur
                   '& fieldset': {
-                    borderColor: '#30363d',
+                    borderColor: theme.palette.divider,
                     borderWidth: '1px',
                   },
                   '&:hover fieldset': {
-                    borderColor: '#58a6ff',
+                    borderColor: theme.palette.primary.light, // Lighter primary for hover
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#58a6ff',
+                    borderColor: theme.palette.primary.main,
                     borderWidth: '2px',
                   },
+                  // Ensure the input text itself is readable
+                  '& .MuiInputBase-input': {
+                    color: theme.palette.text.primary,
+                  }
                 },
               },
             },
           },
           MuiCard: {
             styleOverrides: {
-              root: {
-                borderRadius: 12,
+              root: ({ theme }) => ({ // Make it theme-aware
+                borderRadius: theme.shape.borderRadius * 2, // Larger radius for cards: 16px
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              }
+                backgroundColor: theme.palette.background.paper, // Default card background
+                boxShadow: theme.shadows[1], // Default shadow for cards
+                '&:hover': {
+                  transform: 'translateY(-4px)', // Lift effect on hover
+                  boxShadow: theme.shadows[5], // Stronger shadow on hover
+                }
+              }),
             }
           },
+          MuiAlert: {
+            styleOverrides: {
+              root: ({ theme }) => ({ // Base style for all alerts
+                borderRadius: theme.shape.borderRadius,
+                backdropFilter: 'blur(8px)',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+              }),
+              standardSuccess: ({ theme }) => ({
+                backgroundColor: alpha(theme.palette.success.main, 0.15),
+                color: theme.palette.text.primary, // Ensure text is readable
+                borderColor: alpha(theme.palette.success.dark, 0.3),
+                borderLeft: `5px solid ${theme.palette.success.main}`,
+                '& .MuiAlert-icon': {
+                  color: theme.palette.success.main,
+                },
+              }),
+              standardError: ({ theme }) => ({
+                backgroundColor: alpha(theme.palette.error.main, 0.15),
+                color: theme.palette.text.primary,
+                borderColor: alpha(theme.palette.error.dark, 0.3),
+                borderLeft: `5px solid ${theme.palette.error.main}`,
+                '& .MuiAlert-icon': {
+                  color: theme.palette.error.main,
+                },
+              }),
+              standardInfo: ({ theme }) => ({
+                backgroundColor: alpha(theme.palette.info.main, 0.15),
+                color: theme.palette.text.primary,
+                borderColor: alpha(theme.palette.info.dark, 0.3),
+                borderLeft: `5px solid ${theme.palette.info.main}`,
+                '& .MuiAlert-icon': {
+                  color: theme.palette.info.main,
+                },
+              }),
+              standardWarning: ({ theme }) => ({
+                backgroundColor: alpha(theme.palette.warning.main, 0.15),
+                color: theme.palette.text.primary,
+                borderColor: alpha(theme.palette.warning.dark, 0.3),
+                borderLeft: `5px solid ${theme.palette.warning.main}`,
+                '& .MuiAlert-icon': {
+                  color: theme.palette.warning.main,
+                },
+              }),
+            }
+          }
         },
         shape: {
           borderRadius: 8,
@@ -156,11 +261,11 @@ const AppWrapper = () => {
 
   const themeMode = useMemo(
     () => ({
-      toggleThemeMode: () => {},
-      mode,
-      theme,
+      toggleThemeMode: () => {}, // This is a dummy, actual toggling logic is not in this component
+      mode, // mode is fixed to 'dark' in this setup
+      theme, // Pass the created theme
     }),
-    [mode, theme],
+    [mode, theme], // theme depends on mode (though mode is static here)
   );
 
   return (
@@ -328,34 +433,44 @@ function App() {
       {/* Condición para no mostrar en property, tour, o dashboard */}
       {showTopBar && (
         <Box
-          sx={{
-            position: 'absolute', top: 0, left: 0, right: 0, p: isMobile ? 1 : 2,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1200,
-          }}
+          sx={(theme) => ({ // Added theme argument
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            p: theme.spacing(isMobile ? 1 : 1.5, isMobile ? 2 : 3), // Adjusted padding
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            zIndex: 1200,
+            backgroundColor: alpha(theme.palette.background.paper, 0.7), // Semi-transparent background
+            backdropFilter: 'blur(16px)', // More pronounced blur
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`, // Subtle border
+          })}
         >
-          <Typography 
+          <Typography
             variant={isMobile ? "h6" : "h5"}
-            component="div" 
+            component="div"
             onClick={() => navigate('/')}
-            sx={{
-              color: '#e0e0e0',
-              fontFamily: 'Poppins, sans-serif',
-              fontWeight: 300,
-              letterSpacing: '0.05em',
+            sx={(theme) => ({
+              color: theme.palette.text.primary,
+              fontFamily: 'Poppins, sans-serif', // Keeping Poppins for branding
+              fontWeight: 500, // Slightly bolder
+              letterSpacing: '0.04em', // Fine-tuned letter spacing
               cursor: 'pointer',
               userSelect: 'none',
-              paddingRight: 2,
-              paddingLeft: isMobile ? 1 : 3,
+              // paddingRight: 2, // Padding handled by parent Box
+              // paddingLeft: isMobile ? 1 : 3, // Padding handled by parent Box
               transition: 'color 0.3s ease-in-out',
               '&:hover': {
-                color: '#ffffff',
+                color: theme.palette.primary.light,
               }
-            }}
+            })}
           >
             SkyTerra
           </Typography>
 
-          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1: 2 }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
             <Box sx={{ width: '100%', maxWidth: '700px' }}>
               <AISearchBar 
                 onSearch={handleAISearch} 
@@ -369,11 +484,15 @@ function App() {
               <>
                 <IconButton
                   onClick={handleUserMenuOpen}
-                  sx={{
-                    backgroundColor: 'rgba(22, 27, 34, 0.9)', backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(30, 41, 59, 0.3)', color: '#c9d1d9',
-                    '&:hover': { backgroundColor: 'rgba(30, 41, 59, 0.95)' },
-                  }}
+                  sx={(theme) => ({
+                    backgroundColor: alpha(theme.palette.background.default, 0.6), // Subtle background
+                    backdropFilter: 'blur(8px)', // Blur effect
+                    border: `1px solid ${alpha(theme.palette.divider, 0.3)}`, // Subtle border
+                    color: theme.palette.text.primary, // Primary text color for icon
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, 0.7), // Hover effect
+                    },
+                  })}
                 >
                   <AccountCircleIcon />
                 </IconButton>
@@ -381,28 +500,42 @@ function App() {
                   anchorEl={userMenuAnchorEl}
                   open={Boolean(userMenuAnchorEl)}
                   onClose={handleUserMenuClose}
-                  MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d' } }}
+                  // MuiMenu styleOverrides will handle the paper styling.
+                  // If specific overrides are needed here beyond what MuiMenu.styleOverrides.paper provides, they can be added.
+                  // For now, relying on the global MuiMenu override.
+                  // MenuListProps={{ sx: (theme) => ({
+                  //   backgroundColor: alpha(theme.palette.background.paper, 0.85),
+                  //   backdropFilter: 'blur(10px)',
+                  //   border: `1px solid ${alpha(theme.palette.divider, 0.3)}`
+                  // })}}
                 >
-                  <MenuItem onClick={() => { navigate('/dashboard'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Dashboard</MenuItem>
-                  <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
+                  <MenuItem onClick={() => { navigate('/dashboard'); handleUserMenuClose(); }} sx={{ color: (theme) => theme.palette.text.primary }}>Dashboard</MenuItem>
+                  <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: (theme) => theme.palette.text.primary }}>Crear Propiedad</MenuItem>
                   {user && user.is_staff && (
-                    <MenuItem onClick={() => { navigate('/admin/publications'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>
+                    <MenuItem onClick={() => { navigate('/admin/publications'); handleUserMenuClose(); }} sx={{ color: (theme) => theme.palette.text.primary }}>
                       Panel de Admin
                     </MenuItem>
                   )}
-                  <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Logout</MenuItem>
+                  <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: (theme) => theme.palette.text.primary }}>Logout</MenuItem>
                 </Menu>
               </>
             ) : (
               <Button
                 variant="outlined"
                 onClick={() => navigate('/login')}
-                sx={{
-                  borderColor: 'rgba(30, 58, 138, 0.7)', color: '#60a5fa', fontWeight: 300,
-                  padding: '6px 12px', fontSize: '0.8rem',
-                  backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
-                  '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
-                }}
+                sx={(theme) => ({
+                  borderColor: alpha(theme.palette.primary.dark, 0.5), // Subtle primary border
+                  color: theme.palette.primary.light,
+                  fontWeight: 300, // Keep light weight for this button style
+                  padding: theme.spacing(0.75, 1.5), // Adjusted padding
+                  fontSize: theme.typography.pxToRem(13), // Finer font size control
+                  backgroundColor: alpha(theme.palette.background.default, 0.6), // Subtle background
+                  backdropFilter: 'blur(8px)', // Blur effect
+                  '&:hover': {
+                    borderColor: theme.palette.primary.main,
+                    backgroundColor: alpha(theme.palette.primary.dark, 0.3), // Hover effect
+                  }
+                })}
               >
                 Login
               </Button>
@@ -412,12 +545,13 @@ function App() {
       )}
 
       {/* Snackbar para notificaciones */}
-      <Snackbar 
-        open={snackbarOpen} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
+        {/* Alert inside Snackbar should ideally also use theme colors, but often has its own specific styling based on severity */}
         <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
           {snackbarMessage}
         </Alert>
