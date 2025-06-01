@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorBackground"
+    tools:context=".ui.propertydetail.PropertyDetailFragment">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="16dp">
+
+        <ImageView
+            android:id="@+id/property_detail_image"
+            android:layout_width="0dp"
+            android:layout_height="250dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:srcCompat="@drawable/ic_launcher_background" />
+            <!-- Placeholder, Glide will load the primary image -->
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/property_detail_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:textAppearance="?attr/textAppearanceHeadline5"
+            android:textColor="?attr/colorOnBackground"
+            tools:text="Grand Colonial Estate"
+            app:layout_constraintTop_toBottomOf="@id/property_detail_image"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/property_detail_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            android:textColor="?attr/colorPrimary"
+            tools:text="USD $2,500,000"
+            app:layout_constraintTop_toBottomOf="@id/property_detail_name"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/property_detail_size"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:textAppearance="?attr/textAppearanceSubtitle1"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="320.0 ha"
+            app:layout_constraintBaseline_toBaselineOf="@id/property_detail_price"
+            app:layout_constraintStart_toEndOf="@id/property_detail_price" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/property_detail_type_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:chipBackgroundColor="?attr/colorSecondaryContainer"
+            app:chipStrokeWidth="0dp"
+            android:textColor="?attr/colorOnSecondaryContainer"
+            tools:text="Ranch"
+            app:layout_constraintTop_toBottomOf="@id/property_detail_price"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/label_description"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Description"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorOnBackground"
+            app:layout_constraintTop_toBottomOf="@id/property_detail_type_chip"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/property_detail_description"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="?attr/textAppearanceBody1"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="A sprawling estate with vast lands, perfect for equestrian activities and farming. Features a main house, guest cottages, and extensive facilities..."
+            app:layout_constraintTop_toBottomOf="@id/label_description"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name"
+            app:layout_constraintEnd_toEndOf="@id/property_detail_name"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/label_amenities"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Amenities"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorOnBackground"
+            app:layout_constraintTop_toBottomOf="@id/property_detail_description"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name" />
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/checkbox_has_water"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Has Water Access"
+            android:enabled="false"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            app:layout_constraintTop_toBottomOf="@id/label_amenities"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name"/>
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/checkbox_has_views"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Has Scenic Views"
+            android:enabled="false"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            app:layout_constraintTop_toBottomOf="@id/checkbox_has_water"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/label_owner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Owner Information"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="?attr/colorOnBackground"
+            app:layout_constraintTop_toBottomOf="@id/checkbox_has_views"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/property_detail_owner_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="?attr/textAppearanceBody1"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="Owner: John Doe (john.doe@example.com)"
+            app:layout_constraintTop_toBottomOf="@id/label_owner"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name"
+            app:layout_constraintEnd_toEndOf="@id/property_detail_name"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/property_detail_created_at"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textAppearance="?attr/textAppearanceCaption"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            tools:text="Listed on: 2023-01-15"
+            app:layout_constraintTop_toBottomOf="@id/property_detail_owner_name"
+            app:layout_constraintStart_toStartOf="@id/property_detail_name"
+            app:layout_constraintEnd_toEndOf="@id/property_detail_name"/>
+
+        <ProgressBar
+            android:id="@+id/property_detail_progress_bar"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:visibility="visible"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.core.widget.NestedScrollView>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/mapFragment">
+    <!-- Or propertyListFragment if that's preferred as start -->
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.skyterra.android.ui.map.MapFragment"
+        android:label="Map"
+        tools:layout="@layout/fragment_map" >
+        <action
+            android:id="@+id/action_mapFragment_to_propertyDetailFragment"
+            app:destination="@id/propertyDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/propertyListFragment"
+        android:name="com.skyterra.android.ui.propertylist.PropertyListFragment"
+        android:label="Property List"
+        tools:layout="@layout/fragment_property_list" >
+        <action
+            android:id="@+id/action_propertyListFragment_to_propertyDetailFragment"
+            app:destination="@id/propertyDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/propertyDetailFragment"
+        android:name="com.skyterra.android.ui.propertydetail.PropertyDetailFragment"
+        android:label="Property Details"
+        tools:layout="@layout/fragment_property_detail">
+        <argument
+            android:name="propertyId"
+            app:argType="string" />
+    </fragment>
+
+</navigation>
