@@ -37,7 +37,7 @@
         <item name="colorInversePrimary">@color/md_theme_inversePrimary</item>
         <!-- Surface tint -->
         <item name="colorSurfaceTint">@color/md_theme_surfaceTint</item>
-
+        
         <!-- Status bar color -->
         <item name="android:statusBarColor">@color/sky_background</item>
         <!-- Optional: set status bar icons to light for dark background -->

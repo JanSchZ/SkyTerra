@@ -20,7 +20,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            tools:srcCompat="@drawable/ic_launcher_background" />
+            tools:srcCompat="@drawable/ic_launcher_background" /> 
             <!-- Placeholder, Glide will load the primary image -->
 
         <com.google.android.material.textview.MaterialTextView
@@ -58,7 +58,7 @@
             tools:text="320.0 ha"
             app:layout_constraintBaseline_toBaselineOf="@id/property_detail_price"
             app:layout_constraintStart_toEndOf="@id/property_detail_price" />
-
+        
         <com.google.android.material.chip.Chip
             android:id="@+id/property_detail_type_chip"
             android:layout_width="wrap_content"
@@ -81,7 +81,7 @@
             android:textColor="?attr/colorOnBackground"
             app:layout_constraintTop_toBottomOf="@id/property_detail_type_chip"
             app:layout_constraintStart_toStartOf="@id/property_detail_name" />
-
+            
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/property_detail_description"
             android:layout_width="0dp"
@@ -124,7 +124,7 @@
             android:textColor="?attr/colorOnSurfaceVariant"
             app:layout_constraintTop_toBottomOf="@id/checkbox_has_water"
             app:layout_constraintStart_toStartOf="@id/property_detail_name"/>
-
+        
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/label_owner"
             android:layout_width="wrap_content"
@@ -159,7 +159,7 @@
             app:layout_constraintTop_toBottomOf="@id/property_detail_owner_name"
             app:layout_constraintStart_toStartOf="@id/property_detail_name"
             app:layout_constraintEnd_toEndOf="@id/property_detail_name"/>
-
+        
         <ProgressBar
             android:id="@+id/property_detail_progress_bar"
             style="?android:attr/progressBarStyle"
