@@ -442,9 +442,9 @@ function App() {
             justifyContent: 'space-between',
             alignItems: 'center',
             zIndex: 1200,
-            backgroundColor: alpha(theme.palette.background.paper, 0.7), // Semi-transparent background
-            backdropFilter: 'blur(16px)', // More pronounced blur
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`, // Subtle border
+            backgroundColor: alpha(theme.palette.background.paper, 0.85), // Adjusted opacity
+            backdropFilter: 'blur(12px)', // Adjusted blur radius
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.2)}`, // Keep subtle border
           })}
         >
           <Typography
@@ -470,10 +470,18 @@ function App() {
           </Typography>
 
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
-            <Box sx={{ width: '100%', maxWidth: '700px' }}>
+            {/* Temporary diagnostic styling for AISearchBar container */}
+            <Box sx={{
+              width: '100%',
+              maxWidth: '700px',
+              // backgroundColor: 'transparent', // Temporarily make AISearchBar container transparent
+              // backdropFilter: 'none' // Temporarily remove backdrop from container
+            }}>
               <AISearchBar 
                 onSearch={handleAISearch} 
                 onLocationSearch={handleLocationSearch}
+                // sx prop directly on AISearchBar might be needed if it's a styled component itself
+                // For now, assuming AISearchBar internal styles are the source if issues persist.
               />
             </Box>
           </Box>

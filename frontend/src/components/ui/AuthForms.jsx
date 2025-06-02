@@ -68,15 +68,16 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
 
   return (
     <Box sx={{ width: '100%', p: 3 }}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 300, color: '#c9d1d9', mb: 1, textAlign: 'center' }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: theme.typography.h4.fontWeight, color: theme.palette.text.primary, mb: 1, textAlign: 'center' }}>
         Iniciar Sesión
       </Typography>
-      <Typography variant="body2" sx={{ color: '#8b949e', mb: 4, textAlign: 'center', fontWeight: 300 }}>
+      <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 4, textAlign: 'center', fontWeight: 300 }}>
         Bienvenido de nuevo a SkyTerra.
       </Typography>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373' }}>
+        // Rely on global MuiAlert theme overrides
+        <Alert severity="error" sx={{ mb: 2 }}>
           {typeof error === 'object' ? JSON.stringify(error) : error}
         </Alert>
       )}
@@ -186,15 +187,16 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
 
   return (
     <Box sx={{ width: '100%', p: 3 }}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 300, color: '#c9d1d9', mb: 1, textAlign: 'center' }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: theme.typography.h4.fontWeight, color: theme.palette.text.primary, mb: 1, textAlign: 'center' }}>
         Crear Cuenta
       </Typography>
-      <Typography variant="body2" sx={{ color: '#8b949e', mb: 4, textAlign: 'center', fontWeight: 300 }}>
+      <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 4, textAlign: 'center', fontWeight: 300 }}>
         Únete a SkyTerra para explorar propiedades.
       </Typography>
       
       {error && (
-         <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373' }}>
+        // Rely on global MuiAlert theme overrides
+         <Alert severity="error" sx={{ mb: 2 }}>
            {typeof error === 'object' ? JSON.stringify(error) : error}
         </Alert>
       )}
