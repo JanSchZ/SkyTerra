@@ -91,34 +91,61 @@ def login_view(request):
 @permission_classes([AllowAny])
 def register_view(request):
     """Vista para registrar usuario"""
+    print(f"🔄 Intento de registro con datos: {request.data}")
+    
     email = request.data.get('email')
     username = request.data.get('username')
     password = request.data.get('password')
     
+    # Validación de campos requeridos
     if not email or not username or not password:
+        error_msg = 'Email, username y contraseña son requeridos'
+        print(f"❌ Campos faltantes: {error_msg}")
         return Response({
-            'error': 'Email, username y contraseña son requeridos'
+            'error': error_msg
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Verificar si el usuario ya existe
+    # Validación del formato del email
+    import re
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email):
+        print(f"❌ Email inválido: {email}")
+        return Response({
+            'error': 'Formato de email inválido'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validación de la contraseña
+    if len(password) < 8:
+        print(f"❌ Contraseña muy corta: {len(password)} caracteres")
+        return Response({
+            'error': 'La contraseña debe tener al menos 8 caracteres'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Verificar si el usuario ya existe por email
     if User.objects.filter(email=email).exists():
+        print(f"❌ Email ya existe: {email}")
         return Response({
             'error': 'Ya existe un usuario con este email'
         }, status=status.HTTP_400_BAD_REQUEST)
     
+    # Verificar si el usuario ya existe por username
     if User.objects.filter(username=username).exists():
+        print(f"❌ Username ya existe: {username}")
         return Response({
             'error': 'Ya existe un usuario con este nombre de usuario'
         }, status=status.HTTP_400_BAD_REQUEST)
     
     # Crear usuario
     try:
+        print(f"✅ Creando usuario: {username} ({email})")
         user = User.objects.create_user(
             username=username,
             email=email,
             password=password
         )
         token, created = Token.objects.get_or_create(user=user)
+        
+        print(f"✅ Usuario creado exitosamente: ID={user.id}, Token={'creado' if created else 'existente'}")
         
         return Response({
             'token': token.key,
@@ -131,6 +158,7 @@ def register_view(request):
             }
         }, status=status.HTTP_201_CREATED)
     except Exception as e:
+        print(f"❌ Error al crear usuario: {str(e)}")
         return Response({
             'error': f'Error al crear usuario: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

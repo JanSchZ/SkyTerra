@@ -15,10 +15,10 @@ const getBaseURL = () => {
     return `${backendUrl}/api`;
   }
   
-  // Para desarrollo local, usar el proxy de Vite (URL relativa)
+  // Para desarrollo local, usar localhost directamente
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    const backendUrl = '/api';
-    console.log('💻 Configurando para localhost con proxy de Vite:', backendUrl);
+    const backendUrl = 'http://localhost:8000/api';
+    console.log('💻 Configurando para localhost:', backendUrl);
     return backendUrl;
   }
   
@@ -145,20 +145,54 @@ export const authService = {
   // Registrar usuario
   async register(userData) {
     try {
+      console.log('🔄 Intentando registrar usuario:', { 
+        email: userData.email, 
+        username: userData.username,
+        hasPassword: !!userData.password 
+      });
+      
       const response = await api.post('/auth/register/', userData);
+      console.log('✅ Registro exitoso:', response.data);
+      
       localStorage.setItem('auth_token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     } catch (error) {
-      console.error('Error during registration:', error);
-      // Lanzar el error real en lugar de simular
-      if (error.response && error.response.data) {
-        const errorMessages = Object.values(error.response.data).flat().join(' ');
-        throw new Error(errorMessages || 'Error en el registro.');
-      } else if (error.message) {
-        throw new Error(error.message);
+      console.error('❌ Error during registration:', error);
+      
+      // Manejo detallado de errores de respuesta
+      if (error.response) {
+        console.error('Response error details:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        
+        // Si hay datos específicos de error
+        if (error.response.data) {
+          if (typeof error.response.data === 'string') {
+            throw new Error(error.response.data);
+          } else if (error.response.data.error) {
+            throw new Error(error.response.data.error);
+          } else {
+            // Combinar todos los errores de validación
+            const errorMessages = Object.entries(error.response.data)
+              .map(([field, messages]) => {
+                if (Array.isArray(messages)) {
+                  return `${field}: ${messages.join(', ')}`;
+                }
+                return `${field}: ${messages}`;
+              })
+              .join('; ');
+            throw new Error(errorMessages || 'Error en el registro.');
+          }
+        }
+      } else if (error.request) {
+        console.error('Network error:', error.request);
+        throw new Error('Error de conexión con el servidor. Verifica tu conexión a internet.');
       } else {
-        throw new Error('Error de conexión con el servidor durante el registro.');
+        console.error('Setup error:', error.message);
+        throw new Error(error.message || 'Error desconocido durante el registro.');
       }
     }
   },

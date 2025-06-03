@@ -161,21 +161,60 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
 
   const validateForm = () => {
     const errors = {};
-    if (!formData.email) errors.email = 'El correo es obligatorio';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) errors.email = 'Correo no válido';
-    if (!formData.username) errors.username = 'El usuario es obligatorio';
-    if (!formData.password) errors.password = 'La contraseña es obligatoria';
-    else if (formData.password.length < 8) errors.password = 'Mínimo 8 caracteres';
-    if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Las contraseñas no coinciden';
+    
+    // Validación del email
+    if (!formData.email) {
+      errors.email = 'El correo es obligatorio';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Correo no válido';
+    }
+    
+    // Validación del username
+    if (!formData.username) {
+      errors.username = 'El usuario es obligatorio';
+    } else if (formData.username.length < 3) {
+      errors.username = 'El usuario debe tener al menos 3 caracteres';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      errors.username = 'El usuario solo puede contener letras, números y guiones bajos';
+    }
+    
+    // Validación de la contraseña
+    if (!formData.password) {
+      errors.password = 'La contraseña es obligatoria';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Mínimo 8 caracteres';
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      errors.password = 'Debe contener al menos una minúscula, una mayúscula y un número';
+    }
+    
+    // Validación de confirmación de contraseña
+    if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Las contraseñas no coinciden';
+    }
+    
     return errors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('🔄 Formulario de registro enviado:', {
+      email: formData.email,
+      username: formData.username,
+      hasPassword: !!formData.password,
+      passwordLength: formData.password.length
+    });
+    
     const errors = validateForm();
     if (Object.keys(errors).length === 0) {
-      if (onRegister) onRegister({email: formData.email, username: formData.username, password: formData.password});
+      console.log('✅ Validación exitosa, enviando datos...');
+      const userData = {
+        email: formData.email, 
+        username: formData.username, 
+        password: formData.password
+      };
+      if (onRegister) onRegister(userData);
     } else {
+      console.log('❌ Errores de validación:', errors);
       setFormErrors(errors);
     }
   };

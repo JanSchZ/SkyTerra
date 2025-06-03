@@ -138,3 +138,25 @@
 *   2025-05-29: Re-priorizadas otras tareas según el nuevo enfoque estratégico.
 *   2025-05-30: Actualizado el estado de los puntos 3 y 4 de la Fase 0 (edificios 3D resuelto, error de update depth pospuesto/no prioritario).
 *   2025-05-30: **[COMPLETADO]** Eliminada la restricción en el backend para que todas las propiedades sean visibles en el mapa, independientemente del estado de publicación o si el usuario está autenticado/staff. Código pusheado a GitHub.
+*   **[RESUELTO - 3 Jun 2025]** 🐛 **BUG DE REGISTRO DE USUARIOS SOLUCIONADO:**
+    * **Problema identificado:** Bug que impedía crear nuevas cuentas de usuario
+    * **Causa raíz:** 
+        - Migraciones de Django no aplicadas completamente
+        - Configuración incorrecta de URLs en entorno Codespaces
+        - Manejo de errores insuficiente en frontend y backend
+    * **Soluciones implementadas:**
+        1. ✅ Aplicación completa de migraciones Django
+        2. ✅ Mejora en detección automática de entorno (Codespaces vs localhost)
+        3. ✅ Validaciones mejoradas en formulario de registro:
+            - Email único y formato válido
+            - Username con caracteres permitidos (3+ chars)
+            - Contraseña segura (8+ chars, mayús/minús/número)
+        4. ✅ Logging detallado para debugging en backend y frontend
+        5. ✅ Mejor manejo de errores con mensajes específicos
+    * **Testing realizado:**
+        - Endpoint `/api/auth/register/` funciona correctamente
+        - Formulario frontend valida datos correctamente
+        - Respuestas de error claras y específicas
+        - Usuarios creados exitosamente (IDs 5, 6 durante testing)
+    * **Estado:** Completamente funcional
+    * **Próximos pasos:** Continuar con testing de flujo completo registro → login → dashboard
