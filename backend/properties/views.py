@@ -38,7 +38,8 @@ class PropertyViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['price', 'size', 'has_water', 'has_views']
-    search_fields = ['name', 'description', 'location_name']
+    # 'location_name' se eliminó porque no existe en el modelo
+    search_fields = ['name', 'description']
     ordering_fields = ['price', 'size', 'created_at']
 
     def get_permissions(self):
