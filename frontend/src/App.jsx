@@ -16,6 +16,7 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  Chip,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
@@ -183,6 +184,7 @@ const ProtectedRoute = ({ user, element }) => {
 function App() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [aiAppliedFilters, setAiAppliedFilters] = useState(null);
 
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -207,18 +209,36 @@ function App() {
   
   const handleAISearch = (aiGeneratedFilters) => {
     if (!aiGeneratedFilters) return;
-    console.log('AI search response (filters removed):', aiGeneratedFilters);
+    // console.log('AI search response (raw):', aiGeneratedFilters); // Debug log
+
+    if (aiGeneratedFilters.suggestedFilters) {
+      // console.log('Received AI Suggested Filters:', aiGeneratedFilters.suggestedFilters); // Debug log
+      setAiAppliedFilters(aiGeneratedFilters.suggestedFilters);
+    }
+
     if (aiGeneratedFilters.flyToLocation) {
         handleLocationSearch(aiGeneratedFilters.flyToLocation);
+    } else if (aiGeneratedFilters.recommendations && aiGeneratedFilters.recommendations.length > 0) {
+      // If no direct flyToLocation, but we have recommendations, try to fly to the first one
+      const firstReco = aiGeneratedFilters.recommendations[0];
+      if (firstReco && typeof firstReco.latitude === 'number' && typeof firstReco.longitude === 'number') {
+        // console.log('Flying to first recommendation:', firstReco); // Debug log
+        const locationData = {
+          center: [firstReco.longitude, firstReco.latitude],
+          zoom: 12, // Default zoom for recommended property
+          pitch: 60,
+          bearing: 0
+        };
+        handleLocationSearch(locationData);
+      }
     }
   };
 
   const handleLocationSearch = (locationData) => {
     if (!locationData || !mapRef.current) return;
-    console.log('Flying to location:', locationData);
-    const map = mapRef.current.getMap();
-    if (map) {
-      map.flyTo({
+    // console.log('Flying to location:', locationData); // Debug log
+    if (mapRef.current) {
+      mapRef.current.flyTo({
         center: locationData.center,
         zoom: locationData.zoom || 12,
         pitch: locationData.pitch || 60,
@@ -322,92 +342,175 @@ function App() {
     location.pathname !== '/create-property' &&
     !location.pathname.startsWith('/edit-property/');
 
+  // Helper function to format ranges (price, size)
+  const formatRange = (range, unit = '', prefix = '') => {
+    if (!range || range.length !== 2) return 'N/A';
+    const [min, max] = range;
+    if (min === null && max === null) return 'Cualquiera';
+    if (min === null) return `Hasta ${prefix}${max?.toLocaleString()}${unit}`;
+    if (max === null) return `Desde ${prefix}${min?.toLocaleString()}${unit}`;
+    return `${prefix}${min?.toLocaleString()}${unit} - ${prefix}${max?.toLocaleString()}${unit}`;
+  };
+
+  // Component to display applied AI filters
+  const AppliedFiltersDisplay = ({ filters, onClear }) => {
+    if (!filters || Object.keys(filters).length === 0) {
+      return null;
+    }
+
+    const hasContent = Object.values(filters).some(value => 
+      Array.isArray(value) ? value.length > 0 : value !== null
+    );
+
+    if (!hasContent) return null;
+
+    return (
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 1.5, 
+          mt: 1, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 1.5, 
+          flexWrap: 'wrap',
+          backgroundColor: 'rgba(22, 27, 34, 0.8)', // Darker paper
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(48, 54, 61, 0.7)',
+          maxWidth: '700px', // Match AISearchBar width
+          mx: 'auto', // Center it like AISearchBar
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ color: muiTheme.palette.text.secondary, mr: 1 }}>Filtros IA:</Typography>
+        {filters.propertyTypes && filters.propertyTypes.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            <Typography variant="body2" sx={{color: muiTheme.palette.text.secondary}}>Tipo:</Typography>
+            {filters.propertyTypes.map(type => <Chip key={type} label={type} size="small" />)}
+          </Box>
+        )}
+        {filters.priceRange && (filters.priceRange[0] !== null || filters.priceRange[1] !== null) && (
+          <Typography variant="body2">Precio: {formatRange(filters.priceRange, '', '$')}</Typography>
+        )}
+        {filters.sizeRange && (filters.sizeRange[0] !== null || filters.sizeRange[1] !== null) && (
+          <Typography variant="body2">Tamaño: {formatRange(filters.sizeRange, ' ha')}</Typography>
+        )}
+        {filters.features && filters.features.length > 0 && (
+           <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+            <Typography variant="body2" sx={{color: muiTheme.palette.text.secondary}}>Caract.:</Typography>
+            {filters.features.map(feature => <Chip key={feature} label={feature} size="small" />)}
+          </Box>
+        )}
+        <IconButton onClick={onClear} size="small" sx={{ ml: 'auto', color: muiTheme.palette.text.secondary }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Paper>
+    );
+  };
+
   return (
     <>
       {/* UI principal siempre visible (Header Minimalista, etc.) */}
       {/* Condición para no mostrar en property, tour, o dashboard */}
       {showTopBar && (
-        <Box
+        <Box // This Box is the main container for the top bar elements
           sx={{
-            position: 'absolute', top: 0, left: 0, right: 0, p: isMobile ? 1 : 2,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1200,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            p: isMobile ? 1 : 2,
+            zIndex: 1200,
+            display: 'flex', // Changed to flex to allow vertical stacking of AISearchBar and FiltersDisplay
+            flexDirection: 'column', // Stack vertically
+            alignItems: 'center', // Center items horizontally in the column
           }}
         >
-          <Typography 
-            variant={isMobile ? "h6" : "h5"}
-            component="div" 
-            onClick={() => navigate('/')}
+          <Box // This Box wraps the original top bar content (Logo, Search, UserMenu)
             sx={{
-              color: '#e0e0e0',
-              fontFamily: 'Poppins, sans-serif',
-              fontWeight: 300,
-              letterSpacing: '0.05em',
-              cursor: 'pointer',
-              userSelect: 'none',
-              paddingRight: 2,
-              paddingLeft: isMobile ? 1 : 3,
-              transition: 'color 0.3s ease-in-out',
-              '&:hover': {
-                color: '#ffffff',
-              }
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              width: '100%',
             }}
           >
-            SkyTerra
-          </Typography>
+            <Typography 
+              variant={isMobile ? "h6" : "h5"}
+              component="div" 
+              onClick={() => navigate('/')}
+              sx={{
+                color: '#e0e0e0',
+                fontFamily: 'Poppins, sans-serif',
+                fontWeight: 300,
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+                userSelect: 'none',
+                paddingRight: 2,
+                paddingLeft: isMobile ? 1 : 3,
+                transition: 'color 0.3s ease-in-out',
+                '&:hover': {
+                  color: '#ffffff',
+                }
+              }}
+            >
+              SkyTerra
+            </Typography>
 
-          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1: 2 }}>
-            <Box sx={{ width: '100%', maxWidth: '700px' }}>
-              <AISearchBar 
-                onSearch={handleAISearch} 
-                onLocationSearch={handleLocationSearch}
-              />
+            <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
+              <Box sx={{ width: '100%', maxWidth: '700px' }}> {/* This ensures AISearchBar keeps its width */}
+                <AISearchBar 
+                  onSearch={handleAISearch} 
+                  onLocationSearch={handleLocationSearch}
+                />
+              </Box>
             </Box>
-          </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {user ? (
-              <>
-                <IconButton
-                  onClick={handleUserMenuOpen}
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              {user ? (
+                <>
+                  <IconButton
+                    onClick={handleUserMenuOpen}
+                    sx={{
+                      backgroundColor: 'rgba(22, 27, 34, 0.9)', backdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(30, 41, 59, 0.3)', color: '#c9d1d9',
+                      '&:hover': { backgroundColor: 'rgba(30, 41, 59, 0.95)' },
+                    }}
+                  >
+                    <AccountCircleIcon />
+                  </IconButton>
+                  <Menu
+                    anchorEl={userMenuAnchorEl}
+                    open={Boolean(userMenuAnchorEl)}
+                    onClose={handleUserMenuClose}
+                    MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d' } }}
+                  >
+                    <MenuItem onClick={() => { navigate('/dashboard'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Dashboard</MenuItem>
+                    <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
+                    {user && user.is_staff && (
+                      <MenuItem onClick={() => { navigate('/admin/publications'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>
+                        Panel de Admin
+                      </MenuItem>
+                    )}
+                    <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Logout</MenuItem>
+                  </Menu>
+                </>
+              ) : (
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/login')}
                   sx={{
-                    backgroundColor: 'rgba(22, 27, 34, 0.9)', backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(30, 41, 59, 0.3)', color: '#c9d1d9',
-                    '&:hover': { backgroundColor: 'rgba(30, 41, 59, 0.95)' },
+                    borderColor: 'rgba(30, 58, 138, 0.7)', color: '#60a5fa', fontWeight: 300,
+                    padding: '6px 12px', fontSize: '0.8rem',
+                    backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
+                    '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
                   }}
                 >
-                  <AccountCircleIcon />
-                </IconButton>
-                <Menu
-                  anchorEl={userMenuAnchorEl}
-                  open={Boolean(userMenuAnchorEl)}
-                  onClose={handleUserMenuClose}
-                  MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d' } }}
-                >
-                  <MenuItem onClick={() => { navigate('/dashboard'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Dashboard</MenuItem>
-                  <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
-                  {user && user.is_staff && (
-                    <MenuItem onClick={() => { navigate('/admin/publications'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>
-                      Panel de Admin
-                    </MenuItem>
-                  )}
-                  <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Logout</MenuItem>
-                </Menu>
-              </>
-            ) : (
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/login')}
-                sx={{
-                  borderColor: 'rgba(30, 58, 138, 0.7)', color: '#60a5fa', fontWeight: 300,
-                  padding: '6px 12px', fontSize: '0.8rem',
-                  backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
-                  '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
-                }}
-              >
-                Login
-              </Button>
-            )}
+                  Login
+                </Button>
+              )}
+            </Box>
           </Box>
+          {/* Conditionally render AppliedFiltersDisplay below the main top bar content */}
+          <AppliedFiltersDisplay filters={aiAppliedFilters} onClear={() => setAiAppliedFilters(null)} />
         </Box>
       )}
 
@@ -429,7 +532,7 @@ function App() {
             path="/"
             element={
               <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                <MapView ref={mapRef} />
+                <MapView ref={mapRef} appliedFilters={aiAppliedFilters} />
               </motion.div>
             }
           />

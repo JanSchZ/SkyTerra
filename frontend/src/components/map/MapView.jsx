@@ -29,7 +29,7 @@ const propertiesToGeoJSON = (properties) => ({
   }))
 });
 
-const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad, disableIntroAnimation = false }, ref) => {
+const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad, disableIntroAnimation = false }, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
   // Estados
@@ -78,7 +78,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       const connection = navigator.connection;
       if (connection) {
         setConnectionType(connection.effectiveType);
-        console.log(`🌐 Connection type: ${connection.effectiveType}`);
+        // console.log(`🌐 Connection type: ${connection.effectiveType}`);
       }
     };
 
@@ -137,7 +137,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     if (autoFlyCompleted || userInteractedRef.current) {
       const timer = setTimeout(() => {
         if (!disableIntroAnimation) setShowOverlay(false);
-      }, 500); // Reducido el tiempo para ocultar más rápido tras interacción
+      }, 300); // Reduced timeout for snappier overlay dismissal
       return () => clearTimeout(timer);
     }
   }, [autoFlyCompleted, userInteractedRef.current, disableIntroAnimation]);
@@ -147,7 +147,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     if (flightTimeoutIdRef.current) {
       clearTimeout(flightTimeoutIdRef.current);
       flightTimeoutIdRef.current = null;
-      console.log('🚁 Futuros vuelos de animación cancelados por usuario.');
+      // console.log('🚁 Futuros vuelos de animación cancelados por usuario.');
     }
     
     userInteractedRef.current = true; 
@@ -163,14 +163,15 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const mapStyle = config.mapbox.style;
   
   useEffect(() => {
-    console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
+    // console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
   }, []);
 
   // Serializar filters para la dependencia del useEffect
   const serializedFilters = JSON.stringify(filters);
+  const serializedAppliedFilters = JSON.stringify(appliedFilters);
 
   // Memoized fetchProperties function
-  const fetchProperties = useCallback(async (pageToFetch = 1, currentFilters) => {
+  const fetchProperties = useCallback(async (pageToFetch = 1, currentFilters, aiFilters) => {
     if (pageToFetch === 1) {
       setLoading(true);
       // When filters change (pageToFetch === 1), we should reset properties
@@ -181,7 +182,41 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     }
     setError(null);
     try {
-      const params = { ...currentFilters }; // Use passed filters
+      let params = { ...currentFilters };
+
+      if (aiFilters && Object.keys(aiFilters).length > 0) {
+        // console.log("Aplicando filtros AI:", aiFilters); // Debug log
+        params = {}; // Prioritize AI filters: start with a clean slate if AI filters exist
+
+        if (aiFilters.propertyTypes && aiFilters.propertyTypes.length > 0) {
+          params.type__in = aiFilters.propertyTypes.join(',');
+        }
+        if (aiFilters.priceRange && aiFilters.priceRange.length === 2) {
+          if (aiFilters.priceRange[0] !== null) params.min_price = aiFilters.priceRange[0];
+          if (aiFilters.priceRange[1] !== null) params.max_price = aiFilters.priceRange[1];
+        }
+        if (aiFilters.sizeRange && aiFilters.sizeRange.length === 2) {
+          if (aiFilters.sizeRange[0] !== null) params.min_size = aiFilters.sizeRange[0];
+          if (aiFilters.sizeRange[1] !== null) params.max_size = aiFilters.sizeRange[1];
+        }
+        if (aiFilters.features && aiFilters.features.length > 0) {
+          aiFilters.features.forEach(feature => {
+            // Assuming features are like "has_water", "has_views"
+            // The backend needs to be set up to expect these as boolean true
+            // e.g. has_water=true
+            // For now, let's convert common ones. This might need more robust mapping.
+            if (feature.toLowerCase().includes('water')) params.has_water = true;
+            if (feature.toLowerCase().includes('views')) params.has_views = true;
+            if (feature.toLowerCase().includes('road')) params.has_road_access = true;
+            // Add more feature mappings as needed based on backend capabilities
+          });
+        }
+        // If AI filters are applied, they might also want to override location/keyword from manual search
+        // For now, we assume AISearchBar provides 'text_search' if that's intended.
+        // If `currentFilters` had a `text_search` and AI filters are applied, it's removed unless AI also provides it.
+      }
+      
+      // console.log("Parámetros finales para API:", params); // Debug log
       const data = await propertyService.getPaginatedProperties(pageToFetch, params);
       
       setProperties(prev => pageToFetch === 1 ? data.results : [...prev, ...data.results]);
@@ -220,7 +255,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   }, [ // Dependencies for fetchProperties
     setLoading, setLoadingMore, setError, setProperties, 
     setPropertiesGeoJSON, setTotalProperties, setCurrentPage, setHasNextPage
-    // `filters` (via currentFilters param) and `editable` are handled by the calling useEffect
+    // `filters`, `appliedFilters` (via currentFilters, aiFilters params) and `editable` are handled by the calling useEffect
   ]);
 
   useEffect(() => {
@@ -236,23 +271,24 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       return; // Don't fetch if editable
     }
 
-    // Not editable: Fetch properties if filters changed or if it's the first load for these filters
-    // (i.e., lastFetchedPage1FiltersRef.current doesn't match current serializedFilters)
-    if (serializedFilters !== lastFetchedPage1FiltersRef.current) {
-      console.log('MapView: Filters changed or first non-editable load for current filters. Fetching page 1.');
-      fetchProperties(1, filters); // Call with current filters
-      lastFetchedPage1FiltersRef.current = serializedFilters; // Record that these filters have been fetched for page 1
-    }
-    // If serializedFilters === lastFetchedPage1FiltersRef.current, it means we've already fetched page 1
-    // for these filters, so we don't do it again here. Infinite scroll will handle subsequent pages.
+    const combinedFiltersForRef = JSON.stringify({ manual: filters, ai: appliedFilters });
 
-  }, [serializedFilters, editable, fetchProperties, filters]); // Removed properties.length from dependencies
+    // Not editable: Fetch properties if filters (manual or AI) changed or if it's the first load for these filters
+    if (combinedFiltersForRef !== lastFetchedPage1FiltersRef.current) {
+      // console.log('MapView: Filters (manual or AI) changed or first non-editable load for current combined filters. Fetching page 1.');
+      fetchProperties(1, filters, appliedFilters); // Call with current manual and AI filters
+      lastFetchedPage1FiltersRef.current = combinedFiltersForRef; // Record that these combined filters have been fetched for page 1
+    }
+    // If combinedFiltersForRef === lastFetchedPage1FiltersRef.current, it means we've already fetched page 1
+    // for these combined filters, so we don't do it again here. Infinite scroll will handle subsequent pages.
+
+  }, [serializedFilters, serializedAppliedFilters, editable, fetchProperties, filters, appliedFilters]);
 
   const handleLoadMore = useCallback(() => { // This function can now call the memoized fetchProperties
     if (hasNextPage && !loadingMore) {
-      fetchProperties(currentPage + 1, filters); // Pass current filters
+      fetchProperties(currentPage + 1, filters, appliedFilters); // Pass current manual and AI filters
     }
-  }, [hasNextPage, loadingMore, currentPage, fetchProperties, filters]);
+  }, [hasNextPage, loadingMore, currentPage, fetchProperties, filters, appliedFilters]);
 
   const MAPBOX_TOKEN = config.mapbox.accessToken;
 
@@ -312,7 +348,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   };
 
   const handleMarkerHover = (property) => {
-    setPopupInfo({ ...property, country: getCountryFromCoords(property.latitude, property.longitude) });
+    setPopupInfo(property);
     clearTimeout(window.tooltipHideTimeout);
   };
 
@@ -338,7 +374,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     if (onBoundariesUpdate) {
       onBoundariesUpdate(boundaries);
     }
-    console.log('Boundaries updated:', boundaries);
+    // console.log('Boundaries updated:', boundaries); // Debug log
   };
 
   // Países y sus recorridos de vuelo
@@ -380,18 +416,18 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
     // Skip animation for slow connections
     if (['slow-2g', '2g', '3g'].includes(connectionType)) {
-      console.log(`Conexión lenta (${connectionType}), omitiendo animación de vuelo automático.`);
+      // console.log(`Conexión lenta (${connectionType}), omitiendo animación de vuelo automático.`);
       if (!autoFlyCompleted) setAutoFlyCompleted(true);
       return;
     }
 
     if (!mapRef.current || !isMapLoaded || userInteractedRef.current || autoFlyCompleted) {
-      console.warn('Intento de iniciar auto-vuelo pero el mapa no está listo, o usuario ya interactuó, o ya completó.');
+      // console.warn('Intento de iniciar auto-vuelo pero el mapa no está listo, o usuario ya interactuó, o ya completó.');
       if (!userInteractedRef.current) setAutoFlyCompleted(true);
       return;
     }
     
-    console.log(`🚁 Iniciando vuelo automático para ${userCountry}`);
+    // console.log(`🚁 Iniciando vuelo automático para ${userCountry}`);
 
     let flightPerformed = false;
     try {
@@ -442,11 +478,11 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
           const flyToNextSelectedProperty = () => {
             if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= selectedProperties.length) {
               if (!userInteractedRef.current) setAutoFlyCompleted(true);
-              console.log('Secuencia de propiedades terminada o interrumpida (modo paseo lento).');
+              // console.log('Secuencia de propiedades terminada o interrumpida (modo paseo lento).');
               return;
             }
             const property = selectedProperties[currentStep];
-            console.log(`🏞️ Volando sobre: ${property.name} (animación pausada, duración: ${currentStep === 0 ? 7000 : 8000}ms)`);
+            // console.log(`🏞️ Volando sobre: ${property.name} (animación pausada, duración: ${currentStep === 0 ? 7000 : 8000}ms)`);
             
             mapRef.current.flyTo({
               ...property,
@@ -467,18 +503,18 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       }
 
       if (!flightPerformed && !userInteractedRef.current) {
-        console.log('No hay propiedades para el vuelo cinematográfico o fue interrumpido, usando vuelo genérico por país.');
+        // console.log('No hay propiedades para el vuelo cinematográfico o fue interrumpido, usando vuelo genérico por país.');
         const flightPath = countryFlightPaths[userCountry] || countryFlightPaths['default'];
         let currentStep = 0;
 
         const flyToNextGenericPoint = () => {
           if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= flightPath.length) {
             if (!userInteractedRef.current) setAutoFlyCompleted(true);
-            console.log('Secuencia genérica terminada o interrumpida (modo paseo lento).');
+            // console.log('Secuencia genérica terminada o interrumpida (modo paseo lento).');
             return;
           }
           const point = flightPath[currentStep];
-          console.log(`🌎 Volando a punto genérico (animación pausada, duración: ${currentStep === 0 ? 7000 : 8000}ms)`);
+          // console.log(`🌎 Volando a punto genérico (animación pausada, duración: ${currentStep === 0 ? 7000 : 8000}ms)`);
           mapRef.current.flyTo({
             ...point,
             duration: currentStep === 0 ? 7000 : 8000,
@@ -519,17 +555,17 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
-            console.log(`🌍 Ubicación detectada: ${getCountryFromCoords(latitude, longitude)} (${latitude}, ${longitude})`);
+            // console.log(`🌍 Ubicación detectada: ${getCountryFromCoords(latitude, longitude)} (${latitude}, ${longitude})`);
             userCountry = getCountryFromCoords(latitude, longitude);
             performAutoFlight(userCountry);
           },
           () => {
-            console.warn('No se pudo obtener la ubicación del usuario, usando vuelo por defecto.');
+            // console.warn('No se pudo obtener la ubicación del usuario, usando vuelo por defecto.');
             performAutoFlight('default'); 
           }
         );
       } else {
-        console.warn('Geolocalización no soportada, usando vuelo por defecto.');
+        // console.warn('Geolocalización no soportada, usando vuelo por defecto.');
         performAutoFlight('default');
       }
     } 
@@ -582,7 +618,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   };
 
   const onMapLoad = useCallback(() => {
-    console.log('🗺️ Mapa cargado, configurando...');
+    // console.log('🗺️ Mapa cargado, configurando...');
     setIsMapLoaded(true);
 
     if (mapRef.current) {
@@ -592,7 +628,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       // No es necesario map.setTerrain aquí si ya está en el estilo.
       // Asegurarse que 'mapbox-dem' esté en las fuentes del estilo.
       if (map.getSource('mapbox-dem') && map.getTerrain() === null) {
-         console.log('Aplicando configuración de terreno desde el estilo...');
+         // console.log('Aplicando configuración de terreno desde el estilo...');
          // Esto podría ser redundante si el estilo lo define bien.
          map.setTerrain({ source: 'mapbox-dem', exaggeration: config.mapbox.styles.dark.terrain.exaggeration || 1.5 });
       } else if (!map.getSource('mapbox-dem')){
@@ -608,14 +644,14 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
 
       map.on('sourcedata', (e) => {
         if (e.sourceId === 'composite' && e.isSourceLoaded) {
-          console.log('✅ Fuente composite cargada');
+          // console.log('✅ Fuente composite cargada');
         }
         if (e.sourceId === 'mapbox-dem' && e.isSourceLoaded) {
-          console.log('✅ Fuente de terreno cargada');
+          // console.log('✅ Fuente de terreno cargada');
         }
       });
 
-      console.log('✅ Configuración del mapa completada');
+      // console.log('✅ Configuración del mapa completada');
       
       // Llamar al callback externo si existe
       if (onLoad) {
@@ -654,7 +690,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
       }
 
       if (shouldLoad) {
-        console.log('🗺️ Map moved, attempting to load more properties via handleLoadMore...');
+        // console.log('🗺️ Map moved, attempting to load more properties via handleLoadMore...');
         lastLoadViewportRef.current = currentViewport; // Update viewport ref before loading
         handleLoadMore(); // Call the memoized and stable handleLoadMore
       }
@@ -703,40 +739,39 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
     type: 'circle',
     source: 'properties-source',
     paint: {
-      'circle-color': '#10b981', // Mantener el color base, pero ajustaremos la opacidad
+      'circle-color': '#10b981', // Verde esmeralda principal
       'circle-radius': [
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 5,   // Aumentar ligeramente el radio base
-        12, 10, // Aumentar el radio en zoom medio
-        16, 15  // Aumentar el radio en zoom alto
+        8, 4,   // Zoom bajo = puntos pequeños
+        12, 8,  // Zoom medio = puntos medianos  
+        16, 12  // Zoom alto = puntos grandes
       ],
-      'circle-stroke-width': 0, // Quitar el borde
-      'circle-stroke-color': '#ffffff', // No visible al quitar el borde
-      'circle-stroke-opacity': 0,     // Asegurar que el borde sea transparente
+      'circle-stroke-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 1,   // Borde fino en zoom bajo
+        12, 2,  // Borde medio en zoom medio
+        16, 3   // Borde grueso en zoom alto
+      ],
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-opacity': 0.9,
       'circle-opacity': [
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 0.6,   // Aumentar opacidad de lejos
-        12, 0.8,  // Aumentar opacidad cerca
+        8, 0.7,   // Menos opaco de lejos
+        12, 0.9,  // Más opaco cerca
         16, 1     // Completamente opaco muy cerca
-      ],
-      'circle-blur': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        8, 0.4, // Menor difuminado de lejos
-        12, 0.25, // Menor difuminado medio
-        16, 0.1 // Menor difuminado de cerca
       ]
     }
   };
   
   const onMapClick = useCallback(event => {
     if (!userInteractedRef.current && !autoFlyCompleted) {
-      console.log('Interacción de click en mapa, deteniendo animación intro.');
+      // console.log('Interacción de click en mapa, deteniendo animación intro.');
       stopAndSkipAnimation();
     }
     if (navigatingToTour || !mapRef.current) return;
@@ -769,7 +804,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
   const handleUserInteraction = useCallback((event) => {
     // Detectar si es una interacción genuina del usuario
     if (event.originalEvent && !userInteractedRef.current && !autoFlyCompleted) {
-        console.log('Interacción de movimiento en mapa, deteniendo animación intro.');
+        // console.log('Interacción de movimiento en mapa, deteniendo animación intro.');
         stopAndSkipAnimation();
     }
   }, [stopAndSkipAnimation, autoFlyCompleted]);
@@ -880,7 +915,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             onMapClick(e); 
             if (!e.features || e.features.length === 0) {
                 if (!userInteractedRef.current && !autoFlyCompleted) {
-                    console.log('Click genérico en mapa, deteniendo animación intro.');
+                    // console.log('Click genérico en mapa, deteniendo animación intro.');
                     stopAndSkipAnimation();
                 }
             }
@@ -924,7 +959,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             />
           )}
           {!editable && propertiesGeoJSON && (
-            <Source 
+            <Source
               id="properties-source"
               type="geojson"
               data={propertiesGeoJSON}
@@ -966,45 +1001,48 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
             <Popup
               longitude={popupInfo.longitude}
               latitude={popupInfo.latitude}
-              anchor="bottom"
-              onClose={() => setPopupInfo(null)}
               closeButton={false}
               closeOnClick={false}
+              onClose={() => setPopupInfo(null)}
+              anchor="bottom"
+              offset={15} 
               maxWidth="300px"
-              className="skyterra-map-popup"
             >
-              <Card elevation={3}>
-                {popupInfo.images && popupInfo.images.length > 0 && (
+              <Card sx={{ 
+                maxWidth: 280, 
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                border: 'none', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+              }}>
+                {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
                   <CardMedia
                     component="img"
-                    height="100"
-                    image={popupInfo.images[0].image}
-                    alt={popupInfo.name}
+                    height="120"
+                    image={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
+                    alt={`Imagen de ${popupInfo.name}`}
                     sx={{ objectFit: 'cover' }}
                   />
-                )}
-                <CardContent sx={{ padding: '10px', '&:last-child': { paddingBottom: '10px' } }}>
-                  <Typography variant="subtitle2" component="div" sx={{ fontWeight: 'bold' }}>
+                ) : null}
+                <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
                     {popupInfo.name}
                   </Typography>
-                  {popupInfo.country && (
-                    <Typography variant="caption" color="text.secondary" component="div">
-                      País: {popupInfo.country.toUpperCase()}
-                    </Typography>
-                  )}
-                  {popupInfo.price && (
-                    <Typography variant="body2" color="text.secondary">
-                      Precio: {formatPrice(popupInfo.price)}
-                    </Typography>
-                  )}
-                  <Link 
-                    component="button"
-                    variant="body2" 
-                    onClick={() => navigate(`/property/${popupInfo.id}`)}
-                    sx={{ mt: 0.5, display: 'block' }}
-                  >
-                    Ver Detalles
-                  </Link>
+                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5}}>
+                    Precio: {formatPrice(popupInfo.price)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Tamaño: {popupInfo.size} ha
+                  </Typography>
+                  <Box sx={{mt: 1}}>
+                      <Link 
+                          component="button" 
+                          variant="body2" 
+                          onClick={() => handleMarkerClick(popupInfo)} 
+                          sx={{cursor: 'pointer'}}
+                      >
+                          Ver detalles / Tour 360°
+                      </Link>
+                  </Box>
                 </CardContent>
               </Card>
             </Popup>
@@ -1111,7 +1149,7 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                 size="large"
                 onClick={stopAndSkipAnimation}
                 sx={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)', // Slightly increased opacity
                   color: 'rgba(255, 255, 255, 0.95)',
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 500,
@@ -1121,9 +1159,9 @@ const MapView = forwardRef(({ filters, editable = false, onBoundariesUpdate, ini
                   borderRadius: '16px',
                   textTransform: 'none',
                   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)', // Slightly increased border opacity
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Slightly increased hover opacity
                     boxShadow: '0 6px 24px rgba(0, 0, 0, 0.15)',
                     transform: 'translateY(-2px)',
                   },

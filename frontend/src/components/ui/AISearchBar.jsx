@@ -14,7 +14,8 @@ import {
   InputAdornment,
   IconButton,
   Collapse,
-  Button
+  Button,
+  alpha
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
@@ -101,6 +102,23 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
   const [searchResult, setSearchResult] = useState(null);
   const theme = useTheme();
 
+  const chipSx = {
+    borderRadius: '6px',
+    fontWeight: 400,
+    backgroundColor: alpha(theme.palette.primary.main, 0.25),
+    color: theme.palette.primary.light,
+    border: `1px solid ${alpha(theme.palette.primary.main, 0.4)}`,
+    '& .MuiChip-icon': {
+      color: theme.palette.primary.light,
+      fontSize: '1rem',
+      marginLeft: '5px',
+      marginRight: '-4px'
+    },
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.primary.main, 0.35),
+    }
+  };
+
   const handleInputChange = (e) => {
     setQuery(e.target.value);
     if (showResults) setShowResults(false);
@@ -146,7 +164,7 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
       }
 
       const geoResults = await searchLocation(searchTerm);
-      if (geoResults.length > 0) {
+      if (geoResults.length > 0 && !query.toLowerCase().includes('propiedades') && !query.toLowerCase().includes('terrenos')) {
         const firstResult = geoResults[0];
         const center = firstResult.center;
         const placeName = firstResult.place_name || firstResult.text;
@@ -163,43 +181,60 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
 
       const response = await api.post('ai-search/', { current_query: searchTerm, conversation_history: [] });
       if (response.data && typeof response.data === 'object') {
-        const hasValidAssistantMessage = response.data.assistant_message && typeof response.data.assistant_message === 'string';
-        const hasValidFilters = response.data.suggestedFilters && typeof response.data.suggestedFilters === 'object';
-        
-        if (hasValidAssistantMessage || hasValidFilters) {
-          const processedResult = {
-            type: 'properties',
-            assistant_message: response.data.assistant_message || "Búsqueda procesada",
-            suggestedFilters: response.data.suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [] },
-            interpretation: response.data.assistant_message || response.data.interpretation || "Búsqueda de propiedades procesada",
-            recommendations: response.data.recommendations || []
-          };
-          setSearchResult(processedResult);
-          if (onSearch) onSearch(processedResult);
-          setShowResults(true);
-        } else {
-          if (response.data.error) throw new Error(response.data.error + (response.data.details ? `: ${response.data.details}` : ''));
-          const fallbackMsg = "No se encontraron ubicaciones ni propiedades específicas para esta búsqueda.";
-          setSearchResult({ type: 'properties', assistant_message: fallbackMsg, suggestedFilters: { propertyTypes: [], priceRange: [null, null], features: [], locations: [] }, interpretation: fallbackMsg, recommendations: [] });
-          if (onSearch) onSearch(searchResult);
-          setShowResults(true);
-          setError(fallbackMsg);
+        const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation } = response.data;
+        const hasContentForPropertyList = (suggestedFilters && Object.values(suggestedFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== null && (Array.isArray(v) ? v.some(subVal => subVal !== null) : true )))) || (recommendations && recommendations.length > 0);
+
+        if (flyToLocation && onLocationSearch) {
+          onLocationSearch({
+            center: flyToLocation.center,
+            zoom: flyToLocation.zoom || 12,
+            locationName: flyToLocation.name || searchTerm,
+            pitch: flyToLocation.pitch,
+            bearing: flyToLocation.bearing,
+          });
+          setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` });
+          setShowResults(true); setLoading(false); return;
         }
+
+        let resultType = 'ai_response';
+        if (hasContentForPropertyList) {
+          resultType = 'properties';
+        }
+
+        const processedResult = {
+          type: resultType,
+          assistant_message: assistant_message || (resultType === 'properties' ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
+          suggestedFilters: suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [] },
+          interpretation: interpretation || assistant_message,
+          recommendations: recommendations || [],
+          flyToLocation
+        };
+        setSearchResult(processedResult);
+        if (onSearch) {
+          onSearch(processedResult);
+        }
+        setShowResults(true);
+
       } else {
-        throw new Error('El servidor devolvió una respuesta con formato inválido');
+        const errorMsg = response.data?.error || response.data?.detail || 'Respuesta inesperada del servidor de IA.';
+        throw new Error(errorMsg);
       }
     } catch (err) {
-      console.error('Error en la búsqueda:', err);
-      let errorMsg = 'Error al realizar la búsqueda. Intente de nuevo.';
+      console.error('Error en la búsqueda AISearchBar:', err);
+      let errorMsg = 'Error al procesar la búsqueda. Intente de nuevo.';
       if (err.response?.data) {
         const errorData = err.response.data;
         errorMsg = errorData.error ? (errorData.details ? `${errorData.error}: ${errorData.details}` : errorData.error) : (typeof errorData === 'string' ? errorData : errorMsg);
-        if (errorMsg.includes('Gemini') || errorMsg.includes('API key')) errorMsg += ' Verifique la configuración de la API de Gemini.';
-        if (errorData.suggestions) errorMsg += ` ${errorData.suggestions}`;
       } else if (err.message) {
-        errorMsg = err.message.includes('Network Error') ? 'Error de conexión. Verifique que el servidor esté funcionando.' : `Error: ${err.message}`;
+        errorMsg = err.message;
       }
       setError(errorMsg);
+      setSearchResult({
+        type: 'error',
+        assistant_message: errorMsg,
+        interpretation: "Error en la Búsqueda"
+      });
+      setShowResults(true);
     } finally {
       setLoading(false);
     }
@@ -222,81 +257,9 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start" sx={{ ml: 0.5 }}>
-              <TravelExploreIcon sx={{ color: '#8b949e', fontSize: '20px' }} />
-            </InputAdornment>
-          ),
-          endAdornment: (
-            <InputAdornment position="end">
-              {loading ? (
-                <CircularProgress size={22} sx={{color: '#8b949e', mr: 0.5}} />
-              ) : (
-                <IconButton 
-                  onClick={handleSearch} 
-                  disabled={!query.trim()} 
-                  sx={{
-                    mr: -0.5,
-                    color: query.trim() ? '#60a5fa' : '#8b949e',
-                    '&:hover': {
-                      backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                    }
-                  }}
-                >
-                  <SearchIcon />
-                </IconButton>
-              )}
-            </InputAdornment>
-          ),
-          sx: {
-            backgroundColor: 'rgba(22, 27, 34, 0.85)',
-            borderRadius: '50px',
-            fontSize: '0.9rem',
-            color: '#c9d1d9',
-            border: 'none !important',
-            outline: 'none !important',
-            backdropFilter: 'blur(20px)',
-            fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-            '&.MuiOutlinedInput-root': {
-                '& fieldset': { 
-                  border: 'none !important',
-                  outline: 'none !important',
-                },
-                '&:hover fieldset': { 
-                  border: 'none !important',
-                  outline: 'none !important',
-                },
-                '&.Mui-focused fieldset': { 
-                  border: 'none !important',
-                  outline: 'none !important',
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(22, 27, 34, 0.9)',
-                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.16)',
-                },
-                '&.Mui-focused': {
-                  backgroundColor: 'rgba(22, 27, 34, 0.95)',
-                  boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)',
-                },
-            },
-            '& .MuiInputBase-input': {
-                padding: '14px 12px',
-                color: '#c9d1d9',
-                fontWeight: 300,
-                fontSize: '0.95rem',
-                '&::placeholder': {
-                    color: '#8b949e',
-                    opacity: 1,
-                    fontWeight: 300,
-                },
-            },
-          }
-        }}
       />
       
-      {error && (
+      {error && !showResults && (
         <Box sx={{ mt: 1, px: 1 }}>
           <Typography color="error" variant="body2" sx={{ fontSize: '0.8rem' }}>
             {error}
@@ -323,7 +286,11 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', pt: 1, pb:0.5, px: 2, borderBottom: '1px solid rgba(30, 41, 59, 0.2)' }}>
             <Typography variant="subtitle2" fontWeight="300" sx={{ color: '#c9d1d9' }}>
-              {searchResult?.type === 'location' ? 'Ubicación Encontrada' : 'Resultados de Búsqueda IA'}
+              {searchResult?.type === 'location' ? 'Ubicación Encontrada' :
+               searchResult?.type === 'properties' ? 'Sugerencias de Búsqueda IA' :
+               searchResult?.type === 'ai_response' ? 'Respuesta de IA' :
+               searchResult?.type === 'error' ? 'Error en la Búsqueda' :
+               'Resultados'}
             </Typography>
             <IconButton size="small" onClick={handleCloseResults} sx={{color: '#8b949e'}}>
               <CloseIcon fontSize="inherit" />
@@ -331,6 +298,12 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
           </Box>
           
           <Box sx={{p:1.5}}>
+            {searchResult && searchResult.type === 'error' && (
+              <Typography variant="body2" sx={{ color: theme.palette.error.main, fontWeight: 300 }} gutterBottom>
+                {searchResult.assistant_message || "Ocurrió un error."}
+              </Typography>
+            )}
+
             {searchResult && searchResult.type === 'location' && (
               <>
                 <Typography variant="body2" sx={{ color: '#c9d1d9', fontWeight: 300 }} gutterBottom>
@@ -377,61 +350,104 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
               </>
             )}
 
-            {searchResult && searchResult.type === 'properties' && (
-              <>
-                <Typography variant="body2" sx={{ color: '#c9d1d9', fontWeight: 300, mb: 1.5 }} gutterBottom>
-                  {searchResult.assistant_message || searchResult.interpretation}
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mb: 1.5, maxHeight: '150px', overflowY: 'auto' }}>
-                  {searchResult.suggestedFilters?.propertyTypes?.map(type => (
-                    <Chip key={type} label={type.charAt(0).toUpperCase() + type.slice(1)} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
-                  ))}
-                  {searchResult.suggestedFilters?.priceRange?.[0] !== null && searchResult.suggestedFilters?.priceRange?.[1] !== null && (
-                    <Chip label={`$${searchResult.suggestedFilters.priceRange[0]?.toLocaleString()} - $${searchResult.suggestedFilters.priceRange[1]?.toLocaleString()}`} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
-                  )}
-                  {searchResult.suggestedFilters?.features?.map(feature => (
-                    <Chip key={feature} label={feature} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
-                  ))}
-                  {searchResult.suggestedFilters?.locations?.map(loc => (
-                    <Chip key={loc} label={loc} icon={<TravelExploreIcon fontSize='small'/>} size="small" variant="outlined" sx={{borderRadius: '6px'}}/>
-                  ))}
-                </Box>
-                
-                {searchResult.recommendations && searchResult.recommendations.length > 0 && (
+            {(searchResult && (searchResult.type === 'properties' || searchResult.type === 'ai_response')) && (() => {
+              const isPropertiesSearch = searchResult.type === 'properties';
+              const suggestedFilters = searchResult.suggestedFilters || {};
+              const recommendations = searchResult.recommendations || [];
+
+              const hasSuggestedFilters = isPropertiesSearch && (
+                (suggestedFilters.propertyTypes && suggestedFilters.propertyTypes.length > 0) ||
+                (suggestedFilters.priceRange && suggestedFilters.priceRange[0] !== null && suggestedFilters.priceRange[1] !== null) ||
+                (suggestedFilters.features && suggestedFilters.features.length > 0) ||
+                (suggestedFilters.locations && suggestedFilters.locations.length > 0)
+              );
+              const hasRecommendations = isPropertiesSearch && recommendations.length > 0;
+
+              return (
+                <>
+                  <Typography variant="body2" sx={{ color: '#c9d1d9', fontWeight: 300, mb: 1.5 }} gutterBottom>
+                    {searchResult.assistant_message || (isPropertiesSearch ? "Aquí hay algunas sugerencias basadas en tu búsqueda:" : "Respuesta de IA:")}
+                  </Typography>
+                  
+                  {isPropertiesSearch && (
                     <>
-                        <Typography variant="caption" sx={{ color: '#8b949e', display:'block', mb: 0.5 }}>Recomendaciones:</Typography>
-                        <List dense sx={{ maxHeight: '150px', overflowY: 'auto', p:0}}>
-                            {searchResult.recommendations.map((rec, index) => (
-                                <ListItem key={index} sx={{ py: 0.2, px: 1, borderRadius: 1, mb: 0.5}}>
-                                    <ListItemText primary={rec.name || rec} primaryTypographyProps={{ fontSize: '0.85rem', color: '#c9d1d9', fontWeight: 300}} />
-                                </ListItem>
+                      {hasSuggestedFilters && (
+                        <Box mb={2.5}>
+                          <Typography variant="overline" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}>
+                            Filtros Sugeridos
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                            {suggestedFilters.propertyTypes?.map(type => (
+                              <Chip key={type} label={type.charAt(0).toUpperCase() + type.slice(1)} size="small" sx={chipSx}/>
                             ))}
-                        </List>
+                            {suggestedFilters.priceRange?.[0] !== null && suggestedFilters.priceRange?.[1] !== null && (
+                              <Chip label={`$${suggestedFilters.priceRange[0]?.toLocaleString()} - $${suggestedFilters.priceRange[1]?.toLocaleString()}`} size="small" sx={chipSx}/>
+                            )}
+                            {suggestedFilters.features?.map(feature => (
+                              <Chip key={feature} label={feature} size="small" sx={chipSx}/>
+                            ))}
+                            {suggestedFilters.locations?.map(loc => (
+                              <Chip key={loc} label={`${loc}`} icon={<TravelExploreIcon />} size="small" sx={chipSx}/>
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {hasRecommendations && (
+                          <Box mb={2.5}>
+                              <Typography variant="overline" sx={{ color: theme.palette.text.secondary, display:'block', mb: 1 }}>
+                                Recomendaciones de Propiedades
+                              </Typography>
+                              <List dense sx={{ maxHeight: '180px', overflowY: 'auto', p:0, backgroundColor: alpha(theme.palette.common.white, 0.03), borderRadius: '8px'}}>
+                                  {recommendations.map((rec, index) => (
+                                      <ListItem 
+                                        key={index} 
+                                        sx={{ 
+                                          py: 0.75, px: 1.5, 
+                                          borderRadius: '6px', 
+                                          mb: 0.5, 
+                                          '&:hover': {backgroundColor: alpha(theme.palette.common.white, 0.07)}
+                                        }}
+                                      >
+                                          <ListItemText 
+                                            primary={rec.name || rec} 
+                                            primaryTypographyProps={{ fontSize: '0.85rem', color: '#c9d1d9', fontWeight: 300}} 
+                                          />
+                                      </ListItem>
+                                  ))}
+                              </List>
+                          </Box>
+                      )}
+
+                      {(hasSuggestedFilters || hasRecommendations) && (
+                          <Button 
+                              variant="contained" 
+                              size="small" 
+                              onClick={() => { 
+                                  if(onSearch) onSearch(searchResult); 
+                                  setShowResults(false); 
+                              }}
+                              sx={{
+                                mt:0.5, 
+                                width:'100%', 
+                                fontWeight: 400, 
+                                borderRadius: '12px', 
+                                textTransform: 'none',
+                                color: theme.palette.common.white,
+                                backgroundColor: theme.palette.primary.main,
+                                '&:hover': {
+                                  backgroundColor: theme.palette.primary.dark,
+                                }
+                              }}
+                          >
+                              Aplicar Filtros y Ver Propiedades
+                          </Button>
+                      )}
                     </>
-                )}
-                <Button 
-                    variant="contained" 
-                    size="small" 
-                    onClick={() => { 
-                        if(onSearch) onSearch(searchResult); 
-                        setShowResults(false); 
-                    }}
-                    sx={{
-                      mt:1.5, 
-                      width:'100%', 
-                      fontWeight: 300, 
-                      borderRadius: '12px', 
-                      textTransform: 'none',
-                      backgroundColor: 'rgba(30, 58, 138, 0.9)',
-                      '&:hover': {
-                        backgroundColor: 'rgba(30, 58, 138, 1)',
-                      }
-                    }}
-                >
-                    Aplicar Filtros de IA
-                </Button>
-              </>
-            )}
+                  )}
+                </>
+              );
+            })()}
           </Box>
         </Paper>
       </Collapse>
@@ -439,4 +455,4 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
   );
 };
 
-export default AISearchBar; 
+export default AISearchBar;
