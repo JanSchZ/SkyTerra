@@ -1,8 +1,38 @@
 import axios from 'axios';
 
+// Configuración dinámica de la URL base
+const getBaseURL = () => {
+  const hostname = window.location.hostname;
+  const origin = window.location.origin;
+  
+  console.log('🔍 Detectando entorno:', { hostname, origin, protocol: window.location.protocol, port: window.location.port });
+  
+  // Si estamos en Codespaces, usar la URL del Codespace
+  if (hostname.includes('github.dev') || hostname.includes('codespaces.io')) {
+    // Para Codespaces, reemplazar el puerto del frontend (5173) por el del backend (8000)
+    const backendUrl = origin.replace(/:\d+/, ':8000');
+    console.log('🚀 Configurando para Codespaces:', `${backendUrl}/api`);
+    return `${backendUrl}/api`;
+  }
+  
+  // Para desarrollo local, usar el proxy de Vite (URL relativa)
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    const backendUrl = '/api';
+    console.log('💻 Configurando para localhost con proxy de Vite:', backendUrl);
+    return backendUrl;
+  }
+  
+  // Para producción o otros entornos, usar una URL relativa
+  console.log('🌐 Configurando para producción:', '/api');
+  return '/api';
+};
+
 // Crear una instancia con configuración base
+const baseURL = getBaseURL();
+console.log('🔧 API configurada con baseURL:', baseURL);
+
 export const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -13,18 +43,21 @@ api.interceptors.request.use(
   config => {
     const token = localStorage.getItem('auth_token');
     
+    // DEBUG: Log every request being made
+    console.log('🌐 [API Request]', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: config.headers
+    });
+    
     // Siempre enviar el token si está disponible. 
     // El backend determinará si es necesario y si el usuario tiene los permisos adecuados.
     if (token) {
       config.headers.Authorization = `Token ${token}`;
     }
     
-    console.log('[API Request]', {
-      url: config.url,
-      method: config.method,
-      data: config.data,
-      params: config.params
-    });
     return config;
   },
   error => {

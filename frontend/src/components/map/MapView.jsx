@@ -17,17 +17,31 @@ import config from '../../config/environment';
 import { motion } from 'framer-motion';
 
 // Function to transform properties to GeoJSON
-const propertiesToGeoJSON = (properties) => ({
-  type: 'FeatureCollection',
-  features: properties.map(prop => ({
-    type: 'Feature',
-    properties: { ...prop }, // Keep all property data here
-    geometry: {
-      type: 'Point',
-      coordinates: [prop.longitude, prop.latitude]
-    }
-  }))
-});
+const propertiesToGeoJSON = (properties) => {
+  // Ensure properties is an array
+  const validProperties = Array.isArray(properties) ? properties : [];
+  
+  return {
+    type: 'FeatureCollection',
+    features: validProperties.map(prop => ({
+      type: 'Feature',
+      properties: { ...prop }, // Keep all property data here
+      geometry: {
+        type: 'Point',
+        coordinates: [prop.longitude, prop.latitude]
+      }
+    }))
+  };
+};
+
+// Helper function to ensure safe array operations
+const ensureArray = (value) => Array.isArray(value) ? value : [];
+
+// Helper function to safely access properties
+const safePropertiesAccess = (properties, callback) => {
+  const validProperties = ensureArray(properties);
+  return callback(validProperties);
+};
 
 const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad, disableIntroAnimation = false }, ref) => {
   const navigate = useNavigate();
@@ -219,9 +233,25 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
       // console.log("Parámetros finales para API:", params); // Debug log
       const data = await propertyService.getPaginatedProperties(pageToFetch, params);
       
-      setProperties(prev => pageToFetch === 1 ? data.results : [...prev, ...data.results]);
+      // Debug: verificar qué datos recibimos
+      console.log('Datos recibidos del API:', { pageToFetch, data, dataType: typeof data });
+      
+      // Verificar que data tenga la estructura esperada
+      if (!data || !Array.isArray(data.results)) {
+        console.error('Datos inválidos recibidos del API:', data);
+        throw new Error('Formato de datos inválido recibido del servidor');
+      }
+      
+      setProperties(prev => {
+        const prevArray = Array.isArray(prev) ? prev : [];
+        return pageToFetch === 1 ? data.results : [...prevArray, ...data.results];
+      });
       // Update GeoJSON with the potentially new set of properties
-      setPropertiesGeoJSON(currentProps => propertiesToGeoJSON(pageToFetch === 1 ? data.results : [...currentProps.features.map(f => f.properties), ...data.results]));
+      setPropertiesGeoJSON(currentProps => {
+        const existingProperties = currentProps?.features?.map(f => f.properties) || [];
+        const newProperties = pageToFetch === 1 ? data.results : [...existingProperties, ...data.results];
+        return propertiesToGeoJSON(newProperties);
+      });
 
       setTotalProperties(data.count);
       setCurrentPage(pageToFetch);
@@ -431,7 +461,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
 
     let flightPerformed = false;
     try {
-      if (properties.length > 0 && !userInteractedRef.current) {
+      if (Array.isArray(properties) && properties.length > 0 && !userInteractedRef.current) {
         const selectedProperties = [];
         const latRanges = [
           { min: -35, max: -30, name: "Centro" },
@@ -457,7 +487,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           }
         }
 
-        if (selectedProperties.length < 3 && properties.length > 0) {
+        if (selectedProperties.length < 3 && Array.isArray(properties) && properties.length > 0) {
           const shuffled = [...properties].sort(() => 0.5 - Math.random());
           for (let i = 0; i < Math.min(3, shuffled.length); i++) {
             const prop = shuffled[i];
