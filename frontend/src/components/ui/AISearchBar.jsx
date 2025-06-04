@@ -94,7 +94,7 @@ const PREDEFINED_LOCATIONS = {
   'india': { center: [78.9629, 20.5937], zoom: 5, name: 'India' },
 };
 
-const AISearchBar = ({ onSearch, onLocationSearch }) => {
+const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -144,13 +144,20 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
+    const searchTerm = query.trim(); // Using original case for query submission
+
+    if (onQuerySubmit) {
+      onQuerySubmit(searchTerm);
+    }
+
     setLoading(true);
     setError(null);
     setShowResults(false);
-    const searchTerm = query.trim().toLowerCase();
+    // Using toLowerCase() for internal logic like predefined locations matching
+    const searchTermLowerCase = searchTerm.toLowerCase();
 
     try {
-      const predefinedLocation = PREDEFINED_LOCATIONS[searchTerm];
+      const predefinedLocation = PREDEFINED_LOCATIONS[searchTermLowerCase];
       if (predefinedLocation) {
         if (onLocationSearch) {
           onLocationSearch({
@@ -163,8 +170,8 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
         setShowResults(true); setLoading(false); return;
       }
 
-      const geoResults = await searchLocation(searchTerm);
-      if (geoResults.length > 0 && !query.toLowerCase().includes('propiedades') && !query.toLowerCase().includes('terrenos')) {
+      const geoResults = await searchLocation(searchTermLowerCase);
+      if (geoResults.length > 0 && !searchTermLowerCase.includes('propiedades') && !searchTermLowerCase.includes('terrenos')) {
         const firstResult = geoResults[0];
         const center = firstResult.center;
         const placeName = firstResult.place_name || firstResult.text;
@@ -179,6 +186,7 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
         setShowResults(true); setLoading(false); return;
       }
 
+      // Use original searchTerm (with original casing) for AI search context
       const response = await api.post('ai-search/', { current_query: searchTerm, conversation_history: [] });
       if (response.data && typeof response.data === 'object') {
         const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation } = response.data;
@@ -188,11 +196,11 @@ const AISearchBar = ({ onSearch, onLocationSearch }) => {
           onLocationSearch({
             center: flyToLocation.center,
             zoom: flyToLocation.zoom || 12,
-            locationName: flyToLocation.name || searchTerm,
+            locationName: flyToLocation.name || searchTerm, // Use original searchTerm
             pitch: flyToLocation.pitch,
             bearing: flyToLocation.bearing,
           });
-          setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` });
+          setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` }); // Use original searchTerm
           setShowResults(true); setLoading(false); return;
         }
 

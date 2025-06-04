@@ -133,42 +133,82 @@ PROPIEDADES DISPONIBLES EN LA PLATAFORMA:
 
 INSTRUCCIONES:
 1. Analiza la consulta del usuario: "{user_query}"
-2. Identifica qué tipo de propiedad busca, rango de precio, características deseadas, etc.
-3. Busca en las propiedades disponibles las que mejor coincidan
-4. Proporciona recomendaciones específicas basadas en las propiedades reales
-5. Sugiere filtros apropiados para refinar la búsqueda
+2. Determina el tipo de consulta:
+    - Si la consulta es principalmente una ubicación (ej: "Villarrica", "terrenos en Santiago"), enfócate en devolver datos para `flyToLocation` (coordenadas, zoom apropiado) y establece `search_mode: "location"`.
+    - Si la consulta describe características de una propiedad (ej: "casa con vista al lago y bosque nativo"), enfócate en generar `suggestedFilters` y hasta 3 `recommendations` a partir del contexto de propiedades proporcionado. Establece `search_mode: "property_recommendation"`.
+3. Para `search_mode: "property_recommendation"`:
+    - Identifica qué tipo de propiedad busca, rango de precio, características deseadas, etc.
+    - Busca en las propiedades disponibles las que mejor coincidan.
+    - Proporciona recomendaciones específicas basadas en las propiedades reales.
+    - Sugiere filtros apropiados para refinar la búsqueda.
+4. Para `search_mode: "location"`:
+    - Intenta identificar coordenadas (longitud, latitud) y un nivel de zoom adecuado para la ubicación mencionada. `pitch` y `bearing` son opcionales pero buenos si se pueden inferir.
+    - No generes `suggestedFilters` ni `recommendations` si el modo es "location".
 
 FORMATO DE RESPUESTA (JSON):
 {{
-    "assistant_message": "Respuesta amigable al usuario explicando qué encontraste",
-    "suggestedFilters": {{
-        "propertyTypes": ["farm", "ranch", "forest", "lake"],
-        "priceRange": [min_precio, max_precio],
-        "features": ["hasWater", "hasViews"],
-        "sizeRange": [min_hectareas, max_hectareas]
+    "search_mode": "location" | "property_recommendation",
+    "assistant_message": "Respuesta amigable al usuario explicando tu acción o hallazgos.",
+    "flyToLocation": {{ // Poblar solo si search_mode es 'location'. Asegúrate que center sea [longitud, latitud]
+        "center": [-71.5, -33.0], // [longitud, latitud]
+        "zoom": 10,
+        "pitch": 0,  // Opcional, default 0
+        "bearing": 0 // Opcional, default 0
     }},
-    "recommendations": [
+    "suggestedFilters": {{ // Poblar solo si search_mode es 'property_recommendation'
+        "propertyTypes": ["farm", "ranch", "forest", "lake"],
+        "priceRange": [null, null], // [min_precio, max_precio] - usa null si no se especifica
+        "features": [], // ej: ["hasWater", "hasViews"]
+        "sizeRange": [null, null] // [min_hectareas, max_hectareas] - usa null si no se especifica
+    }},
+    "recommendations": [ // Poblar solo si search_mode es 'property_recommendation', máximo 3
         {{
-            "id": 1,
+            "id": 1, // ID de la propiedad real del contexto
             "name": "Nombre de la propiedad",
             "price": 120000,
             "size": 43.5,
-            "type": "farm",
-            "reason": "Por qué recomiendas esta propiedad"
+            "type": "farm", // Tipo de la propiedad real
+            "reason": "Por qué recomiendas esta propiedad, basado en la consulta y los datos de la propiedad."
         }}
     ],
-    "interpretation": "Resumen de lo que el usuario está buscando"
+    "interpretation": "Resumen de lo que el usuario está buscando o de la ubicación identificada."
 }}
 
-EJEMPLOS DE CONSULTAS Y RESPUESTAS:
-- "Busco una granja con agua" → Recomendar granjas con has_water=True
-- "Terreno barato" → Filtrar por precio bajo y recomendar las opciones más económicas
-- "Rancho grande" → Filtrar por type=ranch y size grande
-- "Propiedad con vistas" → Filtrar por has_views=True
+EJEMPLOS DE CONSULTAS Y RESPUESTAS ESPERADAS:
+- Usuario: "Busco una granja con agua cerca de Osorno"
+  Respuesta (property_recommendation):
+  {{
+      "search_mode": "property_recommendation",
+      "assistant_message": "Encontré algunas granjas con agua cerca de Osorno. Aquí tienes algunas opciones:",
+      "flyToLocation": null,
+      "suggestedFilters": {{"propertyTypes": ["farm"], "features": ["hasWater"], "priceRange": [null, null], "sizeRange": [null, null]}},
+      "recommendations": [ /* ...propiedades de ejemplo... */ ],
+      "interpretation": "El usuario busca una granja con agua, posiblemente cerca de Osorno."
+  }}
+- Usuario: "Muéstrame Villarrica"
+  Respuesta (location):
+  {{
+      "search_mode": "location",
+      "assistant_message": "Claro, llevándote a Villarrica.",
+      "flyToLocation": {{"center": [-72.2297, -39.2839], "zoom": 12, "pitch": 0, "bearing": 0}},
+      "suggestedFilters": null,
+      "recommendations": [],
+      "interpretation": "El usuario quiere ver la ubicación de Villarrica."
+  }}
+- Usuario: "Terrenos en la Patagonia con bosque nativo y buen precio"
+  Respuesta (property_recommendation):
+  {{
+      "search_mode": "property_recommendation",
+      "assistant_message": "Encontré estos terrenos en la Patagonia con bosque nativo que podrían interesarte:",
+      "flyToLocation": null,
+      "suggestedFilters": {{"features": ["hasForest"], "priceRange": [null, 100000] /* Asumiendo 'buen precio' como <100k */}},
+      "recommendations": [ /* ...propiedades de ejemplo... */ ],
+      "interpretation": "El usuario busca terrenos en la Patagonia con bosque nativo y un precio accesible."
+  }}
 
 Consulta del usuario: "{user_query}"
 
-Responde SOLO con el JSON, sin texto adicional.
+Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.center` sea `[longitud, latitud]`.
 """
         
         return prompt
@@ -223,32 +263,56 @@ Responde SOLO con el JSON, sin texto adicional.
                             # Intentar parsear como JSON
                             ai_response = json.loads(content)
                             
-                            # Buscar propiedades reales basadas en los filtros sugeridos
-                            if 'suggestedFilters' in ai_response:
-                                # Agregar texto de búsqueda para mejorar resultados
+                            # Asegurar que los campos básicos estén presentes
+                            ai_response.setdefault('search_mode', 'property_recommendation') # Default si Gemini no lo incluye
+                            ai_response.setdefault('flyToLocation', None)
+                            ai_response.setdefault('suggestedFilters', None)
+                            ai_response.setdefault('recommendations', [])
+                            ai_response.setdefault('assistant_message', "Tu búsqueda ha sido procesada.")
+                            ai_response.setdefault('interpretation', user_query)
+
+                            # Si el modo es "property_recommendation", buscar propiedades reales
+                            if ai_response['search_mode'] == 'property_recommendation' and ai_response.get('suggestedFilters'):
                                 search_filters = ai_response['suggestedFilters'].copy()
-                                search_filters['searchText'] = user_query
+                                # Considerar si 'searchText' debe ser parte del filtro o si la IA ya lo usó
+                                # search_filters['searchText'] = user_query
                                 
                                 real_properties = self._search_properties(search_filters)
                                 
-                                # Actualizar recomendaciones con propiedades reales
                                 if real_properties.exists():
                                     real_recommendations = []
+                                    # Usar las razones de la IA si existen y coinciden los IDs, sino generar una genérica
+                                    # Esto es complejo de mapear directamente si la IA inventa IDs.
+                                    # Por ahora, simplemente reemplazaremos las recomendaciones.
+
                                     for prop in real_properties:
                                         real_recommendations.append({
                                             'id': prop.id,
                                             'name': prop.name,
                                             'price': float(prop.price),
                                             'size': prop.size,
-                                            'type': prop.type,
+                                            'type': prop.get_type_display(), # Usar display name
                                             'has_water': prop.has_water,
                                             'has_views': prop.has_views,
                                             'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
-                                            'reason': f"Coincide con tu búsqueda de {user_query}"
+                                            'latitude': prop.latitude, # Ensure this is being added
+                                            'longitude': prop.longitude, # Ensure this is being added
+                                            # 'reason': "Coincide con los filtros sugeridos." # Podríamos mejorar esto. If AI gives a reason, we should try to use it.
                                         })
                                     
                                     ai_response['recommendations'] = real_recommendations
-                                    ai_response['assistant_message'] = f"Encontré {len(real_recommendations)} propiedades que coinciden con tu búsqueda. {ai_response.get('assistant_message', '')}"
+                                    # Actualizar mensaje del asistente si se encontraron propiedades
+                                    if not ai_response.get('assistant_message') or "Encontré" not in ai_response['assistant_message']:
+                                         ai_response['assistant_message'] = f"Encontré {len(real_recommendations)} propiedades que podrían interesarte. {ai_response.get('assistant_message', '')}".strip()
+
+                            elif ai_response['search_mode'] == 'location':
+                                # Para modo 'location', nos aseguramos que no haya recomendaciones de propiedades
+                                # y que flyToLocation esté presente (aunque el prompt ya lo pide)
+                                ai_response['recommendations'] = []
+                                ai_response['suggestedFilters'] = None # No se usan filtros de propiedad
+                                if not ai_response.get('flyToLocation'):
+                                    logger.warning("[GeminiService] search_mode es 'location' pero no se encontró flyToLocation en la respuesta de Gemini.")
+                                    # Podríamos intentar un geocoding aquí como fallback si fuera necesario
                             
                             return ai_response
                             
@@ -269,11 +333,16 @@ Responde SOLO con el JSON, sin texto adicional.
                                         'name': prop.name,
                                         'price': float(prop.price),
                                         'size': prop.size,
-                                        'type': prop.type,
+                                        'type': prop.get_type_display(), # Use display name for consistency
+                                        'latitude': prop.latitude, # Add latitude
+                                        'longitude': prop.longitude, # Add longitude
+                                        'has_water': prop.has_water, # Add has_water
+                                        'has_views': prop.has_views, # Add has_views
                                         'reason': f"Relacionada con: {user_query}"
                                     } for prop in real_properties[:5]
                                 ],
-                                'interpretation': f"Búsqueda procesada: {user_query}"
+                                'interpretation': f"Búsqueda procesada: {user_query}",
+                                'fallback': True # Ensure fallback flag is set for this path too
                             }
                             
                             return fallback_response
@@ -368,14 +437,18 @@ Responde SOLO con el JSON, sin texto adicional.
                 'name': prop.name,
                 'price': float(prop.price),
                 'size': prop.size,
-                'type': prop.type,
+                'type': prop.get_type_display(), # Use display name for consistency
+                'latitude': prop.latitude, # Add latitude
+                'longitude': prop.longitude, # Add longitude
                 'has_water': prop.has_water,
                 'has_views': prop.has_views,
                 'reason': f"Coincide con tu búsqueda: {user_query}"
             })
         
         return {
-            'assistant_message': f"Encontré {len(recommendations)} propiedades relacionadas con tu búsqueda. (Servicio de IA temporalmente no disponible)",
+            'search_mode': 'property_recommendation', # Fallback implies property recommendation
+            'assistant_message': f"Encontré {len(recommendations)} propiedades relacionadas con tu búsqueda. (Servicio de IA con funcionalidad limitada)",
+            'flyToLocation': None,
             'suggestedFilters': basic_filters,
             'recommendations': recommendations,
             'interpretation': f"Búsqueda procesada: {user_query}",
