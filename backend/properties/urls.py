@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    PropertyViewSet, TourViewSet, ImageViewSet,
+    PropertyViewSet, TourViewSet, ImageViewSet, AdminTourPackageViewSet, # Added AdminTourPackageViewSet
     admin_pending_properties, admin_approve_property, 
     admin_reject_property, admin_add_tour, admin_dashboard_stats
 )
@@ -9,8 +9,9 @@ from .views import (
 # Define router and register viewsets
 router = DefaultRouter()
 router.register(r'properties', PropertyViewSet)
-router.register(r'tours', TourViewSet)
+router.register(r'tours', TourViewSet) # General tours (like URL-based)
 router.register(r'images', ImageViewSet)
+router.register(r'admin/tour-packages', AdminTourPackageViewSet, basename='admin-tour-package') # New ViewSet for package uploads
 
 # Admin URLs for property workflow
 admin_urlpatterns = [

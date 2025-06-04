@@ -38,7 +38,9 @@ import { authService } from './services/api';
 import './App.css';
 import AdminPropertiesPage from './components/admin/AdminPropertiesPage';
 import AdminTicketsPage from './components/admin/AdminTicketsPage';
-import AdminUsersPage from './components/admin/AdminUsersPage';
+import AdminUsersPage from './components/admin/AdminUsersPage'; // Original generic AdminUsersPage
+import AdminUsersListPage from './components/admin/AdminUsersListPage'; // The new list page
+import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage'; // Import new page
 import AdminSettingsPage from './components/admin/AdminSettingsPage';
 
 export const ThemeModeContext = React.createContext({
@@ -649,10 +651,18 @@ function App() {
               }
             />
             <Route 
-              path="/admin-properties" 
+              path="/admin-properties" // This path might be for a different properties view or can be removed
               element={ 
                 <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                   <AdminPropertiesPage />
+                </motion.div>
+              }
+            />
+             <Route
+              path="/admin-detailed-properties-list" // New route for the detailed list
+              element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminDetailedPropertiesPage />
                 </motion.div>
               }
             />
@@ -665,10 +675,18 @@ function App() {
               }
             />
             <Route 
-              path="/admin-users" 
-              element={ 
+              path="/admin-users" // This might be a general user management page or can be removed if list is the main view
+              element={
                 <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                   <AdminUsersPage />
+                </motion.div>
+              }
+            />
+            <Route
+              path="/admin-users-list" // New route for the list page
+              element={ 
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminUsersListPage />
                 </motion.div>
               }
             />

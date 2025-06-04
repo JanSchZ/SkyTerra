@@ -17,9 +17,50 @@ class ImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'type', 'order', 'created_at']
 
 class TourSerializer(serializers.ModelSerializer):
+    # Renaming created_at to uploaded_at for clarity in the API response,
+    # as it represents the upload time for packages or creation time for other tour types.
+    uploaded_at = serializers.DateTimeField(source='created_at', read_only=True)
+
     class Meta:
         model = Tour
-        fields = ['id', 'url', 'type', 'created_at']
+        fields = [
+            'id',
+            'tour_id',
+            'name',
+            'description',
+            'url',
+            'package_path',
+            'type',
+            'property', # Property is useful to have here
+            'uploaded_at', # Renamed from created_at
+            'updated_at'
+        ]
+        read_only_fields = ['package_path', 'updated_at', 'uploaded_at']
+
+
+class AdminTourPackageCreateSerializer(serializers.ModelSerializer):
+    tour_zip = serializers.FileField(write_only=True)
+    # property_id = serializers.PrimaryKeyRelatedField(queryset=Property.objects.all(), source='property', write_only=True)
+    # tour_id is auto-generated in the view if not provided or can be optional here
+    # url is auto-generated in the view
+    # type is set to 'package' in the view
+
+    class Meta:
+        model = Tour
+        fields = [
+            'property', # Changed from property_id to allow DRF to handle relation
+            'tour_zip',
+            'tour_id', # Keep for admin specification
+            'name',
+            'description',
+            # 'url' and 'type' will be set in the view, not taken from direct input here.
+            # 'package_path' is also set in view.
+        ]
+        extra_kwargs = {
+            'tour_id': {'required': False, 'allow_null': True}, # Admin can optionally specify
+            'name': {'required': False, 'allow_blank': True},
+            'description': {'required': False, 'allow_blank': True},
+        }
 
 class PropertySerializer(serializers.ModelSerializer):
     images = ImageSerializer(many=True, read_only=True)

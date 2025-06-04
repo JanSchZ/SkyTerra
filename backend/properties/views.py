@@ -19,10 +19,14 @@ from rest_framework.pagination import PageNumberPagination
 from .models import Property, Tour, Image
 from .serializers import (
     PropertySerializer, PropertyListSerializer,
-    TourSerializer, ImageSerializer
+    TourSerializer, ImageSerializer, AdminTourPackageCreateSerializer
 )
 from .services import GeminiService, GeminiServiceError
 from .email_service import EmailService
+import os
+import zipfile
+import shutil
+import uuid # Already imported in models.py, but good to have here if used directly
 
 # Create your views here.
 logger = logging.getLogger(__name__)
@@ -41,7 +45,8 @@ class PropertyViewSet(viewsets.ModelViewSet):
     filterset_fields = ['price', 'size', 'has_water', 'has_views']
     # 'location_name' se eliminó porque no existe en el modelo
     search_fields = ['name', 'description']
-    ordering_fields = ['price', 'size', 'created_at']
+    ordering_fields = ['price', 'size', 'created_at', 'publication_status']
+    # permission_classes = [permissions.IsAuthenticatedOrReadOnly] # Example, adjust as needed
 
     def get_permissions(self):
         """
@@ -456,6 +461,273 @@ def admin_pending_properties(request):
         return Response({
             'error': 'Error interno del servidor'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminTourPackageViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Tour.objects.all().order_by('-created_at') # using created_at as per model
+
+    def get_serializer_class(self):
+        if self.action == 'create' or self.action == 'update': # update also uses create serializer for file upload
+            return AdminTourPackageCreateSerializer
+        return TourSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        property_instance = validated_data.get('property')
+        tour_zip_file = validated_data.get('tour_zip')
+        provided_tour_id = validated_data.get('tour_id') # Optional from serializer
+        tour_name = validated_data.get('name')
+        tour_description = validated_data.get('description')
+
+        if not tour_zip_file:
+            return Response({'error': 'Tour ZIP file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not tour_zip_file.name.endswith('.zip'):
+            return Response({'error': 'Invalid file type. Only ZIP files are allowed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate tour_id if not provided or if it's an empty string
+        generated_tour_id_str = str(provided_tour_id) if provided_tour_id else uuid.uuid4().hex
+
+        # Ensure property_instance is not None (it should be handled by serializer's validation if field is required)
+        if not property_instance:
+             return Response({'error': 'Property not found or not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        # Define paths
+        # property_id_str = str(property_instance.id)
+        # Using property_instance.pk which is the primary key value
+        base_tour_path = os.path.join('tours', str(property_instance.pk), generated_tour_id_str)
+        tour_extract_full_path = os.path.join(settings.MEDIA_ROOT, base_tour_path)
+
+        # Create directory
+        os.makedirs(tour_extract_full_path, exist_ok=True)
+
+        temp_zip_path = os.path.join(tour_extract_full_path, tour_zip_file.name)
+
+        try:
+            # Save uploaded zip file temporarily
+            with open(temp_zip_path, 'wb+') as temp_zip:
+                for chunk in tour_zip_file.chunks():
+                    temp_zip.write(chunk)
+
+            # Extract zip file
+            with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                zip_ref.extractall(tour_extract_full_path)
+
+            # Clean up the temporary zip file
+            os.remove(temp_zip_path)
+
+            # Find main HTML file (simple check for index.html or tour.html)
+            # This logic might need to be more robust (e.g., user specifies main file, or parse a manifest)
+            main_html_file = None
+            possible_main_files = ['index.html', 'tour.html'] # Add more common names if needed
+
+            # Check in root of extracted tour
+            for pf in possible_main_files:
+                if os.path.exists(os.path.join(tour_extract_full_path, pf)):
+                    main_html_file = pf
+                    break
+
+            # If not in root, check one level deeper (common for packages like Pano2VR)
+            if not main_html_file:
+                for root, dirs, files in os.walk(tour_extract_full_path):
+                    if main_html_file: break
+                    # Limit depth to one level from tour_extract_full_path
+                    if root == tour_extract_full_path or os.path.dirname(root) == tour_extract_full_path:
+                        for pf in possible_main_files:
+                            if pf in files:
+                                # Check if this file is in a subdirectory relative to tour_extract_full_path
+                                relative_dir = os.path.relpath(root, tour_extract_full_path)
+                                if relative_dir == '.': # root itself
+                                     main_html_file = pf
+                                else:
+                                     main_html_file = os.path.join(relative_dir, pf)
+                                break
+                    # Prune exploration beyond one level deep from the initial extraction path
+                    if os.path.dirname(root) != tour_extract_full_path and root != tour_extract_full_path :
+                        dirs[:] = [] # Stop descending further from this path
+
+
+            if not main_html_file:
+                shutil.rmtree(tour_extract_full_path) # Clean up if main file not found
+                return Response({'error': f'Main HTML file (e.g., index.html, tour.html) not found in ZIP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            package_path_for_model = os.path.join(base_tour_path, main_html_file).replace('\\', '/')
+
+            # Construct URL using MEDIA_URL
+            # Ensure no leading slash if MEDIA_URL already ends with one
+            if settings.MEDIA_URL.endswith('/'):
+                full_url_for_access = request.build_absolute_uri(f"{settings.MEDIA_URL}{package_path_for_model}")
+            else:
+                full_url_for_access = request.build_absolute_uri(f"{settings.MEDIA_URL}/{package_path_for_model}")
+
+
+            # Create Tour object
+            tour_data_for_creation = {
+                'property': property_instance.pk,
+                'tour_id': generated_tour_id_str,
+                'package_path': package_path_for_model,
+                'url': full_url_for_access,
+                'type': 'package',
+                'name': tour_name if tour_name else f"Tour for {property_instance.name}",
+                'description': tour_description
+            }
+
+            # Use TourSerializer for creating the instance, as AdminTourPackageCreateSerializer has 'tour_zip'
+            # which is not a model field.
+            # We need to ensure all required fields for Tour model are present.
+            # The AdminTourPackageCreateSerializer is for input validation and file handling.
+            # For saving, we map to model fields.
+
+            # Check if a tour with this tour_id already exists for this property
+            existing_tour = Tour.objects.filter(property=property_instance, tour_id=generated_tour_id_str).first()
+            if existing_tour:
+                # This is an update scenario for the files, but the request was a POST (create)
+                # For simplicity, let's reject if tour_id is provided and already exists on a POST.
+                # Proper update logic should be in PUT/PATCH.
+                if provided_tour_id: # If admin specified an ID that already exists
+                     shutil.rmtree(tour_extract_full_path) # Clean up newly extracted files
+                     return Response({'error': f'A tour with the specified tour_id {provided_tour_id} already exists for this property. Use update (PUT/PATCH) to modify.'}, status=status.HTTP_409_CONFLICT)
+                # If tour_id was generated and somehow clashed (highly unlikely with UUID4 hex)
+                # Or if no tour_id was provided, but we generated one that clashed (even more unlikely)
+                # Fallback: just in case, clean up and error
+                shutil.rmtree(tour_extract_full_path)
+                return Response({'error': 'Tour ID conflict or error generating unique ID.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            tour_instance = Tour.objects.create(
+                property=property_instance,
+                tour_id=generated_tour_id_str,
+                package_path=package_path_for_model,
+                url=full_url_for_access,
+                type='package',
+                name=tour_name if tour_name else f"Tour for {property_instance.name}",
+                description=tour_description
+            )
+
+            output_serializer = TourSerializer(tour_instance, context={'request': request})
+            return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+        except zipfile.BadZipFile:
+            shutil.rmtree(tour_extract_full_path, ignore_errors=True)
+            return Response({'error': 'Invalid ZIP file.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            shutil.rmtree(tour_extract_full_path, ignore_errors=True)
+            logger.error(f"Error creating tour package: {str(e)}", exc_info=True)
+            return Response({'error': f'Failed to create tour package: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=kwargs.pop('partial', False))
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        tour_zip_file = validated_data.get('tour_zip')
+
+        if tour_zip_file: # If a new zip file is uploaded
+            # Delete old package files
+            if instance.package_path:
+                old_package_base_dir = os.path.dirname(os.path.join(settings.MEDIA_ROOT, instance.package_path))
+                if os.path.exists(old_package_base_dir) and old_package_base_dir != settings.MEDIA_ROOT : # safety check
+                    shutil.rmtree(old_package_base_dir, ignore_errors=True)
+
+            # Process the new zip file (similar to create logic)
+            property_instance = instance.property
+            # tour_id remains the same for update
+            tour_id_str = str(instance.tour_id)
+
+            base_tour_path = os.path.join('tours', str(property_instance.pk), tour_id_str)
+            tour_extract_full_path = os.path.join(settings.MEDIA_ROOT, base_tour_path)
+            os.makedirs(tour_extract_full_path, exist_ok=True)
+            temp_zip_path = os.path.join(tour_extract_full_path, tour_zip_file.name)
+
+            try:
+                with open(temp_zip_path, 'wb+') as temp_zip:
+                    for chunk in tour_zip_file.chunks():
+                        temp_zip.write(chunk)
+                with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(tour_extract_full_path)
+                os.remove(temp_zip_path)
+
+                main_html_file = None
+                possible_main_files = ['index.html', 'tour.html']
+                for pf in possible_main_files:
+                    if os.path.exists(os.path.join(tour_extract_full_path, pf)):
+                        main_html_file = pf
+                        break
+                if not main_html_file: # Check one level deeper
+                    for root, dirs, files in os.walk(tour_extract_full_path):
+                        if main_html_file: break
+                        if root == tour_extract_full_path or os.path.dirname(root) == tour_extract_full_path:
+                            for pf in possible_main_files:
+                                if pf in files:
+                                    relative_dir = os.path.relpath(root, tour_extract_full_path)
+                                    main_html_file = os.path.join(relative_dir, pf) if relative_dir != '.' else pf
+                                    break
+                        if os.path.dirname(root) != tour_extract_full_path and root != tour_extract_full_path :
+                            dirs[:] = []
+
+
+                if not main_html_file:
+                    # Don't delete the new files yet, the old tour is still technically active
+                    return Response({'error': 'Main HTML file (e.g., index.html, tour.html) not found in new ZIP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+                instance.package_path = os.path.join(base_tour_path, main_html_file).replace('\\','/')
+
+                if settings.MEDIA_URL.endswith('/'):
+                     instance.url = request.build_absolute_uri(f"{settings.MEDIA_URL}{instance.package_path}")
+                else:
+                     instance.url = request.build_absolute_uri(f"{settings.MEDIA_URL}/{instance.package_path}")
+                instance.type = 'package' # Ensure type is package
+
+            except zipfile.BadZipFile:
+                return Response({'error': 'Invalid new ZIP file.'}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                logger.error(f"Error updating tour package files: {str(e)}", exc_info=True)
+                return Response({'error': f'Failed to update tour package files: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Save other potentially updated fields like name, description
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        # tour_id cannot be changed on update via this mechanism, property also cannot be changed.
+        instance.save()
+
+        output_serializer = TourSerializer(instance, context={'request': request})
+        return Response(output_serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.package_path:
+            # Derive the base directory of the tour package from its package_path
+            # e.g. if package_path is 'tours/prop_id/tour_id/index.html', base is 'tours/prop_id/tour_id'
+            package_full_path = os.path.join(settings.MEDIA_ROOT, instance.package_path)
+            package_base_dir = os.path.dirname(package_full_path) # Gets 'tours/prop_id/tour_id/
+
+            # A more robust way if main_html_file is nested:
+            # Path(instance.package_path).parts will give ('tours', 'prop_id', 'tour_id', ..., 'index.html')
+            # We want to delete the 'tour_id' directory.
+            # Example: package_path = 'tours/1/abc123def/data/index.html'
+            # We need to delete 'MEDIA_ROOT/tours/1/abc123def'
+
+            # Assuming package_path starts with 'tours/<property_pk>/<tour_id_str>/...'
+            path_parts = instance.package_path.replace('\\', '/').split('/')
+            if len(path_parts) >= 3 and path_parts[0] == 'tours':
+                # Construct path to 'tours/property_pk/tour_id_str' directory
+                tour_dir_to_delete = os.path.join(settings.MEDIA_ROOT, path_parts[0], path_parts[1], path_parts[2])
+                if os.path.exists(tour_dir_to_delete) and tour_dir_to_delete.startswith(os.path.join(settings.MEDIA_ROOT, 'tours')): # Safety check
+                    shutil.rmtree(tour_dir_to_delete, ignore_errors=True)
+                    logger.info(f"Deleted tour package directory: {tour_dir_to_delete}")
+                else:
+                    logger.warning(f"Tour package directory not found or path is suspicious, not deleting: {tour_dir_to_delete}")
+            else:
+                logger.warning(f"Tour package_path format unexpected, cannot reliably delete directory: {instance.package_path}")
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])

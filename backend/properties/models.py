@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -105,12 +106,17 @@ class Property(models.Model):
 
 class Tour(models.Model):
     property = models.ForeignKey(Property, related_name='tours', on_delete=models.CASCADE)
-    url = models.URLField()
-    type = models.CharField(max_length=50, choices=[('360', '360°'), ('video', 'Video'), ('other', 'Other')])
-    created_at = models.DateTimeField(auto_now_add=True)
+    tour_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    name = models.CharField(max_length=255, blank=True, null=True) # Added name as it's in serializer
+    description = models.TextField(blank=True, null=True) # Added description as it's in serializer
+    url = models.URLField(max_length=1024, blank=True, null=True) # Allow blank/null if package_path is used
+    package_path = models.CharField(max_length=512, blank=True, null=True)
+    type = models.CharField(max_length=50, choices=[('360', '360°'), ('video', 'Video'), ('package', 'Package'), ('other', 'Other')])
+    created_at = models.DateTimeField(auto_now_add=True) # Serves as uploaded_at for now
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Tour {self.type} for {self.property.name}"
+        return f"Tour {self.name or self.type} for {self.property.name} ({self.tour_id})"
 
 class Image(models.Model):
     property = models.ForeignKey(Property, related_name='images', on_delete=models.CASCADE)

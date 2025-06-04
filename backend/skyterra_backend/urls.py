@@ -28,7 +28,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from skyterra_backend.views_admin import AdminDashboardSummaryView
+from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView # Import AdminUserListView
 
 def home_view(request):
     """Vista simple para la página de inicio"""
@@ -189,6 +189,7 @@ urlpatterns = [
          auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), 
          name='password_reset_complete'),
     path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
+    path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'), # New URL for user list
     path('api/', include('properties.urls')),
 ]
 
