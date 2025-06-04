@@ -21,7 +21,7 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            tools:srcCompat="@drawable/ic_launcher_background" /> 
+            tools:srcCompat="@drawable/ic_launcher_background" />
             <!-- tools:srcCompat is for preview, Glide will load actual image -->
 
         <TextView
@@ -31,7 +31,7 @@
             android:layout_marginStart="16dp"
             android:layout_marginTop="12dp"
             android:layout_marginEnd="16dp"
-            android:textAppearance="?attr/textAppearanceHeadline6" 
+            android:textAppearance="?attr/textAppearanceHeadline6"
             android:textColor="?attr/colorOnSurface"
             tools:text="Beautiful Ranch Property"
             android:maxLines="2"
@@ -66,13 +66,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="16dp"
-            android:background="@drawable/tag_background" 
+            android:background="@drawable/tag_background"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
             android:paddingTop="4dp"
             android:paddingBottom="4dp"
             android:textAppearance="?attr/textAppearanceCaption"
-            android:textColor="?attr/colorSecondary" 
+            android:textColor="?attr/colorSecondary"
             tools:text="Ranch"
             app:layout_constraintTop_toBottomOf="@id/property_price"
             app:layout_constraintStart_toStartOf="@id/property_name"

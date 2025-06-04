@@ -44,7 +44,7 @@ class MapFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentMapBinding.inflate(inflater, container, false)
-        
+
         // Initialize Mapbox SDK.
         // Note: The Mapbox Access Token should be set in AndroidManifest.xml
         // Mapbox.getInstance(requireContext()) // This is for older SDK, v10+ auto-inits.
@@ -54,7 +54,7 @@ class MapFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        
+
         // Set initial camera position (e.g., a general overview)
         // This can be overridden by loaded data later
         binding.mapView.getMapboxMap().setCamera(
@@ -68,12 +68,12 @@ class MapFragment : Fragment() {
                 // Initialize annotation manager here, after style is loaded
                 val annotationApi = binding.mapView.annotations
                 pointAnnotationManager = annotationApi.createPointAnnotationManager()
-                
+
                 // Add click listener to the manager
                 pointAnnotationManager?.addClickListener(OnPointAnnotationClickListener { annotation: PointAnnotation ->
                     // Extract propertyId from annotation's data if stored
                     val propertyId = annotation.getData()?.asJsonObject?.get("property_id")?.asString
-                    
+
                     if (propertyId != null) {
                         val bundle = Bundle().apply {
                             putString("propertyId", propertyId)
@@ -134,12 +134,12 @@ class MapFragment : Fragment() {
                         .withPoint(Point.fromLngLat(property.longitude, property.latitude))
                         .withIconImage(iconBitmap)
                         .withData(data) // Add property ID here
-                    
+
                     manager.create(pointAnnotationOptions)
                 }
             }
         }
-        
+
         // Optionally, adjust camera to fit markers if it's the first load or data changes significantly
         // This can be complex; for now, manual navigation is assumed after initial load.
     }

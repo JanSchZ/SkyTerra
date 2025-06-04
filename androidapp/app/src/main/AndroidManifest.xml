@@ -16,7 +16,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SkyTerra" 
+        android:theme="@style/Theme.SkyTerra"
         tools:targetApi="31"
         android:usesCleartextTraffic="true">  <!-- Important for localhost development if not using HTTPS -->
 

@@ -24,7 +24,7 @@ class PropertyDetailFragment : Fragment() {
 
     private val viewModel: PropertyDetailViewModel by viewModels()
     // Assuming you'll pass propertyId via Navigation Component arguments
-    // private val args: PropertyDetailFragmentArgs by navArgs() 
+    // private val args: PropertyDetailFragmentArgs by navArgs()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -68,7 +68,7 @@ class PropertyDetailFragment : Fragment() {
         binding.propertyDetailSize.text = property.size?.let { "%.2f ha".format(it) } ?: "N/A"
         binding.propertyDetailTypeChip.text = property.type?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } ?: "N/A"
         binding.propertyDetailDescription.text = property.description.takeIf { !it.isNullOrBlank() } ?: "No description available."
-        
+
         binding.checkboxHasWater.isChecked = property.hasWater ?: false
         binding.checkboxHasViews.isChecked = property.hasViews ?: false
 
@@ -79,7 +79,7 @@ class PropertyDetailFragment : Fragment() {
         }
 
         binding.propertyDetailCreatedAt.text = "Listed: ${formatIsoDate(property.createdAt)}"
-        
+
         // Load image using Glide (first image for now)
         val imageUrl = property.images?.firstOrNull()?.url
         if (!imageUrl.isNullOrEmpty()) {
@@ -92,14 +92,14 @@ class PropertyDetailFragment : Fragment() {
             binding.propertyDetailImage.setImageResource(R.drawable.ic_launcher_background) // Default if no image
         }
     }
-    
+
     private fun formatIsoDate(isoDateString: String?): String {
         if (isoDateString.isNullOrEmpty()) return "N/A"
         return try {
             val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'", Locale.getDefault())
             inputFormat.timeZone = TimeZone.getTimeZone("UTC")
             val date = inputFormat.parse(isoDateString)
-            
+
             val outputFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
             outputFormat.timeZone = TimeZone.getDefault() // Convert to local timezone for display
             date?.let { outputFormat.format(it) } ?: "N/A"

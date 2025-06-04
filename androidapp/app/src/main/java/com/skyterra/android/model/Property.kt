@@ -13,7 +13,7 @@ data class Property(
     val latitude: Double?,
     val longitude: Double?,
     @SerializedName("boundary_polygon")
-    val boundaryPolygon: Any?, 
+    val boundaryPolygon: Any?,
     val description: String?, // Added for details
     @SerializedName("has_water")
     val hasWater: Boolean?,
@@ -29,9 +29,9 @@ data class Property(
     val updatedAt: String?, // Added for details
 
     // Fields from PropertyListSerializer (might be redundant if PropertySerializer has them too)
-    @SerializedName("image_count") 
+    @SerializedName("image_count")
     val imageCount: Int?,
-    @SerializedName("has_tour") 
+    @SerializedName("has_tour")
     val hasTour: Boolean?,
 
     // Detailed fields from PropertySerializer

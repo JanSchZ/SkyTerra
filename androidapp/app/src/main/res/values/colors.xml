@@ -5,7 +5,7 @@
     <color name="sky_primary_light">#7FBFFF</color> <!-- Web: primary.light -->
     <color name="sky_primary_dark">#005DB3</color> <!-- Web: primary.dark -->
     <color name="sky_secondary">#f6d55c</color> <!-- Web: secondary.main -->
-    
+
     <color name="sky_background">#0d1117</color> <!-- Web: background.default -->
     <color name="sky_surface">#161b22</color> <!-- Web: background.paper / cards -->
     <color name="sky_surface_variant">#30363d</color> <!-- Web: divider, MuiTextField border -->
@@ -20,7 +20,7 @@
     <color name="md_theme_onPrimary">@color/sky_text_on_primary</color>
     <color name="md_theme_primaryContainer">@color/sky_primary_dark</color> <!-- Or a lighter shade if needed for contrast -->
     <color name="md_theme_onPrimaryContainer">@color/sky_primary_light</color>
-    
+
     <color name="md_theme_secondary">@color/sky_secondary</color>
     <color name="md_theme_onSecondary">@color/sky_text_on_secondary</color>
     <color name="md_theme_secondaryContainer">#f6d55c</color> <!-- Adjust as needed -->
@@ -30,21 +30,21 @@
     <color name="md_theme_onTertiary">@color/sky_text_on_primary</color>
     <color name="md_theme_tertiaryContainer">#005DB3</color>
     <color name="md_theme_onTertiaryContainer">@color/sky_primary_light</color>
-    
+
     <color name="md_theme_error">#FFB4AB</color>
     <color name="md_theme_onError">#690005</color>
     <color name="md_theme_errorContainer">#93000A</color>
     <color name="md_theme_onErrorContainer">#FFDAD6</color>
-    
+
     <color name="md_theme_background">@color/sky_background</color>
     <color name="md_theme_onBackground">@color/sky_text_primary</color>
-    
+
     <color name="md_theme_surface">@color/sky_surface</color>
     <color name="md_theme_onSurface">@color/sky_text_primary</color>
-    
+
     <color name="md_theme_surfaceVariant">@color/sky_surface_variant</color>
     <color name="md_theme_onSurfaceVariant">@color/sky_text_secondary</color>
-    
+
     <color name="md_theme_outline">@color/sky_surface_variant</color> <!-- For borders, dividers -->
     <color name="md_theme_inverseSurface">@color/sky_text_primary</color>
     <color name="md_theme_inverseOnSurface">@color/sky_background</color>

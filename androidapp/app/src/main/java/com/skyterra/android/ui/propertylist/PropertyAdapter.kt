@@ -30,9 +30,9 @@ class PropertyAdapter(private val onClickListener: (Property) -> Unit) :
             binding.propertyName.text = property.name ?: "N/A"
             binding.propertyPrice.text = property.price?.let { "USD ${'$'}%.2f".format(it) } ?: "N/A"
             binding.propertySize.text = property.size?.let { "%.2f ha".format(it) } ?: "N/A"
-            
+
             // Placeholder for image - replace with actual image URL logic
-            // val imageUrl = property.images?.firstOrNull()?.url 
+            // val imageUrl = property.images?.firstOrNull()?.url
             // For now, using a placeholder if imageCount > 0
             if ((property.imageCount ?: 0) > 0) {
                 Glide.with(binding.propertyImage.context)
