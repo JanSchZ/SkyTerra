@@ -153,7 +153,7 @@ const AdminPublicationsPage = () => {
                         {prop.name}
                       </MuiLink>
                     </TableCell>
-                    <TableCell>{prop.owner_email || prop.owner_username || 'N/A'}</TableCell> {/* Asumiendo que tienes owner_email o username en el serializer */}
+                    <TableCell>{prop.owner_details?.email || prop.owner_details?.username || 'N/A'}</TableCell> {/* Asumiendo que tienes owner_email o username en el serializer */}
                     <TableCell>{prop.type}</TableCell>
                     <TableCell>${parseFloat(prop.price).toLocaleString('es-CL')}</TableCell>
                     <TableCell>{prop.size}</TableCell>
