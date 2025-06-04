@@ -40,6 +40,8 @@ if check_port 8000; then
 else
     echo "🔄 Iniciando backend Django..."
     cd backend
+    source .venv/Scripts/activate
+    python manage.py migrate
     python manage.py runserver 0.0.0.0:8000 > /tmp/backend.log 2>&1 &
     BACKEND_PID=$!
     echo "🆔 Backend PID: $BACKEND_PID"

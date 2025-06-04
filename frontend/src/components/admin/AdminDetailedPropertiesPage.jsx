@@ -145,6 +145,48 @@ const AdminDetailedPropertiesPage = () => {
         fetchProperties();
     }, [fetchProperties]);
 
+    // Polling automático cada 10 segundos para refrescar la lista, solo actualizando si hay cambios reales
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const params = {
+                page: page + 1,
+                page_size: rowsPerPage,
+                ordering: `${order === 'desc' ? '-' : ''}${orderBy}`,
+            };
+            axios.get('/api/properties/', {
+                params,
+                headers: { Authorization: `Token ${localStorage.getItem('auth_token')}` }
+            })
+            .then(res => {
+                const newProperties = res.data.results || [];
+                // Solo actualiza si hay cambios reales
+                const hasChanged =
+                    newProperties.length !== properties.length ||
+                    newProperties.some((newProp, idx) => {
+                        const oldProp = properties[idx];
+                        if (!oldProp) return true;
+                        // Compara campos clave
+                        return (
+                            newProp.id !== oldProp.id ||
+                            newProp.publication_status !== oldProp.publication_status ||
+                            newProp.name !== oldProp.name ||
+                            newProp.price !== oldProp.price ||
+                            newProp.size !== oldProp.size
+                        );
+                    });
+                if (hasChanged) {
+                    setProperties(newProperties);
+                    setTotalProperties(res.data.count || 0);
+                }
+            })
+            .catch(err => {
+                // No actualices el error visual si es polling
+                // Opcional: puedes mostrar un pequeño indicador si quieres
+            });
+        }, 10000); // 10 segundos
+        return () => clearInterval(interval);
+    }, [page, rowsPerPage, order, orderBy, properties]);
+
     const handleRequestSort = (event, property) => {
         const isAsc = orderBy === property && order === 'asc';
         setOrder(isAsc ? 'desc' : 'asc');
@@ -194,17 +236,45 @@ const AdminDetailedPropertiesPage = () => {
         handleCloseActionMenu();
     }
 
-    // Placeholder for approve/reject logic
-    const handleSetStatus = (status) => {
-        if(selectedProperty) {
-            console.log(`Setting status to ${status} for property ${selectedProperty.id}`);
-            // TODO: Implement API call to change status and refresh list
-            // Example: axios.post(`/api/properties/${selectedProperty.id}/set-status/`, { status }, headers)
-            // .then(() => fetchProperties())
-            // .catch(err => console.error("Error setting status", err));
+    const handleSetStatus = async (newStatus) => {
+        if (!selectedProperty) {
+            handleCloseActionMenu();
+            return;
+        }
+
+        // Use the set-status endpoint which handles all status changes
+        const endpoint = `/api/properties/${selectedProperty.id}/set-status/`;
+        const token = localStorage.getItem('auth_token');
+
+        try {
+            // Send the new status in the request body
+            await axios.post(endpoint, { status: newStatus }, { 
+                headers: {
+                    Authorization: `Token ${token}`
+                }
+            });
+
+            // Update local state
+            setProperties(prevProperties => 
+                prevProperties.map(prop => 
+                    prop.id === selectedProperty.id 
+                        ? { ...prop, publication_status: newStatus } 
+                        : prop
+                )
+            );
+            
+            setSnackbarMessage(`Property ${selectedProperty.id} status updated to ${newStatus}.`);
+            setSnackbarSeverity('success');
+            setSnackbarOpen(true);
+
+        } catch (err) {
+            console.error(`Error setting property status to ${newStatus}:`, err);
+            setSnackbarMessage(`Error updating property status: ${err.response?.data?.detail || err.message}`);
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
         }
         handleCloseActionMenu();
-    }
+    };
 
     const handleOpenTourModal = async () => {
         if (!selectedProperty) return;
@@ -488,8 +558,6 @@ const AdminDetailedPropertiesPage = () => {
 
                                 <TextField
                                     autoFocus={!existingTourDetails} // Autofocus only if creating new
-                            margin="dense"
-                                    margin="dense"
                                     id="tourName"
                                     label="Nombre del Tour"
                                     type="text"

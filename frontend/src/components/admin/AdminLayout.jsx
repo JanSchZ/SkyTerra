@@ -23,9 +23,9 @@ const AdminLayout = () => {
   const location = useLocation();
 
   const drawer = (
-    <Box sx={{ overflow: 'auto', backgroundColor: '#182534', height: '100%', color: '#E5E8F0' }}>
+    <Box sx={{ overflow: 'auto', backgroundColor: '#101923', height: '100%', color: '#E5E8F0' }}>
       <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2, backgroundColor: '#101923' }}>
-        <Typography variant="h5" component="div" sx={{ color: '#E5E8F0', fontFamily: 'Code Pro, sans-serif', fontWeight: 'bold' }}>
+        <Typography variant="h5" component="div" sx={{ color: '#E5E8F0', fontWeight: 'bold' }}>
           SKYTERRA
         </Typography>
       </Toolbar>
@@ -54,7 +54,7 @@ const AdminLayout = () => {
               <ListItemIcon sx={{ color: '#8faacc' }}>
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text} primaryTypographyProps={{ fontFamily: 'Clear Sans, sans-serif' }} />
+              <ListItemText primary={item.text} primaryTypographyProps={{ }} />
             </ListItemButton>
           </ListItem>
         ))}
@@ -65,29 +65,30 @@ const AdminLayout = () => {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: `calc(100% - ${drawerWidth}px)`,
-          ml: `${drawerWidth}px`,
-          backgroundColor: '#101923',
-          boxShadow: 'none',
-          borderBottom: '1px solid rgba(143, 170, 204, 0.2)'
-        }}
-      >
-        <Toolbar>
-          <Typography variant="h6" noWrap component="div" sx={{ fontFamily: 'Code Pro, sans-serif', color: '#E5E8F0'}}>
-            Panel de Administración
-          </Typography>
-          {/* Aquí podrían ir más elementos como búsqueda, perfil de usuario admin */}
-        </Toolbar>
-      </AppBar>
+      {false && (
+          <AppBar
+            position="fixed"
+            sx={{
+              width: `calc(100% - ${drawerWidth}px)`,
+              ml: `${drawerWidth}px`,
+              backgroundColor: '#101923',
+              boxShadow: 'none'
+            }}
+          >
+            <Toolbar>
+              <Typography variant="h6" noWrap component="div" sx={{ fontFamily: 'Code Pro, sans-serif', color: '#E5E8F0'}}>
+                Panel de Administración
+              </Typography>
+              {/* Aquí podrían ir más elementos como búsqueda, perfil de usuario admin */}
+            </Toolbar>
+          </AppBar>
+      )}
       <Drawer
         variant="permanent"
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', backgroundColor: '#182534', borderRight: 'none' },
+          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', backgroundColor: '#101923', borderRight: 'none' },
         }}
       >
         {drawer}
@@ -98,10 +99,14 @@ const AdminLayout = () => {
           flexGrow: 1, 
           bgcolor: '#101923',
           p: 3, 
-          width: `calc(100% - ${drawerWidth}px)` 
+          width: `calc(100% - ${drawerWidth}px)`,
+          // If the AppBar is removed, the main content might need explicit margin/padding top
+          // to not be obscured if there was any content in a non-fixed AppBar replacement.
+          // Since we fully removed it, the existing Toolbar spacer should still work.
+          // Consider adjusting if content is too high or too low.
         }}
       >
-        <Toolbar />
+        <Toolbar /> {/* This Toolbar acts as a spacer for the removed fixed AppBar. Review if still needed or if p:3 is enough */} 
         <Outlet />
       </Box>
     </Box>
