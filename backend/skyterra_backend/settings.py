@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'corsheaders',  # Para manejar CORS con el frontend
     'django_filters',  # Añadimos django-filter
     'properties',   # Nuestra app principal
+    'support_tickets', # Nueva app para tickets de soporte
 ]
 
 AUTHENTICATION_BACKENDS = [
@@ -70,6 +71,9 @@ GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY', '')
 
 # Configuración de CORS
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Frontend URL for email links
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 ROOT_URLCONF = 'skyterra_backend.urls'
 

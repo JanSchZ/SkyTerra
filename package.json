@@ -4,6 +4,7 @@
     "@mui/icons-material": "^7.1.0",
     "@turf/turf": "^7.2.0",
     "axios": "^1.9.0",
+    "chart.js": "^4.4.9",
     "framer-motion": "^12.12.1",
     "mapbox-gl": "^3.12.0",
     "react-map-gl": "^8.0.4",

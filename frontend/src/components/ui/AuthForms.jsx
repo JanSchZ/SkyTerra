@@ -112,8 +112,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
             )
           }}
         />
-        
-        <Button
+          <Button
           type="submit"
           variant="contained"
           fullWidth
@@ -130,6 +129,27 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
         >
           {loading ? 'Iniciando...' : 'Iniciar Sesión'}
         </Button>
+        
+        <Box sx={{ textAlign: 'center', mb: 2 }}>
+          <Typography 
+            variant="body2" 
+            component="a" 
+            href="/password-reset"
+            sx={{ 
+              color: '#58a6ff', 
+              textDecoration: 'none',
+              fontWeight: 300,
+              fontSize: '0.875rem',
+              '&:hover': { 
+                textDecoration: 'underline',
+                color: '#4a90e2'
+              }
+            }}
+          >
+            ¿Olvidaste tu contraseña?
+          </Typography>
+        </Box>
+        
         <Divider sx={{ my: 2, borderColor: 'rgba(88, 166, 255, 0.1)' }} />
         <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
           ¿No tienes una cuenta?

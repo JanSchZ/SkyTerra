@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, filters, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Exists, OuterRef
@@ -22,6 +22,7 @@ from .serializers import (
     TourSerializer, ImageSerializer
 )
 from .services import GeminiService, GeminiServiceError
+from .email_service import EmailService
 
 # Create your views here.
 logger = logging.getLogger(__name__)
@@ -117,32 +118,15 @@ class PropertyViewSet(viewsets.ModelViewSet):
             logger.info(f"Datos recibidos: {serializer.validated_data}")
             
             property_instance = serializer.save(owner=self.request.user, publication_status='pending')
-            logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}, Estado: {property_instance.publication_status}")
-
-            # Enviar email de notificación si la propiedad está pendiente de revisión
+            logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}, Estado: {property_instance.publication_status}")            # Enviar email de notificación si la propiedad está pendiente de revisión
             if property_instance.publication_status == 'pending':
                 try:
-                    subject = f"Nueva Propiedad Enviada para Revisión: {property_instance.name}"
-                    message_body = f"""
-                    Una nueva propiedad ha sido enviada para revisión:
-
-                    Nombre: {property_instance.name}
-                    Tipo: {property_instance.get_type_display()}
-                    Precio: {property_instance.price}
-                    Tamaño: {property_instance.size} ha
-                    Enviada por: {self.request.user.username} (ID: {self.request.user.id})
-                    
-                    ID de Propiedad: {property_instance.id}
-
-                    Por favor, revísala en el panel de administración. 
-                    (Enlace al detalle en API: /api/properties/{property_instance.id}/ ) 
-                    """
-                    # Asegúrate que DEFAULT_FROM_EMAIL está configurado en settings.py
-                    from_email = settings.DEFAULT_FROM_EMAIL
-                    recipient_list = ['skyedits.cl@gmail.com'] 
-                    
-                    send_mail(subject, message_body, from_email, recipient_list, fail_silently=False)
-                    logger.info(f"Email de notificación enviado a {recipient_list} para propiedad ID: {property_instance.id}")
+                    from .email_service import EmailService
+                    email_sent = EmailService.send_property_submitted_notification(property_instance)
+                    if email_sent:
+                        logger.info(f"Email de notificación enviado exitosamente para propiedad ID: {property_instance.id}")
+                    else:
+                        logger.warning(f"No se pudo enviar email de notificación para propiedad ID: {property_instance.id}")
                 except Exception as email_error:
                     logger.error(f"Error al enviar email de notificación para propiedad ID: {property_instance.id}: {str(email_error)}", exc_info=True)
                     # No relanzar el error para no impedir la creación de la propiedad, solo loggearlo.
@@ -432,8 +416,7 @@ class AISearchView(APIView):
                     },
                     'recommendations': [],
                     'interpretation': current_query,
-                    'error': 'Error interno del servidor'
-                }
+                    'error': 'Error interno del servidor'                }
                 
                 return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -447,3 +430,163 @@ class AISearchView(APIView):
     def get(self, request, *args, **kwargs):
         print("--- AISearchView GET method reached (use POST for AI search) ---")
         return Response({"message": "Use POST for AI search. Include 'current_query' and 'conversation_history'."}, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# ADMIN WORKFLOW VIEWS - Sistema de Aprobación de Propiedades
+# ============================================================================
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def admin_pending_properties(request):
+    """Lista todas las propiedades pendientes de aprobación"""
+    try:
+        pending_properties = Property.objects.filter(
+            publication_status='pending'
+        ).order_by('-created_at')
+        
+        serializer = PropertyListSerializer(pending_properties, many=True)
+        
+        return Response({
+            'count': pending_properties.count(),
+            'properties': serializer.data
+        })
+    except Exception as e:
+        logger.error(f"Error obteniendo propiedades pendientes: {str(e)}")
+        return Response({
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def admin_approve_property(request, property_id):
+    """Aprueba una propiedad y envía notificación al propietario"""
+    try:
+        property_obj = Property.objects.get(id=property_id)
+        
+        if property_obj.publication_status != 'pending':
+            return Response({
+                'error': 'Esta propiedad ya ha sido procesada'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Aprobar la propiedad
+        property_obj.publication_status = 'approved'
+        property_obj.save()
+        
+        # Enviar notificación por email
+        email_sent = EmailService.send_property_approval_notification(
+            property_obj, approved=True
+        )
+        
+        return Response({
+            'message': 'Propiedad aprobada exitosamente',
+            'property_id': property_id,
+            'email_sent': email_sent
+        })
+        
+    except Property.DoesNotExist:
+        return Response({
+            'error': 'Propiedad no encontrada'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error aprobando propiedad {property_id}: {str(e)}")
+        return Response({
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def admin_reject_property(request, property_id):
+    """Rechaza una propiedad y envía notificación al propietario"""
+    try:
+        property_obj = Property.objects.get(id=property_id)
+        
+        if property_obj.publication_status != 'pending':
+            return Response({
+                'error': 'Esta propiedad ya ha sido procesada'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Rechazar la propiedad
+        property_obj.publication_status = 'rejected'
+        property_obj.save()
+        
+        # Enviar notificación por email
+        email_sent = EmailService.send_property_approval_notification(
+            property_obj, approved=False
+        )
+        
+        return Response({
+            'message': 'Propiedad rechazada',
+            'property_id': property_id,
+            'email_sent': email_sent
+        })
+        
+    except Property.DoesNotExist:
+        return Response({
+            'error': 'Propiedad no encontrada'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error rechazando propiedad {property_id}: {str(e)}")
+        return Response({
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def admin_add_tour(request, property_id):
+    """Añade un tour virtual a una propiedad"""
+    try:
+        property_obj = Property.objects.get(id=property_id)
+        
+        tour_url = request.data.get('url')
+        tour_type = request.data.get('type', '360')
+        
+        if not tour_url:
+            return Response({
+                'error': 'URL del tour es requerida'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Crear el tour
+        tour = Tour.objects.create(
+            property=property_obj,
+            url=tour_url,
+            type=tour_type
+        )
+        
+        serializer = TourSerializer(tour)
+        
+        return Response({
+            'message': 'Tour añadido exitosamente',
+            'tour': serializer.data
+        }, status=status.HTTP_201_CREATED)
+        
+    except Property.DoesNotExist:
+        return Response({
+            'error': 'Propiedad no encontrada'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error añadiendo tour a propiedad {property_id}: {str(e)}")
+        return Response({
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def admin_dashboard_stats(request):
+    """Estadísticas para el dashboard de administración"""
+    try:
+        stats = {
+            'pending_properties': Property.objects.filter(publication_status='pending').count(),
+            'approved_properties': Property.objects.filter(publication_status='approved').count(),
+            'rejected_properties': Property.objects.filter(publication_status='rejected').count(),
+            'total_properties': Property.objects.count(),
+            'properties_with_tours': Property.objects.filter(tours__isnull=False).distinct().count(),
+        }
+        
+        return Response(stats)
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas del dashboard: {str(e)}")
+        return Response({
+            'error': 'Error interno del servidor'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

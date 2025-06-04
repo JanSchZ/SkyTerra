@@ -194,9 +194,13 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     } else {
       setLoadingMore(true);
     }
-    setError(null);
-    try {
+    setError(null);    try {
       let params = { ...currentFilters };
+
+      // Always filter to show only approved properties in the public map
+      if (!editable) {
+        params.publication_status = 'approved';
+      }
 
       if (aiFilters && Object.keys(aiFilters).length > 0) {
         // console.log("Aplicando filtros AI:", aiFilters); // Debug log

@@ -28,6 +28,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+from skyterra_backend.views_admin import AdminDashboardSummaryView
 
 def home_view(request):
     """Vista simple para la página de inicio"""
@@ -74,6 +75,8 @@ def login_view(request):
                 'email': user.email,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser
             }
         })
     else:
@@ -85,7 +88,7 @@ def login_view(request):
 @permission_classes([AllowAny])
 def register_view(request):
     """Vista para registrar usuario"""
-    print(f"🔄 Intento de registro con datos: {request.data}")
+    print(f"🔄 [REGISTER] Intento de registro con datos: {request.data}")
     
     email = request.data.get('email')
     username = request.data.get('username')
@@ -94,11 +97,13 @@ def register_view(request):
     # Validación de campos requeridos
     if not email or not username or not password:
         error_msg = 'Email, username y contraseña son requeridos'
-        print(f"❌ Campos faltantes: {error_msg}")
+        print(f"❌ [REGISTER] Campos faltantes: {error_msg}")
         return Response({
             'error': error_msg
         }, status=status.HTTP_400_BAD_REQUEST)
     
+    print(f"✅ [REGISTER] Campos requeridos presentes: email={email}, username={username}, password_length={len(password) if password else 0}")
+
     # Validación del formato del email
     import re
     email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -124,22 +129,27 @@ def register_view(request):
     
     # Verificar si el usuario ya existe por username
     if User.objects.filter(username=username).exists():
-        print(f"❌ Username ya existe: {username}")
+        print(f"❌ [REGISTER] Username ya existe: {username}")
         return Response({
             'error': 'Ya existe un usuario con este nombre de usuario'
         }, status=status.HTTP_400_BAD_REQUEST)
     
     # Crear usuario
     try:
-        print(f"✅ Creando usuario: {username} ({email})")
+        print(f"✅ [REGISTER] Creando usuario: {username} ({email})")
         user = User.objects.create_user(
             username=username,
             email=email,
             password=password
         )
+        user.is_staff = False # Explicitly set is_staff to False
+        user.is_superuser = False # Explicitly set is_superuser to False
+        user.save()
+        print(f"✅ [REGISTER] Usuario creado en base de datos: ID={user.id}, is_staff={user.is_staff}, is_superuser={user.is_superuser}")
+
         token, created = Token.objects.get_or_create(user=user)
         
-        print(f"✅ Usuario creado exitosamente: ID={user.id}, Token={'creado' if created else 'existente'}")
+        print(f"✅ [REGISTER] Usuario creado exitosamente: ID={user.id}, Token={'creado' if created else 'existente'}")
         
         return Response({
             'token': token.key,
@@ -149,10 +159,12 @@ def register_view(request):
                 'email': user.email,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
+                'is_staff': user.is_staff,
+                'is_superuser': user.is_superuser
             }
         }, status=status.HTTP_201_CREATED)
     except Exception as e:
-        print(f"❌ Error al crear usuario: {str(e)}")
+        print(f"❌ [REGISTER] Error al crear usuario: {str(e)}")
         return Response({
             'error': f'Error al crear usuario: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -176,6 +188,7 @@ urlpatterns = [
     path('api/auth/reset/done/', 
          auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), 
          name='password_reset_complete'),
+    path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
     path('api/', include('properties.urls')),
 ]
 

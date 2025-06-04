@@ -31,8 +31,15 @@ import AISearchBar from './components/ui/AISearchBar';
 import CreateProperty from './components/property/CreateProperty';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import AdminPublicationsPage from './components/admin/AdminPublicationsPage';
+import AdminDashboardPage from './components/admin/AdminDashboardPage';
+import AdminLayout from './components/admin/AdminLayout';
+import { PasswordResetRequest, PasswordResetConfirm } from './components/auth/PasswordReset';
 import { authService } from './services/api';
 import './App.css';
+import AdminPropertiesPage from './components/admin/AdminPropertiesPage';
+import AdminTicketsPage from './components/admin/AdminTicketsPage';
+import AdminUsersPage from './components/admin/AdminUsersPage';
+import AdminSettingsPage from './components/admin/AdminSettingsPage';
 
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
@@ -256,7 +263,13 @@ function App() {
       setSnackbarMessage('¡Inicio de sesión exitoso! Bienvenido.');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
-      navigate('/');
+
+      // Check if the logged-in user is staff/admin
+      if (userData.user && userData.user.is_staff) {
+        navigate('/admin-dashboard'); // Redirect admins to a new admin dashboard route
+      } else {
+        navigate('/'); // Redirect regular users to the home page
+      }
     } catch (error) {
       console.error("Login failed:", error);
       setSnackbarMessage(error.message || 'Error al iniciar sesión. Inténtalo de nuevo.');
@@ -481,16 +494,42 @@ function App() {
                     anchorEl={userMenuAnchorEl}
                     open={Boolean(userMenuAnchorEl)}
                     onClose={handleUserMenuClose}
-                    MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d' } }}
+                    MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d', py: 1 } }}
+                    PaperProps={{
+                      sx: {
+                        mt: 1.5,
+                        '& .MuiAvatar-root': {
+                          width: 32,
+                          height: 32,
+                          ml: -0.5,
+                          mr: 1,
+                        },
+                      },
+                    }}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                   >
-                    <MenuItem onClick={() => { navigate('/dashboard'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Dashboard</MenuItem>
-                    <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
-                    {user && user.is_staff && (
-                      <MenuItem onClick={() => { navigate('/admin/publications'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>
-                        Panel de Admin
-                      </MenuItem>
+                    {user && (
+                      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'medium', color: '#e5e8f0' }}>
+                          {user.username || 'Usuario'}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                          {user.email || 'No email'}
+                        </Typography>
+                      </Box>
                     )}
-                    <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Logout</MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        navigate(user && user.is_staff ? '/admin-dashboard' : '/dashboard');
+                        handleUserMenuClose();
+                      }}
+                      sx={{ color: '#c9d1d9', pt: user ? 1.5 : 0.5 }}
+                    >
+                      Dashboard
+                    </MenuItem>
+                    <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
+                    <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9', borderTop: user ? '1px solid rgba(255,255,255,0.1)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
                   </Menu>
                 </>
               ) : (
@@ -553,10 +592,19 @@ function App() {
             <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
               <AuthPage formType="login" onLogin={handleLogin} />
             </motion.div>
-          } />
-          <Route path="/register" element={
+          } />          <Route path="/register" element={
             <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
               <AuthPage formType="register" onRegister={handleRegister} />
+            </motion.div>
+          } />
+          <Route path="/password-reset" element={
+            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+              <PasswordResetRequest />
+            </motion.div>
+          } />
+          <Route path="/password-reset-confirm" element={
+            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+              <PasswordResetConfirm />
             </motion.div>
           } />
           <Route
@@ -589,6 +637,48 @@ function App() {
             path="/admin/publications"
             element={<AdminProtectedRoute element={<AdminPublicationsPage />} />} 
           />
+          <Route element={<AdminProtectedRoute element={<AdminLayout />} />}>
+            <Route 
+              path="/admin-dashboard" 
+              element={ 
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminDashboardPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-properties" 
+              element={ 
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminPropertiesPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-tickets" 
+              element={ 
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminTicketsPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-users" 
+              element={ 
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminUsersPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-settings" 
+              element={ 
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminSettingsPage />
+                </motion.div>
+              }
+            />
+          </Route>
           <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
         </Routes>
       </AnimatePresence>

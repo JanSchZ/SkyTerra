@@ -2,34 +2,60 @@
 
 **NOTA PARA EL USUARIO/DESARROLLADOR:** Por favor, actualiza este archivo a medida que se completan las tareas o surgen nuevos problemas. Esto ayudará a mantener un seguimiento claro del progreso y facilitará la colaboración, incluso si trabajas con diferentes asistentes de IA o en diferentes sesiones. Marca las tareas completadas con `[COMPLETADO]` o `[RESUELTO]`.
 
-**Fecha de Última Actualización:** 2025-05-29 (Refleja nuevo plan estratégico)
+**Fecha de Última Actualización:** 2025-06-03 (Actualización crítica: Workflow de Aprobación de Propiedades)
 
 ### **PLAN DE IMPLEMENTACIÓN GLOBAL AJUSTADO**
 
 **Principios Guía:**
-1.  Estabilidad y Seguridad PRIMERO.
-2.  Funcionalidad Core para el MVP (Producto Mínimo Viable) y Experiencia IA Central después.
-3.  Mejoras UX incrementales y continuas.
-4.  Expansión a largo plazo (móvil, internacionalización).
+1.  Workflow de Aprobación de Propiedades (PRIORIDAD CRÍTICA).
+2.  Estabilidad y Seguridad.
+3.  Funcionalidad Core para el MVP (Producto Mínimo Viable).
+4.  Mejoras UX incrementales y continuas.
+5.  Expansión a largo plazo (móvil, internacionalización).
 
 ---
 
-**Fase 0: Estabilización Inmediata (Urgente)**
-*   **Objetivo:** Asegurar una base técnica sólida y resolver problemas críticos antes de añadir nuevas funcionalidades mayores.
+**Fase 0: Workflow Crítico de Aprobación de Propiedades (URGENTE - MÁXIMA PRIORIDAD)**
+*   **Objetivo:** Implementar el workflow completo desde la subida de propiedades hasta su publicación con tours virtuales.
 *   **Tareas:**
-    1.  **[PENDIENTE]** 🔒 Migrar `MAPBOX_TOKEN` de `frontend/src/components/map/MapView.jsx` (y cualquier otra instancia) a variables de entorno (ej. `REACT_APP_MAPBOX_TOKEN` en un archivo `.env`).
-        *   **Acción:** Requiere acción manual del usuario para crear/actualizar su `.env`.
-    2.  **[EN PROGRESO]** 🛠 Completar migración MUI Grid v2.
-        *   **Subtarea:** **[PENDIENTE - BLOQUEADO]** `Dashboard.jsx` (Bloqueado por limitación de herramienta de lectura de archivos para realizar una revisión completa y segura. Se intentará con ediciones directas si el uso es simple).
-        *   **Subtarea:** **[PENDIENTE]** Revisión general de otros componentes que pudieran seguir usando Grid v1.
-    3.  **[PENDIENTE - NO PRIORITARIO]** 🐛 Solucionar error "Maximum update depth exceeded" en `frontend/src/components/map/MapView.jsx`.
-        *   **Contexto:** Persiste a pesar de intentos previos. Se pospone su resolución hasta nuevo aviso.
-    4.  **[RESUELTO]** 픽스 Visualización edificios 3D oscuros en Mapbox (si aún es problema tras ajustes previos en `MapView.jsx`).
-        *   **Acción:** El problema fue solucionado y no requiere más acción.
+   
+    1.  **[PARCIALMENTE COMPLETADO]** 🔐 **Sistema de Autenticación Mejorado:**
+        *   **Subtarea:** **[COMPLETADO]** Custom authentication backend para login con username/email.
+        *   **Subtarea:** **[PENDIENTE]** Sistema de recuperación de contraseña por email.
+        *   **Subtarea:** **[PENDIENTE]** Actualizar frontend para usar login_identifier en lugar de email.
+    
+    2.  **[PENDIENTE]** 📧 **Sistema de Notificaciones por Email:**
+        *   **Subtarea (Backend):** Implementar envío de emails para:
+            - Notificación al admin cuando se sube una nueva propiedad
+            - Notificación al cliente cuando su propiedad es aprobada/rechazada
+        *   **Subtarea (Frontend):** Configurar templates de email profesionales.
+    
+    3.  **[PENDIENTE]** 👤 **Panel de Administración Avanzado:**
+        *   **Subtarea (Backend):** 
+            - Endpoints para listar propiedades pendientes de aprobación
+            - Endpoint para aprobar/rechazar propiedades
+            - Endpoint para añadir tours virtuales a propiedades aprobadas
+        *   **Subtarea (Frontend):**
+            - Vista de administración con lista de propiedades pendientes
+            - Formulario para añadir tour virtual (URL 360°)
+            - Botones de aprobar/rechazar con confirmación
+    
+    4.  **[PENDIENTE]** 🗺️ **Integración Mapa con Tours 360°:**
+        *   **Subtarea (Frontend):**
+            - Mostrar solo propiedades aprobadas en el mapa
+            - Ventana flotante con datos de propiedad (sin tapar tour)
+            - Integración del tour 360° en popup/modal
+            - Diseño responsive para diferentes tamaños de pantalla
+    
+    5.  **[PENDIENTE]** 🏠 **Estados de Publicación Mejorados:**
+        *   **Subtarea (Backend):** Validar que el modelo Property ya tiene publication_status (✓ VERIFICADO)
+        *   **Subtarea (Frontend):** 
+            - Dashboard de usuario muestra estado de sus propiedades
+            - Indicadores visuales claros (pending/approved/rejected)
 
 ---
 
-**Fase 1: Núcleo de Negocio y Experiencia IA Central (Máxima Prioridad)**
+**Fase 1: Estabilización Post-Workflow (Alta Prioridad)**
 *   **Objetivo:** Implementar las funcionalidades centrales que definen la propuesta de valor de SkyTerra, con un fuerte énfasis en la búsqueda inteligente y la versatilidad del listado de propiedades.
 *   **Tareas:**
     1.  **[PENDIENTE]** 🧠 **IA Search Bar - Experiencia Central (Alcance Extendido):**
@@ -160,3 +186,37 @@
         - Usuarios creados exitosamente (IDs 5, 6 durante testing)
     * **Estado:** Completamente funcional
     * **Próximos pasos:** Continuar con testing de flujo completo registro → login → dashboard
+
+---
+
+**[2025-06-03] AVANCE Y SIGUIENTES PASOS CRÍTICOS - PANEL DE ADMIN SKYTERRA**
+
+[COMPLETADO]
+- Redirección automática de admins a /admin-dashboard tras login.
+- Layout base de panel admin con sidebar y topbar, colores y fuentes ajustados según feedback.
+- Eliminada navegación accidental al mapa desde el panel admin.
+
+[PENDIENTE - CRÍTICO]
+1. **Navegación Admin Fluida:**
+   - [ ] Crear componentes y rutas para `/admin-dashboard`, `/admin-properties`, `/admin-tickets`, `/admin-users`, `/admin-settings` (aunque sean placeholders).
+   - [ ] Asegurar que el sidebar solo navegue entre secciones admin.
+
+2. **Dashboard Visual y Métricas:**
+   - [ ] Backend: Endpoint `/api/admin/dashboard-summary/` con métricas clave (propiedades pendientes, tickets abiertos, usuarios nuevos, etc.).
+   - [ ] Frontend: Mostrar tarjetas de métricas reales y placeholders para gráficos/listas rápidas.
+
+3. **Gestión de Propiedades Admin:**
+   - [ ] Vista de propiedades pendientes de aprobación.
+   - [ ] Botones para aprobar/rechazar propiedades desde el panel admin.
+
+4. **Gestión de Tickets de Soporte:**
+   - [ ] Listar tickets abiertos y permitir responder/cerrar desde el panel admin.
+
+5. **Gestión de Usuarios:**
+   - [ ] Listar usuarios, ver detalles y cambiar estado (activo/inactivo).
+
+[NOTA]
+- El diseño visual debe seguir la inspiración de dashboards modernos (Linear Admin, UBOLD, etc.) y la paleta de azules oscuros con acentos claros.
+- El panel admin debe ser completamente independiente de la experiencia de usuario normal.
+
+---
