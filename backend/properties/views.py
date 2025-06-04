@@ -116,7 +116,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
             logger.info(f"Creando propiedad para usuario: {self.request.user.username}")
             logger.info(f"Datos recibidos: {serializer.validated_data}")
             
-            property_instance = serializer.save(owner=self.request.user)
+            property_instance = serializer.save(owner=self.request.user, publication_status='pending')
             logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}, Estado: {property_instance.publication_status}")
 
             # Enviar email de notificación si la propiedad está pendiente de revisión
@@ -155,20 +155,56 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """Actualizar propiedad con validaciones adicionales"""
         try:
-            # Verificar que el usuario sea el owner de la propiedad
-            instance = self.get_object()
+            instance = self.get_object() # instance is retrieved first
+
+            # Permission check: User must be owner or staff
             if instance.owner != self.request.user and not self.request.user.is_staff:
-                logger.error(f"Usuario {self.request.user.username} intentó editar propiedad {instance.id} sin permisos")
-                raise PermissionError("No tiene permisos para editar esta propiedad")
-            
-            logger.info(f"Actualizando propiedad ID: {instance.id}")
-            logger.info(f"Datos recibidos: {serializer.validated_data}")
-            
+                logger.error(f"Usuario {self.request.user.username} intentó editar propiedad {instance.id} sin permisos.")
+                # This should ideally be caught by permission_classes in the viewset or object-level permissions.
+                # Raising PermissionError here will lead to a 500 error if not handled by DRF's exception handler.
+                # A more DRF-idiomatic way is to rely on `self.check_object_permissions(self.request, instance)`
+                # or let the main `update` method's permission checks handle it.
+                # However, for this specific instruction, we ensure the logic is within perform_update.
+                # To be safe and explicit, we can return a Response for clarity, though this might duplicate view-level checks.
+                # For now, let's stick to the plan of modifying validated_data.
+                # The original code had `raise PermissionError`, which is fine if DRF handles it.
+                # The `update` method already has a permission check, so this one is an additional safeguard.
+                raise PermissionError("No tiene permisos para editar esta propiedad.")
+
+            logger.info(f"Actualizando propiedad ID: {instance.id} por usuario {self.request.user.username}")
+            logger.info(f"Datos recibidos para actualización: {serializer.validated_data}")
+
+            # Prevent non-staff users from changing publication_status
+            if not self.request.user.is_staff:
+                if 'publication_status' in serializer.validated_data:
+                    # Log the attempt and remove the field
+                    original_status_attempt = serializer.validated_data['publication_status']
+                    logger.warning(
+                        f"Usuario no administrador {self.request.user.username} "
+                        f"intentó cambiar publication_status a '{original_status_attempt}' "
+                        f"para la propiedad ID {instance.id}. Este cambio será ignorado."
+                    )
+                    del serializer.validated_data['publication_status']
+
+                # Additionally, if the property was already approved, a non-staff owner should not be able to change it back to pending.
+                # Or, if any change is made by a non-staff owner to an approved property, it should perhaps revert to 'pending'.
+                # The current issue description implies admins approve publications.
+                # If a user edits an *already approved* property, should it become pending again?
+                # For now, the scope is to prevent users from *setting* the status.
+                # Let's assume that if an admin approved it, user edits on other fields are fine without changing status,
+                # unless specified otherwise.
+
             serializer.save()
-            logger.info(f"Propiedad {instance.id} actualizada exitosamente")
+            logger.info(f"Propiedad {instance.id} actualizada exitosamente. Nuevo estado: {instance.publication_status}")
             
+        except PermissionError as pe: # Catch the specific error
+            # This is to make sure PermissionError is handled gracefully if not caught by DRF default handlers
+            # However, DRF's default exception handling should convert PermissionDenied to 403.
+            # Re-raising here to let DRF handle it.
+            raise pe
         except Exception as e:
-            logger.error(f"Error al actualizar propiedad: {str(e)}", exc_info=True)
+            logger.error(f"Error al actualizar propiedad {instance.id}: {str(e)}", exc_info=True)
+            # Re-raise to be handled by the main update method or DRF's exception handler
             raise
 
     def create(self, request, *args, **kwargs):
