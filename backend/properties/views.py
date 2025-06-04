@@ -349,22 +349,28 @@ class AISearchView(APIView):
                 
                 # Verificar si es una respuesta válida
                 if ai_response and isinstance(ai_response, dict):
-                    # Asegurar que tenemos los campos necesarios
+                    # Construir la respuesta base, priorizando los datos de ai_response
                     response_data = {
-                        'assistant_message': ai_response.get('assistant_message', 'Búsqueda procesada'),
-                        'suggestedFilters': ai_response.get('suggestedFilters', {
-                            'propertyTypes': [],
-                            'priceRange': [None, None],
-                            'features': [],
-                            'sizeRange': [None, None]
-                        }),
+                        'search_mode': ai_response.get('search_mode', 'property_recommendation'), # Default si no viene
+                        'assistant_message': ai_response.get('assistant_message', 'Búsqueda procesada.'),
+                        'flyToLocation': ai_response.get('flyToLocation', None), # Incluir flyToLocation
+                        'suggestedFilters': ai_response.get('suggestedFilters'), # Puede ser None si es modo location
                         'recommendations': ai_response.get('recommendations', []),
                         'interpretation': ai_response.get('interpretation', current_query),
                         'fallback': ai_response.get('fallback', False)
                     }
+
+                    # Si suggestedFilters es None (ej. en modo 'location'), inicializarlo a un dict vacío para consistencia
+                    if response_data['suggestedFilters'] is None:
+                        response_data['suggestedFilters'] = {
+                            'propertyTypes': [],
+                            'priceRange': [None, None],
+                            'features': [],
+                            'sizeRange': [None, None]
+                        }
                     
                     # Agregar información adicional si es respuesta de fallback
-                    if ai_response.get('fallback'):
+                    if response_data.get('fallback'):
                         response_data['assistant_message'] += " (Usando búsqueda básica)"
                     
                     self._log_debug("Respuesta final enviada:", response_data)
