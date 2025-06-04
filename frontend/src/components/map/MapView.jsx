@@ -1203,7 +1203,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                 }}
                 startIcon={<TravelExploreIcon />}
               >
-                Explorar Ahora
+                Explora tu terreno
               </Button>
             </Box>
 
