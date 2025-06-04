@@ -394,7 +394,7 @@ const AdminDetailedPropertiesPage = () => {
                         borderRadius: '12px',
                     }}
                 >
-                    <Typography variant="h4" component="h1" sx={{ fontFamily: 'Code Pro, sans-serif', fontWeight: 'bold', mb: 3 }}>
+                    <Typography variant="h4" component="h1" sx={{ fontFamily: 'Code Pro, sans-serif', fontWeight: 'bold', mb: 3, color: '#E5E8F0' }}>
                         Manage Properties (Detailed List)
                     </Typography>
 
