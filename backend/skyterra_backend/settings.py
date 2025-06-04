@@ -49,6 +49,11 @@ INSTALLED_APPS = [
     'properties',   # Nuestra app principal
 ]
 
+AUTHENTICATION_BACKENDS = [
+    'skyterra_backend.backends.EmailOrUsernameModelBackend', # Custom backend
+    'django.contrib.auth.backends.ModelBackend', # Default backend
+]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -137,6 +142,19 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Email configuration for password reset
+# IMPORTANT: Replace with your actual email provider's details and credentials.
+# For Gmail, you might need to generate an "App Password".
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # Example for Gmail
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'YOUR_EMAIL@example.com') # Load from .env or use placeholder
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'YOUR_EMAIL_PASSWORD') # Load from .env or use placeholder
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'SkyTerra <noreply@example.com>') # Load from .env or use placeholder
+SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL) # For server error notifications
+ADMINS = [('Admin', os.getenv('ADMIN_EMAIL', 'admin@example.com'))] # For site admins
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -21,7 +21,7 @@ from django.conf.urls.static import static
 from rest_framework.authtoken import views as token_views
 from properties.views import AISearchView
 from django.http import JsonResponse
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, views as auth_views
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
@@ -48,27 +48,21 @@ def home_view(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    """Vista para iniciar sesión"""
-    print(f"Login attempt with data: {request.data}")  # Debug
-    
-    email = request.data.get('email')
+    """Vista para iniciar sesión con email/username y contraseña"""
+    print(f"Login attempt with data: {request.data}")
+
+    login_identifier = request.data.get('login_identifier') # Expecting 'login_identifier' from frontend
     password = request.data.get('password')
-    
-    if not email or not password:
+
+    if not login_identifier or not password:
         return Response({
-            'error': 'Email y contraseña son requeridos'
+            'error': 'Identificador de inicio de sesión y contraseña son requeridos'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Buscar usuario por email
-    try:
-        user_obj = User.objects.get(email=email)
-        print(f"User found: {user_obj.username}")  # Debug
-        user = authenticate(username=user_obj.username, password=password)
-        print(f"Authentication result: {user}")  # Debug
-    except User.DoesNotExist:
-        print(f"User with email {email} not found")  # Debug
-        user = None
-    
+
+    # Authenticate using the custom backend which handles email or username
+    user = authenticate(request, username=login_identifier, password=password)
+    print(f"Authentication result: {user}")
+
     if user and user.is_active:
         token, created = Token.objects.get_or_create(user=user)
         print(f"Token created: {created}, token: {token.key[:10]}...")  # Debug
@@ -169,6 +163,19 @@ urlpatterns = [
     path('api/ai-search/', AISearchView.as_view(), name='project-ai-search'),
     path('api/auth/login/', login_view, name='auth-login'),
     path('api/auth/register/', register_view, name='auth-register'),
+    # Password Reset URLs (namespaced for clarity, though not strictly necessary here)
+    path('api/auth/password_reset/', 
+         auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html', email_template_name='registration/password_reset_email.html', subject_template_name='registration/password_reset_subject.txt'), 
+         name='password_reset'),
+    path('api/auth/password_reset/done/', 
+         auth_views.PasswordResetDoneView.as_view(template_name='registration/password_reset_done.html'), 
+         name='password_reset_done'),
+    path('api/auth/reset/<uidb64>/<token>/', 
+         auth_views.PasswordResetConfirmView.as_view(template_name='registration/password_reset_confirm.html'), 
+         name='password_reset_confirm'),
+    path('api/auth/reset/done/', 
+         auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), 
+         name='password_reset_complete'),
     path('api/', include('properties.urls')),
 ]
 

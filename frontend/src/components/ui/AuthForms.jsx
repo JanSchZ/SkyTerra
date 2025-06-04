@@ -54,13 +54,13 @@ const commonTextFieldStyles = {
 
 // Componente de formulario de inicio de sesión
 export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose }) => {
-  const [email, setEmail] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (onLogin) onLogin({ email, password });
+    if (onLogin) onLogin({ login_identifier: loginIdentifier, password });
   };
 
   return (
@@ -80,12 +80,12 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
       
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 0 }}>
         <TextField
-          label="Correo Electrónico"
-          type="email"
+          label="Email o Nombre de Usuario"
+          type="text"
           fullWidth
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={loginIdentifier}
+          onChange={(e) => setLoginIdentifier(e.target.value)}
           margin="normal"
           autoFocus
           disabled={loading}

@@ -120,7 +120,7 @@ export const authService = {
   // Iniciar sesión
   async login(credentials) {
     try {
-      console.log('Attempting login with:', { email: credentials.email });
+      console.log('Attempting login with:', { login_identifier: credentials.login_identifier });
       const response = await api.post('/auth/login/', credentials);
       console.log('Login successful:', response.data);
       
