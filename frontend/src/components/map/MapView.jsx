@@ -9,9 +9,6 @@ import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import PropertyBoundaryDraw from './PropertyBoundaryDraw';
 import { useNavigate } from 'react-router-dom';
 import { ThemeModeContext } from '../../App';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import CardMedia from '@mui/material/CardMedia';
 import Link from '@mui/material/Link';
 import config from '../../config/environment';
 import { motion } from 'framer-motion';
@@ -1042,43 +1039,64 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               offset={15} 
               maxWidth="300px"
             >
-              <Card sx={{ 
+              <Box sx={{ 
                 maxWidth: 280, 
-                backgroundColor: 'rgba(255,255,255,0.9)',
-                border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                backgroundColor: 'rgba(0, 0, 0, 0.75)', // Más oscuro y con más transparencia
+                border: 'none', // Sin borde
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(12px)', // Más blur para el fondo
+                borderRadius: '16px', // Bordes más redondeados
+                color: '#FFFFFF', // Texto completamente blanco
+                overflow: 'hidden' // Para que la imagen respete los bordes redondeados
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
-                  <CardMedia
+                  <Box
                     component="img"
-                    height="120"
-                    image={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
+                    src={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
                     alt={`Imagen de ${popupInfo.name}`}
-                    sx={{ objectFit: 'cover' }}
+                    sx={{ 
+                      width: '100%',
+                      height: '100px',
+                      objectFit: 'cover', 
+                      borderTopLeftRadius: '16px', 
+                      borderTopRightRadius: '16px',
+                      display: 'block',
+                      border: 'none'
+                    }}
                   />
                 ) : null}
-                <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
+                <Box sx={{p: 1.5}}>
+                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '0.9rem', fontWeight: 'bold', color: '#FFFFFF', mb: 0.5}}>
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5}}>
+                  <Typography variant="body2" sx={{mb: 0.25, fontSize: '0.75rem', color: '#B0B8C4'}}>
                     Precio: {formatPrice(popupInfo.price)}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" sx={{fontSize: '0.75rem', color: '#B0B8C4', mb: 1}}>
                     Tamaño: {popupInfo.size} ha
                   </Typography>
-                  <Box sx={{mt: 1}}>
+                  <Box sx={{mt: 1, textAlign: 'right'}}>
                       <Link 
                           component="button" 
                           variant="body2" 
                           onClick={() => handleMarkerClick(popupInfo)} 
-                          sx={{cursor: 'pointer'}}
+                          sx={{
+                            cursor: 'pointer', 
+                            color: '#82aaff', // Un azul más brillante para el enlace
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            textDecoration: 'none',
+                            '&:hover': {
+                              color: '#E5E8F0',
+                              textDecoration: 'underline',
+                            }
+                          }}
                       >
                           Ver detalles / Tour 360°
                       </Link>
                   </Box>
-                </CardContent>
-              </Card>
+                </Box>
+              </Box>
             </Popup>
           )}
         </Map>
