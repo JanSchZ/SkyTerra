@@ -296,10 +296,17 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
   };
 
   const handleRegisterSubmit = async (userData) => {
+    console.log('🔵 [AuthPage] handleRegisterSubmit called with userData:', userData);
+    console.log('🔵 [AuthPage] typeof onRegister prop:', typeof onRegister);
     setIsLoading(true);
     setError(null);
     try {
-      if (onRegister) await onRegister(userData);
+      if (onRegister) {
+        console.log('🔵 [AuthPage] Calling onRegister prop from App.jsx...');
+        await onRegister(userData);
+      } else {
+        console.error('❌ [AuthPage] onRegister prop is missing!');
+      }
       // Navigation or message should be handled by App component
     } catch (err) {
       setError(err.message || 'Error al registrar.');

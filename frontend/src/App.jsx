@@ -280,7 +280,9 @@ function App() {
   };
 
   const handleRegister = async (userData) => {
+    console.log('🟢 [App.jsx] handleRegister called with userData:', userData);
     try {
+      console.log('🟢 [App.jsx] Attempting to call authService.register...');
       await authService.register(userData);
       setSnackbarMessage('¡Registro exitoso! Por favor, inicia sesión.');
       setSnackbarSeverity('success');
@@ -590,11 +592,11 @@ function App() {
           } />
           <Route path="/login" element={
             <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <AuthPage formType="login" onLogin={handleLogin} />
+              <AuthPage formType="login" onLogin={handleLogin} onRegister={handleRegister} />
             </motion.div>
           } />          <Route path="/register" element={
             <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <AuthPage formType="register" onRegister={handleRegister} />
+              <AuthPage formType="register" onLogin={handleLogin} onRegister={handleRegister} />
             </motion.div>
           } />
           <Route path="/password-reset" element={
