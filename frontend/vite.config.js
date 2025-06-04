@@ -5,11 +5,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: '0.0.0.0', // Importante para Codespaces
+    port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.CODESPACE_NAME 
+          ? `https://${process.env.CODESPACE_NAME}-8000.app.github.dev`
+          : 'http://localhost:8000',
         changeOrigin: true,
-        secure: false,
+        secure: true,
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
