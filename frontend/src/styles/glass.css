@@ -1,0 +1,22 @@
+:root {
+  --st-glass-bg-light: hsla(230, 60%, 97%, .55);
+  --st-glass-bg-dark: hsla(230, 30%, 12%, .55);
+  --st-accent: #5dade2;
+  --st-glass-bg: var(--st-glass-bg-light);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --st-glass-bg: var(--st-glass-bg-dark);
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background-color: #0f0f2f !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

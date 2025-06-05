@@ -898,7 +898,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   }
 
   return (
-    <Box sx={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
+    <motion.div layoutId="map-view" style={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
       {loading && !error && (
         <Box sx={{
           position: 'absolute', 
@@ -1278,7 +1278,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           </Box>
         </Box>
       )}
-    </Box>
+    </motion.div>
   );
 });
 
