@@ -1099,6 +1099,42 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               </Box>
             </Popup>
           )}
+          {/* Fuente y Capa para propiedades de prueba */}
+          {/* {testPropertiesGeoJSON && testPropertiesGeoJSON.features.length > 0 && (
+            <Source id="test-properties-data" type="geojson" data={testPropertiesGeoJSON}>
+              <Layer
+                id="test-properties-points"
+                type="circle"
+                paint={{
+                  'circle-radius': 8,
+                  'circle-color': '#00BFFF', // Un color distintivo para las propiedades de prueba (DeepSkyBlue)
+                  'circle-stroke-color': '#FFFFFF',
+                  'circle-stroke-width': 2,
+                }}
+              />
+            </Source>
+          )} */}
+          {/* Capas de polígono de límites de propiedad */}
+          {propertyBoundaries && (
+            <Source id="property-boundary" type="geojson" data={propertyBoundaries}>
+              <Layer
+                id="property-boundary-fill"
+                type="fill"
+                paint={{
+                  'fill-color': selectedProperty === propertyBoundaries.id ? '#4CAF50' : '#2196F3',
+                  'fill-opacity': selectedProperty === propertyBoundaries.id ? 0.3 : 0.1,
+                }}
+              />
+              <Layer
+                id="property-boundary-line"
+                type="line"
+                paint={{
+                  'line-color': selectedProperty === propertyBoundaries.id ? '#4CAF50' : '#2196F3',
+                  'line-width': selectedProperty === propertyBoundaries.id ? 3 : 2,
+                }}
+              />
+            </Source>
+          )}
         </Map>
       )}
 
