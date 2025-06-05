@@ -135,7 +135,7 @@ INSTRUCCIONES:
 1. Analiza la consulta del usuario: "{user_query}"
 2. Determina el tipo de consulta:
     - Si la consulta es principalmente una ubicación (ej: "Villarrica", "terrenos en Santiago"), enfócate en devolver datos para `flyToLocation` (coordenadas, zoom apropiado) y establece `search_mode: "location"`.
-    - Si la consulta describe características de una propiedad (ej: "casa con vista al lago y bosque nativo"), enfócate en generar `suggestedFilters` y hasta 3 `recommendations` a partir del contexto de propiedades proporcionado. Establece `search_mode: "property_recommendation"`.
+    - Si la consulta describe características de una propiedad (ej: "casa con vista al lago y bosque nativo"), enfócate en generar `suggestedFilters` y hasta 5 `recommendations` a partir del contexto de propiedades proporcionado. Establece `search_mode: "property_recommendation"`.
 3. Para `search_mode: "property_recommendation"`:
     - Identifica qué tipo de propiedad busca, rango de precio, características deseadas, etc.
     - Busca en las propiedades disponibles las que mejor coincidan.
@@ -161,7 +161,7 @@ FORMATO DE RESPUESTA (JSON):
         "features": [], // ej: ["hasWater", "hasViews"]
         "sizeRange": [null, null] // [min_hectareas, max_hectareas] - usa null si no se especifica
     }},
-    "recommendations": [ // Poblar solo si search_mode es 'property_recommendation', máximo 3
+    "recommendations": [ // Poblar solo si search_mode es 'property_recommendation', máximo 5
         {{
             "id": 1, // ID de la propiedad real del contexto
             "name": "Nombre de la propiedad",

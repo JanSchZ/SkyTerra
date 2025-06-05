@@ -1,6 +1,7 @@
-import React from 'react';
-import { Box, Typography, Paper, List, ListItem, ListItemText, CircularProgress, Card, CardContent, CardMedia, Divider, Chip } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Paper, List, ListItem, ListItemText, CircularProgress, Card, CardContent, Divider, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
+import { tourService } from '../../services/api';
 
 const AISuggestionPanel = ({
   assistantMessage,
@@ -13,6 +14,37 @@ const AISuggestionPanel = ({
   isLoading,
   currentQuery // The user's query that led to these results
 }) => {
+  const [tourPreviews, setTourPreviews] = useState({});
+
+  useEffect(() => {
+    const fetchPreviews = async () => {
+      if (!recommendations || recommendations.length === 0) return;
+      const previews = {};
+      const toFetch = recommendations.slice(0, 5);
+      for (const rec of toFetch) {
+        try {
+          const data = await tourService.getTours(rec.id);
+          const tours = data?.results || data;
+          const firstTour = Array.isArray(tours) ? tours[0] : null;
+          if (firstTour && firstTour.url) {
+            let url = firstTour.url;
+            if (!url.includes('autoLoad=true')) {
+              url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+            }
+            if (!url.includes('autoRotate=')) {
+              url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+            }
+            previews[rec.id] = url;
+          }
+        } catch (err) {
+          console.error('Error fetching tour preview', err);
+        }
+      }
+      setTourPreviews(previews);
+    };
+
+    fetchPreviews();
+  }, [recommendations]);
   if (isLoading) {
     return (
       <Paper elevation={3} sx={{ p: 2, position: 'absolute', top: '100px', left: '20px', width: '350px', zIndex: 1300, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', backgroundColor: 'rgba(22, 27, 34, 0.85)', backdropFilter: 'blur(10px)' }}>
@@ -84,10 +116,10 @@ const AISuggestionPanel = ({
           <>
           <Divider sx={{ my: 1.5 }} />
           <Typography variant="subtitle1" sx={{ mb: 1, fontWeight:'bold', color: 'text.primary' }}>
-             Top {recommendations.length > 1 ? recommendations.length : ''} Sugerencia{recommendations.length > 1 ? 's' : ''}:
+             Top {Math.min(recommendations.length, 5)} Sugerencia{Math.min(recommendations.length, 5) > 1 ? 's' : ''}:
           </Typography>
           <List dense disablePadding>
-            {recommendations.slice(0, 3).map((rec, index) => (
+            {recommendations.slice(0, 5).map((rec, index) => (
               <motion.div
                  key={rec.id || index}
                  initial={{ opacity: 0, y: 20 }}
@@ -112,8 +144,17 @@ const AISuggestionPanel = ({
                 onMouseEnter={() => onSuggestionHover && onSuggestionHover(rec)}
                 onMouseLeave={() => onSuggestionHover && onSuggestionHover(null)} // Clear hover
               >
-                {/* Placeholder for CardMedia if images become available */}
-                {/* <CardMedia component="img" height="100" image={rec.imageUrl || "https://via.placeholder.com/300x100?text=Propiedad"} alt={rec.name} /> */}
+                {tourPreviews[rec.id] && (
+                  <Box sx={{ height: 100, mb: 1 }}>
+                    <iframe
+                      src={tourPreviews[rec.id]}
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      title={`Tour preview ${rec.name}`}
+                    />
+                  </Box>
+                )}
                 <CardContent sx={{p: 1.5}}>
                   <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'primary.light' }}>
                     {rec.name}
