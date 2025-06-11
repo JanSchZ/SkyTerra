@@ -2,60 +2,31 @@
 
 **NOTA PARA EL USUARIO/DESARROLLADOR:** Por favor, actualiza este archivo a medida que se completan las tareas o surgen nuevos problemas. Esto ayudará a mantener un seguimiento claro del progreso y facilitará la colaboración, incluso si trabajas con diferentes asistentes de IA o en diferentes sesiones. Marca las tareas completadas con `[COMPLETADO]` o `[RESUELTO]`.
 
-**Fecha de Última Actualización:** 2025-06-03 (Actualización crítica: Workflow de Aprobación de Propiedades)
+**Fecha de Última Actualización:** 2025-05-29 (Refleja nuevo plan estratégico)
 
 ### **PLAN DE IMPLEMENTACIÓN GLOBAL AJUSTADO**
 
 **Principios Guía:**
-1.  Workflow de Aprobación de Propiedades (PRIORIDAD CRÍTICA).
-2.  Estabilidad y Seguridad.
-3.  Funcionalidad Core para el MVP (Producto Mínimo Viable).
-4.  Mejoras UX incrementales y continuas.
-5.  Expansión a largo plazo (móvil, internacionalización).
+1.  Estabilidad y Seguridad PRIMERO.
+2.  Funcionalidad Core para el MVP (Producto Mínimo Viable) y Experiencia IA Central después.
+3.  Mejoras UX incrementales y continuas.
+4.  Expansión a largo plazo (móvil, internacionalización).
 
 ---
 
-**Fase 0: Workflow Crítico de Aprobación de Propiedades (URGENTE - MÁXIMA PRIORIDAD)**
-*   **Objetivo:** Implementar el workflow completo desde la subida de propiedades hasta su publicación con tours virtuales.
+**Fase 0: Estabilización Inmediata (Urgente)**
+*   **Objetivo:** Asegurar una base técnica sólida y resolver problemas críticos antes de añadir nuevas funcionalidades mayores.
 *   **Tareas:**
    
-    1.  **[PARCIALMENTE COMPLETADO]** 🔐 **Sistema de Autenticación Mejorado:**
-        *   **Subtarea:** **[COMPLETADO]** Custom authentication backend para login con username/email.
-        *   **Subtarea:** **[PENDIENTE]** Sistema de recuperación de contraseña por email.
-        *   **Subtarea:** **[PENDIENTE]** Actualizar frontend para usar login_identifier en lugar de email.
-    
-    2.  **[PENDIENTE]** 📧 **Sistema de Notificaciones por Email:**
-        *   **Subtarea (Backend):** Implementar envío de emails para:
-            - Notificación al admin cuando se sube una nueva propiedad
-            - Notificación al cliente cuando su propiedad es aprobada/rechazada
-        *   **Subtarea (Frontend):** Configurar templates de email profesionales.
-    
-    3.  **[PENDIENTE]** 👤 **Panel de Administración Avanzado:**
-        *   **Subtarea (Backend):** 
-            - Endpoints para listar propiedades pendientes de aprobación
-            - Endpoint para aprobar/rechazar propiedades
-            - Endpoint para añadir tours virtuales a propiedades aprobadas
-        *   **Subtarea (Frontend):**
-            - Vista de administración con lista de propiedades pendientes
-            - Formulario para añadir tour virtual (URL 360°)
-            - Botones de aprobar/rechazar con confirmación
-    
-    4.  **[PENDIENTE]** 🗺️ **Integración Mapa con Tours 360°:**
-        *   **Subtarea (Frontend):**
-            - Mostrar solo propiedades aprobadas en el mapa
-            - Ventana flotante con datos de propiedad (sin tapar tour)
-            - Integración del tour 360° en popup/modal
-            - Diseño responsive para diferentes tamaños de pantalla
-    
-    5.  **[PENDIENTE]** 🏠 **Estados de Publicación Mejorados:**
-        *   **Subtarea (Backend):** Validar que el modelo Property ya tiene publication_status (✓ VERIFICADO)
-        *   **Subtarea (Frontend):** 
-            - Dashboard de usuario muestra estado de sus propiedades
-            - Indicadores visuales claros (pending/approved/rejected)
+    1.  **[EN PROGRESO]** 🛠 Completar migración MUI Grid v2.
+        *   **Subtarea:** **[PENDIENTE - BLOQUEADO]** `Dashboard.jsx` (Bloqueado por limitación de herramienta de lectura de archivos para realizar una revisión completa y segura. Se intentará con ediciones directas si el uso es simple).
+        *   **Subtarea:** **[PENDIENTE]** Revisión general de otros componentes que pudieran seguir usando Grid v1.
+    2.  **[PENDIENTE - NO PRIORITARIO]** 🐛 Solucionar error "Maximum update depth exceeded" en `frontend/src/components/map/MapView.jsx`.
+        *   **Contexto:** Persiste a pesar de intentos previos. Se pospone su resolución hasta nuevo aviso.
 
 ---
 
-**Fase 1: Estabilización Post-Workflow (Alta Prioridad)**
+**Fase 1: Núcleo de Negocio y Experiencia IA Central (Máxima Prioridad)**
 *   **Objetivo:** Implementar las funcionalidades centrales que definen la propuesta de valor de SkyTerra, con un fuerte énfasis en la búsqueda inteligente y la versatilidad del listado de propiedades.
 *   **Tareas:**
     1.  **[PENDIENTE]** 🧠 **IA Search Bar - Experiencia Central (Alcance Extendido):**
@@ -165,55 +136,24 @@
 *   2025-05-30: Actualizado el estado de los puntos 3 y 4 de la Fase 0 (edificios 3D resuelto, error de update depth pospuesto/no prioritario).
 *   2025-05-30: **[COMPLETADO]** Eliminada la restricción en el backend para que todas las propiedades sean visibles en el mapa, independientemente del estado de publicación o si el usuario está autenticado/staff. Código pusheado a GitHub.
 *   **[RESUELTO - 3 Jun 2025]** 🐛 **BUG DE REGISTRO DE USUARIOS SOLUCIONADO:**
-    * **Problema identificado:** Bug que impedía crear nuevas cuentas de usuario normal (no admin).
-    * **Causa raíz:** La prop `onRegister` no estaba siendo pasada correctamente desde `App.jsx` a `AuthPage.jsx`, impidiendo que el formulario de registro llamara a la función que inicia el proceso de registro en el servicio de API.
+    * **Problema identificado:** Bug que impedía crear nuevas cuentas de usuario
+    * **Causa raíz:** 
+        - Migraciones de Django no aplicadas completamente
+        - Configuración incorrecta de URLs en entorno Codespaces
+        - Manejo de errores insuficiente en frontend y backend
     * **Soluciones implementadas:**
-        1. ✅ Instalación de `react-chartjs-2` y `chart.js` (resolvió un error de importación relacionado con gráficos).
-        2. ✅ Aplicación completa de migraciones Django (ver log anterior).
-        3. ✅ Mejora en detección automática de entorno (Codespaces vs localhost) (ver log anterior).
-        4. ✅ Validaciones mejoradas en formulario de registro (ver log anterior).
-        5. ✅ Logging detallado para debugging en backend y frontend (ver log anterior).
-        6. ✅ Mejor manejo de errores con mensajes específicos (ver log anterior).
-        7. ✅ **[FIX FRONTE ND]** Pasada explícitamente la prop `onRegister` (`handleRegister` de App.jsx) al componente `AuthPage` en `App.jsx` para las rutas `/login` y `/register`.
+        1. ✅ Aplicación completa de migraciones Django
+        2. ✅ Mejora en detección automática de entorno (Codespaces vs localhost)
+        3. ✅ Validaciones mejoradas en formulario de registro:
+            - Email único y formato válido
+            - Username con caracteres permitidos (3+ chars)
+            - Contraseña segura (8+ chars, mayús/minús/número)
+        4. ✅ Logging detallado para debugging en backend y frontend
+        5. ✅ Mejor manejo de errores con mensajes específicos
     * **Testing realizado:**
-        - Endpoint `/api/auth/register/` funciona correctamente.
-        - Formulario frontend valida datos correctamente.
-        - Respuestas de error claras y específicas.
-        - Usuarios creados exitosamente (IDs 5, 6, nuevo usuario creado durante el debugging actual).
-        - El flujo completo formulario -> App.jsx -> api.js -> Backend funciona correctamente.
+        - Endpoint `/api/auth/register/` funciona correctamente
+        - Formulario frontend valida datos correctamente
+        - Respuestas de error claras y específicas
+        - Usuarios creados exitosamente (IDs 5, 6 durante testing)
     * **Estado:** Completamente funcional
-    * **Próximos pasos:** Continuar con testing de flujo completo registro → login → dashboard. Asegurar que los gráficos en el admin dashboard funcionen correctamente ahora que las librerías de charting están instaladas.
-
----
-
-**[2025-06-03] AVANCE Y SIGUIENTES PASOS CRÍTICOS - PANEL DE ADMIN SKYTERRA**
-
-[COMPLETADO]
-- Redirección automática de admins a /admin-dashboard tras login.
-- Layout base de panel admin con sidebar y topbar, colores y fuentes ajustados según feedback.
-- Eliminada navegación accidental al mapa desde el panel admin.
-
-[PENDIENTE - CRÍTICO]
-1. **Navegación Admin Fluida:**
-   - [ ] Crear componentes y rutas para `/admin-dashboard`, `/admin-properties`, `/admin-tickets`, `/admin-users`, `/admin-settings` (aunque sean placeholders).
-   - [ ] Asegurar que el sidebar solo navegue entre secciones admin.
-
-2. **Dashboard Visual y Métricas:**
-   - [ ] Backend: Endpoint `/api/admin/dashboard-summary/` con métricas clave (propiedades pendientes, tickets abiertos, usuarios nuevos, etc.).
-   - [ ] Frontend: Mostrar tarjetas de métricas reales y placeholders para gráficos/listas rápidas.
-
-3. **Gestión de Propiedades Admin:**
-   - [ ] Vista de propiedades pendientes de aprobación.
-   - [ ] Botones para aprobar/rechazar propiedades desde el panel admin.
-
-4. **Gestión de Tickets de Soporte:**
-   - [ ] Listar tickets abiertos y permitir responder/cerrar desde el panel admin.
-
-5. **Gestión de Usuarios:**
-   - [ ] Listar usuarios, ver detalles y cambiar estado (activo/inactivo).
-
-[NOTA]
-- El diseño visual debe seguir la inspiración de dashboards modernos (Linear Admin, UBOLD, etc.) y la paleta de azules oscuros con acentos claros.
-- El panel admin debe ser completamente independiente de la experiencia de usuario normal.
-
----
+    * **Próximos pasos:** Continuar con testing de flujo completo registro → login → dashboard

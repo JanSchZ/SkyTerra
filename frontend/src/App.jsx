@@ -28,21 +28,13 @@ import TourViewer from './components/tours/TourViewer';
 import AuthPage from './components/ui/AuthForms';
 import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
-import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import CreateProperty from './components/property/CreateProperty';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import AdminPublicationsPage from './components/admin/AdminPublicationsPage';
 import AdminDashboardPage from './components/admin/AdminDashboardPage';
 import AdminLayout from './components/admin/AdminLayout';
-import { PasswordResetRequest, PasswordResetConfirm } from './components/auth/PasswordReset';
 import { authService } from './services/api';
 import './App.css';
-import AdminPropertiesPage from './components/admin/AdminPropertiesPage';
-import AdminTicketsPage from './components/admin/AdminTicketsPage';
-import AdminUsersPage from './components/admin/AdminUsersPage'; // Original generic AdminUsersPage
-import AdminUsersListPage from './components/admin/AdminUsersListPage'; // The new list page
-import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage'; // Import new page
-import AdminSettingsPage from './components/admin/AdminSettingsPage';
 
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
@@ -194,15 +186,7 @@ const ProtectedRoute = ({ user, element }) => {
 function App() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-
-  // State for AI Search and Suggestions
   const [aiAppliedFilters, setAiAppliedFilters] = useState(null);
-  const [assistantMessage, setAssistantMessage] = useState('');
-  const [aiRecommendations, setAiRecommendations] = useState([]);
-  const [aiSearchMode, setAiSearchMode] = useState(null); // 'location' or 'property_recommendation'
-  const [aiFlyToLocation, setAiFlyToLocation] = useState(null);
-  const [isAISearchLoading, setIsAISearchLoading] = useState(false);
-  const [currentAIQuery, setCurrentAIQuery] = useState(''); // To store the query that yielded the current AI results
 
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -224,104 +208,31 @@ function App() {
     }
     setLoadingAuth(false);
   }, []);
+  
+  const handleAISearch = (aiGeneratedFilters) => {
+    if (!aiGeneratedFilters) return;
+    // console.log('AI search response (raw):', aiGeneratedFilters); // Debug log
 
-  const handleAIQuerySubmit = (queryText) => {
-    setCurrentAIQuery(queryText);
-    setIsAISearchLoading(true);
-  };
-
-  const handleAISearch = (aiResponse) => { // aiResponse is the data from backend
-    if (!aiResponse) {
-      setIsAISearchLoading(false);
-      setAssistantMessage('Error: No se recibió respuesta del servicio de IA.');
-      setAiRecommendations([]);
-      setAiSearchMode(null);
-      setAiFlyToLocation(null);
-      // No limpiar aiAppliedFilters aquí, podría ser de una búsqueda anterior válida
-      return;
+    if (aiGeneratedFilters.suggestedFilters) {
+      // console.log('Received AI Suggested Filters:', aiGeneratedFilters.suggestedFilters); // Debug log
+      setAiAppliedFilters(aiGeneratedFilters.suggestedFilters);
     }
-    // console.log('AI search response (raw):', aiResponse); // Debug log
 
-    setAssistantMessage(aiResponse.assistant_message || 'Respuesta procesada.');
-    setAiRecommendations(aiResponse.recommendations || []);
-    setAiSearchMode(aiResponse.search_mode || null);
-    setAiFlyToLocation(aiResponse.flyToLocation || null);
-    setAiAppliedFilters(aiResponse.suggestedFilters || null); // Esto puede ser null si es modo location
-    setIsAISearchLoading(false);
-
-    if (aiResponse.flyToLocation) {
-        handleLocationSearch(aiResponse.flyToLocation);
-    } else if (aiResponse.search_mode === 'property_recommendation' && aiResponse.recommendations && aiResponse.recommendations.length > 0) {
-      // If no direct flyToLocation, but we have recommendations, try to fly to the first one with valid coordinates
-      const firstRecoWithCoords = aiResponse.recommendations.find(
-        rec => typeof rec.latitude === 'number' && typeof rec.longitude === 'number'
-      );
-      if (firstRecoWithCoords) {
-        // console.log('Flying to first recommendation with coords:', firstRecoWithCoords); // Debug log
+    if (aiGeneratedFilters.flyToLocation) {
+        handleLocationSearch(aiGeneratedFilters.flyToLocation);
+    } else if (aiGeneratedFilters.recommendations && aiGeneratedFilters.recommendations.length > 0) {
+      // If no direct flyToLocation, but we have recommendations, try to fly to the first one
+      const firstReco = aiGeneratedFilters.recommendations[0];
+      if (firstReco && typeof firstReco.latitude === 'number' && typeof firstReco.longitude === 'number') {
+        // console.log('Flying to first recommendation:', firstReco); // Debug log
         const locationData = {
-          center: [firstRecoWithCoords.longitude, firstRecoWithCoords.latitude],
+          center: [firstReco.longitude, firstReco.latitude],
           zoom: 12, // Default zoom for recommended property
           pitch: 60,
           bearing: 0
         };
         handleLocationSearch(locationData);
       }
-    }
-  };
-
-  const handleClearAISearch = () => {
-    setAssistantMessage('');
-    setAiRecommendations([]);
-    setAiSearchMode(null);
-    setAiFlyToLocation(null);
-    setAiAppliedFilters(null); // Also clear applied filters for the map
-    setCurrentAIQuery('');
-    setIsAISearchLoading(false);
-    // Optionally, could also clear the text in AISearchBar itself if a ref to it is available
-    // For now, AISearchBar would clear itself or App would need a way to tell it to.
-  };
-
-  const handleSuggestionClick = (suggestion) => {
-    if (!suggestion || typeof suggestion.latitude !== 'number' || typeof suggestion.longitude !== 'number') {
-      console.warn('Clicked suggestion does not have valid coordinates:', suggestion);
-      setSnackbarMessage('No se pudieron obtener las coordenadas para esta sugerencia.');
-      setSnackbarSeverity('warning');
-      setSnackbarOpen(true);
-      return;
-    }
-
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: [suggestion.longitude, suggestion.latitude],
-        zoom: 15, // Zoom closer to see the property
-        pitch: 50,  // Slightly more dramatic pitch
-        bearing: 0,
-        duration: 2500, // Smooth animation
-        essential: true,
-      });
-      // Optionally, clear panel or highlight:
-      // setCurrentAIQuery(''); // This would clear the panel
-    } else {
-      console.warn('mapRef.current is not available to fly to suggestion.');
-      setSnackbarMessage('El mapa no está listo para navegar a la sugerencia.');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    }
-  };
-
-  const handleSuggestionHover = (suggestion) => {
-    if (mapRef.current) {
-      if (suggestion && typeof suggestion.latitude === 'number' && typeof suggestion.longitude === 'number') {
-        mapRef.current.flyTo({
-          center: [suggestion.longitude, suggestion.latitude],
-          zoom: mapRef.current.getMap().getZoom(),
-          duration: 1200,
-          essential: false,
-        });
-      }
-      // No action on mouse leave (suggestion is null) for now
-    } else if (suggestion) {
-      console.warn('mapRef.current is not available to pan to hovered suggestion.');
     }
   };
 
@@ -364,9 +275,7 @@ function App() {
   };
 
   const handleRegister = async (userData) => {
-    console.log('🟢 [App.jsx] handleRegister called with userData:', userData);
     try {
-      console.log('🟢 [App.jsx] Attempting to call authService.register...');
       await authService.register(userData);
       setSnackbarMessage('¡Registro exitoso! Por favor, inicia sesión.');
       setSnackbarSeverity('success');
@@ -551,15 +460,14 @@ function App() {
                 }
               }}
             >
-              SKYTERRA
+              SkyTerra
             </Typography>
 
             <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
               <Box sx={{ width: '100%', maxWidth: '700px' }}> {/* This ensures AISearchBar keeps its width */}
-                <AISearchBar
-                  onQuerySubmit={handleAIQuerySubmit} // New prop
-                  onSearch={handleAISearch} // Existing prop, called with AI response
-                  onLocationSearch={handleLocationSearch} // Existing prop
+                <AISearchBar 
+                  onSearch={handleAISearch} 
+                  onLocationSearch={handleLocationSearch}
                 />
               </Box>
             </Box>
@@ -616,6 +524,17 @@ function App() {
                       Dashboard
                     </MenuItem>
                     <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
+                    {user && user.is_staff && (
+                      <MenuItem 
+                        onClick={() => { 
+                          window.open('/admin/', '_blank'); // Open Django admin in a new tab
+                          handleUserMenuClose(); 
+                        }} 
+                        sx={{ color: '#c9d1d9' }}
+                      >
+                        Panel de Administración
+                      </MenuItem>
+                    )}
                     <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9', borderTop: user ? '1px solid rgba(255,255,255,0.1)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
                   </Menu>
                 </>
@@ -658,20 +577,6 @@ function App() {
             path="/"
             element={
               <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                {/* AISuggestionPanel rendered here, above MapView but within the same route context if needed */}
-                { (currentAIQuery || isAISearchLoading) && (
-                  <AISuggestionPanel
-                    assistantMessage={assistantMessage}
-                    recommendations={aiRecommendations}
-                    searchMode={aiSearchMode}
-                    flyToLocation={aiFlyToLocation}
-                    isLoading={isAISearchLoading}
-                    currentQuery={currentAIQuery}
-                    onSuggestionClick={handleSuggestionClick} // Pass the actual handler
-                    onSuggestionHover={handleSuggestionHover} // Pass the actual handler
-                    onClearAISearch={handleClearAISearch}
-                  />
-                )}
                 <MapView ref={mapRef} appliedFilters={aiAppliedFilters} />
               </motion.div>
             }
@@ -691,21 +596,12 @@ function App() {
           } />
           <Route path="/login" element={
             <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <AuthPage formType="login" onLogin={handleLogin} onRegister={handleRegister} />
-            </motion.div>
-          } />          <Route path="/register" element={
-            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <AuthPage formType="register" onLogin={handleLogin} onRegister={handleRegister} />
+              <AuthPage formType="login" onLogin={handleLogin} />
             </motion.div>
           } />
-          <Route path="/password-reset" element={
+          <Route path="/register" element={
             <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <PasswordResetRequest />
-            </motion.div>
-          } />
-          <Route path="/password-reset-confirm" element={
-            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <PasswordResetConfirm />
+              <AuthPage formType="register" onRegister={handleRegister} />
             </motion.div>
           } />
           <Route
@@ -744,54 +640,6 @@ function App() {
               element={ 
                 <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                   <AdminDashboardPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-properties" // This path might be for a different properties view or can be removed
-              element={ 
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminPropertiesPage />
-                </motion.div>
-              }
-            />
-             <Route
-              path="/admin-detailed-properties-list" // New route for the detailed list
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminDetailedPropertiesPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-tickets" 
-              element={ 
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminTicketsPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-users" // This might be a general user management page or can be removed if list is the main view
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminUsersPage />
-                </motion.div>
-              }
-            />
-            <Route
-              path="/admin-users-list" // New route for the list page
-              element={ 
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminUsersListPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-settings" 
-              element={ 
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminSettingsPage />
                 </motion.div>
               }
             />

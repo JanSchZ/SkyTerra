@@ -30,18 +30,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-oz7k_zw9rjk8qc_01i9ataa7a0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-# Configuración para GitHub Codespaces
-CODESPACE_NAME = os.getenv('CODESPACE_NAME')
-if CODESPACE_NAME:
-    ALLOWED_HOSTS = [
-        f'{CODESPACE_NAME}-8000.app.github.dev',
-        f'{CODESPACE_NAME}-8000.preview.app.github.dev',
-        'localhost',
-        '127.0.0.1',
-        '0.0.0.0',
-    ]
-else:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -80,24 +69,8 @@ MIDDLEWARE = [
 # Configuración de API Keys
 GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY', '')
 
-# Configuración de CORS para GitHub Codespaces
+# Configuración de CORS
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
-
-# Si estamos en Codespaces, configurar CORS específico
-if CODESPACE_NAME:
-    CORS_ALLOWED_ORIGINS = [
-        f'https://{CODESPACE_NAME}-5173.app.github.dev',
-        f'https://{CODESPACE_NAME}-3000.app.github.dev',
-        f'https://{CODESPACE_NAME}-5173.preview.app.github.dev',
-        f'https://{CODESPACE_NAME}-3000.preview.app.github.dev',
-        'http://localhost:3000',
-        'http://localhost:5173',
-    ]
-    # Frontend URL for email links in Codespaces
-    FRONTEND_URL = f'https://{CODESPACE_NAME}-5173.app.github.dev'
-else:
-    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 ROOT_URLCONF = 'skyterra_backend.urls'
 

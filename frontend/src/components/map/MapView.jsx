@@ -9,6 +9,9 @@ import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import PropertyBoundaryDraw from './PropertyBoundaryDraw';
 import { useNavigate } from 'react-router-dom';
 import { ThemeModeContext } from '../../App';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardMedia from '@mui/material/CardMedia';
 import Link from '@mui/material/Link';
 import config from '../../config/environment';
 import { motion } from 'framer-motion';
@@ -191,13 +194,9 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     } else {
       setLoadingMore(true);
     }
-    setError(null);    try {
+    setError(null);
+    try {
       let params = { ...currentFilters };
-
-      // Always filter to show only approved properties in the public map
-      if (!editable) {
-        params.publication_status = 'approved';
-      }
 
       if (aiFilters && Object.keys(aiFilters).length > 0) {
         // console.log("Aplicando filtros AI:", aiFilters); // Debug log
@@ -1039,101 +1038,44 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               offset={15} 
               maxWidth="300px"
             >
-              <Box sx={{ 
+              <Card sx={{ 
                 maxWidth: 280, 
-                backgroundColor: 'rgba(0, 0, 0, 0.75)', // Más oscuro y con más transparencia
-                border: 'none', // Sin borde
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                backdropFilter: 'blur(12px)', // Más blur para el fondo
-                borderRadius: '16px', // Bordes más redondeados
-                color: '#FFFFFF', // Texto completamente blanco
-                overflow: 'hidden' // Para que la imagen respete los bordes redondeados
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                border: 'none', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
-                  <Box
+                  <CardMedia
                     component="img"
-                    src={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
+                    height="120"
+                    image={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
                     alt={`Imagen de ${popupInfo.name}`}
-                    sx={{ 
-                      width: '100%',
-                      height: '100px',
-                      objectFit: 'cover', 
-                      borderTopLeftRadius: '16px', 
-                      borderTopRightRadius: '16px',
-                      display: 'block',
-                      border: 'none'
-                    }}
+                    sx={{ objectFit: 'cover' }}
                   />
                 ) : null}
-                <Box sx={{p: 1.5}}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '0.9rem', fontWeight: 'bold', color: '#FFFFFF', mb: 0.5}}>
+                <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" sx={{mb: 0.25, fontSize: '0.75rem', color: '#B0B8C4'}}>
+                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5}}>
                     Precio: {formatPrice(popupInfo.price)}
                   </Typography>
-                  <Typography variant="body2" sx={{fontSize: '0.75rem', color: '#B0B8C4', mb: 1}}>
+                  <Typography variant="body2" color="text.secondary">
                     Tamaño: {popupInfo.size} ha
                   </Typography>
-                  <Box sx={{mt: 1, textAlign: 'right'}}>
+                  <Box sx={{mt: 1}}>
                       <Link 
                           component="button" 
                           variant="body2" 
                           onClick={() => handleMarkerClick(popupInfo)} 
-                          sx={{
-                            cursor: 'pointer', 
-                            color: '#82aaff', // Un azul más brillante para el enlace
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            textDecoration: 'none',
-                            '&:hover': {
-                              color: '#E5E8F0',
-                              textDecoration: 'underline',
-                            }
-                          }}
+                          sx={{cursor: 'pointer'}}
                       >
                           Ver detalles / Tour 360°
                       </Link>
                   </Box>
-                </Box>
-              </Box>
+                </CardContent>
+              </Card>
             </Popup>
-          )}
-          {/* Fuente y Capa para propiedades de prueba */}
-          {/* {testPropertiesGeoJSON && testPropertiesGeoJSON.features.length > 0 && (
-            <Source id="test-properties-data" type="geojson" data={testPropertiesGeoJSON}>
-              <Layer
-                id="test-properties-points"
-                type="circle"
-                paint={{
-                  'circle-radius': 8,
-                  'circle-color': '#00BFFF', // Un color distintivo para las propiedades de prueba (DeepSkyBlue)
-                  'circle-stroke-color': '#FFFFFF',
-                  'circle-stroke-width': 2,
-                }}
-              />
-            </Source>
-          )} */}
-          {/* Capas de polígono de límites de propiedad */}
-          {propertyBoundaries && (
-            <Source id="property-boundary" type="geojson" data={propertyBoundaries}>
-              <Layer
-                id="property-boundary-fill"
-                type="fill"
-                paint={{
-                  'fill-color': selectedProperty === propertyBoundaries.id ? '#4CAF50' : '#2196F3',
-                  'fill-opacity': selectedProperty === propertyBoundaries.id ? 0.3 : 0.1,
-                }}
-              />
-              <Layer
-                id="property-boundary-line"
-                type="line"
-                paint={{
-                  'line-color': selectedProperty === propertyBoundaries.id ? '#4CAF50' : '#2196F3',
-                  'line-width': selectedProperty === propertyBoundaries.id ? 3 : 2,
-                }}
-              />
-            </Source>
           )}
         </Map>
       )}
@@ -1257,7 +1199,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                 }}
                 startIcon={<TravelExploreIcon />}
               >
-                Explora tu terreno
+                Explorar Ahora
               </Button>
             </Box>
 

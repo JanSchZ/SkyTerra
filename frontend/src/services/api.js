@@ -145,12 +145,11 @@ export const authService = {
   // Registrar usuario
   async register(userData) {
     try {
-      console.log('🔄 [API Service] Intentando registrar usuario:', { 
+      console.log('🔄 Intentando registrar usuario:', { 
         email: userData.email, 
         username: userData.username,
         hasPassword: !!userData.password 
       });
-      console.log('✅ [API Service] Data being sent to /auth/register/:', userData);
       
       const response = await api.post('/auth/register/', userData);
       console.log('✅ Registro exitoso:', response.data);
@@ -221,6 +220,7 @@ export const authService = {
   isAuthenticated() {
     return !!localStorage.getItem('auth_token');
   },
+
   // Actualizar perfil de usuario
   async updateProfile(userData) {
     try {
@@ -230,70 +230,6 @@ export const authService = {
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
-    }
-  },
-
-  // Solicitar restablecimiento de contraseña
-  async requestPasswordReset(email) {
-    try {
-      console.log('🔄 Solicitando restablecimiento de contraseña para:', email);
-      const response = await api.post('/auth/password/reset/', { email });
-      console.log('✅ Solicitud de restablecimiento enviada exitosamente');
-      return response.data;
-    } catch (error) {
-      console.error('❌ Error durante solicitud de restablecimiento:', error);
-      
-      if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 
-                            error.response.data.detail || 
-                            'Error al solicitar restablecimiento de contraseña';
-        throw new Error(errorMessage);
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Error de conexión con el servidor');
-      }
-    }
-  },
-
-  // Confirmar restablecimiento de contraseña
-  async confirmPasswordReset(uid, token, newPassword) {
-    try {
-      console.log('🔄 Confirmando restablecimiento de contraseña');
-      const response = await api.post('/auth/password/reset/confirm/', {
-        uid,
-        token,
-        new_password1: newPassword,
-        new_password2: newPassword
-      });
-      console.log('✅ Contraseña restablecida exitosamente');
-      return response.data;
-    } catch (error) {
-      console.error('❌ Error durante confirmación de restablecimiento:', error);
-      
-      if (error.response && error.response.data) {
-        const errorData = error.response.data;
-        
-        // Manejo de errores específicos
-        if (errorData.new_password2) {
-          throw new Error(errorData.new_password2[0]);
-        } else if (errorData.new_password1) {
-          throw new Error(errorData.new_password1[0]);
-        } else if (errorData.token) {
-          throw new Error('El enlace de restablecimiento es inválido o ha expirado');
-        } else if (errorData.uid) {
-          throw new Error('El enlace de restablecimiento es inválido');
-        } else {
-          const errorMessage = errorData.error || 
-                              errorData.detail || 
-                              'Error al restablecer la contraseña';
-          throw new Error(errorMessage);
-        }
-      } else if (error.message) {
-        throw new Error(error.message);
-      } else {
-        throw new Error('Error de conexión con el servidor');
-      }
     }
   }
 };
@@ -637,101 +573,9 @@ export const imageService = {
   }
 };
 
-// =============================================================================
-// ADMIN SERVICES - Workflow de Aprobación de Propiedades
-// =============================================================================
-
-export const adminService = {
-  // Obtener estadísticas del dashboard
-  async getDashboardStats() {
-    try {
-      console.log('🔧 Admin: Getting dashboard stats');
-      const response = await api.get('/admin/dashboard/stats/');
-      console.log('Dashboard stats:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error getting dashboard stats:', error);
-      if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error al obtener estadísticas del dashboard.';
-        throw new Error(errorMessage);
-      }
-      throw error;
-    }
-  },
-
-  // Obtener propiedades pendientes de aprobación
-  async getPendingProperties() {
-    try {
-      console.log('🔧 Admin: Getting pending properties');
-      const response = await api.get('/admin/properties/pending/');
-      console.log('Pending properties:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error getting pending properties:', error);
-      if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error al obtener propiedades pendientes.';
-        throw new Error(errorMessage);
-      }
-      throw error;
-    }
-  },
-
-  // Aprobar una propiedad
-  async approveProperty(propertyId) {
-    try {
-      console.log(`🔧 Admin: Approving property ${propertyId}`);
-      const response = await api.post(`/admin/properties/${propertyId}/approve/`);
-      console.log('Property approved:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error(`Error approving property ${propertyId}:`, error);
-      if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error al aprobar la propiedad.';
-        throw new Error(errorMessage);
-      }
-      throw error;
-    }
-  },
-
-  // Rechazar una propiedad
-  async rejectProperty(propertyId) {
-    try {
-      console.log(`🔧 Admin: Rejecting property ${propertyId}`);
-      const response = await api.post(`/admin/properties/${propertyId}/reject/`);
-      console.log('Property rejected:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error(`Error rejecting property ${propertyId}:`, error);
-      if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error al rechazar la propiedad.';
-        throw new Error(errorMessage);
-      }
-      throw error;
-    }
-  },
-
-  // Añadir tour virtual a una propiedad
-  async addTourToProperty(propertyId, tourData) {
-    try {
-      console.log(`🔧 Admin: Adding tour to property ${propertyId}`, tourData);
-      const response = await api.post(`/admin/properties/${propertyId}/add-tour/`, tourData);
-      console.log('Tour added:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error(`Error adding tour to property ${propertyId}:`, error);
-      if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error al añadir tour virtual.';
-        throw new Error(errorMessage);
-      }
-      throw error;
-    }
-  }
-};
-
 export default {
   property: propertyService,
   auth: authService,
   tour: tourService,
-  image: imageService,
-  admin: adminService
-};
+  image: imageService
+}; 
