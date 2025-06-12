@@ -37,7 +37,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     serializer_class = PropertySerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['price', 'size', 'has_water', 'has_views']
+    filterset_fields = ['price', 'size', 'has_water', 'has_views', 'listing_type']
     # 'location_name' se eliminó porque no existe en el modelo
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'size', 'created_at']
@@ -334,115 +334,31 @@ class AISearchView(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            current_query = request.data.get('query') 
-            if current_query is None: 
-                 current_query = request.data.get('current_query', '')
-                 conversation_history = request.data.get('conversation_history', [])
-            else: 
-                 conversation_history = []
-
-            if not current_query and not conversation_history: 
-                return Response({'error': 'Current query or conversation history is missing.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            self._log_debug(f"Current Query: '{current_query}'")
-            self._log_debug(f"Conversation History (entrada):", conversation_history)
-
-            try:
-                gemini_service = GeminiService()
-                
-                # Usar el nuevo método que integra propiedades reales
-                ai_response = gemini_service.search_properties_with_ai(
-                    user_query=current_query,
-                    conversation_history=conversation_history
-                )
-                
-                self._log_debug("Respuesta de IA procesada:", ai_response)
-                
-                # Verificar si es una respuesta válida
-                if ai_response and isinstance(ai_response, dict):
-                    # Asegurar que tenemos los campos necesarios
-                    response_data = {
-                        'assistant_message': ai_response.get('assistant_message', 'Búsqueda procesada'),
-                        'suggestedFilters': ai_response.get('suggestedFilters', {
-                            'propertyTypes': [],
-                            'priceRange': [None, None],
-                            'features': [],
-                            'sizeRange': [None, None]
-                        }),
-                        'recommendations': ai_response.get('recommendations', []),
-                        'interpretation': ai_response.get('interpretation', current_query),
-                        'fallback': ai_response.get('fallback', False)
-                    }
-                    
-                    # Agregar información adicional si es respuesta de fallback
-                    if ai_response.get('fallback'):
-                        response_data['assistant_message'] += " (Usando búsqueda básica)"
-                    
-                    self._log_debug("Respuesta final enviada:", response_data)
-                    return Response(response_data, status=status.HTTP_200_OK)
-                
-                else:
-                    # Si no hay respuesta válida, crear una respuesta básica
-                    fallback_response = {
-                        'assistant_message': 'No se pudo procesar tu búsqueda en este momento.',
-                        'suggestedFilters': {
-                            'propertyTypes': [],
-                            'priceRange': [None, None],
-                            'features': [],
-                            'sizeRange': [None, None]
-                        },
-                        'recommendations': [],
-                        'interpretation': current_query,
-                        'error': 'Servicio temporalmente no disponible'
-                    }
-                    
-                    return Response(fallback_response, status=status.HTTP_200_OK)
-                
-            except GeminiServiceError as e:
-                logger.error(f"Error específico de GeminiService: {e}")
-                
-                # Crear respuesta de error más informativa
-                error_response = {
-                    'assistant_message': f'Error en el servicio de IA: {str(e)}',
-                    'suggestedFilters': {
-                        'propertyTypes': [],
-                        'priceRange': [None, None],
-                        'features': [],
-                        'sizeRange': [None, None]
-                    },
-                    'recommendations': [],
-                    'interpretation': current_query,
-                    'error': str(e),
-                    'suggestions': 'Verifique la configuración de la API de Gemini o intente más tarde.'
-                }
-                
-                return Response(error_response, status=status.HTTP_200_OK)
-                
-            except Exception as e:
-                logger.error(f"Error inesperado en AISearchView: {e}", exc_info=True)
-                
-                # Respuesta de error genérico
-                error_response = {
-                    'assistant_message': 'Error interno del servidor. Intente nuevamente.',
-                    'suggestedFilters': {
-                        'propertyTypes': [],
-                        'priceRange': [None, None],
-                        'features': [],
-                        'sizeRange': [None, None]
-                    },
-                    'recommendations': [],
-                    'interpretation': current_query,
-                    'error': 'Error interno del servidor'
-                }
-                
-                return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            query = request.data.get('query', '')
+            if not query:
+                return Response({'error': 'Query is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use GeminiService for NLP processing
+            gemini_service = GeminiService()
+            interpreted_query = gemini_service.interpret_query(query)  # Assume this returns structured data like {'location': 'región de los lagos', 'features': ['borde de lago', 'sin vecinos cerca']}
+            
+            # Build dynamic queryset based on interpreted query
+            queryset = Property.objects.all()
+            if 'location' in interpreted_query:
+                queryset = queryset.filter(description__icontains=interpreted_query['location'])  # Example filter
+            if 'features' in interpreted_query:
+                for feature in interpreted_query['features']:
+                    queryset = queryset.filter(description__icontains=feature)
+            
+            # Order and limit to top 3
+            top_properties = queryset.order_by('-price').distinct()[:3]  # Example ordering; adjust based on relevance
+            serializer = PropertyListSerializer(top_properties, many=True)
+            return Response({'top_options': serializer.data})
+        except GeminiServiceError as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            logger.error(f"Error crítico en AISearchView: {e}", exc_info=True)
-            return Response({
-                'error': 'Error crítico del servidor',
-                'details': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f'Error in AISearchView: {str(e)}')
+            return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request, *args, **kwargs):
         print("--- AISearchView GET method reached (use POST for AI search) ---")

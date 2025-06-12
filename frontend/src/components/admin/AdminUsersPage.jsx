@@ -1,5 +1,6 @@
 import React from 'react';
 import { Typography, Box } from '@mui/material';
+import AdminUsersListPage from './AdminUsersListPage';
 
 const AdminUsersPage = () => (
   <Box>
@@ -12,4 +13,6 @@ const AdminUsersPage = () => (
   </Box>
 );
 
-export default AdminUsersPage; 
+export default function AdminUsersPageWrapper() {
+  return <AdminUsersListPage />;
+} 

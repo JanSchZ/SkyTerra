@@ -463,6 +463,20 @@ export const propertyService = {
       delete prepared.hasViews;
     }
     
+    if (prepared.listingType) {
+      prepared.listing_type = prepared.listingType;
+      delete prepared.listingType;
+    }
+    if (prepared.rentPrice !== undefined) {
+      if (prepared.rentPrice === '') prepared.rentPrice = null;
+      if (prepared.rentPrice !== null) prepared.rent_price = parseFloat(prepared.rentPrice);
+      delete prepared.rentPrice;
+    }
+    if (prepared.rentalTerms !== undefined) {
+      prepared.rental_terms = prepared.rentalTerms;
+      delete prepared.rentalTerms;
+    }
+    
     // Limpiar campos que no son necesarios para el backend
     delete prepared.images;
     delete prepared.existingImageUrls;

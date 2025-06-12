@@ -26,6 +26,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import MapIcon from '@mui/icons-material/Map';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import TerrainIcon from '@mui/icons-material/Terrain';
+import SellIcon from '@mui/icons-material/Sell';
 import { propertyService } from '../../services/api';
 import MapView from '../map/MapView';
 import PropertyBoundaryDraw from '../map/PropertyBoundaryDraw';
@@ -69,6 +70,9 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     tour360: null,
     existingTourUrl: property?.tourUrl || null,
     tourToDelete: false,
+    listingType: 'sale',
+    rentPrice: '',
+    rentalTerms: '',
     ...property,
   };
 
@@ -137,6 +141,10 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
       setFormData(prev => ({ ...prev, [name]: checked }));
     } else if (name === 'price' || name === 'size' || name === 'latitude' || name === 'longitude') {
       if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
+        setFormData(prev => ({ ...prev, [name]: value }));
+      }
+    } else if (name === 'rentPrice') {
+      if (value === '' || /^\d*\.?\d*$/.test(value)) {
         setFormData(prev => ({ ...prev, [name]: value }));
       }
     } else {
@@ -219,6 +227,9 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     else if (isNaN(parseFloat(formData.size)) || parseFloat(formData.size) <= 0) errors.size = 'Tamaño inválido.';
     if (formData.latitude && (isNaN(parseFloat(formData.latitude)) || parseFloat(formData.latitude) < -90 || parseFloat(formData.latitude) > 90)) errors.latitude = 'Latitud inválida.';
     if (formData.longitude && (isNaN(parseFloat(formData.longitude)) || parseFloat(formData.longitude) < -180 || parseFloat(formData.longitude) > 180)) errors.longitude = 'Longitud inválida.';
+    if ((formData.listingType === 'rent' || formData.listingType === 'both') && (!formData.rentPrice || parseFloat(formData.rentPrice) <= 0)) {
+      errors.rentPrice = 'Precio de arriendo requerido y debe ser > 0';
+    }
     return errors;
   };
 
@@ -304,7 +315,22 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
               <TextField fullWidth label="Tamaño" name="size" type="number" value={formData.size} onChange={handleChange} error={!!formErrors.size} helperText={formErrors.size || 'En hectáreas'} required InputProps={{ endAdornment: <InputAdornment position="end">ha</InputAdornment> }} />
             </Grid>
             <Grid xs={12} md={4}>
+              <TextField fullWidth label="Modalidad" name="listingType" select SelectProps={{ native: true }} value={formData.listingType} onChange={handleChange}>
+                <option value="sale">Venta</option>
+                <option value="rent">Arriendo</option>
+                <option value="both">Venta y Arriendo</option>
+              </TextField>
             </Grid>
+            {(formData.listingType === 'rent' || formData.listingType === 'both') && (
+              <Grid xs={12} sm={6} md={4}>
+                <TextField fullWidth label="Precio Arriendo (CLP)" name="rentPrice" type="number" value={formData.rentPrice} onChange={handleChange} error={!!formErrors.rentPrice} helperText={formErrors.rentPrice} required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
+              </Grid>
+            )}
+            {(formData.listingType === 'rent' || formData.listingType === 'both') && (
+              <Grid xs={12}>
+                <TextField fullWidth multiline minRows={3} label="Términos de Arriendo (Opcional)" name="rentalTerms" value={formData.rentalTerms} onChange={handleChange} />
+              </Grid>
+            )}
             <Grid xs={12} sm={6}>
               <TextField fullWidth label="Latitud (Opcional)" name="latitude" type="number" value={formData.latitude} onChange={handleChange} error={!!formErrors.latitude} helperText={formErrors.latitude || 'Ej: -33.4489'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
             </Grid>

@@ -49,6 +49,11 @@ class Property(models.Model):
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
+    PROPERTY_LISTING_TYPES = [
+        ('sale', 'Sale'),
+        ('rent', 'Rent'),
+        ('both', 'Both'),
+    ]
     
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='properties', null=True, blank=True)
     name = models.CharField(max_length=255)
@@ -72,6 +77,9 @@ class Property(models.Model):
         default='pending',
         help_text='Estado de publicación de la propiedad'
     )
+    listing_type = models.CharField(max_length=10, choices=PROPERTY_LISTING_TYPES, default='sale')
+    rent_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    rental_terms = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -95,6 +103,11 @@ class Property(models.Model):
         if self.longitude is not None:
             if self.longitude < -180 or self.longitude > 180:
                 raise ValidationError({'longitude': 'La longitud debe estar entre -180 y 180'})
+
+        # Validate rent_price if listing_type involves rent
+        if self.listing_type in ['rent', 'both']:
+            if self.rent_price is None or self.rent_price <= 0:
+                raise ValidationError({'rent_price': 'El precio de arriendo debe ser mayor que 0 para propiedades en arriendo.'})
 
     def save(self, *args, **kwargs):
         """Override save para ejecutar validaciones"""

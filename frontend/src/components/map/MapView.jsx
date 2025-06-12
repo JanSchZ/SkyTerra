@@ -137,14 +137,13 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
 
   // Rotar texto cada 6 segundos
   useEffect(() => {
-    if (!showOverlay || disableIntroAnimation) return;
-    
-    const interval = setInterval(() => {
-      setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
-    }, 6000);
-
-    return () => clearInterval(interval);
-  }, [showOverlay, descriptiveTexts.length, disableIntroAnimation]);
+    if (showOverlay && !disableIntroAnimation && !userInteractedRef.current) {
+      const interval = setInterval(() => {
+        setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
+      }, 6000);
+      return () => clearInterval(interval);
+    }
+  }, [showOverlay, descriptiveTexts.length, disableIntroAnimation, userInteractedRef.current]);
 
   // Ocultar overlay cuando la animación termine O el usuario interactúe
   useEffect(() => {

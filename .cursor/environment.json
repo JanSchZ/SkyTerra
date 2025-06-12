@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.cursor.com/background-agent/base-environment.schema.json",
+  "name": "SkyTerra Development Environment",
+  "install": "pip install -r backend/requirements.txt && npm --prefix frontend install",
+  "start": "bash start_skyterra.sh",
+  "terminals": [
+    {
+      "name": "SkyTerra servers",
+      "command": "bash start_skyterra.sh",
+      "description": "Arranca los servidores de backend en 8000 y frontend en 5173."
+    }
+  ],
+  "build": {
+    "context": ".",
+    "dockerfile": "Dockerfile"
+  }
+}

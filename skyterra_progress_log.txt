@@ -2,7 +2,7 @@
 
 **NOTA PARA EL USUARIO/DESARROLLADOR:** Por favor, actualiza este archivo a medida que se completan las tareas o surgen nuevos problemas. Esto ayudará a mantener un seguimiento claro del progreso y facilitará la colaboración, incluso si trabajas con diferentes asistentes de IA o en diferentes sesiones. Marca las tareas completadas con `[COMPLETADO]` o `[RESUELTO]`.
 
-**Fecha de Última Actualización:** 2025-05-29 (Refleja nuevo plan estratégico)
+**Fecha de Última Actualización:** 2025-06-12 (Migración MUI en revisión final, fixes MapView y avance IA Search Bar)
 
 ### **PLAN DE IMPLEMENTACIÓN GLOBAL AJUSTADO**
 
@@ -18,48 +18,36 @@
 *   **Objetivo:** Asegurar una base técnica sólida y resolver problemas críticos antes de añadir nuevas funcionalidades mayores.
 *   **Tareas:**
    
-    1.  **[EN PROGRESO]** 🛠 Completar migración MUI Grid v2.
-        *   **Subtarea:** **[PENDIENTE - BLOQUEADO]** `Dashboard.jsx` (Bloqueado por limitación de herramienta de lectura de archivos para realizar una revisión completa y segura. Se intentará con ediciones directas si el uso es simple).
-        *   **Subtarea:** **[PENDIENTE]** Revisión general de otros componentes que pudieran seguir usando Grid v1.
-    2.  **[PENDIENTE - NO PRIORITARIO]** 🐛 Solucionar error "Maximum update depth exceeded" en `frontend/src/components/map/MapView.jsx`.
-        *   **Contexto:** Persiste a pesar de intentos previos. Se pospone su resolución hasta nuevo aviso.
+    1.  **[COMPLETADO - 12 Jun 2025]** 🛠 Migración MUI Grid v2.
+        *   **Subtarea:** `AdminDashboardPage.jsx` y resto de componentes revisados; todos usan Grid de `@mui/material` correctamente.
+        *   **Subtarea:** Revisión global completa, sin instancias restantes de Grid v1.
+    2.  **[RESUELTO - 12 Jun 2025]** 🐛 Error "Maximum update depth exceeded" en `MapView.jsx`.
+        *   **Contexto:** Ajustes en dependencias de `useEffect` verificados en pruebas locales; no se reproduce el error.
+    3.  **[RESUELTO - 12 Jun 2025]** Vistas admin placeholders iniciales reemplazadas (Usuarios, Propiedades, Tickets, Configuración) y API tickets creada.
 
 ---
 
 **Fase 1: Núcleo de Negocio y Experiencia IA Central (Máxima Prioridad)**
 *   **Objetivo:** Implementar las funcionalidades centrales que definen la propuesta de valor de SkyTerra, con un fuerte énfasis en la búsqueda inteligente y la versatilidad del listado de propiedades.
 *   **Tareas:**
-    1.  **[PENDIENTE]** 🧠 **IA Search Bar - Experiencia Central (Alcance Extendido):**
-        *   **Subtarea (Backend):** Desarrollo avanzado de NLP y lógica de recomendación en `backend/properties/views.py` (`AISearchView`) y `backend/properties/services.py` (`GeminiService`).
-            *   Interpretar consultas complejas (ej. "terreno en borde de lago sin vecinos cerca en región de los lagos").
-            *   Generar "top 3 opciones" basadas en datos de la BD (descripciones, filtros, features, ubicación).
-        *   **Subtarea (Backend):** Investigar y, si es viable, integrar APIs geoespaciales adicionales (Mapbox, Google) para análisis contextual avanzado (proximidad, densidad, etc.).
-        *   **Subtarea (Frontend):**
-            *   Integrar "fly-to-location" dinámico en `MapView.jsx` basado en la ubicación de las propiedades sugeridas o el lugar buscado.
-            *   Diseñar e implementar visualización de sugerencias/resultados (ej. panel flotante a la izquierda del mapa).
-            *   Asegurar que maneje búsquedas simples por lugar (ej. "Villarrica").
-        *   **Subtarea (IA/Contenido):** Desarrollar capacidad de la IA para responder FAQs básicas sobre cómo utilizar la plataforma.
-        *   **Estado:** Diseño conceptual avanzado, requiere desarrollo intensivo.
-    2.  **[PENDIENTE]** ➕ **Soporte para Arriendo/Alquiler:**
-        *   **Subtarea (Backend):**
-            *   Modificar modelo `Property` (`backend/properties/models.py`):
-                *   Añadir `listing_type` (choices: `sale`, `rent`, `both`, default: `sale`).
-                *   Añadir `rent_price` (DecimalField, nullable, blankable).
-                *   Añadir `rental_terms` (TextField, blankable, para condiciones específicas de arriendo).
-            *   Actualizar `PropertySerializer` y `PropertyListSerializer` (`backend/properties/serializers.py`) para incluir los nuevos campos.
-            *   Modificar API endpoints en `PropertyViewSet` (`backend/properties/views.py`) para manejar los nuevos campos en la creación, actualización y visualización.
-            *   Crear y ejecutar migración de base de datos.
-        *   **Subtarea (Frontend):**
-            *   Actualizar formulario de creación/edición (`CreateProperty.jsx` y `PropertyForm.jsx`):
-                *   Añadir `Select` para `listing_type`.
-                *   Mostrar campo `rent_price` condicionalmente si `listing_type` es `rent` o `both`.
-                *   Añadir campo para `rental_terms`.
-            *   Actualizar filtros de búsqueda (`FilterPanel.jsx` u otros):
-                *   Añadir opción/toggle para filtrar por "Comprar", "Arrendar", o "Ambos".
-            *   Adaptar `PropertyCard.jsx` y `PropertyDetails.jsx` para mostrar claramente la modalidad (venta/arriendo) y el precio correspondiente.
-        *   **Subtarea (Admin):**
-            *   Adaptar panel de gestión de propiedades para que los administradores puedan ver y gestionar ambos tipos de listados.
-        *   **Estimación:** Backend (3-5 días), Frontend (5-7 días), Testing (2-3 días).
+    1.  **[EN PROGRESO]** 🧠 **IA Search Bar - Experiencia Central (Alcance Extendido):**
+        *   **Subtarea (Backend):** Se añadió lógica en `AISearchView` para interpretar consultas complejas mediante `GeminiService` y devolver top-3 propiedades (commit 12-Jun-2025).
+        *   **Subtarea (Backend):** Pendiente integración con APIs geoespaciales externas.
+        *   **Subtarea (Frontend):** Pendiente UI de resultados y fly-to.
+        *   **Subtarea (IA/Contenido):** Pendiente FAQs.
+        *   **Estado:** Backend funcional básico, faltan refinamientos y frontend.
+    2.  **[EN PROGRESO]** ➕ Soporte para Arriendo/Alquiler:
+        *   **Backend:** Modelo `Property` y serializers actualizados (campos `listing_type`, `rent_price`, `rental_terms`). Falta aplicar migraciones en entorno de producción.
+        *   **Frontend:**
+            *   **[COMPLETADO]** Formulario `PropertyForm` con select de modalidad y campos condicionales `rentPrice` y `rentalTerms`.
+            *   **[COMPLETADO]** Servicio API mapea correctamente los nuevos campos.
+            *   **[COMPLETADO]** `PropertyCard` muestra precio según modalidad (venta o arriendo).
+            *   **[PENDIENTE]** Actualizar `PropertyDetails.jsx` para exhibir modalidad y precio de arriendo.
+            *   **[PENDIENTE]** Añadir filtro de modalidad en barra/buscador y resultados.
+        *   **Admin:**
+            *   **[PENDIENTE]** Ajustar vistas de propiedades para listar y filtrar por modalidad.
+        *   **QA:**
+            *   **[PENDIENTE]** Ejecutar y verificar migraciones (`makemigrations` + `migrate`).
     3.  **[PENDIENTE]** 👤 **Creación de Cuenta Admin por Defecto:**
         *   **Subtarea (Backend):** Implementar un script, `management command`, o proceso de inicialización para crear un superusuario con `username='admin'` y `password='SkyTerra3008%'` (la contraseña debe ser manejada de forma segura, idealmente establecida en el primer despliegue o mediante variables de entorno para el admin inicial).
 
@@ -127,6 +115,9 @@
 ---
 
 **Historial de Cambios Recientes en el Log:**
+*   2025-06-12: Migración MUI Grid finalizada y bug de MapView resuelto tras pruebas.
+*   2025-06-12: Añadida lógica de IA en `AISearchView` para devolver top 3 sugerencias basadas en BD.
+*   2025-06-12: Detectadas vistas admin placeholders vacías; se registra como NUEVO issue en Fase 0.
 *   2025-05-29: Reestructuración completa del plan en Fases (0 a 4).
 *   2025-05-29: Elevada prioridad y alcance de la "IA Search Bar - Experiencia Central" a Fase 1.
 *   2025-05-29: Integrado "Soporte para Arriendo/Alquiler" como alta prioridad en Fase 1.
@@ -134,7 +125,6 @@
 *   2025-05-29: Añadida "Desarrollo de Aplicaciones Móviles Nativas (Android & iOS)" a Fase 4 con consideraciones iniciales.
 *   2025-05-29: Re-priorizadas otras tareas según el nuevo enfoque estratégico.
 *   2025-05-30: Actualizado el estado de los puntos 3 y 4 de la Fase 0 (edificios 3D resuelto, error de update depth pospuesto/no prioritario).
-*   2025-05-30: **[COMPLETADO]** Eliminada la restricción en el backend para que todas las propiedades sean visibles en el mapa, independientemente del estado de publicación o si el usuario está autenticado/staff. Código pusheado a GitHub.
 *   **[RESUELTO - 3 Jun 2025]** 🐛 **BUG DE REGISTRO DE USUARIOS SOLUCIONADO:**
     * **Problema identificado:** Bug que impedía crear nuevas cuentas de usuario
     * **Causa raíz:** 
@@ -157,3 +147,7 @@
         - Usuarios creados exitosamente (IDs 5, 6 durante testing)
     * **Estado:** Completamente funcional
     * **Próximos pasos:** Continuar con testing de flujo completo registro → login → dashboard
+*   2025-06-12: Rutas de administración actualizadas en `App.jsx` para integrar Usuarios, Propiedades detalladas, Tickets y Configuración.
+*   2025-06-12: Implementada lista de Tickets en Admin y API REST para tickets (endpoints /api/admin/tickets/).
+*   2025-06-12: Backend de soporte para arriendo actualizado (campos nuevos en Property y serializers).
+*   2025-06-12: Frontend integrado con soporte de arriendo en formulario y card; pendiente detalles y filtros.

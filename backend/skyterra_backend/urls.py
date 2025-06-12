@@ -29,6 +29,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView # Import AdminUserListView
+from rest_framework import routers
+from support_tickets.views import TicketViewSet, TicketResponseViewSet
 
 def home_view(request):
     """Vista simple para la página de inicio"""
@@ -169,6 +171,10 @@ def register_view(request):
             'error': f'Error al crear usuario: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+router = routers.DefaultRouter()
+router.register(r'admin/tickets', TicketViewSet, basename='admin-tickets')
+router.register(r'admin/ticket-responses', TicketResponseViewSet, basename='admin-ticket-responses')
+
 urlpatterns = [
     path('', home_view, name='home'),  # Ruta raíz
     path('admin/', admin.site.urls),
@@ -189,8 +195,9 @@ urlpatterns = [
          auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), 
          name='password_reset_complete'),
     path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
-    path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'), # New URL for user list
+    path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('api/', include('properties.urls')),
+    path('api/', include(router.urls)),
 ]
 
 # Servir archivos estáticos y media en desarrollo

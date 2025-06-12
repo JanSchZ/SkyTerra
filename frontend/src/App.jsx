@@ -33,6 +33,10 @@ import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import AdminPublicationsPage from './components/admin/AdminPublicationsPage';
 import AdminDashboardPage from './components/admin/AdminDashboardPage';
 import AdminLayout from './components/admin/AdminLayout';
+import AdminUsersListPage from './components/admin/AdminUsersListPage';
+import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage';
+import AdminTicketsPage from './components/admin/AdminTicketsPage';
+import AdminSettingsPage from './components/admin/AdminSettingsPage';
 import { authService } from './services/api';
 import './App.css';
 
@@ -640,6 +644,38 @@ function App() {
               element={ 
                 <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                   <AdminDashboardPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-users-list" 
+              element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminUsersListPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-detailed-properties-list" 
+              element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminDetailedPropertiesPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-tickets" 
+              element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminTicketsPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-settings" 
+              element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminSettingsPage />
                 </motion.div>
               }
             />

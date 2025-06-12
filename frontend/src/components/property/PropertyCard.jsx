@@ -23,6 +23,10 @@ const PropertyCard = ({ property }) => {
     ? property.images[0].url 
     : 'https://via.placeholder.com/300x200.png?text=Sin+Imagen'; // Placeholder
 
+  const priceDisplay = property.listing_type === 'rent' || property.listing_type === 'both'
+    ? (property.rent_price ? `${Number(property.rent_price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })} /mes` : 'Arriendo no disponible')
+    : (property.price ? Number(property.price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) : 'Precio no disponible');
+
   return (
     <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 2, boxShadow: 3 }}>
       <CardMedia
@@ -39,7 +43,7 @@ const PropertyCard = ({ property }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, color: 'text.secondary' }}>
           <AttachMoneyIcon fontSize="small" sx={{ mr: 0.5 }} />
           <Typography variant="body2" color="text.primary" sx={{ fontWeight: 'medium' }}>
-            {property.price ? Number(property.price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) : 'Precio no disponible'}
+            {priceDisplay}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
