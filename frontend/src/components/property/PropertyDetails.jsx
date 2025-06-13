@@ -32,7 +32,7 @@ import TerrainIcon from '@mui/icons-material/Terrain';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
-import { propertyService, tourService, imageService } from '../../services/api';
+import { propertyService, tourService, imageService, authService } from '../../services/api';
 import MapView from '../map/MapView';
 
 // Países y sus recorridos de vuelo
@@ -81,6 +81,7 @@ const PropertyDetails = () => {
     bearing: 0          // Initial bearing
   });
   const mapRef = useRef(null);
+  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
 
   // Cargar datos de la propiedad
   useEffect(() => {
@@ -282,6 +283,9 @@ const PropertyDetails = () => {
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
+
+  // Helper: check if logged user is owner or admin
+  const isOwnerOrAdmin = currentUser && (currentUser.is_staff || (property?.owner_details && currentUser.id === property.owner_details.id));
 
   // Función para manejar la carga del mapa
   const handleMapLoad = () => {
@@ -546,6 +550,9 @@ const PropertyDetails = () => {
               <Tab label="Detalles" />
               <Tab label="Tours 360°" />
               <Tab label="Ubicación" />
+              {isOwnerOrAdmin && (
+                <Tab label="Documentos" />
+              )}
             </Tabs>
 
             {/* Contenido scrolleable */}
@@ -731,6 +738,54 @@ const PropertyDetails = () => {
                       {property?.latitude?.toFixed(6)}, {property?.longitude?.toFixed(6)}
                     </Typography>
                   </Box>
+                </Box>
+              )}
+
+              {/* Documentos Tab (index depends on isOwnerOrAdmin) */}
+              {isOwnerOrAdmin && activeTab === 3 && (
+                <Box>
+                  {(!property?.documents || property.documents.length === 0) ? (
+                    <Typography variant="body2" sx={{ color: '#8b949e', textAlign: 'center', py: 4 }}>
+                      No hay documentos cargados aún.
+                    </Typography>
+                  ) : (
+                    <List sx={{ p: 0 }}>
+                      {property.documents.map((doc) => (
+                        <ListItem key={doc.id} sx={{ px: 0, py: 1, display:'flex', alignItems:'center', gap:1 }}>
+                          <ListItemIcon sx={{ minWidth: '40px' }}>
+                            <ViewInArIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={doc.doc_type ? doc.doc_type.toUpperCase() : 'Documento'}
+                            secondary={doc.description || ''}
+                            primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 300, color: '#c9d1d9' }}
+                            secondaryTypographyProps={{ fontSize: '0.8rem', color: '#8b949e' }}
+                          />
+                          <Chip
+                            label={
+                              doc.status === 'approved' ? 'Aprobado' : (doc.status === 'rejected' ? 'Rechazado' : 'Pendiente')
+                            }
+                            size="small"
+                            sx={(theme) => ({
+                              backgroundColor: doc.status === 'approved' ? theme.palette.success.light : (doc.status === 'rejected' ? theme.palette.error.light : 'rgba(255,255,255,0.1)'),
+                              color: doc.status === 'approved' ? theme.palette.success.contrastText : (doc.status === 'rejected' ? theme.palette.error.contrastText : theme.palette.text.secondary),
+                              fontWeight: 400,
+                            })}
+                          />
+                          <Button
+                            href={doc.file}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="outlined"
+                            size="small"
+                            sx={{ ml: 1, textTransform: 'none', borderColor:'rgba(30, 58, 138, 0.4)', color:'#60a5fa', '&:hover':{ borderColor:'rgba(30, 58, 138, 0.6)', backgroundColor:'rgba(30, 58, 138, 0.1)' } }}
+                          >
+                            Ver
+                          </Button>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
                 </Box>
               )}
             </Box>

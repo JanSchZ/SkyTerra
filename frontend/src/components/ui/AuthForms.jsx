@@ -22,27 +22,30 @@ import CloseIcon from '@mui/icons-material/Close';
 // Estilos comunes para los TextField
 const commonTextFieldStyles = {
   '& .MuiInputLabel-root': {
-    color: '#8b949e', 
+    color: '#c9d1d9',
     fontWeight: 300,
   },
   '& .MuiInputLabel-root.Mui-focused': {
-    color: '#58a6ff',
+    color: '#c9d1d9',
   },
   '& .MuiOutlinedInput-root': {
-    backgroundColor: 'rgba(13, 17, 23, 0.85)',
-    color: '#c9d1d9',
-    borderRadius: '8px',
-    transition: 'background-color 0.3s ease, border-color 0.3s ease',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    color: '#e5e5e5',
+    borderRadius: '10px',
+    transition: 'box-shadow 0.4s ease',
     '& fieldset': {
-      borderColor: 'rgba(88, 166, 255, 0.2)',
-      borderWidth: '1px',
+      borderColor: 'transparent',
     },
     '&:hover fieldset': {
-      borderColor: 'rgba(88, 166, 255, 0.4)',
+      borderColor: 'transparent',
     },
     '&.Mui-focused fieldset': {
-      borderColor: '#58a6ff',
-      borderWidth: '1px',
+      borderColor: 'transparent',
+    },
+    '&.Mui-focused': {
+      boxShadow: '0 0 8px rgba(255,255,255,0.35)',
     },
   },
   '& .MuiFormHelperText-root': {
@@ -119,21 +122,23 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           fullWidth
           sx={{ 
             mt: 3, mb: 2, py: 1.5, borderRadius: '8px',
-            backgroundColor: '#58a6ff', 
+            backgroundColor: 'rgba(255,255,255,0.25)', 
+            border: '1px solid rgba(255,255,255,0.35)',
+            color: '#ffffff',
             fontWeight: 400,
             letterSpacing: '0.02em',
             textTransform: 'none',
-            '&:hover': { backgroundColor: '#4a90e2' }
+            '&:hover': { backgroundColor: 'rgba(255,255,255,0.35)' }
           }}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
         >
           {loading ? 'Iniciando...' : 'Iniciar Sesión'}
         </Button>
-        <Divider sx={{ my: 2, borderColor: 'rgba(88, 166, 255, 0.1)' }} />
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
         <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
           ¿No tienes una cuenta?
-          <Button onClick={onSwitchToRegister} sx={{ color: '#58a6ff', fontWeight: 400, textTransform: 'none', p:0.5 }}>
+          <Button onClick={onSwitchToRegister} sx={{ color: '#c9d1d9', fontWeight: 400, textTransform: 'none', p:0.5, '&:hover':{textDecoration:'underline'} }}>
             Crear cuenta
           </Button>
         </Typography>
@@ -240,13 +245,13 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
         <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
         <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles} />
         
-        <Button type="submit" variant="contained" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', backgroundColor: '#58a6ff', fontWeight: 400, letterSpacing: '0.02em', textTransform: 'none', '&:hover': { backgroundColor: '#4a90e2' } }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
+        <Button type="submit" variant="contained" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.35)', color: '#ffffff', fontWeight: 400, letterSpacing: '0.02em', textTransform: 'none', '&:hover': { backgroundColor: 'rgba(255,255,255,0.35)' } }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
           {loading ? 'Registrando...' : 'Crear Cuenta'}
         </Button>
-        <Divider sx={{ my: 2, borderColor: 'rgba(88, 166, 255, 0.1)' }} />
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
         <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
           ¿Ya tienes una cuenta?
-          <Button onClick={onSwitchToLogin} sx={{ color: '#58a6ff', fontWeight: 400, textTransform: 'none', p: 0.5 }}>
+          <Button onClick={onSwitchToLogin} sx={{ color: '#c9d1d9', fontWeight: 400, textTransform: 'none', p: 0.5, '&:hover':{textDecoration:'underline'} }}>
             Iniciar sesión
           </Button>
         </Typography>
@@ -316,9 +321,11 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
             width: '100%',
             maxWidth: '420px',
             borderRadius: '16px',
-            backgroundColor: '#101418',
-            border: '1px solid rgba(88, 166, 255, 0.15)',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.25)',
+            boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
             overflow: 'hidden',
           }}
         >
@@ -328,11 +335,11 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
               position: 'absolute', 
               top: 12, 
               right: 12, 
-              color: '#8b949e',
-              backgroundColor: 'rgba(255,255,255,0.05)',
+              color: '#e5e5e5',
+              backgroundColor: 'rgba(255,255,255,0.10)',
               '&:hover': { 
-                color: '#c9d1d9',
-                backgroundColor: 'rgba(255,255,255,0.1)',
+                color: '#ffffff',
+                backgroundColor: 'rgba(255,255,255,0.18)',
               } 
             }}
           >

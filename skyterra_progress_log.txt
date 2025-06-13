@@ -231,6 +231,11 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
     * `AISuggestionPanel` ahora usa fondo claro y borde acorde.
     * Token `surface-glass` aplicado a inputs (OutlinedInput root).
     * **Pendiente:** Migrar Dashboard, PropertyDetails, CreateProperty y demás vistas que aún usan `rgba(22,27,34,*)` directo a `variant="glass"` o al nuevo token.
+*   **[COMPLETADO - 14 Jun 2025]** Rediseño de Dashboards (Usuario y Admin) al estilo Liquid Glass minimalista:
+    *  Se reemplazaron colores azules (#3b82f6, #8faacc, etc.) por acento neutro (#a0a0a0) y colores de tema.
+    *  Cards, Paper y métricas ahora usan variante `glass` con fondos translúcidos y bordes consistentes.
+    *  Íconos y botones actualizados para seguir la paleta neutra; bordes y hovers adaptados.
+    *  Gráficos en Admin Dashboard recodificados con color neutro y contenedores translúcidos.
 
 ---
 

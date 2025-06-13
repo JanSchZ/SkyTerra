@@ -315,6 +315,7 @@ function App() {
     return (
       <Paper 
         elevation={3} 
+        className="no-shine"
         sx={{ 
           p: 1.5, 
           mt: 1, 
@@ -465,8 +466,11 @@ function App() {
                     onMouseLeave={handleMenuMouseLeave}
                     TransitionComponent={Grow}
                     PaperProps={{
+                      className: 'no-shine',
                       sx: {
                         mt: 1.5,
+                        minWidth: 220,
+                        width: '260px',
                         backgroundColor: 'rgba(255,255,255,0.18)',
                         backgroundImage: 'none',
                         border: '1px solid rgba(255,255,255,0.25)',

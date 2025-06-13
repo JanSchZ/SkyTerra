@@ -1150,8 +1150,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.15)',
-            backdropFilter: 'blur(1px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.05)',
+            backdropFilter: 'blur(6px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1166,11 +1166,12 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               maxWidth: '600px',
               px: 4,
               py: 3,
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              backgroundColor: 'rgba(255, 255, 255, 0.18)',
               borderRadius: '24px',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             }}
           >
             <motion.div
@@ -1187,6 +1188,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   fontWeight: 700,
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                   color: 'rgba(255, 255, 255, 0.95)',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.4)',
                   mb: 2,
                   letterSpacing: '-0.02em'
                 }}
@@ -1200,7 +1202,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 300,
                   fontSize: { xs: '1.1rem', md: '1.4rem' },
-                  color: 'rgba(255, 255, 255, 0.8)',
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  textShadow: '0 1px 6px rgba(0,0,0,0.35)',
                   mb: 1,
                   letterSpacing: '-0.01em'
                 }}
@@ -1214,7 +1217,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 300,
                   fontSize: { xs: '0.95rem', md: '1.1rem' },
-                  color: 'rgba(255, 255, 255, 0.65)',
+                  color: 'rgba(255, 255, 255, 0.75)',
+                  textShadow: '0 1px 4px rgba(0,0,0,0.3)',
                   lineHeight: 1.6,
                   maxWidth: '400px',
                   mx: 'auto'
@@ -1230,8 +1234,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                 size="large"
                 onClick={stopAndSkipAnimation}
                 sx={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)', // Slightly increased opacity
-                  color: 'rgba(255, 255, 255, 0.95)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                  color: '#ffffff',
                   fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
                   fontWeight: 500,
                   fontSize: '1.1rem',
@@ -1240,10 +1244,10 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   borderRadius: '16px',
                   textTransform: 'none',
                   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.25)', // Slightly increased border opacity
+                  border: '1px solid rgba(255, 255, 255, 0.35)',
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Slightly increased hover opacity
-                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.15)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.2)',
                     transform: 'translateY(-2px)',
                   },
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

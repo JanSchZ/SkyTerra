@@ -10,6 +10,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 // Set global default font for Chart.js
 ChartJS.defaults.font.family = "'Source Code Pro', monospace";
 ChartJS.defaults.color = '#E5E8F0'; // Default text color for charts
+const ACCENT = '#a0a0a0'; // neutral accent color (no blue)
 
 // Importar el layout del panel de admin si ya existe uno, o crear uno básico aquí.
 // Por ahora, será un layout simple.
@@ -92,20 +93,20 @@ const AdminDashboardPage = () => {
           <Typography variant="h4" component="h1" sx={{ /*fontFamily: 'Code Pro, sans-serif',*/ fontWeight: 'bold', mb: 3, color: '#E5E8F0' }}> {/* Updated font */}
             SkyTerra Admin Dashboard
           </Typography>
-          <Typography variant="body1" sx={{ /*fontFamily: 'Clear Sans, sans-serif',*/ color: '#8faacc' }}> {/* Updated font */}
+          <Typography variant="body1" sx={{ color: ACCENT }}>
             Bienvenido al panel de administración de SkyTerra. Desde aquí podrás gestionar propiedades, usuarios y más.
           </Typography>
           {/* Aquí se añadirán las métricas y otros componentes del dashboard */}
           
-          {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress color="info" /></Box>}
+          {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress color="primary" /></Box>}
           {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
 
           {metrics && (
             <Grid container spacing={3} sx={{ mt: 4 }}>
               {metricCards.map(card => (
                 <Grid item xs={12} sm={6} md={3} key={card.key}>
-                  <Paper elevation={2} sx={{ p: 2, backgroundColor: '#182534', color: '#E5E8F0', borderRadius: '12px', minHeight: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="h6" sx={{ /*fontFamily: 'Clear Sans, sans-serif',*/ color: '#8faacc', mb: 1, textAlign: 'center' }}> {/* Updated font */}
+                  <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', minHeight: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="h6" sx={{ color: ACCENT, mb: 1, textAlign: 'center' }}>
                       {card.label}
                     </Typography>
                     <Typography variant="h3" sx={{ /*fontFamily: 'Code Pro, sans-serif',*/ fontWeight: 'bold', color: '#E5E8F0' }}> {/* Updated font */}
@@ -125,8 +126,8 @@ const AdminDashboardPage = () => {
             {/* Property Type Distribution Chart */}
             {propertyData.length > 0 && (
               <Grid item xs={12} md={6}>
-                <Paper elevation={2} sx={{ p: 2, backgroundColor: '#182534', color: '#E5E8F0', borderRadius: '12px', height: '400px' /* Fixed height */ }}>
-                  <Typography variant="h6" sx={{ /*fontFamily: 'Clear Sans, sans-serif',*/ color: '#8faacc', mb: 2 }}>Distribución de Propiedades por Tipo</Typography> {/* Updated font */}
+                <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', height: '400px' }}>
+                  <Typography variant="h6" sx={{ color: ACCENT, mb: 2 }}>Distribución de Propiedades por Tipo</Typography>
                   <Box sx={{ height: 'calc(100% - 48px)' }}> {/* Adjust height for chart, considering title */}
                     <Bar
                       data={{
@@ -136,8 +137,8 @@ const AdminDashboardPage = () => {
                           data: [...new Set(propertyData.map(item => item.type || 'N/A'))].map(type =>
                             propertyData.filter(item => (item.type || 'N/A') === type).length
                           ),
-                          backgroundColor: '#8faacc',
-                          borderColor: '#8faacc',
+                          backgroundColor: ACCENT,
+                          borderColor: ACCENT,
                           borderWidth: 1,
                           borderRadius: 4, // Rounded bars
                           barThickness: 'flex',
@@ -188,8 +189,8 @@ const AdminDashboardPage = () => {
             {/* Price Distribution Chart */}
             {propertyData.length > 0 && (
               <Grid item xs={12} md={6}>
-                <Paper elevation={2} sx={{ p: 2, backgroundColor: '#182534', color: '#E5E8F0', borderRadius: '12px', height: '400px' /* Fixed height */ }}>
-                  <Typography variant="h6" sx={{ /*fontFamily: 'Clear Sans, sans-serif',*/ color: '#8faacc', mb: 2 }}>Distribución de Precios</Typography>
+                <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', height: '400px' }}>
+                  <Typography variant="h6" sx={{ color: ACCENT, mb: 2 }}>Distribución de Precios</Typography>
                   <Box sx={{ height: 'calc(100% - 48px)' }}> {/* Adjust height for chart, considering title */}
                     <Line
                       data={{
@@ -197,14 +198,14 @@ const AdminDashboardPage = () => {
                         datasets: [{
                           label: 'Precio (USD)',
                           data: propertyData.map(item => item.price),
-                          borderColor: '#8faacc',
-                          backgroundColor: 'rgba(143, 170, 204, 0.2)', // Optional fill
+                          borderColor: ACCENT,
+                          backgroundColor: 'rgba(160,160,160,0.25)', // Optional fill
                           fill: true, // Optional fill
                           tension: 0.1, // Smoother lines
                           pointBackgroundColor: '#E5E8F0',
-                          pointBorderColor: '#8faacc',
+                          pointBorderColor: ACCENT,
                           pointHoverBackgroundColor: '#fff',
-                          pointHoverBorderColor: '#8faacc',
+                          pointHoverBorderColor: ACCENT,
                           pointRadius: 4,
                           pointHoverRadius: 6
                         }]
@@ -272,8 +273,8 @@ const AdminDashboardPage = () => {
             {/* Property Status Chart */}
             {propertyStatusChartData && (
               <Grid item xs={12} md={6}> {/* Displayed below, taking half width or full if desired */}
-                <Paper elevation={2} sx={{ p: 2, backgroundColor: '#182534', color: '#E5E8F0', borderRadius: '12px', height: '400px' /* Fixed height */ }}>
-                  <Typography variant="h6" sx={{ /*fontFamily: 'Clear Sans, sans-serif',*/ color: '#8faacc', mb: 2 }}>Estado de Propiedades</Typography>
+                <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', height: '400px' }}>
+                  <Typography variant="h6" sx={{ color: ACCENT, mb: 2 }}>Estado de Propiedades</Typography>
                   <Box sx={{ height: 'calc(100% - 48px)' }}> {/* Adjust height for chart, considering title */}
                     <Pie
                       data={propertyStatusChartData} // propertyStatusChartData already defines labels and datasets
@@ -287,14 +288,14 @@ const AdminDashboardPage = () => {
                               color: '#E5E8F0', // Color for legend text
                               font: { family: "'Source Code Pro', monospace" } // Updated font
                             }
+                          },
+                          elements: {
+                            arc: {
+                              borderColor: 'rgba(255,255,255,0.08)',
+                              borderWidth: 2
+                            }
                           }
                         },
-                        elements: {
-                          arc: {
-                            borderColor: '#182534', // Border color for pie slices, matching Paper background
-                            borderWidth: 2
-                          }
-                        }
                       }}
                     />
                   </Box>

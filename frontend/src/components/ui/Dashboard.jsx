@@ -100,7 +100,7 @@ const Dashboard = ({ user }) => {
   if (!user && !loading) {
     return (
       <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d1117'}}>
-        <CircularProgress sx={{ color: '#3b82f6' }} />
+        <CircularProgress color="primary" />
       </Box>
     );
   }
@@ -116,7 +116,7 @@ const Dashboard = ({ user }) => {
         backgroundColor: '#0d1117',
         color: '#c9d1d9'
       }}>
-        <CircularProgress color="primary" size={50} sx={{mb: 2}} />
+        <CircularProgress color="primary" size={50} sx={{ mb: 2 }} />
         <Typography variant="h6" sx={{ fontWeight: 300 }}>
           Cargando tu panel...
         </Typography>
@@ -191,7 +191,7 @@ const Dashboard = ({ user }) => {
         {/* Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid xs={12} sm={6} md={3}>
-            <Card variant="glass" sx={{ p:2 }}>
+            <Card variant="glass" sx={{ p: 2 }}>
               <CardContent>
                 <Typography variant="h4" sx={{ color: 'primary.light', fontWeight: 600 }}>
                   {properties.length}
@@ -203,11 +203,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Grid>
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
-              borderRadius: 2
-            }}>
+            <Card variant="glass" sx={{ p: 2 }}>
               <CardContent>
                 <Typography variant="h4" sx={{ color: '#10b981', fontWeight: 'bold' }}>
                   {properties.reduce((acc, p) => acc + (p.size || 0), 0).toFixed(1)}
@@ -219,11 +215,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Grid>
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
-              borderRadius: 2
-            }}>
+            <Card variant="glass" sx={{ p: 2 }}>
               <CardContent>
                 <Typography variant="h4" sx={{ color: '#f59e0b', fontWeight: 'bold' }}>
                   {formatPrice(properties.reduce((acc, p) => acc + (p.price || 0), 0))}
@@ -235,11 +227,7 @@ const Dashboard = ({ user }) => {
             </Card>
           </Grid>
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
-              borderRadius: 2
-            }}>
+            <Card variant="glass" sx={{ p: 2 }}>
               <CardContent>
                 <Typography variant="h4" sx={{ color: '#8b5cf6', fontWeight: 'bold' }}>
                   {properties.filter(p => p.hasWater || p.has_water).length}
@@ -253,19 +241,14 @@ const Dashboard = ({ user }) => {
         </Grid>
 
         {/* Properties Section */}
-        <Paper sx={{ 
-          p: 4, 
-          backgroundColor: 'rgba(22, 27, 34, 0.95)',
-          border: '1px solid rgba(30, 41, 59, 0.3)',
-          borderRadius: 3
-        }}>
+        <Paper variant="glass" sx={{ p: 4 }}>
           <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 3 }}>
             Mis Propiedades
           </Typography>
 
           {loading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress sx={{ color: '#3b82f6' }} />
+              <CircularProgress color="primary" />
             </Box>
           )}
 
@@ -306,7 +289,7 @@ const Dashboard = ({ user }) => {
                     borderRadius: 2,
                     transition: 'all 0.2s ease',
                     '&:hover': {
-                      borderColor: 'rgba(59, 130, 246, 0.4)',
+                      borderColor: 'primary.main',
                       transform: 'translateY(-2px)'
                     }
                   }}>
@@ -365,7 +348,7 @@ const Dashboard = ({ user }) => {
                                   sx={{borderColor: '#30363d', color: '#8b949e'}} 
                               />
                           )}
-                          {property.has_water && <Chip icon={<WaterDropIcon fontSize="small" />} label="Agua" size="small" variant="filled" sx={{backgroundColor: 'rgba(56,139,253,0.2)', color: '#79c0ff'}} />}
+                          {property.has_water && <Chip icon={<WaterDropIcon fontSize="small" />} label="Agua" size="small" variant="filled" sx={{ backgroundColor: 'rgba(40,180,133,0.2)', color: '#40c9a2' }} />}
                           {property.has_views && <Chip icon={<TerrainIcon fontSize="small" />} label="Vistas" size="small" variant="filled" sx={{backgroundColor: 'rgba(35,134,54,0.2)', color: '#56d364'}}/>}
                            {property.publication_status && (
                             <Chip 
@@ -387,7 +370,7 @@ const Dashboard = ({ user }) => {
                       <IconButton
                         size="small"
                         onClick={() => navigate(`/property/${property.id}`)}
-                        sx={{ color: '#58a6ff', '&:hover': {backgroundColor: 'rgba(88,166,255,0.1)'} }}
+                        sx={{ color: 'primary.main', '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' } }}
                         title="Ver Detalles"
                       >
                         <VisibilityIcon />
@@ -395,7 +378,7 @@ const Dashboard = ({ user }) => {
                       <IconButton
                         size="small"
                         onClick={() => navigate(`/property/edit/${property.id}`)}
-                        sx={{ color: '#a5d6ff', '&:hover': {backgroundColor: 'rgba(165,214,255,0.1)'} }}
+                        sx={{ color: 'primary.main', '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' } }}
                          title="Editar"
                       >
                         <EditIcon />
@@ -403,7 +386,7 @@ const Dashboard = ({ user }) => {
                       <IconButton
                         size="small"
                         onClick={() => handleDeleteClick(property)}
-                        sx={{ color: '#f85149', '&:hover': {backgroundColor: 'rgba(248,81,73,0.1)'} }}
+                        sx={{ color: '#f85149', '&:hover': { backgroundColor: 'rgba(248,81,73,0.1)' } }}
                         title="Eliminar"
                       >
                         <DeleteIcon />
