@@ -55,8 +55,8 @@
             *   **[PENDIENTE]** Ajustar vistas de propiedades para listar y filtrar por modalidad.
         *   **QA:**
             *   **[PENDIENTE]** Ejecutar y verificar migraciones (`makemigrations` + `migrate`).
-    3.  **[EN PROGRESO]** 📈 **Métrica de Plusvalía Inteligente (Recovery Score‐style):**
-        *   **Backend:** Campo `plusvalia_score` en modelo `Property` con cálculo automático; migraciones pendientes de aplicar.
+    3.  **[RESUELTO - 13 Jun 2025]** 📈 **Métrica de Plusvalía Inteligente (Recovery Score‐style):**
+        *   **Backend:** Campo `plusvalia_score` en modelo `Property` con cálculo automático; migraciones aplicadas.
         *   **Servicio `PlusvaliaService` v2:** Combina 10 factores (valor de mercado externo, tasa apreciación histórica, demanda interna por visitas, precio/hectárea, agua, vistas, tamaño, proximidad, modalidad, IA). Integra **ClearAVM / Property Valuation API** para AVM y apreciación histórica [fuente](https://www.clearcapital.com/products/property-valuation-api/). **Completado** (stub externo, pesos iniciales, cálculos y fallback a neutro).
         *   **Demanda:** Nuevo modelo `PropertyVisit` para registrar vistas; falta endpoint y frontend para registrar cada visualización de detalle de propiedad.
         *   **Seguridad:** `plusvalia_score` solo visible para usuarios `is_staff`.
@@ -98,8 +98,8 @@
         *   Diseño detallado de la UX y los flujos antes de la implementación.
         *   Backend: Modelos, lógica de negocio, posibles integraciones con pasarelas de pago.
         *   Frontend: Interfaz para gestionar estas transacciones.
-    2.  **[PENDIENTE]** 🎨 **Unificar Tema Oscuro y Estilo Visual Globalmente:**
-        *   Asegurar consistencia de diseño, tipografía, colores, y componentes en toda la aplicación.
+    2.  **[EN PROGRESO]** 🎨 **Unificar Tema Oscuro y Estilo Visual Globalmente:**
+        *   Asegurar consistencia de diseño, tipografía, colores, y componentes en toda la aplicación. **Problema identificado:** Persistencia de estilos `backgroundColor` inline y en reglas CSS específicas con mayor prioridad (`!important`) sobre el tema global Liquid Glass. Requiere una refactorización exhaustiva para eliminar estilos `hard-coded` y confiar plenamente en las variantes de tema de MUI (`variant="glass"`) y clases auxiliares.
     3.  **[PENDIENTE]** 📱 **Optimización Móvil Detallada (para la Web App) y Pruebas de Accesibilidad.**
         *   Asegurar que la PWA o web app sea completamente responsive y accesible.
     4.  **[PENDIENTE]** 💡 **Onboarding/Ayuda Rápida para nuevos usuarios:**

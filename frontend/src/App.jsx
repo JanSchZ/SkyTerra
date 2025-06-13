@@ -68,14 +68,14 @@ const AppWrapper = () => {
             contrastText: '#000000',
           },
           background: {
-            default: '#0d1117',
-            paper: '#161b22',
+            default: 'rgba(13,17,23,0.72)',
+            paper: 'rgba(22,27,34,0.72)',
           },
           text: {
             primary: '#c9d1d9',
             secondary: '#8b949e',
           },
-          divider: '#30363d',
+          divider: 'rgba(255,255,255,0.12)',
           action: {
             hover: 'rgba(88, 166, 255, 0.12)',
             selected: 'rgba(88, 166, 255, 0.20)',
@@ -109,11 +109,75 @@ const AppWrapper = () => {
             },
           },
           MuiPaper: {
+            variants: [
+              {
+                props: { variant: 'glass' },
+                style: {
+                  backgroundColor: 'rgba(22, 27, 34, 0.85)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.125)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                  transition: 'background-color 0.6s ease, backdrop-filter 0.6s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(30, 36, 42, 0.85)',
+                    backdropFilter: 'blur(14px)',
+                    WebkitBackdropFilter: 'blur(14px)',
+                  },
+                },
+              },
+            ],
             styleOverrides: {
               root: {
                 borderRadius: 12,
-                border: '1px solid #30363d',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                backgroundClip: 'padding-box',
+                backgroundColor: 'rgba(22,27,34,0.72)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                transition: 'background-color 0.6s ease, backdrop-filter 0.6s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(30, 36, 42, 0.80)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                },
+              },
+            },
+          },
+          MuiAppBar: {
+            styleOverrides: {
+              root: {
+                backgroundColor: 'rgba(22,27,34,0.72)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+              },
+            },
+          },
+          MuiCard: {
+            variants: [
+              {
+                props: { variant: 'glass' },
+                style: {
+                  backgroundColor: 'rgba(30, 36, 42, 0.75)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
+                  transition: 'background-color 0.6s ease, backdrop-filter 0.6s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(40, 46, 52, 0.80)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                  },
+                },
+              },
+            ],
+            styleOverrides: {
+              root: {
+                borderRadius: 12,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               },
             },
           },
@@ -122,10 +186,11 @@ const AppWrapper = () => {
               root: {
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 8,
-                  backgroundColor: 'rgba(13, 17, 23, 0.7)',
-                  backdropFilter: 'blur(5px)',
+                  backgroundColor: 'rgba(13, 17, 23, 0.65)',
+                  backdropFilter: 'blur(6px)',
+                  WebkitBackdropFilter: 'blur(6px)',
                   '& fieldset': {
-                    borderColor: '#30363d',
+                    borderColor: 'rgba(255,255,255,0.12)',
                     borderWidth: '1px',
                   },
                   '&:hover fieldset': {
@@ -138,14 +203,6 @@ const AppWrapper = () => {
                 },
               },
             },
-          },
-          MuiCard: {
-            styleOverrides: {
-              root: {
-                borderRadius: 12,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              }
-            }
           },
         },
         shape: {

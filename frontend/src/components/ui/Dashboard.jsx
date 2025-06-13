@@ -179,15 +179,10 @@ const Dashboard = ({ user }) => {
 
           <Button
             variant="contained"
+            color="primary"
             startIcon={<AddIcon />}
             onClick={() => navigate('/create-property')}
-            sx={{
-              backgroundColor: '#3b82f6',
-              '&:hover': { backgroundColor: '#2563eb' },
-              borderRadius: 2,
-              px: 3,
-              py: 1
-            }}
+            sx={{ borderRadius: 2, px: 3, py: 1, backdropFilter:'blur(8px)', textTransform:'none' }}
           >
             Nueva Propiedad
           </Button>
@@ -196,16 +191,12 @@ const Dashboard = ({ user }) => {
         {/* Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid xs={12} sm={6} md={3}>
-            <Card sx={{
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              border: '1px solid rgba(30, 41, 59, 0.3)',
-              borderRadius: 2
-            }}>
+            <Card variant="glass" sx={{ p:2 }}>
               <CardContent>
-                <Typography variant="h4" sx={{ color: '#3b82f6', fontWeight: 'bold' }}>
+                <Typography variant="h4" sx={{ color: 'primary.light', fontWeight: 600 }}>
                   {properties.length}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#8b949e' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   Propiedades Publicadas
                 </Typography>
               </CardContent>

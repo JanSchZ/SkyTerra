@@ -329,6 +329,7 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
 
   const filterContent = (
     <Paper 
+        variant="glass"
         elevation={isMobile ? 0 : 16}
         sx={{
             ...(isMobile ? {
@@ -339,13 +340,9 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
                 maxHeight: 'calc(100vh - 120px)',
                 borderRadius: '20px',
             }),
-            backgroundColor: 'rgba(22, 27, 34, 0.95)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(88, 166, 255, 0.15)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
             ...sx,
         }}
     >

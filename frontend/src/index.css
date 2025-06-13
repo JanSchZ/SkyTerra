@@ -26,53 +26,30 @@
 }
 
 :root {
-  /* Navy Blue Color Palette */
-  --navy-dark: #0a1628;
-  --navy-primary: #1e3a5f;
-  --navy-medium: #2c5282;
-  --navy-light: #4a90c2;
-  --navy-lightest: #e2f4ff;
-  
-  /* Accent Colors */
-  --accent-gold: #f6d55c;
-  --accent-light: #ffffff;
-  --accent-gray: #64748b;
-  --accent-light-gray: #f8fafc;
-  
-  /* Text Colors */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-light: #94a3b8;
-  --text-white: #ffffff;
-  
-  /* Background Colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-dark: var(--navy-dark);
-  
-  /* Border Colors */
-  --border-light: #e2e8f0;
-  --border-medium: #cbd5e1;
+  /* Glassmorphism base palette */
+  --glass-bg: rgba(22,27,34,0.75);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-text-primary: #e5e7eb;
+  --glass-text-secondary: #9ca3af;
 }
 
 body {
-  /* font-family will be inherited from * selector */
   font-weight: 400;
   line-height: 1.6;
-  color: var(--text-primary);
-  background-color: #0d1117;
+  color: var(--glass-text-primary);
+  background-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   font-size: 14px;
 }
 
-/* Typography improvements */
+/* Headings over glass surfaces */
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Source Code Pro', sans-serif !important;
   font-weight: 600;
-  color: var(--navy-primary);
-  line-height: 1.4;
+  color: var(--glass-text-primary);
+  line-height: 1.3;
 }
 
 /* Configuración de mapbox-gl */
@@ -178,54 +155,9 @@ iframe {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Button styles */
-.btn-primary {
-  background-color: var(--navy-primary);
-  color: var(--text-white);
-  border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-family: 'Source Code Pro', sans-serif !important;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-primary:hover {
-  background-color: var(--navy-medium);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2);
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: var(--navy-primary);
-  border: 1px solid var(--navy-primary);
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-family: 'Source Code Pro', sans-serif !important;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background-color: var(--navy-primary);
-  color: var(--text-white);
-}
-
-/* Card styles */
-.card {
-  background: var(--bg-primary);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(30, 58, 95, 0.08);
-  border: 1px solid var(--border-light);
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  box-shadow: 0 8px 25px rgba(30, 58, 95, 0.12);
-  transform: translateY(-2px);
+/* Legacy button/card classes deprecated in favor of MUI variants */
+.btn-primary, .btn-secondary, .card {
+  all: unset;
 }
 
 /* Input styles */
@@ -245,4 +177,54 @@ iframe {
   outline: none;
   border-color: var(--navy-primary);
   box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+@keyframes glassFlow {
+  0% {
+    backdrop-filter: blur(10px) saturate(110%);
+    -webkit-backdrop-filter: blur(10px) saturate(110%);
+  }
+  50% {
+    backdrop-filter: blur(14px) saturate(130%);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+  }
+  100% {
+    backdrop-filter: blur(10px) saturate(110%);
+    -webkit-backdrop-filter: blur(10px) saturate(110%);
+  }
+}
+
+.glass-hover:hover {
+  animation: glassFlow 6s ease-in-out infinite alternate;
+}
+
+/* ----- Liquid Glass Global Override (forces old hard-coded backgrounds to glass) ----- */
+.glass-surface,
+.MuiPaper-root,
+.MuiCard-root,
+.MuiAppBar-root,
+.MuiDrawer-paper,
+.MuiAlert-root,
+.MuiTooltip-tooltip,
+.MuiPopover-paper {
+  background-color: rgba(22, 27, 34, 0.78) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.35) !important;
+}
+
+/* Soft translucent buttons */
+.MuiButton-containedPrimary,
+.MuiButton-containedSecondary {
+  background-color: rgba(88, 166, 255, 0.25) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  color: #e5e7eb !important;
+  box-shadow: none;
+  transition: background-color 0.4s ease;
+}
+.MuiButton-containedPrimary:hover,
+.MuiButton-containedSecondary:hover {
+  background-color: rgba(88, 166, 255, 0.35) !important;
 }

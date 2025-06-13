@@ -47,7 +47,7 @@ const AISuggestionPanel = ({
   }, [recommendations]);
   if (isLoading) {
     return (
-      <Paper elevation={3} sx={{ p: 2, position: 'absolute', top: '100px', left: '20px', width: '350px', zIndex: 1300, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', backgroundColor: 'rgba(22, 27, 34, 0.85)', backdropFilter: 'blur(10px)' }}>
+      <Paper variant="glass" elevation={3} sx={{ p: 2, position: 'absolute', top: '100px', left: '20px', width: '350px', zIndex: 1300, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100px' }}>
           <CircularProgress size={30} />
           <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>Buscando con IA...</Typography>
@@ -73,22 +73,18 @@ const AISuggestionPanel = ({
       transition={{ duration: 0.3 }}
     >
       <Paper
+        variant="glass"
         elevation={6}
         sx={{
           p: 2,
           position: 'absolute',
-          top: { xs: 'auto', sm: '140px' }, // Adjust based on AISearchBar and AppliedFiltersDisplay height
+          top: { xs: 'auto', sm: '140px' },
           bottom: { xs: '20px', sm: 'auto' },
           left: '20px',
           width: { xs: 'calc(100% - 40px)', sm: '380px' },
-          zIndex: 1250, // Below AISearchBar (1300), above MapView (1)
+          zIndex: 1250,
           maxHeight: { xs: '40vh', sm: 'calc(100vh - 160px)' },
           overflowY: 'auto',
-          backgroundColor: 'rgba(22, 27, 34, 0.9)', // Darker, more translucent
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(48, 54, 61, 0.7)',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
@@ -127,18 +123,16 @@ const AISuggestionPanel = ({
                  transition={{ delay: index * 0.1 }}
               >
               <Card
-                variant="outlined"
+                variant="glass"
                 sx={{
                   mb: 1.5,
                   cursor: 'pointer',
-                  backgroundColor: 'rgba(30, 36, 42, 0.7)',
                   transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                   '&:hover': {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
                     borderColor: 'primary.main'
-                  },
-                  border: '1px solid rgba(48, 54, 61, 0.5)'
+                  }
                 }}
                 onClick={() => onSuggestionClick && onSuggestionClick(rec)}
                 onMouseEnter={() => onSuggestionHover && onSuggestionHover(rec)}
