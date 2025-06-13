@@ -251,7 +251,7 @@ function App() {
         zoom: locationData.zoom || 12,
         pitch: locationData.pitch || 60,
         bearing: locationData.bearing || 0,
-        duration: 2000,
+        duration: 4500,
         essential: true,
       });
     }

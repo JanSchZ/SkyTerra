@@ -6,6 +6,7 @@ import time
 import random
 from django.db.models import Q
 from .models import Property
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -263,7 +264,6 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                             # Limpiar posibles bloques de código Markdown (```json ... ```)
                             clean_content = content.strip()
                             if clean_content.startswith('```'):
-                                import re
                                 # Remove opening fence and optional language tag
                                 clean_content = re.sub(r'^```[a-zA-Z]*\s*', '', clean_content)
                                 # Remove trailing fence

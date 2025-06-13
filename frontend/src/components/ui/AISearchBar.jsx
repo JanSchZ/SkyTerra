@@ -367,30 +367,6 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                     }}
                   />
                 </Box>
-                {searchResult.allResults && searchResult.allResults.length > 1 && (
-                  <>
-                    <Typography variant="caption" sx={{ color: '#8b949e', display:'block', mb: 0.5 }}>
-                      Otras ubicaciones:
-                    </Typography>
-                    <List dense sx={{ maxHeight: '180px', overflowY: 'auto', p:0 }}>
-                      {searchResult.allResults.slice(1, 5).map((location, index) => (
-                        <ListItem 
-                          key={index} 
-                          button 
-                          onClick={() => handleLocationClick(location)}
-                          sx={{ py: 0.2, px: 1, borderRadius: 1, mb: 0.5, '&:hover': {backgroundColor: 'rgba(30, 41, 59, 0.3)'} }}
-                        >
-                          <ListItemText 
-                            primary={location.name}
-                            secondary={location.type}
-                            primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 300, color: '#c9d1d9' }}
-                            secondaryTypographyProps={{ fontSize: '0.75rem', color: '#8b949e' }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </>
-                )}
               </>
             )}
 
