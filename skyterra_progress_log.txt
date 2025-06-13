@@ -128,6 +128,56 @@
 
 ---
 
+**ROADMAP DE REDISEÑO UI “LIQUID GLASS” (Estilo macOS)** — *[DETALLADO - 13 Jun 2025]*
+
+*Visión:* Transicionar todo el frontend a un diseño minimalista inspirado en macOS con fondos translúcidos, tipografía limpia y micro-interacciones fluidas. Se introduce un *theme* unificado `liquidGlassTheme` y variantes `glass` en los componentes MUI. El backend proveerá assets retina, versionado de diseño y feature-flags para gradual rollout.
+
+### Fase GL-0 • Auditoría & Definición (1 sem)
+1. Inventario completo de componentes React/MUI y estilos CSS/inline.  
+2. Matriz de dependencias visuales ↔ payload backend (ej. `publication_status`, `listing_type`).  
+3. Informe de inconsistencias + propuesta de tokens.
+
+### Fase GL-1 • Fundaciones de Diseño (1 sem)
+1. Crear `src/theme/tokens.js` con:  
+   • `surface-0` #0e0e0e, `surface-1` rgba(255,255,255,.04), `surface-glass` rgba(255,255,255,.12) + blur(10px).  
+   • `accent` #66ccff.  
+   • Escala tipográfica `14/18/22/28/40`, grid 4 px.  
+2. Implementar `liquidGlassTheme.js` y registrar variantes `glass` para `Paper`, `Card`, `AppBar`, `Drawer`.  
+3. Página interna `/styleguide` (Storybook o ruta React) para previsualizar tokens.
+
+### Fase GL-2 • Layout & Navegación (2 sem)
+1. Sidebar → off-canvas `Drawer` (`permanent` desktop / `temporary` mobile) con `surface-glass`.  
+2. TopBar minimal (56 px) autohide on-scroll móvil.  
+3. Reescritura de grids: `repeat(auto-fit,minmax(280px,1fr))`.  
+4. Tablas → `@mui/x-data-grid` sin sombras.
+
+### Fase GL-3 • Conversión de Componentes (3 sem, rolling)
+Para cada componente: migrar a `sx` + tokens, sustituir sombras por bordes semitransparentes, aplicar variante `glass` si es contenedor.
+Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups → Vistas Admin → Formularios Auth → `AISuggestionPanel`.
+
+### Fase GL-4 • Animaciones & Micro-interacciones (1 sem)
+1. Wrapper `GlassFade` (opacity+blur+scale) con Framer-motion.  
+2. Ripple buttons (`scale(.96)` + inset-shadow 150 ms).  
+3. Page-transitions vía `AnimatePresence`.  
+4. Map fly-to duration 4.5 s.
+
+### Fase GL-5 • Backend & Assets (1 sem paralela)
+1. Header `X-Design-Version: liquid-v1` para compatibilidad.  
+2. Endpoints `/images` sirven WebP 2× retina.  
+3. Streaming progresivo de tours.
+
+### Fase GL-6 • Performance & QA (1 sem)
+1. Lighthouse ≥ 85 móvil/escritorio.  
+2. Test cross-browser; fallback sólido cuando no haya `backdrop-filter`.  
+3. WCAG 2.1 AA.
+
+### Fase GL-7 • Lanzamiento & Gobernanza (continuo)
+1. Feature-flag `liquidGlass` por usuario.  
+2. Documentación de tokens y patrones en Notion.  
+3. ESLint rule: prohibido usar hex directo, sólo tokens.
+
+---
+
 **Historial de Cambios Recientes en el Log:**
 *   2025-06-12: Migración MUI Grid finalizada y bug de MapView resuelto tras pruebas.
 *   2025-06-12: Añadida lógica de IA en `AISearchView` para devolver top 3 sugerencias basadas en BD.
@@ -167,6 +217,8 @@
 *   2025-06-12: Frontend integrado con soporte de arriendo en formulario y card; pendiente detalles y filtros.
 *   2025-06-13: Añadido `plusvalia_score` con cálculo IA + datos externos; modelo `PropertyVisit`; servicio `ExternalMarketDataService` y actualización de `PlusvaliaService` v2.
 *   2025-06-13: Actualizado Fase 1 con la nueva tarea 'Métrica de Plusvalía Inteligente'.
+*   2025-06-13: Añadido Roadmap detallado de Rediseño UI “Liquid Glass” y marcada la tarea general de unificación de tema como parte del nuevo roadmap GL.
+*   2025-06-13: Crítica de diseño fuerte y lineamientos minimalistas incorporados.
 
 ---
 

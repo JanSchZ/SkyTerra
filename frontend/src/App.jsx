@@ -551,7 +551,7 @@ function App() {
                 }
               }}
             >
-              SkyTerra
+              SKYTERRA
             </Typography>
 
             <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
