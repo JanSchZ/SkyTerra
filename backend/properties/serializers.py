@@ -78,6 +78,7 @@ class PropertySerializer(serializers.ModelSerializer):
     boundary_polygon = serializers.JSONField(required=False, allow_null=True)
     owner_details = BasicUserSerializer(source='owner', read_only=True)
     documents = PropertyDocumentSerializer(many=True, read_only=True)
+    plusvalia_score = serializers.SerializerMethodField()
     # TODO: add documents serializer when backend model ready
 
     class Meta:
@@ -85,7 +86,7 @@ class PropertySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
-                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents']
+                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score']
         
     def validate_boundary_polygon(self, value):
         """Validar que boundary_polygon sea un GeoJSON válido"""
@@ -126,6 +127,12 @@ class PropertySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El tamaño debe ser mayor que 0")
         return value
         
+    def get_plusvalia_score(self, obj):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_staff:
+            return obj.plusvalia_score
+        return None
+
 class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer para listar propiedades con menos detalles"""
     image_count = serializers.IntegerField(source='image_count_annotation', read_only=True)

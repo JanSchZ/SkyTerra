@@ -80,6 +80,7 @@ class Property(models.Model):
     listing_type = models.CharField(max_length=10, choices=PROPERTY_LISTING_TYPES, default='sale')
     rent_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     rental_terms = models.TextField(blank=True)
+    plusvalia_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Métrica interna que refleja el potencial de plusvalía (0-100). Solo visible para admin.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -109,9 +110,27 @@ class Property(models.Model):
             if self.rent_price is None or self.rent_price <= 0:
                 raise ValidationError({'rent_price': 'El precio de arriendo debe ser mayor que 0 para propiedades en arriendo.'})
 
+    def calculate_plusvalia_score(self):
+        """Calcula el puntaje de plusvalía de la propiedad combinando 7 métricas y una evaluación IA.
+        El resultado se normaliza en un rango 0-100.
+        """
+        from .plusvalia_service import PlusvaliaService  # Import aquí para evitar ciclos
+        return PlusvaliaService.calculate(self)
+
     def save(self, *args, **kwargs):
-        """Override save para ejecutar validaciones"""
-        self.full_clean()  # Ejecuta clean() y las validaciones de campo
+        """Override save para calcular automáticamente el plusvalia_score antes de guardar."""
+        # Ejecuta validaciones estándar
+        self.full_clean()
+        # Calcular puntaje de plusvalía (si no se pasa explícitamente o si se fuerza recálculo)
+        # El parámetro de palabra clave 'recalculate_plusvalia' permite recalcular desde callers
+        recalc = kwargs.pop('recalculate_plusvalia', False)
+        if self.plusvalia_score is None or recalc:
+            try:
+                self.plusvalia_score = self.calculate_plusvalia_score()
+            except Exception as e:
+                # No impedir el guardado si algo falla; dejar puntaje en None
+                import logging
+                logging.getLogger(__name__).error(f"Error calculando plusvalia_score para propiedad {self.id}: {e}")
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -173,3 +192,21 @@ class PropertyDocument(models.Model):
 
     def __str__(self):
         return f"Document {self.doc_type} for {self.property.name}"
+
+# -----------------------------
+# Analytics - Visitas a Propiedades
+# -----------------------------
+
+class PropertyVisit(models.Model):
+    property = models.ForeignKey(Property, related_name='visits', on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    visited_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['visited_at']),
+        ]
+        ordering = ['-visited_at']
+
+    def __str__(self):
+        return f"Visit to {self.property.name} at {self.visited_at}"
