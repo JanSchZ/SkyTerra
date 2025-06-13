@@ -234,6 +234,11 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         params.has_tour = params.has360Tour;
         delete params.has360Tour;
       }
+      // NEW: manual listing type filter
+      if (params.listingType !== undefined) {
+        params.listing_type = params.listingType;
+        delete params.listingType;
+      }
       
       // If AI filters exist, they take precedence over manual filters
       if (aiFilters && Object.keys(aiFilters).length > 0) {
@@ -255,6 +260,10 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             if (feature.toLowerCase().includes('views')) params.has_views = true;
             if (feature.toLowerCase().includes('road')) params.has_road_access = true;
           });
+        }
+        // NEW: listing type filter
+        if (aiFilters.listingType && (aiFilters.listingType === 'sale' || aiFilters.listingType === 'rent' || aiFilters.listingType === 'both')) {
+          params.listing_type = aiFilters.listingType;
         }
       }
       

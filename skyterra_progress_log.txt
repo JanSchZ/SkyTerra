@@ -47,7 +47,7 @@
             *   **[COMPLETADO - 13 Jun 2025]** Backend: Modelo `PropertyDocument` implementado (relación 1-a-N), con campos `file`, `doc_type`, `description`, `uploaded_at`.
             *   **[COMPLETADO - 13 Jun 2025]** API: Se añadió `PropertyDocumentViewSet` (CRUD), ruta `/api/documents/`, serializer y registro en `urls.py`; `PropertySerializer` actualizado y manejo de `new_documents` en vistas.
             *   **[EN PROGRESO - 13 Jun 2025]** Backend: Acciones `approve` / `reject` añadidas a `PropertyDocumentViewSet`; actualización de estado y transición automática de `publication_status`.
-            *   **[PENDIENTE]** Admin UX: Panel React para revisar documentos y botones aprobar/rechazar.
+            *   **[COMPLETADO - 13 Jun 2025]** Admin UX: Panel React `AdminDocumentsReviewPage.jsx` para revisión y aprobar/rechazar documentos; rutas y menú añadidos; backend filter `status` añadido.
             *   **[PENDIENTE]** Notificaciones: Email al propietario cuando su propiedad cambia de estado (pendiente → approved/rejected).
             *   **[PENDIENTE]** Frontend: Mostrar estado de verificación y lista de documentos subidos en `PropertyDetails.jsx` (sólo para owner y admin).
             *   **[DESCARTADO - 13 Jun 2025]** Filtros manuales eliminados del UI principal; la IA gestionará filtros internamente.
@@ -128,7 +128,7 @@
 
 ---
 
-**ROADMAP DE REDISEÑO UI “LIQUID GLASS” (Estilo macOS)** — *[DETALLADO - 13 Jun 2025]*
+**ROADMAP DE REDISEÑO UI "LIQUID GLASS" (Estilo macOS)** — *[DETALLADO - 13 Jun 2025]*
 
 *Visión:* Transicionar todo el frontend a un diseño minimalista inspirado en macOS con fondos translúcidos, tipografía limpia y micro-interacciones fluidas. Se introduce un *theme* unificado `liquidGlassTheme` y variantes `glass` en los componentes MUI. El backend proveerá assets retina, versionado de diseño y feature-flags para gradual rollout.
 
@@ -217,8 +217,13 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
 *   2025-06-12: Frontend integrado con soporte de arriendo en formulario y card; pendiente detalles y filtros.
 *   2025-06-13: Añadido `plusvalia_score` con cálculo IA + datos externos; modelo `PropertyVisit`; servicio `ExternalMarketDataService` y actualización de `PlusvaliaService` v2.
 *   2025-06-13: Actualizado Fase 1 con la nueva tarea 'Métrica de Plusvalía Inteligente'.
-*   2025-06-13: Añadido Roadmap detallado de Rediseño UI “Liquid Glass” y marcada la tarea general de unificación de tema como parte del nuevo roadmap GL.
+*   2025-06-13: Añadido Roadmap detallado de Rediseño UI "Liquid Glass" y marcada la tarea general de unificación de tema como parte del nuevo roadmap GL.
 *   2025-06-13: Crítica de diseño fuerte y lineamientos minimalistas incorporados.
+*   **[RESUELTO - 13 Jun 2025]** Filtros de Modalidad (Venta/Arriendo) implementados en frontend:
+    *   MapView.jsx ahora envía `listing_type` en parámetros API (manual y AI).
+    *   AISearchBar.jsx soporta `listingType` en chips y filtros sugeridos.
+    *   Propagación via `aiAppliedFilters` garantizada.
+*   **[COMPLETADO - 13 Jun 2025]** Se implementó `liquidGlassTheme` con tokens y se reemplazó azul primario por paleta neutra; componentes principales actualizados (App, Dashboard, AISearchBar, AdminLayout) para usar colores del tema.
 
 ---
 

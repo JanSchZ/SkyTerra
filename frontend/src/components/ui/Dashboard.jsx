@@ -139,7 +139,7 @@ const Dashboard = ({ user }) => {
         <Alert severity="error" sx={{mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373'}}>
           {error}
         </Alert>
-        <Button variant="outlined" onClick={() => window.location.reload()} sx={{color: '#58a6ff', borderColor: '#58a6ff'}}>
+        <Button variant="outlined" onClick={() => window.location.reload()} sx={{color: 'primary.main', borderColor: 'primary.main'}}>
           Reintentar Carga
         </Button>
       </Box>
@@ -286,9 +286,9 @@ const Dashboard = ({ user }) => {
               </Typography>
               <Button
                 variant="contained"
+                color="primary"
                 startIcon={<AddIcon />}
                 onClick={() => navigate('/create-property')}
-                sx={{ backgroundColor: '#3b82f6', '&:hover': { backgroundColor: '#2563eb' } }}
               >
                 Crear Mi Primera Propiedad
               </Button>

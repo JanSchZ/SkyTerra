@@ -3,7 +3,6 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-
 import {
   CssBaseline,
   ThemeProvider,
-  createTheme,
   Box,
   Typography,
   Button,
@@ -21,6 +20,7 @@ import {
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import { motion, AnimatePresence } from 'framer-motion';
+import { liquidGlassTheme } from './theme/liquidGlassTheme';
 
 import MapView from './components/map/MapView';
 import PropertyDetails from './components/property/PropertyDetails';
@@ -38,6 +38,7 @@ import AdminUsersListPage from './components/admin/AdminUsersListPage';
 import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage';
 import AdminTicketsPage from './components/admin/AdminTicketsPage';
 import AdminSettingsPage from './components/admin/AdminSettingsPage';
+import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage';
 import { authService } from './services/api';
 import './App.css';
 
@@ -49,175 +50,7 @@ export const ThemeModeContext = React.createContext({
 const AppWrapper = () => {
   const mode = 'dark';
 
-  const baseFontFamily = '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-  const titleFontFamily = '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-
-  const theme = useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: 'dark',
-          primary: {
-            main: '#58a6ff',
-            light: '#7FBFFF',
-            dark: '#005DB3',
-            contrastText: '#ffffff',
-          },
-          secondary: {
-            main: '#f6d55c',
-            contrastText: '#000000',
-          },
-          background: {
-            default: 'rgba(13,17,23,0.72)',
-            paper: 'rgba(22,27,34,0.72)',
-          },
-          text: {
-            primary: '#c9d1d9',
-            secondary: '#8b949e',
-          },
-          divider: 'rgba(255,255,255,0.12)',
-          action: {
-            hover: 'rgba(88, 166, 255, 0.12)',
-            selected: 'rgba(88, 166, 255, 0.20)',
-          }
-        },
-        typography: {
-          fontFamily: baseFontFamily,
-          h1: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.02em' },
-          h2: { fontFamily: titleFontFamily, fontWeight: 300, letterSpacing: '-0.01em' },
-          h3: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '-0.01em' },
-          h4: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' },
-          h5: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0em' },
-          h6: { fontFamily: titleFontFamily, fontWeight: 400, letterSpacing: '0.01em' },
-          body1: { fontWeight: 300, lineHeight: 1.65 },
-          body2: { fontWeight: 300, lineHeight: 1.55 },
-          button: { fontWeight: 400, textTransform: 'none', letterSpacing: '0.02em', fontSize: '0.9rem' },
-        },
-        components: {
-          MuiButton: {
-            styleOverrides: {
-              root: {
-                borderRadius: 8,
-                padding: '8px 20px',
-                boxShadow: 'none',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&:hover': {
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
-                }
-              },
-            },
-          },
-          MuiPaper: {
-            variants: [
-              {
-                props: { variant: 'glass' },
-                style: {
-                  backgroundColor: 'rgba(22, 27, 34, 0.85)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255, 255, 255, 0.125)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-                  transition: 'background-color 0.6s ease, backdrop-filter 0.6s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(30, 36, 42, 0.85)',
-                    backdropFilter: 'blur(14px)',
-                    WebkitBackdropFilter: 'blur(14px)',
-                  },
-                },
-              },
-            ],
-            styleOverrides: {
-              root: {
-                borderRadius: 12,
-                backgroundClip: 'padding-box',
-                backgroundColor: 'rgba(22,27,34,0.72)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-                transition: 'background-color 0.6s ease, backdrop-filter 0.6s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(30, 36, 42, 0.80)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                },
-              },
-            },
-          },
-          MuiAppBar: {
-            styleOverrides: {
-              root: {
-                backgroundColor: 'rgba(22,27,34,0.72)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-              },
-            },
-          },
-          MuiCard: {
-            variants: [
-              {
-                props: { variant: 'glass' },
-                style: {
-                  backgroundColor: 'rgba(30, 36, 42, 0.75)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
-                  transition: 'background-color 0.6s ease, backdrop-filter 0.6s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(40, 46, 52, 0.80)',
-                    backdropFilter: 'blur(12px)',
-                    WebkitBackdropFilter: 'blur(12px)',
-                  },
-                },
-              },
-            ],
-            styleOverrides: {
-              root: {
-                borderRadius: 12,
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              },
-            },
-          },
-          MuiTextField: {
-            styleOverrides: {
-              root: {
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 8,
-                  backgroundColor: 'rgba(13, 17, 23, 0.65)',
-                  backdropFilter: 'blur(6px)',
-                  WebkitBackdropFilter: 'blur(6px)',
-                  '& fieldset': {
-                    borderColor: 'rgba(255,255,255,0.12)',
-                    borderWidth: '1px',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#58a6ff',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#58a6ff',
-                    borderWidth: '2px',
-                  },
-                },
-              },
-            },
-          },
-        },
-        shape: {
-          borderRadius: 8,
-        },
-        shadows: Array(25).fill('none').map((_, index) => {
-          if (index === 0) return 'none';
-          const y = index;
-          const blur = index * 2.5;
-          const alpha = 0.2 + index * 0.02;
-          return `0 ${y}px ${blur}px rgba(0,0,0, ${Math.min(alpha, 0.7)})`;
-        }),
-      }),
-    [mode],
-  );
+  const theme = useMemo(() => liquidGlassTheme('dark'), []);
 
   const themeMode = useMemo(
     () => ({
@@ -636,7 +469,7 @@ function App() {
                   variant="outlined"
                   onClick={() => navigate('/login')}
                   sx={{
-                    borderColor: 'rgba(30, 58, 138, 0.7)', color: '#60a5fa', fontWeight: 300,
+                    borderColor: 'rgba(120, 120, 120, 0.7)', color: theme.palette.primary.main, fontWeight: 300,
                     padding: '6px 12px', fontSize: '0.8rem',
                     backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
                     '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
@@ -756,6 +589,14 @@ function App() {
               element={
                 <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
                   <AdminTicketsPage />
+                </motion.div>
+              }
+            />
+            <Route 
+              path="/admin-documents" 
+              element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <AdminDocumentsReviewPage />
                 </motion.div>
               }
             />

@@ -363,7 +363,7 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
     queryset = PropertyDocument.objects.all().order_by('-uploaded_at')
     serializer_class = PropertyDocumentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['property', 'doc_type']
+    filterset_fields = ['property', 'doc_type', 'status']
     search_fields = ['description']
     ordering_fields = ['uploaded_at']
 

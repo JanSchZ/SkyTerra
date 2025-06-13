@@ -75,7 +75,7 @@ const AISuggestionPanel = ({
       <Paper
         variant="glass"
         elevation={6}
-        sx={{
+        sx={(theme) => ({
           p: 2,
           position: 'absolute',
           top: { xs: 'auto', sm: '140px' },
@@ -85,10 +85,14 @@ const AISuggestionPanel = ({
           zIndex: 1250,
           maxHeight: { xs: '40vh', sm: 'calc(100vh - 160px)' },
           overflowY: 'auto',
-        }}
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          backgroundColor: 'rgba(22,27,34,0.82)',
+          border: `1px solid rgba(255,255,255,0.08)`,
+        })}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'medium', color: 'text.primary', fontSize: '1.1rem' }}>
+          <Typography variant="h6" sx={{ fontWeight: 500, color: 'text.primary', fontSize: '1.1rem', letterSpacing: 0 }}>
             Asistente IA SkyTerra
           </Typography>
           {onClearAISearch && (
@@ -110,7 +114,7 @@ const AISuggestionPanel = ({
 
         {hasRecommendations && (
           <>
-          <Divider sx={{ my: 1.5 }} />
+          <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
           <Typography variant="subtitle1" sx={{ mb: 1, fontWeight:'bold', color: 'text.primary' }}>
              Top {Math.min(recommendations.length, 5)} Sugerencia{Math.min(recommendations.length, 5) > 1 ? 's' : ''}:
           </Typography>
@@ -124,16 +128,16 @@ const AISuggestionPanel = ({
               >
               <Card
                 variant="glass"
-                sx={{
+                sx={(theme)=>({
                   mb: 1.5,
                   cursor: 'pointer',
-                  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+                  transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.35s cubic-bezier(0.4,0,0.2,1)',
                   '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                    borderColor: 'primary.main'
-                  }
-                }}
+                    transform: 'translateY(-3px)',
+                    boxShadow: `0 6px 20px rgba(0,0,0,0.35)` ,
+                    borderColor: theme.palette.primary.main,
+                  },
+                })}
                 onClick={() => onSuggestionClick && onSuggestionClick(rec)}
                 onMouseEnter={() => onSuggestionHover && onSuggestionHover(rec)}
                 onMouseLeave={() => onSuggestionHover && onSuggestionHover(null)} // Clear hover
@@ -150,7 +154,7 @@ const AISuggestionPanel = ({
                   </Box>
                 )}
                 <CardContent sx={{p: 1.5}}>
-                  <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'primary.light' }}>
+                  <Typography variant="subtitle1" component="div" sx={{ fontWeight: 500, fontSize: '1rem', color: 'text.primary', letterSpacing: 0 }}>
                     {rec.name}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>

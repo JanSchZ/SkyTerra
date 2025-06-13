@@ -241,7 +241,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
           type: resultType,
           search_mode: search_mode || (resultType === 'properties' ? 'property_recommendation' : 'location'),
           assistant_message: assistant_message || (resultType === 'properties' ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
-          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [] }) : null,
+          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [], listingType: null }) : null,
           interpretation: interpretation || assistant_message,
           recommendations: hasRecs ? (recommendations || []) : [],
           flyToLocation
@@ -361,9 +361,9 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                     sx={{ 
                       fontWeight: 300,
                       borderRadius: '8px',
-                      backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(30, 58, 138, 0.3)',
+                      backgroundColor: 'rgba(80, 80, 80, 0.15)',
+                      color: theme.palette.primary.main,
+                      border: '1px solid rgba(80, 80, 80, 0.3)',
                     }}
                   />
                 </Box>
@@ -379,7 +379,8 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                 (suggestedFilters.propertyTypes && suggestedFilters.propertyTypes.length > 0) ||
                 (suggestedFilters.priceRange && suggestedFilters.priceRange[0] !== null && suggestedFilters.priceRange[1] !== null) ||
                 (suggestedFilters.features && suggestedFilters.features.length > 0) ||
-                (suggestedFilters.locations && suggestedFilters.locations.length > 0)
+                (suggestedFilters.locations && suggestedFilters.locations.length > 0) ||
+                (suggestedFilters.listingType !== undefined && suggestedFilters.listingType !== null)
               );
               const hasRecommendations = isPropertiesSearch && recommendations.length > 0;
 
@@ -409,6 +410,9 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                             {suggestedFilters.locations?.map(loc => (
                               <Chip key={loc} label={`${loc}`} icon={<TravelExploreIcon />} size="small" sx={chipSx}/>
                             ))}
+                            {suggestedFilters.listingType && (
+                              <Chip label={suggestedFilters.listingType === 'rent' ? 'Arriendo' : (suggestedFilters.listingType === 'both' ? 'Venta/Arriendo' : 'Venta')} size="small" sx={chipSx} />
+                            )}
                           </Box>
                         </Box>
                       )}

@@ -6,6 +6,7 @@ import SupportAgentIcon from '@mui/icons-material/SupportAgent'; // Para Tickets
 import PeopleIcon from '@mui/icons-material/People'; // Para Usuarios
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts'; // Icon for User Management
 import SettingsIcon from '@mui/icons-material/Settings';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom'; // Outlet para renderizar contenido de rutas hijas
 
 const drawerWidth = 260;
@@ -14,6 +15,7 @@ const navItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin-dashboard' },
   { text: 'Propiedades', icon: <HomeWorkIcon />, path: '/admin-detailed-properties-list' }, // Updated path
   { text: 'Tickets de Soporte', icon: <SupportAgentIcon />, path: '/admin-tickets' },
+  { text: 'Documentos', icon: <DescriptionIcon />, path: '/admin-documents' },
   // { text: 'Usuarios', icon: <PeopleIcon />, path: '/admin-users' }, // Original generic users link
   { text: 'Gestionar Usuarios', icon: <ManageAccountsIcon />, path: '/admin-users-list' }, // New specific link
   { text: 'Configuración', icon: <SettingsIcon />, path: '/admin-settings' },
@@ -38,7 +40,7 @@ const AdminLayout = () => {
               to={item.path}
               selected={location.pathname.startsWith(item.path)}
               sx={{
-                color: '#8faacc',
+                color: theme => theme.palette.text.secondary,
                 '&.Mui-selected': {
                   backgroundColor: 'rgba(75, 110, 150, 0.3)',
                   color: '#E5E8F0',
@@ -51,7 +53,7 @@ const AdminLayout = () => {
                 }
               }}
             >
-              <ListItemIcon sx={{ color: '#8faacc' }}>
+              <ListItemIcon sx={{ color: theme => theme.palette.text.secondary }}>
                 {item.icon}
               </ListItemIcon>
               <ListItemText primary={item.text} primaryTypographyProps={{ }} />
