@@ -28,7 +28,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView # Import AdminUserListView
+from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView  # Import stats view
 from rest_framework import routers
 from support_tickets.views import TicketViewSet, TicketResponseViewSet
 
@@ -196,6 +196,7 @@ urlpatterns = [
          name='password_reset_complete'),
     path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
     path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
+    path('api/admin/dashboard/stats/', AdminDashboardStatsView.as_view(), name='admin-dashboard-stats'),
     path('api/', include('properties.urls')),
     path('api/', include(router.urls)),
 ]

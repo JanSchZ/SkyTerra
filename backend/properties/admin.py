@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Property, Tour, Image # Ensure Property is imported
+from .models import Property, Tour, Image, PropertyDocument # Ensure Property is imported
 
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
@@ -38,3 +38,9 @@ class ImageAdmin(admin.ModelAdmin):
     list_filter = ('type',)
     search_fields = ('property__name',)
     list_editable = ('order',)
+
+@admin.register(PropertyDocument)
+class PropertyDocumentAdmin(admin.ModelAdmin):
+    list_display = ('property', 'doc_type', 'status', 'uploaded_at', 'reviewed_by')
+    list_filter = ('doc_type',)
+    search_fields = ('property__name', 'description')

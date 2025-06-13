@@ -23,9 +23,9 @@ class AdminDashboardSummaryView(APIView):
         last_month_start = now - timedelta(days=30)
 
         # Propiedades pendientes de aprobación
-        pending_properties = Property.objects.filter(publication_status='pending_approval').count()
-        # Propiedades publicadas hoy
-        published_today = Property.objects.filter(publication_status='published', created_at__date=today).count()
+        pending_properties = Property.objects.filter(publication_status='pending').count()
+        # Propiedades aprobadas/publicadas hoy
+        published_today = Property.objects.filter(publication_status='approved', created_at__date=today).count()
         # Tickets de soporte abiertos
         open_tickets = Ticket.objects.filter(status__in=['new', 'in_progress', 'on_hold']).count()
         # Nuevos usuarios últimos 7 días
@@ -62,3 +62,19 @@ class AdminUserListView(ListAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = UserSerializer
     queryset = User.objects.all().order_by('-date_joined')
+
+class AdminDashboardStatsView(APIView):
+    """Return aggregated counts of properties by publication status for admin charts."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        # Count properties in each publication status category
+        pending = Property.objects.filter(publication_status='pending').count()
+        approved = Property.objects.filter(publication_status='approved').count()
+        rejected = Property.objects.filter(publication_status='rejected').count()
+
+        return Response({
+            "pending_properties": pending,
+            "approved_properties": approved,
+            "rejected_properties": rejected,
+        })

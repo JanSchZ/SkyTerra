@@ -305,15 +305,12 @@ export const propertyService = {
   // Crear nueva propiedad
   async createProperty(propertyData) {
     try {
-      // Preparar los datos para envío
-      const dataToSend = this.preparePropertyData(propertyData);
-      
+      const isFormData = typeof FormData !== 'undefined' && propertyData instanceof FormData;
+      const dataToSend = isFormData ? propertyData : this.preparePropertyData(propertyData);
       console.log('Enviando datos de propiedad:', dataToSend);
-      
+
       const response = await api.post('/properties/', dataToSend, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' }
       });
       
       console.log('Propiedad creada exitosamente:', response.data);
@@ -363,15 +360,13 @@ export const propertyService = {
   // Actualizar datos y/o imágenes de una propiedad
   async updateProperty(id, propertyData) {
     try {
-      // Preparar los datos para envío
-      const dataToSend = this.preparePropertyData(propertyData, true); // true para indicar que es update
-      
+      const isFormData = typeof FormData !== 'undefined' && propertyData instanceof FormData;
+      const dataToSend = isFormData ? propertyData : this.preparePropertyData(propertyData, true);
+
       console.log(`Actualizando propiedad ${id} con datos:`, dataToSend);
 
       const response = await api.put(`/properties/${id}/`, dataToSend, {
-        headers: {
-          'Content-Type': 'application/json' 
-        }
+        headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' }
       });
       return response.data;
     } catch (error) {

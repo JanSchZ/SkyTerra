@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef } from 'react';
-import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab } from '@mui/material';
+import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip } from '@mui/material';
 import { propertyService, tourService } from '../../services/api';
 import Map, { NavigationControl, Popup, Source, Layer, AttributionControl } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -197,10 +197,47 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     try {
       let params = { ...currentFilters };
 
-      if (aiFilters && Object.keys(aiFilters).length > 0) {
-        // console.log("Aplicando filtros AI:", aiFilters); // Debug log
-        params = {}; // Prioritize AI filters: start with a clean slate if AI filters exist
+      // Transform manual filters to API query params
+      if (params.propertyTypes) {
+        if (Array.isArray(params.propertyTypes) && params.propertyTypes.length > 0) {
+          params.type__in = params.propertyTypes.join(',');
+        }
+        delete params.propertyTypes;
+      }
 
+      if (params.priceMin !== undefined) {
+        params.min_price = params.priceMin;
+        delete params.priceMin;
+      }
+      if (params.priceMax !== undefined) {
+        params.max_price = params.priceMax;
+        delete params.priceMax;
+      }
+      if (params.sizeMin !== undefined) {
+        params.min_size = params.sizeMin;
+        delete params.sizeMin;
+      }
+      if (params.sizeMax !== undefined) {
+        params.max_size = params.sizeMax;
+        delete params.sizeMax;
+      }
+      // Boolean feature filters
+      if (params.hasWater !== undefined) {
+        params.has_water = params.hasWater;
+        delete params.hasWater;
+      }
+      if (params.hasViews !== undefined) {
+        params.has_views = params.hasViews;
+        delete params.hasViews;
+      }
+      if (params.has360Tour !== undefined) {
+        params.has_tour = params.has360Tour;
+        delete params.has360Tour;
+      }
+      
+      // If AI filters exist, they take precedence over manual filters
+      if (aiFilters && Object.keys(aiFilters).length > 0) {
+        params = {};
         if (aiFilters.propertyTypes && aiFilters.propertyTypes.length > 0) {
           params.type__in = aiFilters.propertyTypes.join(',');
         }
@@ -214,19 +251,11 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         }
         if (aiFilters.features && aiFilters.features.length > 0) {
           aiFilters.features.forEach(feature => {
-            // Assuming features are like "has_water", "has_views"
-            // The backend needs to be set up to expect these as boolean true
-            // e.g. has_water=true
-            // For now, let's convert common ones. This might need more robust mapping.
             if (feature.toLowerCase().includes('water')) params.has_water = true;
             if (feature.toLowerCase().includes('views')) params.has_views = true;
             if (feature.toLowerCase().includes('road')) params.has_road_access = true;
-            // Add more feature mappings as needed based on backend capabilities
           });
         }
-        // If AI filters are applied, they might also want to override location/keyword from manual search
-        // For now, we assume AISearchBar provides 'text_search' if that's intended.
-        // If `currentFilters` had a `text_search` and AI filters are applied, it's removed unless AI also provides it.
       }
       
       // console.log("Parámetros finales para API:", params); // Debug log
@@ -322,12 +351,21 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const MAPBOX_TOKEN = config.mapbox.accessToken;
 
   const formatPrice = (price) => {
+    if (!price && price !== 0) return 'N/A';
     if (price >= 1000000) {
       return `$${(price / 1000000).toFixed(1)}M`;
     } else if (price >= 1000) {
       return `$${(price / 1000).toFixed(0)}K`;
     }
-    return `$${price}`;
+    return `$${price.toLocaleString('es-CL')}`;
+  };
+
+  const getPriceDisplay = (property) => {
+    if (!property) return 'N/A';
+    if (property.listing_type === 'rent' || property.listing_type === 'both') {
+      return property.rent_price ? `${formatPrice(property.rent_price)} /mes` : 'Arriendo N/D';
+    }
+    return formatPrice(property.price);
   };
 
   const handleMarkerClick = async (property) => {
@@ -1056,9 +1094,14 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{mb: 0.5}}>
-                    Precio: {formatPrice(popupInfo.price)}
-                  </Typography>
+                  <Box sx={{ display:'flex', alignItems:'center', gap:0.5, mb:0.5 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Precio: {getPriceDisplay(popupInfo)}
+                    </Typography>
+                    {popupInfo.listing_type && (
+                      <Chip label={popupInfo.listing_type === 'rent' ? 'Arriendo' : (popupInfo.listing_type === 'both' ? 'Venta/Arriendo' : 'Venta')} size="small" color={popupInfo.listing_type === 'rent' ? 'warning' : 'primary'} variant="outlined" />
+                    )}
+                  </Box>
                   <Typography variant="body2" color="text.secondary">
                     Tamaño: {popupInfo.size} ha
                   </Typography>

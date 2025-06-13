@@ -140,3 +140,36 @@ class Image(models.Model):
 
     def __str__(self):
         return f"Image {self.type} for {self.property.name}"
+
+# -----------------------------
+# Documentos asociados a Propiedades
+# -----------------------------
+
+class PropertyDocument(models.Model):
+    DOCUMENT_TYPES = [
+        ('deed', 'Escritura'),
+        ('plan', 'Plano'),
+        ('proof', 'Dominio'),
+        ('other', 'Otro'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('approved', 'Aprobado'),
+        ('rejected', 'Rechazado'),
+    ]
+
+    property = models.ForeignKey(Property, related_name='documents', on_delete=models.CASCADE)
+    file = models.FileField(upload_to='property_documents/')
+    doc_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES, default='other')
+    description = models.CharField(max_length=255, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_documents')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"Document {self.doc_type} for {self.property.name}"

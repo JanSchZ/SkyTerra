@@ -260,8 +260,19 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                         logger.info(f"[GeminiService] Respuesta de Gemini: {content[:200]}...")
                         
                         try:
+                            # Limpiar posibles bloques de código Markdown (```json ... ```)
+                            clean_content = content.strip()
+                            if clean_content.startswith('```'):
+                                import re
+                                # Remove opening fence and optional language tag
+                                clean_content = re.sub(r'^```[a-zA-Z]*\s*', '', clean_content)
+                                # Remove trailing fence
+                                if clean_content.endswith('```'):
+                                    clean_content = clean_content[:-3]
+                                clean_content = clean_content.strip()
+
                             # Intentar parsear como JSON
-                            ai_response = json.loads(content)
+                            ai_response = json.loads(clean_content)
                             
                             # Asegurar que los campos básicos estén presentes
                             ai_response.setdefault('search_mode', 'property_recommendation') # Default si Gemini no lo incluye

@@ -45,11 +45,13 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
   const initialSizeRange = [0, 200];
   const initialPropertyTypes = { farm: false, ranch: false, forest: false, lake: false };
   const initialFeatures = { hasWater: false, hasViews: false, has360Tour: false };
+  const initialListingType = '';
 
   const [priceRange, setPriceRange] = useState(initialPriceRange);
   const [sizeRange, setSizeRange] = useState(initialSizeRange);
   const [propertyTypes, setPropertyTypes] = useState(initialPropertyTypes);
   const [features, setFeatures] = useState(initialFeatures);
+  const [listingType, setListingType] = useState(initialListingType);
 
   // State for text input fields for price and size
   const [priceInput, setPriceInput] = useState({ min: initialPriceRange[0].toString(), max: initialPriceRange[1].toString() });
@@ -279,7 +281,8 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
       propertyTypes: Object.keys(propertyTypes).filter(key => propertyTypes[key]),
       hasWater: features.hasWater,
       hasViews: features.hasViews,
-      has360Tour: features.has360Tour
+      has360Tour: features.has360Tour,
+      ...(listingType ? { listing_type: listingType } : {})
     };
     if (onApplyFilters) {
       onApplyFilters(filtersToApply);
@@ -295,6 +298,7 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
     setSizeRange(initialSizeRange);
     setPropertyTypes(initialPropertyTypes);
     setFeatures(initialFeatures);
+    setListingType(initialListingType);
     
     if (onApplyFilters) {
       onApplyFilters({
@@ -305,7 +309,8 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
         propertyTypes: [],
         hasWater: false,
         hasViews: false,
-        has360Tour: false
+        has360Tour: false,
+        listing_type: ''
       }); 
     }
   };
@@ -486,6 +491,32 @@ const FilterPanel = ({ onApplyFilters, open, onClose, onOpen, currentFilters, ex
               <FormControlLabel
                 control={<Checkbox checked={features.has360Tour} onChange={handleFeatureChange} name="has360Tour" size="small"/>}
                 label="Tour 360° Disponible"
+                sx={{mb: -0.5}}
+              />
+            </FormGroup>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion defaultExpanded={false} sx={accordionStyles(theme)}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={accordionSummaryStyles}>
+            <FilterListIcon sx={{ mr: 1.5, color: theme.palette.text.secondary }} />
+            <Typography>Modalidad</Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0, pb: 1 }}>
+            <FormGroup>
+              <FormControlLabel
+                control={<Checkbox checked={listingType === 'sale'} onChange={() => setListingType(listingType === 'sale' ? '' : 'sale')} name="sale" size="small"/>}
+                label="Venta"
+                sx={{mb: -0.5}}
+              />
+              <FormControlLabel
+                control={<Checkbox checked={listingType === 'rent'} onChange={() => setListingType(listingType === 'rent' ? '' : 'rent')} name="rent" size="small"/>}
+                label="Arriendo"
+                sx={{mb: -0.5}}
+              />
+              <FormControlLabel
+                control={<Checkbox checked={listingType === 'both'} onChange={() => setListingType(listingType === 'both' ? '' : 'both')} name="both" size="small"/>}
+                label="Ambos"
                 sx={{mb: -0.5}}
               />
             </FormGroup>

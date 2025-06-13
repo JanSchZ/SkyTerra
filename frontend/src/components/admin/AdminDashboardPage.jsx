@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Container, Paper, Grid, CircularProgress, Alert } from '@mui/material';
-import axios from 'axios';
+import { api } from '../../services/api';
 import { Bar, Line, Pie } from 'react-chartjs-2';  // Import Chart.js components
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement } from 'chart.js';
 
@@ -37,27 +37,15 @@ const AdminDashboardPage = () => {
       setError(null);
       try {
         // Fetch dashboard summary metrics
-        const metricsRes = await axios.get('/api/admin/dashboard-summary/', {
-          headers: {
-            Authorization: `Token ${localStorage.getItem('auth_token')}`
-          }
-        });
+        const metricsRes = await api.get('/admin/dashboard-summary/');
         setMetrics(metricsRes.data);
 
         // Fetch property status statistics
-        const propertyStatusRes = await axios.get('/api/admin/dashboard/stats/', {
-          headers: {
-            Authorization: `Token ${localStorage.getItem('auth_token')}`
-          }
-        });
+        const propertyStatusRes = await api.get('/admin/dashboard/stats/');
         setPropertyStatusStats(propertyStatusRes.data);
 
         // Fetch general property data for charts
-        const propertiesRes = await axios.get('/api/properties/', {
-           headers: {
-             Authorization: `Token ${localStorage.getItem('auth_token')}`
-           }
-        });
+        const propertiesRes = await api.get('/properties/');
         // The API /api/properties/ returns paginated results. We need the 'results' array.
         setPropertyData(propertiesRes.data.results || []); // Assuming the data is in a 'results' field due to pagination
 

@@ -2,7 +2,7 @@
 
 **NOTA PARA EL USUARIO/DESARROLLADOR:** Por favor, actualiza este archivo a medida que se completan las tareas o surgen nuevos problemas. Esto ayudará a mantener un seguimiento claro del progreso y facilitará la colaboración, incluso si trabajas con diferentes asistentes de IA o en diferentes sesiones. Marca las tareas completadas con `[COMPLETADO]` o `[RESUELTO]`.
 
-**Fecha de Última Actualización:** 2025-06-12 (Migración MUI en revisión final, fixes MapView y avance IA Search Bar)
+**Fecha de Última Actualización:** 2025-06-13 (PropertyDetails.jsx actualizado con soporte de arriendo, en curso filtros de modalidad; Backend documentos: Modelo y API completados; pendiente approve/reject)
 
 ### **PLAN DE IMPLEMENTACIÓN GLOBAL AJUSTADO**
 
@@ -42,8 +42,15 @@
             *   **[COMPLETADO]** Formulario `PropertyForm` con select de modalidad y campos condicionales `rentPrice` y `rentalTerms`.
             *   **[COMPLETADO]** Servicio API mapea correctamente los nuevos campos.
             *   **[COMPLETADO]** `PropertyCard` muestra precio según modalidad (venta o arriendo).
-            *   **[PENDIENTE]** Actualizar `PropertyDetails.jsx` para exhibir modalidad y precio de arriendo.
-            *   **[PENDIENTE]** Añadir filtro de modalidad en barra/buscador y resultados.
+            *   **[COMPLETADO - 13 Jun 2025]** Actualizar `PropertyDetails.jsx` para exhibir modalidad y precio de arriendo.
+            *   **[COMPLETADO - 13 Jun 2025]** Se añadió pestaña "Documentos" en `PropertyForm.jsx` para permitir subida de PDFs, DOC y planos (hasta 10 archivos). UI con listado, remover y alerta informativa.
+            *   **[COMPLETADO - 13 Jun 2025]** Backend: Modelo `PropertyDocument` implementado (relación 1-a-N), con campos `file`, `doc_type`, `description`, `uploaded_at`.
+            *   **[COMPLETADO - 13 Jun 2025]** API: Se añadió `PropertyDocumentViewSet` (CRUD), ruta `/api/documents/`, serializer y registro en `urls.py`; `PropertySerializer` actualizado y manejo de `new_documents` en vistas.
+            *   **[EN PROGRESO - 13 Jun 2025]** Backend: Acciones `approve` / `reject` añadidas a `PropertyDocumentViewSet`; actualización de estado y transición automática de `publication_status`.
+            *   **[PENDIENTE]** Admin UX: Panel React para revisar documentos y botones aprobar/rechazar.
+            *   **[PENDIENTE]** Notificaciones: Email al propietario cuando su propiedad cambia de estado (pendiente → approved/rejected).
+            *   **[PENDIENTE]** Frontend: Mostrar estado de verificación y lista de documentos subidos en `PropertyDetails.jsx` (sólo para owner y admin).
+            *   **[DESCARTADO - 13 Jun 2025]** Filtros manuales eliminados del UI principal; la IA gestionará filtros internamente.
         *   **Admin:**
             *   **[PENDIENTE]** Ajustar vistas de propiedades para listar y filtrar por modalidad.
         *   **QA:**
@@ -151,3 +158,117 @@
 *   2025-06-12: Implementada lista de Tickets en Admin y API REST para tickets (endpoints /api/admin/tickets/).
 *   2025-06-12: Backend de soporte para arriendo actualizado (campos nuevos en Property y serializers).
 *   2025-06-12: Frontend integrado con soporte de arriendo en formulario y card; pendiente detalles y filtros.
+
+---
+
+## **PLAN DE DESPLIEGUE A PRODUCCIÓN (AWS)**
+
+> **Objetivo:** Tener un entorno productivo robusto, seguro y escalable en AWS para el MVP de SkyTerra antes de Q3-2025.
+
+### 1. Arquitectura Propuesta (Alta Disponibilidad)
+* **VPC** con subredes públicas y privadas en 2 AZ (us-east-1a / 1b)
+* **ALB (Application Load Balancer)** frente a 2× instancias **EC2** (Autoscaling group) con Docker + Gunicorn + Nginx (Backend Django)
+* **RDS PostgreSQL** (Multi-AZ, gp3  db.t3.medium, backups 7 días)
+* **Elasticache Redis** (para sesiones y caching)
+* **S3**: Media (imágenes, tours, documentos) + versión ‑> CloudFront para servir estático
+* **S3** bucket adicional para artefactos de CI/CD (builds)
+* **Route 53** para DNS (skyterra.cl, api.skyterra.cl, cdn.skyterra.cl)
+* **ACM** – TLS certificados para ALB y CloudFront
+* **ECR** para almacenamiento de imágenes Docker
+* **AWS Step Functions + Lambda (futuro)** para procesamiento pesado (ej: IA, generador de thumbnails)
+
+### 2. Flujo CI/CD (GitHub Actions)
+1. **build_frontend**: `npm ci → npm run build` → artefacto comprimido → upload a S3 (`frontend-builds/commitSHA.zip`)
+2. **build_backend**: `docker build` → push a ECR con tag commitSHA
+3. **deploy_staging** (branch *develop*):
+   * EB CLI ó ECS task (Fargate) actualiza containers 
+   * Frontend build sin compresión, servido por CloudFront-dev
+   * Corre migraciones `python manage.py migrate --noinput`
+   * Smoke tests (`pytest -m smoke`)
+4. **deploy_prod** (merge *main* + tag vX.Y.Z):
+   * Blue-green en EC2 ASG → health-check antes de cortar tráfico
+   * Frontend build se sube a bucket S3-prod y se invalida CloudFront
+   * Migraciones + comando para crear superadmin si no existe
+   * Notificación Slack (#deploys) con changelog auto-generado
+
+### 3. Seguridad y Gobernanza
+* **IAM roles** mínimos (EC2, GitHub OIDC)
+* SG restrictivos (solo ALB → EC2, EC2 → RDS/Redis)
+* Secrets en **AWS Secrets Manager** (DB creds, email SMTP)
+* **WAF** delante de ALB + reglas OWASP top-10
+* Backups automatizados (RDS + S3 lifecycle)
+* **CloudTrail** & AWS Config habilitados
+
+### 4. Observabilidad / DevOps
+* **CloudWatch Logs** + métricas custom (latencia API, errores 5xx, duración de migraciones)
+* **Prometheus + Grafana Cloud** (opcional) para métricas de aplicación
+* **Sentry** para errores JS y Django
+* **StatusCake** (heartbeat)
+
+### 5. Costeo Estimado Mensual (USD)
+| Componente | Inicial | Escalable |
+|------------|---------|-----------|
+| EC2 t3.medium ×2 | $35 | +$35 por inst extra |
+| RDS db.t3.medium | $75 | según storage |
+| ALB | $20 | tráfico |
+| S3 + CloudFront | $10 | uso |
+| Otros (Redis, transfer, backups) | $15 | uso |
+| **Total** | **≈ $155** | variable |
+
+### 6. Roadmap Próximos Pasos
+1. **[PENDIENTE]** Crear repo `skyterra-infra` con Terraform IaC (modular)
+2. **[PENDIENTE]** Configurar GitHub Actions con OIDC hacia AWS
+3. **[PENDIENTE]** Dockerizar backend (multi-stage) y frontend (Nginx static)
+4. **[PENDIENTE]** Implementar S3 storage en Django (`django-storages`, presigned URLs)
+5. **[PENDIENTE]** Configurar CloudFront + custom domain para frontend
+6. **[PENDIENTE]** Ajustar CORS y CSRF (api.skyterra.cl ↔ app)
+7. **[PENDIENTE]** Pruebas de carga (k6) antes de GA
+8. **[PENDIENTE]** Revisión de seguridad por OWASP ZAP
+9. **[PENDIENTE]** Manual de rollback y playbook incidentes
+
+### 7. Brechas Detectadas en Revisión 13-Jun-2025
+Tras revisar frontend y backend actuales se identifican los siguientes vacíos adicionales:
+
+1. **Filtros de Modalidad (Venta/Arriendo)**
+   * Falta en SearchBar y en lista de resultados (`PropertyList`, `MapResultsOverlay`).
+   * Endpoint backend ya acepta `listing_type` en `filterset_fields`, solo falta consumirlo.
+
+2. **Gestión de Documentos en Admin**
+   * Crear vista `AdminDocumentsReviewPage.jsx` dentro de `/admin` para aprobar/rechazar documentos.
+   * **[EN PROGRESO]** Endpoint backend: `PropertyDocumentViewSet` implementado (CRUD). Pendiente añadir acciones `approve` / `reject` y lógica de verificación.
+
+3. **Visibilidad de Documentos para Propietario**
+   * En `Dashboard.jsx` y `PropertyDetails.jsx` (si owner==viewer) mostrar lista y estado de verificación.
+
+4. **Flujo de Correo de Verificación de Cuenta**
+   * Implementar correo con token JWT y endpoint `verify-email/`.
+
+5. **Funcionalidad de Favoritos (dependiente de Fase 2)**
+   * Modelo `Favorite`, endpoints `/favorites/`, botón en `PropertyCard` y `PropertyDetails`.
+
+6. **Mensajería / Contacto**
+   * API `Conversation` + WebSocket (Django Channels) o fallback email.
+   * UI: Chat minimal en `PropertyDetails`.
+
+7. **Accesibilidad y SEO**
+   * Revisar `alt` en imágenes, contraste WCAG AA, meta tags React Helmet.
+
+8. **Pruebas Automáticas**
+   * Aumentar cobertura Jest (frontend) y PyTest (backend) a >70 %.
+
+9. **Políticas de Retención de Datos**
+   * GDPR – página Privacy Policy, endpoint `delete-account` y anonimización.
+
+10. **Configuración PWA**
+   * `manifest.json`, Service Worker con precache de rutas críticas.
+
+11. **Optimización Build & Calidad de Código**
+    * Configurar ESLint + Prettier pre-commit (husky) y CI.
+    * Dividir código con React.lazy/Suspense y Vite chunks para reducir TTFB.
+
+12. **Error Boundaries Globales**
+    * Crear componente `AppErrorBoundary` y log a Sentry.
+
+Cada punto se añadirá a la fase correspondiente durante planificación semanal.
+
+> Todas las tareas marcadas `[PENDIENTE]` se irán trasladando a las Fases correspondientes conforme avance la implementación.

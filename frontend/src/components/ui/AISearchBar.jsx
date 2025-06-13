@@ -94,7 +94,7 @@ const PREDEFINED_LOCATIONS = {
   'india': { center: [78.9629, 20.5937], zoom: 5, name: 'India' },
 };
 
-const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit }) => {
+const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart, onSearchComplete }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -153,43 +153,71 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit }) => {
     setLoading(true);
     setError(null);
     setShowResults(false);
-    // Using toLowerCase() for internal logic like predefined locations matching
+    // Normalize lowercase for heuristics and quick checks
     const searchTermLowerCase = searchTerm.toLowerCase();
 
+    // Inform parent that a search has started
+    if (onSearchStart) {
+      onSearchStart(searchTerm);
+    }
+
+    // QUICK HEURISTICS -------------------------------------------------
+    // 1) If the query is very short (≤3 words) *and* doesn't mention property-related keywords,
+    //    we assume it is likely a place name and try geocoding first.
+    // 2) Otherwise we go straight to the AI service.
+
+    const wordCount = searchTermLowerCase.split(/\s+/).filter(Boolean).length;
+    const propertyKeywordsRegex = /(propiedad|propiedades|terreno|terrenos|granja|finca|campo|casa|parcela|parcel|lote|rancho|ranch|farm|forest|bosque)/;
+    const isLikelyLocationQuery = wordCount <= 3 && !propertyKeywordsRegex.test(searchTermLowerCase);
+
     try {
-      const predefinedLocation = PREDEFINED_LOCATIONS[searchTermLowerCase];
-      if (predefinedLocation) {
-        if (onLocationSearch) {
-          onLocationSearch({
-            center: predefinedLocation.center,
-            zoom: predefinedLocation.zoom,
-            locationName: predefinedLocation.name
-          });
+      // ---------------------------------------------------------------
+      // LOCATION SHORT-CIRCUIT
+      // ---------------------------------------------------------------
+      if (isLikelyLocationQuery) {
+        const predefinedLocation = PREDEFINED_LOCATIONS[searchTermLowerCase];
+        if (predefinedLocation) {
+          if (onLocationSearch) {
+            onLocationSearch({
+              center: predefinedLocation.center,
+              zoom: predefinedLocation.zoom,
+              locationName: predefinedLocation.name
+            });
+          }
+          setSearchResult({ type: 'location', locationName: predefinedLocation.name, coordinates: predefinedLocation.center, interpretation: `Volando a ${predefinedLocation.name}...` });
+          setShowResults(true); setLoading(false);
+          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: predefinedLocation.name, center: predefinedLocation.center } });
+          return;
         }
-        setSearchResult({ type: 'location', locationName: predefinedLocation.name, coordinates: predefinedLocation.center, interpretation: `Volando a ${predefinedLocation.name}...` });
-        setShowResults(true); setLoading(false); return;
+
+        // If not predefined, use Mapbox geocoding. We'll only accept high-confidence results.
+        const geoResults = await searchLocation(searchTermLowerCase);
+        if (geoResults.length > 0 && (geoResults[0].relevance ?? 1) >= 0.8) {
+          const firstResult = geoResults[0];
+          const center = firstResult.center;
+          const placeName = firstResult.place_name || firstResult.text;
+          let zoom = 12;
+          if (firstResult.place_type?.includes('country')) zoom = 5;
+          else if (firstResult.place_type?.includes('region')) zoom = 8;
+          else if (firstResult.place_type?.includes('district')) zoom = 10;
+          else if (firstResult.place_type?.includes('place')) zoom = 11;
+
+          if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
+          setSearchResult({ type: 'location', locationName: placeName, coordinates: center, interpretation: `Volando a ${placeName}...`, allResults: geoResults.map(r => ({ name: r.place_name || r.text, center: r.center, type: r.place_type?.[0] || 'place' })) });
+          setShowResults(true); setLoading(false);
+          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: placeName, center } });
+          return;
+        }
+        // If geocoder didn't return confident result, fall through to AI search.
       }
 
-      const geoResults = await searchLocation(searchTermLowerCase);
-      if (geoResults.length > 0 && !searchTermLowerCase.includes('propiedades') && !searchTermLowerCase.includes('terrenos')) {
-        const firstResult = geoResults[0];
-        const center = firstResult.center;
-        const placeName = firstResult.place_name || firstResult.text;
-        let zoom = 12;
-        if (firstResult.place_type?.includes('country')) zoom = 5;
-        else if (firstResult.place_type?.includes('region')) zoom = 8;
-        else if (firstResult.place_type?.includes('district')) zoom = 10;
-        else if (firstResult.place_type?.includes('place')) zoom = 11;
-        
-        if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
-        setSearchResult({ type: 'location', locationName: placeName, coordinates: center, interpretation: `Volando a ${placeName}...`, allResults: geoResults.map(r => ({ name: r.place_name || r.text, center: r.center, type: r.place_type?.[0] || 'place' })) });
-        setShowResults(true); setLoading(false); return;
-      }
+      // ---------------------------------------------------------------
+      // AI SEARCH FALLBACK / PROPERTY QUERY
+      // ---------------------------------------------------------------
 
-      // Use original searchTerm (with original casing) for AI search context
-      const response = await api.post('ai-search/', { current_query: searchTerm, conversation_history: [] });
+      const response = await api.post('ai-search/', { query: searchTerm, conversation_history: [] });
       if (response.data && typeof response.data === 'object') {
-        const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation } = response.data;
+        const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
         const hasContentForPropertyList = (suggestedFilters && Object.values(suggestedFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== null && (Array.isArray(v) ? v.some(subVal => subVal !== null) : true )))) || (recommendations && recommendations.length > 0);
 
         if (flyToLocation && onLocationSearch) {
@@ -201,27 +229,34 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit }) => {
             bearing: flyToLocation.bearing,
           });
           setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` }); // Use original searchTerm
-          setShowResults(true); setLoading(false); return;
+          setShowResults(true); setLoading(false);
+          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: flyToLocation.name || searchTerm, center: flyToLocation.center } });
+          return;
         }
 
-        let resultType = 'ai_response';
-        if (hasContentForPropertyList) {
-          resultType = 'properties';
-        }
+        const hasRecs = recommendations && recommendations.length > 0;
+        let resultType = hasRecs ? 'properties' : 'ai_response';
 
         const processedResult = {
           type: resultType,
+          search_mode: search_mode || (resultType === 'properties' ? 'property_recommendation' : 'location'),
           assistant_message: assistant_message || (resultType === 'properties' ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
-          suggestedFilters: suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [] },
+          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [] }) : null,
           interpretation: interpretation || assistant_message,
-          recommendations: recommendations || [],
+          recommendations: hasRecs ? (recommendations || []) : [],
           flyToLocation
         };
         setSearchResult(processedResult);
         if (onSearch) {
           onSearch(processedResult);
         }
-        setShowResults(true);
+        // Hide inline popup when we have property recommendations; rely on lateral panel
+        if (resultType === 'properties') {
+          setShowResults(false);
+        } else {
+          setShowResults(true);
+        }
+        if (onSearchComplete) onSearchComplete(processedResult);
 
       } else {
         const errorMsg = response.data?.error || response.data?.detail || 'Respuesta inesperada del servidor de IA.';
@@ -243,6 +278,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit }) => {
         interpretation: "Error en la Búsqueda"
       });
       setShowResults(true);
+      if (onSearchComplete) onSearchComplete({ type: 'error', error: err });
     } finally {
       setLoading(false);
     }

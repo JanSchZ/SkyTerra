@@ -3,7 +3,7 @@ from rest_framework import viewsets, filters, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Q
 from rest_framework.views import APIView
 from django.conf import settings
 from django.core.mail import send_mail
@@ -15,11 +15,13 @@ from django.utils.decorators import method_decorator
 import logging
 import traceback
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.exceptions import PermissionDenied
+from django.utils import timezone
 
-from .models import Property, Tour, Image
+from .models import Property, Tour, Image, PropertyDocument
 from .serializers import (
     PropertySerializer, PropertyListSerializer,
-    TourSerializer, ImageSerializer
+    TourSerializer, ImageSerializer, PropertyDocumentSerializer
 )
 from .services import GeminiService, GeminiServiceError
 
@@ -147,6 +149,17 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     logger.error(f"Error al enviar email de notificación para propiedad ID: {property_instance.id}: {str(email_error)}", exc_info=True)
                     # No relanzar el error para no impedir la creación de la propiedad, solo loggearlo.
             
+            # Procesar documentos subidos (campo 'new_documents')
+            new_docs = self.request.FILES.getlist('new_documents')
+            if new_docs:
+                for doc_file in new_docs:
+                    PropertyDocument.objects.create(
+                        property=property_instance,
+                        file=doc_file,
+                        doc_type='other'
+                    )
+                logger.info(f"{len(new_docs)} documento(s) asociados a la propiedad {property_instance.id}")
+            
         except Exception as e:
             logger.error(f"Error al crear propiedad: {str(e)}", exc_info=True)
             # El error ya se maneja en el método create, aquí solo relanzamos para que create lo capture
@@ -169,33 +182,19 @@ class PropertyViewSet(viewsets.ModelViewSet):
                 # For now, let's stick to the plan of modifying validated_data.
                 # The original code had `raise PermissionError`, which is fine if DRF handles it.
                 # The `update` method already has a permission check, so this one is an additional safeguard.
-                raise PermissionError("No tiene permisos para editar esta propiedad.")
-
-            logger.info(f"Actualizando propiedad ID: {instance.id} por usuario {self.request.user.username}")
-            logger.info(f"Datos recibidos para actualización: {serializer.validated_data}")
-
-            # Prevent non-staff users from changing publication_status
-            if not self.request.user.is_staff:
-                if 'publication_status' in serializer.validated_data:
-                    # Log the attempt and remove the field
-                    original_status_attempt = serializer.validated_data['publication_status']
-                    logger.warning(
-                        f"Usuario no administrador {self.request.user.username} "
-                        f"intentó cambiar publication_status a '{original_status_attempt}' "
-                        f"para la propiedad ID {instance.id}. Este cambio será ignorado."
-                    )
-                    del serializer.validated_data['publication_status']
-
-                # Additionally, if the property was already approved, a non-staff owner should not be able to change it back to pending.
-                # Or, if any change is made by a non-staff owner to an approved property, it should perhaps revert to 'pending'.
-                # The current issue description implies admins approve publications.
-                # If a user edits an *already approved* property, should it become pending again?
-                # For now, the scope is to prevent users from *setting* the status.
-                # Let's assume that if an admin approved it, user edits on other fields are fine without changing status,
-                # unless specified otherwise.
-
             serializer.save()
             logger.info(f"Propiedad {instance.id} actualizada exitosamente. Nuevo estado: {instance.publication_status}")
+            
+            # Manejar documentos nuevos enviados en actualización
+            new_docs = self.request.FILES.getlist('new_documents')
+            if new_docs:
+                for doc_file in new_docs:
+                    PropertyDocument.objects.create(
+                        property=instance,
+                        file=doc_file,
+                        doc_type='other'
+                    )
+                logger.info(f"{len(new_docs)} documento(s) añadidos a la propiedad {instance.id} en actualización")
             
         except PermissionError as pe: # Catch the specific error
             # This is to make sure PermissionError is handled gracefully if not caught by DRF default handlers
@@ -334,26 +333,21 @@ class AISearchView(APIView):
 
     def post(self, request, *args, **kwargs):
         try:
-            query = request.data.get('query', '')
+            # Accept both 'query' (new backend contract) and legacy 'current_query' from the frontend
+            query = request.data.get('query') or request.data.get('current_query') or ''
+
             if not query:
                 return Response({'error': 'Query is required'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Use GeminiService for NLP processing
+
+            # Optional conversation context provided by the frontend
+            conversation_history = request.data.get('conversation_history', [])
+
+            # Use the GeminiService to process the natural-language query and build the response
             gemini_service = GeminiService()
-            interpreted_query = gemini_service.interpret_query(query)  # Assume this returns structured data like {'location': 'región de los lagos', 'features': ['borde de lago', 'sin vecinos cerca']}
-            
-            # Build dynamic queryset based on interpreted query
-            queryset = Property.objects.all()
-            if 'location' in interpreted_query:
-                queryset = queryset.filter(description__icontains=interpreted_query['location'])  # Example filter
-            if 'features' in interpreted_query:
-                for feature in interpreted_query['features']:
-                    queryset = queryset.filter(description__icontains=feature)
-            
-            # Order and limit to top 3
-            top_properties = queryset.order_by('-price').distinct()[:3]  # Example ordering; adjust based on relevance
-            serializer = PropertyListSerializer(top_properties, many=True)
-            return Response({'top_options': serializer.data})
+            ai_response = gemini_service.search_properties_with_ai(query, conversation_history)
+
+            # The AI helper already returns the expected JSON structure for the frontend
+            return Response(ai_response, status=status.HTTP_200_OK)
         except GeminiServiceError as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
@@ -363,3 +357,86 @@ class AISearchView(APIView):
     def get(self, request, *args, **kwargs):
         print("--- AISearchView GET method reached (use POST for AI search) ---")
         return Response({"message": "Use POST for AI search. Include 'current_query' and 'conversation_history'."}, status=status.HTTP_200_OK)
+
+class PropertyDocumentViewSet(viewsets.ModelViewSet):
+    """Viewset to manage property documents (upload, list, delete)."""
+    queryset = PropertyDocument.objects.all().order_by('-uploaded_at')
+    serializer_class = PropertyDocumentSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['property', 'doc_type']
+    search_fields = ['description']
+    ordering_fields = ['uploaded_at']
+
+    def get_permissions(self):
+        """
+        Allow read-only access to everyone for documents linked to approved properties.
+        Write operations require authentication and ownership or staff status.
+        """
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Non-staff users can only see documents of approved properties or their own properties
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(
+                Q(property__publication_status='approved') |
+                Q(property__owner=self.request.user)
+            )
+        return queryset
+
+    def perform_create(self, serializer):
+        property_instance = serializer.validated_data.get('property')
+        # Ensure user is owner or staff
+        if not self.request.user.is_staff and property_instance.owner != self.request.user:
+            raise PermissionDenied("No tiene permisos para añadir documentos a esta propiedad.")
+        serializer.save()
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        if not self.request.user.is_staff and instance.property.owner != self.request.user:
+            raise PermissionDenied("No tiene permisos para modificar este documento.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if not self.request.user.is_staff and instance.property.owner != self.request.user:
+            raise PermissionDenied("No tiene permisos para eliminar este documento.")
+        instance.delete()
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def approve(self, request, pk=None):
+        """Approve a document"""
+        document = self.get_object()
+        if document.status != 'pending':
+            return Response({'detail': 'El documento ya fue revisado.'}, status=status.HTTP_400_BAD_REQUEST)
+        document.status = 'approved'
+        document.reviewed_by = request.user
+        document.reviewed_at = timezone.now()
+        document.save()
+
+        # If all documents for property are approved, set property to approved
+        if not document.property.documents.filter(status__in=['pending', 'rejected']).exists():
+            document.property.publication_status = 'approved'
+            document.property.save()
+
+        return Response({'detail': 'Documento aprobado.'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    def reject(self, request, pk=None):
+        """Reject a document"""
+        document = self.get_object()
+        if document.status != 'pending':
+            return Response({'detail': 'El documento ya fue revisado.'}, status=status.HTTP_400_BAD_REQUEST)
+        reason = request.data.get('reason', '')
+        document.status = 'rejected'
+        document.description = f"{document.description}\nRECHAZADO: {reason}" if reason else document.description
+        document.reviewed_by = request.user
+        document.reviewed_at = timezone.now()
+        document.save()
+
+        # Mark property status as rejected (optional)
+        document.property.publication_status = 'rejected'
+        document.property.save()
+
+        return Response({'detail': 'Documento rechazado.'}, status=status.HTTP_200_OK)

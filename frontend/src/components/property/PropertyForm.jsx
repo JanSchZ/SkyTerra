@@ -27,6 +27,7 @@ import MapIcon from '@mui/icons-material/Map';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import TerrainIcon from '@mui/icons-material/Terrain';
 import SellIcon from '@mui/icons-material/Sell';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { propertyService } from '../../services/api';
 import MapView from '../map/MapView';
 import PropertyBoundaryDraw from '../map/PropertyBoundaryDraw';
@@ -73,6 +74,8 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     listingType: 'sale',
     rentPrice: '',
     rentalTerms: '',
+    documents: [],
+    existingDocumentNames: [],
     ...property,
   };
 
@@ -80,6 +83,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
   const [formErrors, setFormErrors] = useState({});
   const [imagePreviews, setImagePreviews] = useState(property?.imageUrls?.map(url => ({ url, isExisting: true, file: null })) || []);
   const [tourPreviewName, setTourPreviewName] = useState(property?.tourUrl ? 'Tour existente' : '');
+  const [documentPreviews, setDocumentPreviews] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const mapViewRef = useRef(null);
@@ -100,13 +104,17 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         imagesToDelete: [],
         tour360: null,
         existingTourUrl: property.tours && property.tours.length > 0 ? property.tours[0].url : null,
-        tourToDelete: false
+        tourToDelete: false,
+        documents: [],
+        existingDocumentNames: [],
       }));
       setTourPreviewName(property.tours && property.tours.length > 0 ? 'Tour existente' : '');
+      setDocumentPreviews([]);
     } else {
       setFormData(initialFormState);
       setImagePreviews([]);
       setTourPreviewName('');
+      setDocumentPreviews([]);
     }
   }, [property]);
 
@@ -218,6 +226,19 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     setTourPreviewName('');
   };
 
+  const handleDocumentUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const newDocs = files.map(file => ({ name: file.name, file }));
+    setDocumentPreviews(prev => [...prev, ...newDocs]);
+    setFormData(prev => ({ ...prev, documents: [...prev.documents, ...files] }));
+    e.target.value = null;
+  };
+
+  const handleRemoveDocument = (indexToRemove) => {
+    setDocumentPreviews(prev => prev.filter((_, i) => i !== indexToRemove));
+    setFormData(prev => ({ ...prev, documents: prev.documents.filter((_, i) => i !== indexToRemove) }));
+  };
+
   const validateForm = () => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'El nombre es obligatorio.';
@@ -243,7 +264,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     setIsSubmitting(true);
     const dataToSend = new FormData();
     Object.keys(formData).forEach(key => {
-      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'tour360') {
+      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'tour360' || key === 'documents') {
       } else if (formData[key] !== null && formData[key] !== undefined) {
         dataToSend.append(key, formData[key]);
       }
@@ -261,6 +282,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     if (formData.tourToDelete && property?.tours?.[0]?.id) {
       dataToSend.append('tour_to_delete_id', property.tours[0].id);
     }
+    formData.documents.forEach(file => dataToSend.append('new_documents', file));
 
     try {
       let savedProperty;
@@ -291,6 +313,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
           <Tab label="Ubicación y Límites" icon={<MapIcon />} iconPosition="start" id="property-tab-1" aria-controls="property-tabpanel-1" />
           <Tab label="Imágenes" icon={<ImageIcon />} iconPosition="start" id="property-tab-2" aria-controls="property-tabpanel-2" />
           <Tab label="Tour Virtual 360" icon={<GpsFixedIcon />} iconPosition="start" id="property-tab-3" aria-controls="property-tabpanel-3" />
+          <Tab label="Documentos" icon={<DescriptionIcon />} iconPosition="start" id="property-tab-4" aria-controls="property-tabpanel-4" />
         </Tabs>
       </Box>
 
@@ -421,6 +444,34 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
               propertyId={property?.id}
               onBoundariesUpdate={handleBoundariesUpdate}
             />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={4}>
+          <Typography variant="h6" gutterBottom>Documentos de Verificación (PDF, DOC, imágenes)</Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {documentPreviews.map((doc, index) => (
+              <Grid xs={12} key={index}>
+                <Paper elevation={1} sx={{ p:2, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
+                    <DescriptionIcon color="action" />
+                    <Typography variant="body2" noWrap>{doc.name}</Typography>
+                  </Box>
+                  <IconButton onClick={() => handleRemoveDocument(index)} size="small"><DeleteIcon fontSize="small" /></IconButton>
+                </Paper>
+              </Grid>
+            ))}
+            {documentPreviews.length < 10 && (
+              <Grid xs={12}>
+                <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
+                  Subir Documento
+                  <input type="file" hidden accept=".pdf,.doc,.docx,image/*" multiple onChange={handleDocumentUpload} />
+                </Button>
+              </Grid>
+            )}
+          </Grid>
+          <Alert severity="info">
+            Estos documentos serán revisados por el equipo de SkyTerra para validar la propiedad (escritura, planos, comprobante de dominio, etc.).
+          </Alert>
         </TabPanel>
 
         <Divider sx={{ my: 4 }} />

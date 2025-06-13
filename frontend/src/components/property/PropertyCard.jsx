@@ -27,6 +27,8 @@ const PropertyCard = ({ property }) => {
     ? (property.rent_price ? `${Number(property.rent_price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })} /mes` : 'Arriendo no disponible')
     : (property.price ? Number(property.price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) : 'Precio no disponible');
 
+  const listingLabel = property.listing_type === 'rent' ? 'Arriendo' : (property.listing_type === 'both' ? 'Venta / Arriendo' : 'Venta');
+
   return (
     <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 2, boxShadow: 3 }}>
       <CardMedia
@@ -40,11 +42,12 @@ const PropertyCard = ({ property }) => {
         <Typography gutterBottom variant="h6" component="div" noWrap sx={{ fontWeight: 'bold' }}>
           {property.name}
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, color: 'text.secondary' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5, color: 'text.secondary', gap: 0.5 }}>
           <AttachMoneyIcon fontSize="small" sx={{ mr: 0.5 }} />
           <Typography variant="body2" color="text.primary" sx={{ fontWeight: 'medium' }}>
             {priceDisplay}
           </Typography>
+          <Chip label={listingLabel} size="small" color={property.listing_type === 'rent' ? 'warning' : 'primary'} variant="outlined" />
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
           <SquareFootIcon fontSize="small" sx={{ mr: 0.5 }} />

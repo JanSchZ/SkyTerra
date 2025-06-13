@@ -249,6 +249,30 @@ const PropertyDetails = () => {
     return `$${price?.toLocaleString()}`;
   };
 
+  // Formateador para precio de arriendo (mensual)
+  const formatRentPrice = (price) => {
+    if (!price) return 'Precio no disponible';
+    if (price >= 1000000) {
+      return `$${(price / 1000000).toFixed(1)}M/mes`;
+    } else if (price >= 1000) {
+      return `$${(price / 1000).toFixed(0)}K/mes`;
+    }
+    return `$${price?.toLocaleString()}/mes`;
+  };
+
+  // Calcular texto de precio según modalidad
+  const getPriceDisplay = () => {
+    if (!property) return '';
+    switch (property.listing_type) {
+      case 'rent':
+        return formatRentPrice(property.rent_price);
+      case 'both':
+        return `${formatPrice(property.price)} o ${formatRentPrice(property.rent_price)}`;
+      default:
+        return formatPrice(property.price);
+    }
+  };
+
   // Botón regresar
   const handleGoBack = () => {
     navigate('/');
@@ -443,7 +467,7 @@ const PropertyDetails = () => {
                     color: '#3b82f6' 
                   }}
                 >
-                  {formatPrice(property?.price)}
+                  {getPriceDisplay()}
                 </Typography>
                 <Typography 
                   variant="body2" 
@@ -584,8 +608,8 @@ const PropertyDetails = () => {
                         <AttachMoneyIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
-                        primary="Precio total"
-                        secondary={formatPrice(property?.price)}
+                        primary={property?.listing_type === 'rent' ? 'Precio mensual de arriendo' : (property?.listing_type === 'both' ? 'Precio de venta / arriendo' : 'Precio de venta')}
+                        secondary={property?.listing_type === 'rent' ? formatRentPrice(property?.rent_price) : (property?.listing_type === 'both' ? `${formatPrice(property?.price)} / ${formatRentPrice(property?.rent_price)}` : formatPrice(property?.price))}
                         primaryTypographyProps={{ 
                           fontSize: '0.9rem', 
                           fontWeight: 300, 

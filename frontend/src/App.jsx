@@ -28,6 +28,7 @@ import TourViewer from './components/tours/TourViewer';
 import AuthPage from './components/ui/AuthForms';
 import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
+import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import CreateProperty from './components/property/CreateProperty';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 import AdminPublicationsPage from './components/admin/AdminPublicationsPage';
@@ -191,6 +192,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [aiAppliedFilters, setAiAppliedFilters] = useState(null);
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [aiSearchResult, setAiSearchResult] = useState(null);
 
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -217,8 +220,7 @@ function App() {
     if (!aiGeneratedFilters) return;
     // console.log('AI search response (raw):', aiGeneratedFilters); // Debug log
 
-    if (aiGeneratedFilters.suggestedFilters) {
-      // console.log('Received AI Suggested Filters:', aiGeneratedFilters.suggestedFilters); // Debug log
+    if (aiGeneratedFilters.recommendations && aiGeneratedFilters.recommendations.length > 0 && aiGeneratedFilters.suggestedFilters) {
       setAiAppliedFilters(aiGeneratedFilters.suggestedFilters);
     }
 
@@ -253,6 +255,34 @@ function App() {
         essential: true,
       });
     }
+  };
+
+  const handleSearchStart = () => {
+    setAiSearchLoading(true);
+    setAiSearchResult(null);
+  };
+
+  const handleSearchComplete = (result) => {
+    setAiSearchLoading(false);
+    if (result && result.type !== 'error') {
+      setAiSearchResult(result);
+      if (result.flyToLocation) {
+        handleLocationSearch(result.flyToLocation);
+      } else if (result.recommendations && result.recommendations.length > 0) {
+        // fly to first recommendation automatically
+        const first = result.recommendations[0];
+        if (first.latitude && first.longitude) {
+          handleLocationSearch({ center:[first.longitude, first.latitude], zoom:12, pitch:60, bearing:0 });
+        }
+      }
+    }
+  };
+
+  const handleSuggestionClick = (rec) => {
+    if (rec.latitude && rec.longitude) {
+      handleLocationSearch({ center:[rec.longitude, rec.latitude], zoom:14, pitch:60, bearing:0 });
+    }
+    navigate(`/property/${rec.id}`);
   };
 
   const handleLogin = async (credentials) => {
@@ -472,6 +502,8 @@ function App() {
                 <AISearchBar 
                   onSearch={handleAISearch} 
                   onLocationSearch={handleLocationSearch}
+                  onSearchStart={handleSearchStart}
+                  onSearchComplete={handleSearchComplete}
                 />
               </Box>
             </Box>
@@ -558,8 +590,7 @@ function App() {
               )}
             </Box>
           </Box>
-          {/* Conditionally render AppliedFiltersDisplay below the main top bar content */}
-          <AppliedFiltersDisplay filters={aiAppliedFilters} onClear={() => setAiAppliedFilters(null)} />
+          {/* Removed AppliedFiltersDisplay to keep filters internal and invisible to user */}
         </Box>
       )}
 
@@ -581,7 +612,7 @@ function App() {
             path="/"
             element={
               <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                <MapView ref={mapRef} appliedFilters={aiAppliedFilters} />
+                <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} />
               </motion.div>
             }
           />
@@ -683,6 +714,19 @@ function App() {
           <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
         </Routes>
       </AnimatePresence>
+
+      {/* Render AI suggestion panel on left */}
+      <AISuggestionPanel 
+         isLoading={aiSearchLoading}
+         assistantMessage={aiSearchResult?.assistant_message}
+         recommendations={aiSearchResult?.recommendations}
+         searchMode={aiSearchResult?.search_mode}
+         flyToLocation={aiSearchResult?.flyToLocation}
+         onSuggestionClick={handleSuggestionClick}
+         onSuggestionHover={null}
+         onClearAISearch={() => { setAiSearchResult(null); setAiAppliedFilters(null);} }
+         currentQuery={aiSearchResult?.interpretation}
+      />
     </>
   );
 }

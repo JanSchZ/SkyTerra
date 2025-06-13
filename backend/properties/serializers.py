@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model # Import get_user_model
 from django.conf import settings # Alternative for AUTH_USER_MODEL
-from .models import Property, Tour, Image
+from .models import Property, Tour, Image, PropertyDocument
 import json
 
 User = get_user_model()
@@ -15,6 +15,16 @@ class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
         fields = ['id', 'url', 'type', 'order', 'created_at']
+
+class PropertyDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PropertyDocument
+        fields = ['id', 'file', 'doc_type', 'description', 'uploaded_at', 'status', 'reviewed_by', 'reviewed_at']
+        extra_kwargs = {
+            'status': {'read_only': True},
+            'reviewed_by': {'read_only': True},
+            'reviewed_at': {'read_only': True},
+        }
 
 class TourSerializer(serializers.ModelSerializer):
     # Renaming created_at to uploaded_at for clarity in the API response,
@@ -67,13 +77,15 @@ class PropertySerializer(serializers.ModelSerializer):
     tours = TourSerializer(many=True, read_only=True)
     boundary_polygon = serializers.JSONField(required=False, allow_null=True)
     owner_details = BasicUserSerializer(source='owner', read_only=True)
+    documents = PropertyDocumentSerializer(many=True, read_only=True)
+    # TODO: add documents serializer when backend model ready
 
     class Meta:
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
-                 'owner_details', 'listing_type', 'rent_price', 'rental_terms']
+                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents']
         
     def validate_boundary_polygon(self, value):
         """Validar que boundary_polygon sea un GeoJSON válido"""
