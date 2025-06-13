@@ -224,6 +224,13 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
     *   AISearchBar.jsx soporta `listingType` en chips y filtros sugeridos.
     *   Propagación via `aiAppliedFilters` garantizada.
 *   **[COMPLETADO - 13 Jun 2025]** Se implementó `liquidGlassTheme` con tokens y se reemplazó azul primario por paleta neutra; componentes principales actualizados (App, Dashboard, AISearchBar, AdminLayout) para usar colores del tema.
+*   2025-06-13: **Refactor UI – Apple-style Liquid Glass Phase**
+    * Global theme updated: `MuiPaper` and `MuiCard` variant `glass` → fondo `rgba(255,255,255,0.12)` + borde 25 % alpha + blur.
+    * Avatar `IconButton` + `Menu` aclarados; animación `glassGlow` deshabilitada en popup.
+    * `AISearchBar` input y panel de resultados migrados al nuevo look translúcido.
+    * `AISuggestionPanel` ahora usa fondo claro y borde acorde.
+    * Token `surface-glass` aplicado a inputs (OutlinedInput root).
+    * **Pendiente:** Migrar Dashboard, PropertyDetails, CreateProperty y demás vistas que aún usan `rgba(22,27,34,*)` directo a `variant="glass"` o al nuevo token.
 
 ---
 
@@ -338,3 +345,30 @@ Tras revisar frontend y backend actuales se identifican los siguientes vacíos a
 Cada punto se añadirá a la fase correspondiente durante planificación semanal.
 
 > Todas las tareas marcadas `[PENDIENTE]` se irán trasladando a las Fases correspondientes conforme avance la implementación.
+
+### Próximas Acciones Inmediatas (14 Jun 2025)
+*   **Objetivo General:** Cerrar brechas críticas identificadas en revisión del 13-Jun y preparar groundwork para despliegue AWS.
+*   **Tareas Prioritarias (orden sugerido):**
+    1.  **Backend – Completar flujo de verificación de documentos**
+        *   Añadir métodos `approve` y `reject` definitivos en `PropertyDocumentViewSet`.
+        *   Señalar transición automática de `publication_status` en `Property` y emitir señal para notificación.
+        *   Tests PyTest para casos `approve`, `reject` y permisos.
+    2.  **Frontend – Visibilidad de documentos y estados**
+        *   `PropertyDetails.jsx`: sección "Documentos" visible para owner/admin; listar archivos con estado.
+        *   `Dashboard.jsx`: Indicador de verificación en card de propiedad.
+        *   `AdminDocumentsReviewPage.jsx`: conectar con endpoints `approve`/`reject` y feedback en tiempo real.
+    3.  **IA Search Bar – Resultados y animación de vuelo**
+        *   Renderizar panel con top-3 sugerencias alineado a lado izquierdo (token `surface-glass`).
+        *   Al seleccionar sugerencia, ejecutar `map.flyTo` con duración 4.5 s.
+        *   Indicador de carga consistente entre búsqueda y flyTo.
+    4.  **Script de superusuario por defecto**
+        *   Management command `create_default_admin` usando variables de entorno para credenciales.
+        *   Incluir ejecución automática en pipeline `deploy_prod` si no existe usuario `admin`.
+    5.  **Infra – Bootstrap repo `skyterra-infra`**
+        *   Estructura Terraform modular (`vpc`, `ecs`, `rds`, `s3`, `iam`, `alb`).
+        *   README con pasos para `terraform init/plan/apply` y variables requeridas.
+    6.  **UX – Migración a Liquid Glass restante (Sprint-focus)**
+        *   Convertir `Dashboard`, `CreateProperty`, `PropertyCard` y formularios Auth a variantes `glass`.
+        *   Eliminar estilos inline `rgba(22,27,34,*)` residuales.
+
+*   **Meta de sprint:** Todas las tareas 1-4 marcadas `[COMPLETADO]` y 5-6 `[EN PROGRESO]` antes del 21-Jun-2025.

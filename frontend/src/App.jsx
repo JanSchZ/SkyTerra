@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useContext, useRef } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   CssBaseline,
@@ -16,6 +16,7 @@ import {
   Snackbar,
   Alert,
   Chip,
+  Grow,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
@@ -96,6 +97,8 @@ function App() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+
+  const hoverTimeoutRef = useRef(null);
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -231,8 +234,21 @@ function App() {
   };
 
   const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
-  const handleUserMenuOpen = (event) => setUserMenuAnchorEl(event.currentTarget);
-  const handleUserMenuClose = () => setUserMenuAnchorEl(null);
+  const openUserMenu = (event) => setUserMenuAnchorEl(event.currentTarget);
+  const closeUserMenu = () => setUserMenuAnchorEl(null);
+
+  const handleAvatarMouseEnter = (e) => {
+    clearTimeout(hoverTimeoutRef.current);
+    openUserMenu(e);
+  };
+  const handleAvatarMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      closeUserMenu();
+    }, 300);
+  };
+
+  const handleMenuMouseEnter = () => { clearTimeout(hoverTimeoutRef.current); };
+  const handleMenuMouseLeave = () => { hoverTimeoutRef.current = setTimeout(closeUserMenu, 300); };
 
   if (loadingAuth) {
     return (
@@ -306,9 +322,9 @@ function App() {
           alignItems: 'center', 
           gap: 1.5, 
           flexWrap: 'wrap',
-          backgroundColor: 'rgba(22, 27, 34, 0.8)', // Darker paper
+          backgroundColor: 'rgba(255,255,255,0.12)',
           backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(48, 54, 61, 0.7)',
+          border: '1px solid rgba(255,255,255,0.25)',
           maxWidth: '700px', // Match AISearchBar width
           mx: 'auto', // Center it like AISearchBar
         }}
@@ -402,66 +418,110 @@ function App() {
               {user ? (
                 <>
                   <IconButton
-                    onClick={handleUserMenuOpen}
-                    sx={{
-                      backgroundColor: 'rgba(22, 27, 34, 0.9)', backdropFilter: 'blur(12px)',
-                      border: '1px solid rgba(30, 41, 59, 0.3)', color: '#c9d1d9',
-                      '&:hover': { backgroundColor: 'rgba(30, 41, 59, 0.95)' },
-                    }}
+                    onClick={openUserMenu}
+                    onMouseEnter={handleAvatarMouseEnter}
+                    onMouseLeave={handleAvatarMouseLeave}
+                    sx={(theme) => ({
+                      backgroundColor: 'rgba(255,255,255,0.18)',
+                      backdropFilter: 'blur(10px)',
+                      WebkitBackdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      color: theme.palette.text.primary,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                      transition: 'box-shadow 0.8s ease, transform 0.25s ease',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '50%',
+                        backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.15) 100%)',
+                        backgroundSize: '200% 100%',
+                        opacity: 0,
+                        transform: 'scale(0.9)',
+                        transition: 'opacity 1s cubic-bezier(0.25,0.1,0.25,1), transform 1s cubic-bezier(0.25,0.1,0.25,1), background-position 5s ease',
+                        pointerEvents: 'none',
+                      },
+                      '&:hover': {
+                        backgroundColor: 'rgba(255,255,255,0.18)',
+                        transform: 'scale(1.05)',
+                        boxShadow: '0 0 12px rgba(255,255,255,0.3)',
+                        '&::before': {
+                          opacity: 0.4,
+                          transform: 'scale(1)',
+                          backgroundPosition: '180% 0',
+                        },
+                      },
+                    })}
                   >
                     <AccountCircleIcon />
                   </IconButton>
                   <Menu
                     anchorEl={userMenuAnchorEl}
                     open={Boolean(userMenuAnchorEl)}
-                    onClose={handleUserMenuClose}
-                    MenuListProps={{ sx: { backgroundColor: '#161b22', border: '1px solid #30363d', py: 1 } }}
+                    onClose={closeUserMenu}
+                    onMouseEnter={handleMenuMouseEnter}
+                    onMouseLeave={handleMenuMouseLeave}
+                    TransitionComponent={Grow}
                     PaperProps={{
                       sx: {
                         mt: 1.5,
+                        backgroundColor: 'rgba(255,255,255,0.18)',
+                        backgroundImage: 'none',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                        backdropFilter: 'blur(14px)',
+                        WebkitBackdropFilter: 'blur(14px)',
+                        borderRadius: 2,
+                        py: 1,
                         '& .MuiAvatar-root': {
                           width: 32,
                           height: 32,
                           ml: -0.5,
                           mr: 1,
                         },
+                        '& .MuiMenuItem-root': {
+                          color: '#fafafa',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.22)',
+                          },
+                        },
+                        '& .MuiMenuItem-root.Mui-focused': { backgroundColor: 'rgba(255,255,255,0.18)' },
                       },
                     }}
                     transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                     anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                   >
                     {user && (
-                      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 'medium', color: '#e5e8f0' }}>
+                      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 500, color: '#fafafa' }}>
                           {user.username || 'Usuario'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#8b949e' }}>
-                          {user.email || 'No email'}
                         </Typography>
                       </Box>
                     )}
                     <MenuItem
                       onClick={() => {
                         navigate(user && user.is_staff ? '/admin-dashboard' : '/dashboard');
-                        handleUserMenuClose();
+                        closeUserMenu();
                       }}
-                      sx={{ color: '#c9d1d9', pt: user ? 1.5 : 0.5 }}
+                      sx={(theme)=>({ color: theme.palette.text.primary, pt: user ? 1.5 : 0.5 })}
                     >
                       Dashboard
                     </MenuItem>
-                    <MenuItem onClick={() => { navigate('/create-property'); handleUserMenuClose(); }} sx={{ color: '#c9d1d9' }}>Crear Propiedad</MenuItem>
+                    <MenuItem onClick={() => { navigate('/create-property'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary })}>Crear Propiedad</MenuItem>
                     {user && user.is_staff && (
                       <MenuItem 
                         onClick={() => { 
                           window.open('/admin/', '_blank'); // Open Django admin in a new tab
-                          handleUserMenuClose(); 
+                          closeUserMenu(); 
                         }} 
-                        sx={{ color: '#c9d1d9' }}
+                        sx={(theme)=>({ color: theme.palette.text.primary })}
                       >
                         Panel de Administración
                       </MenuItem>
                     )}
-                    <MenuItem onClick={() => { handleLogout(); handleUserMenuClose(); }} sx={{ color: '#c9d1d9', borderTop: user ? '1px solid rgba(255,255,255,0.1)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
+                    <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, borderTop: user ? '1px solid rgba(255,255,255,0.08)' : 'none', mt: user ? 1 : 0 })}>Logout</MenuItem>
                   </Menu>
                 </>
               ) : (

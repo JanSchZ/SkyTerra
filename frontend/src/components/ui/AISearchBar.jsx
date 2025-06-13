@@ -301,6 +301,24 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.25)',
+            color: 'text.primary',
+            transition: 'box-shadow 0.35s ease',
+            '& fieldset': { borderColor: 'transparent' },
+            '&:hover fieldset': { borderColor: 'transparent' },
+            '&.Mui-focused fieldset': { borderColor: 'transparent' },
+            '&.Mui-focused': {
+              boxShadow: '0 0 8px rgba(255,255,255,0.35)',
+            },
+          },
+          input: { color: (theme)=>theme.palette.text.primary },
+        }}
       />
       
       {error && !showResults && (
@@ -318,10 +336,10 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             position: 'absolute', 
             width: '100%',
             mt: 0.5,
-            backgroundColor: 'rgba(22, 27, 34, 0.95)',
-            backdropFilter: 'blur(20px)',
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(18px)',
             borderRadius: '16px',
-            border: '1px solid rgba(30, 41, 59, 0.3)',
+            border: '1px solid rgba(255,255,255,0.25)',
             zIndex: 10,
             maxHeight: 'calc(100vh - 200px)',
             overflowY: 'auto',

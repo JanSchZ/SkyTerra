@@ -85,10 +85,12 @@ const AISuggestionPanel = ({
           zIndex: 1250,
           maxHeight: { xs: '40vh', sm: 'calc(100vh - 160px)' },
           overflowY: 'auto',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
           backdropFilter: 'blur(14px)',
           WebkitBackdropFilter: 'blur(14px)',
-          backgroundColor: 'rgba(22,27,34,0.82)',
-          border: `1px solid rgba(255,255,255,0.08)`,
+          backgroundColor: 'rgba(255,255,255,0.18)',
+          border: `1px solid rgba(255,255,255,0.25)`,
         })}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>

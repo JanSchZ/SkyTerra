@@ -36,22 +36,36 @@ export const liquidGlassTheme = (mode = 'dark') => {
           {
             props: { variant: 'glass' },
             style: {
-              backgroundColor: 'rgba(22,27,34,0.85)',
+              backgroundColor: 'rgba(255,255,255,0.18)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
-              border: `1px solid ${alpha('#ffffff',0.12)}`,
+              border: `1px solid ${alpha('#ffffff',0.25)}`,
             }
           }
         ],
         styleOverrides: {
           root: {
             borderRadius: 12,
-            backgroundColor: 'rgba(22,27,34,0.72)',
+            backgroundColor: 'rgba(255,255,255,0.12)',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
-            border: `1px solid ${alpha('#ffffff',0.08)}`
+            border: `1px solid ${alpha('#ffffff',0.15)}`
           }
         }
+      },
+      MuiCard: {
+        variants: [
+          {
+            props: { variant: 'glass' },
+            style: {
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              border: `1px solid ${alpha('#ffffff',0.25)}`,
+              borderRadius: 12,
+            }
+          }
+        ]
       },
       MuiButton: {
         styleOverrides: {
@@ -65,7 +79,7 @@ export const liquidGlassTheme = (mode = 'dark') => {
         styleOverrides: {
           root: {
             borderRadius: 8,
-            backgroundColor: 'rgba(38,42,48,0.55)',
+            backgroundColor: 'rgba(255,255,255,0.14)',
             backdropFilter: 'blur(6px)',
             WebkitBackdropFilter: 'blur(6px)',
             boxShadow: `0 0 2px ${alpha(colors.accent,0.12)}`,
@@ -83,13 +97,13 @@ export const liquidGlassTheme = (mode = 'dark') => {
               borderColor: 'transparent',
             },
             '&:hover': {
-              boxShadow: `0 0 8px ${alpha(colors.accent,0.3)}`,
+              boxShadow: `0 0 8px ${alpha('#ffffff',0.25)}`,
               backgroundImage: 'linear-gradient(270deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015), rgba(255,255,255,0.06))',
               backgroundSize: '400% 400%',
               animation: 'glassGlow 12s ease-in-out infinite'
             },
             '&.Mui-focused': {
-              boxShadow: `0 0 12px ${alpha(colors.accent,0.5)}`,
+              boxShadow: `0 0 12px ${alpha('#ffffff',0.35)}`,
               backgroundImage: 'linear-gradient(270deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025), rgba(255,255,255,0.09))',
               backgroundSize: '400% 400%',
               animation: 'glassGlow 10s ease-in-out infinite'
