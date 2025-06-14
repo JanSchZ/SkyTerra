@@ -162,6 +162,23 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     }
 
     // QUICK HEURISTICS -------------------------------------------------
+    const greetingRegex = /^(hola|buenas|hello|hi|qué tal|que tal|hey)(\s+.*)?$/i;
+    if(greetingRegex.test(searchTermLowerCase.trim())){
+        const chatResponse = {
+          type:'chat',
+          search_mode:'chat',
+          assistant_message:'¡Hola! ¿En qué puedo ayudarte a buscar propiedades o ubicaciones?',
+          suggestedFilters:null,
+          recommendations:[],
+        };
+        setSearchResult(chatResponse);
+        if(onSearch) onSearch(chatResponse);
+        setShowResults(false);
+        if(onSearchComplete) onSearchComplete(chatResponse);
+        setLoading(false);
+        return;
+    }
+
     // 1) If the query is very short (≤3 words) *and* doesn't mention property-related keywords,
     //    we assume it is likely a place name and try geocoding first.
     // 2) Otherwise we go straight to the AI service.
@@ -250,11 +267,10 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         if (onSearch) {
           onSearch(processedResult);
         }
-        // Hide inline popup when we have property recommendations; rely on lateral panel
         if (resultType === 'properties') {
           setShowResults(false);
         } else {
-          setShowResults(true);
+          setShowResults(false); // hide for location/chat minimalism
         }
         if (onSearchComplete) onSearchComplete(processedResult);
 
@@ -301,6 +317,8 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
+        autoComplete="off"
+        inputProps={{ autoComplete: 'off', name: 'ai-search-input' }}
         sx={{
           '& .MuiOutlinedInput-root': {
             backgroundColor: 'rgba(255,255,255,0.18)',
@@ -314,6 +332,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             '&:hover fieldset': { borderColor: 'transparent' },
             '&.Mui-focused fieldset': { borderColor: 'transparent' },
             '&.Mui-focused': {
+              backgroundColor: 'rgba(255,255,255,0.18)',
               boxShadow: '0 0 8px rgba(255,255,255,0.35)',
             },
           },

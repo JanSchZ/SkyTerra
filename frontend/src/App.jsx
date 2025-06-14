@@ -22,6 +22,8 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import { motion, AnimatePresence } from 'framer-motion';
 import { liquidGlassTheme } from './theme/liquidGlassTheme';
+import { ThemeProvider as MuiThemeProvider, createTheme as createMuiTheme } from '@mui/material/styles';
+import { api, authService } from './services/api';
 
 import MapView from './components/map/MapView';
 import PropertyDetails from './components/property/PropertyDetails';
@@ -30,7 +32,6 @@ import AuthPage from './components/ui/AuthForms';
 import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
-import { authService } from './services/api';
 import LandingV2 from './components/ui/LandingV2';
 import CreatePublicationWizard from './components/property/CreatePublicationWizard';
 import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage';
@@ -85,6 +86,7 @@ function App() {
   const [aiAppliedFilters, setAiAppliedFilters] = useState(null);
   const [aiSearchLoading, setAiSearchLoading] = useState(false);
   const [aiSearchResult, setAiSearchResult] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
 
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -249,6 +251,44 @@ function App() {
 
   const handleMenuMouseEnter = () => { clearTimeout(hoverTimeoutRef.current); };
   const handleMenuMouseLeave = () => { hoverTimeoutRef.current = setTimeout(closeUserMenu, 300); };
+
+  // Trigger cinematic fly-through when new AI recommendations arrive
+  useEffect(() => {
+    if (aiSearchResult && aiSearchResult.search_mode === 'property_recommendation' && Array.isArray(aiSearchResult.recommendations) && aiSearchResult.recommendations.length > 0) {
+      mapRef.current?.showRecommendationsTour?.(aiSearchResult.recommendations.slice(0, 3)); // focus on top 3
+    }
+  }, [aiSearchResult]);
+
+  const handleFollowUpQuery = async (text) => {
+    const greetingRegex = /^(hola|buenas|hello|hi|qué tal|que tal|hey)(\s+.*)?$/i;
+    // Local quick response for greetings to avoid unnecessary backend call and map tours
+    if (greetingRegex.test(text.trim())) {
+      const assistantMsg = '¡Hola! ¿En qué puedo ayudarte a buscar propiedades o ubicaciones?';
+      const chatResponse = {
+        search_mode: 'chat',
+        assistant_message: assistantMsg,
+        recommendations: [],
+        suggestedFilters: null,
+      };
+      setConversationHistory(prev => [...prev, { role: 'user', content: text }, { role: 'assistant', content: assistantMsg }]);
+      setAiSearchResult(chatResponse);
+      return;
+    }
+
+    const newHistory = [...conversationHistory, { role: 'user', content: text }];
+    setConversationHistory(newHistory);
+    try {
+      setAiSearchLoading(true);
+      const response = await api.post('ai-search/', { query: text, conversation_history: newHistory });
+      if (response.data) {
+        setAiSearchResult(response.data);
+        if(response.data.assistant_message){
+           setConversationHistory([...newHistory,{ role:'assistant', content: response.data.assistant_message }]);
+        }
+      }
+    } catch (err) { console.error(err); }
+    finally { setAiSearchLoading(false); }
+  };
 
   if (loadingAuth) {
     return (
@@ -635,6 +675,7 @@ function App() {
          onSuggestionClick={handleSuggestionClick}
          onSuggestionHover={null}
          onClearAISearch={() => { setAiSearchResult(null); setAiAppliedFilters(null);} }
+         onFollowUpQuery={handleFollowUpQuery}
          currentQuery={aiSearchResult?.interpretation}
       />
     </>

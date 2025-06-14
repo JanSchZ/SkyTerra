@@ -70,6 +70,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const [viewState, setViewState] = useState(propInitialViewState || initialMapViewState);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
+  const [tourPreviews, setTourPreviews] = useState({});
   const [isDrawingMode, setIsDrawingMode] = useState(editable);
   const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -85,6 +86,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const lastLoadViewportRef = useRef(null);
   const debounceTimeoutRef = useRef(null);
   const lastFetchedPage1FiltersRef = useRef(null);
+  const recommendationsTourTimeoutRef = useRef(null);
 
   // Detectar tipo de conexión del usuario
   useEffect(() => {
@@ -930,8 +932,70 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         console.warn('Intento de flyTo pero el mapa no está listo o la referencia es nula.');
       }
     },
-    getMapInstance: () => mapRef.current
+    getMapInstance: () => mapRef.current,
+    showRecommendationsTour: (recs, options = {}) => {
+      if (!Array.isArray(recs) || recs.length === 0 || !mapRef.current) return;
+
+      const DURATION = options.duration || 4500; // ms per property
+      const ZOOM = options.zoom || 11;
+      const PITCH = options.pitch || 45;
+      const BEARING = options.bearing || 0;
+
+      // Cancel any existing tour
+      if (recommendationsTourTimeoutRef.current) {
+        clearTimeout(recommendationsTourTimeoutRef.current);
+        recommendationsTourTimeoutRef.current = null;
+      }
+
+      let idx = 0;
+      const flyToNext = () => {
+        if (idx >= recs.length) return; // finished
+        const prop = recs[idx];
+        if (prop.longitude == null || prop.latitude == null) {
+          idx++;
+          flyToNext();
+          return;
+        }
+
+        // Focus map
+        mapRef.current.flyTo({
+          center: [prop.longitude, prop.latitude],
+          zoom: ZOOM,
+          pitch: PITCH,
+          bearing: BEARING,
+          duration: DURATION,
+          essential: true,
+        });
+
+        // Show popup info
+        setPopupInfo(prop);
+
+        idx++;
+        recommendationsTourTimeoutRef.current = setTimeout(flyToNext, DURATION + 1000); // wait a bit more than flight
+      };
+
+      flyToNext();
+    }
   }));
+
+  // Load tour preview when popupInfo changes
+  useEffect(() => {
+    const fetchPreview = async () => {
+      if (!popupInfo || tourPreviews[popupInfo.id]) return;
+      try {
+        const data = await tourService.getTours(popupInfo.id);
+        const tours = data?.results || data;
+        const first = Array.isArray(tours) ? tours[0] : null;
+        if (first && first.url) {
+          let url = first.url;
+          if (!url.includes('autoLoad=true')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+          if (!url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+          setTourPreviews(prev => ({ ...prev, [popupInfo.id]: url }));
+        }
+      } catch (err) { console.error('Error loading tour preview', err); }
+    };
+    fetchPreview();
+  }, [popupInfo]);
 
   // Si se está cargando y no es editable, muestra el spinner
   if (loading && !editable) {
@@ -1085,46 +1149,40 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               maxWidth="300px"
             >
               <Card elevation={0} sx={{ 
-                maxWidth: 280, 
+                maxWidth: 320, 
+                display: 'flex',
                 backgroundColor: 'rgba(255,255,255,0.9)',
-                border: 'none', 
+                border: 'none',
                 boxShadow: 'none'
               }}>
-                {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
-                  <CardMedia
-                    component="img"
-                    height="120"
-                    image={(popupInfo.images && popupInfo.images.length > 0 ? popupInfo.images[0].url : popupInfo.image_url)}
-                    alt={`Imagen de ${popupInfo.name}`}
-                    sx={{ objectFit: 'cover' }}
-                  />
-                ) : null}
-                <CardContent sx={{p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                  <Typography gutterBottom variant="h6" component="div" sx={{fontSize: '1rem', fontWeight: 'bold'}}>
+                <CardContent sx={{ p: 1.5, pr: 1, '&:last-child': { pb: 1.5 }, flex: '1 1 60%' }}>
+                  <Typography gutterBottom variant="subtitle1" component="div" sx={{fontSize: '0.95rem', fontWeight: 'bold'}}>
                     {popupInfo.name}
                   </Typography>
-                  <Box sx={{ display:'flex', alignItems:'center', gap:0.5, mb:0.5 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Precio: {getPriceDisplay(popupInfo)}
-                    </Typography>
-                    {popupInfo.listing_type && (
-                      <Chip label={popupInfo.listing_type === 'rent' ? 'Arriendo' : (popupInfo.listing_type === 'both' ? 'Venta/Arriendo' : 'Venta')} size="small" color={popupInfo.listing_type === 'rent' ? 'warning' : 'primary'} variant="outlined" />
-                    )}
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Precio: {getPriceDisplay(popupInfo)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     Tamaño: {popupInfo.size} ha
                   </Typography>
+                  {popupInfo.type && (
+                    <Chip label={popupInfo.type} size="small" variant="outlined" />
+                  )}
                   <Box sx={{mt: 1}}>
-                      <Link 
-                          component="button" 
-                          variant="body2" 
-                          onClick={() => handleMarkerClick(popupInfo)} 
-                          sx={{cursor: 'pointer'}}
-                      >
-                          Ver detalles / Tour 360°
-                      </Link>
+                    <Link component="button" variant="body2" onClick={() => handleMarkerClick(popupInfo)} sx={{cursor: 'pointer'}}>
+                      Ver detalles / Tour 360°
+                    </Link>
                   </Box>
                 </CardContent>
+                <Box sx={{ width: 140, height: 100, mr: 1, mt: 1, flex: '0 0 40%' }}>
+                  {tourPreviews[popupInfo.id] ? (
+                    <iframe src={tourPreviews[popupInfo.id]} width="100%" height="100%" style={{ border: 0 }} title={`Preview ${popupInfo.name}`} />
+                  ) : (
+                    (popupInfo.images && popupInfo.images.length > 0) ? (
+                      <CardMedia component="img" image={popupInfo.images[0].url} alt={popupInfo.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : null
+                  )}
+                </Box>
               </Card>
             </Popup>
           )}

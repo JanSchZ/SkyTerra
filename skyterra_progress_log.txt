@@ -270,6 +270,12 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
 *   **[MEJORA - 14 Jun 2025]** PropertyCard convertido a estilo Glass:
     *   `PropertyCard.jsx` usa ahora `<Card variant="glass">` removiendo sombras previas.
 *   **[RESUELTO - 13 Jun 2025]** Se eliminó `boxShadow` global y en variante glass en `liquidGlassTheme.js` para evitar halo gigante.
+*   **[MEJORA - 14 Jun 2025]** IA Search – GeminiService refinado:
+    *   `backend/properties/services.py` ahora conserva recomendaciones con IDs válidos de la IA y solo genera sugerencias nuevas cuando es necesario.
+    *   Mensajes del asistente se mantienen coherentes y se evita mostrar 3 tarjetas irrelevantes.
+*   **[RESUELTO - 14 Jun 2025]** Halo blanco en pop-ups Mapbox eliminado:
+    *   `frontend/src/index.css` – `.mapboxgl-popup-content`, `.mapboxgl-popup-tip` y `.mapboxgl-popup-tip-inner` ahora son transparentes, sin borde ni sombra.
+    *   El pop-up muestra solo la tarjeta glass interior, sin doble fondo.
 
 ---
 
