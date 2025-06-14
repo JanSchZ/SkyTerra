@@ -34,6 +34,7 @@ import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
 import { propertyService, tourService, imageService, authService } from '../../services/api';
 import MapView from '../map/MapView';
+import axios from 'axios';
 
 // Países y sus recorridos de vuelo
 const countryFlightPaths = {
@@ -292,6 +293,14 @@ const PropertyDetails = () => {
     console.log('🗺️ Mapa de PropertyDetails cargado');
     // El vuelo automático se iniciará desde el useEffect cuando la propiedad esté cargada
   };
+
+  useEffect(() => {
+    if (property) {
+      // registrar visita
+      axios.post('/api/property-visits/', { property: property.id })
+        .catch(err => console.warn('Error registrando visita', err));
+    }
+  }, [property]);
 
   if (loading) {
     return (

@@ -283,38 +283,75 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                             ai_response.setdefault('interpretation', user_query)
 
                             # Si el modo es "property_recommendation", buscar propiedades reales
-                            if ai_response['search_mode'] == 'property_recommendation' and ai_response.get('suggestedFilters'):
-                                search_filters = ai_response['suggestedFilters'].copy()
-                                # Considerar si 'searchText' debe ser parte del filtro o si la IA ya lo usó
-                                # search_filters['searchText'] = user_query
-                                
-                                real_properties = self._search_properties(search_filters)
-                                
-                                if real_properties.exists():
-                                    real_recommendations = []
-                                    # Usar las razones de la IA si existen y coinciden los IDs, sino generar una genérica
-                                    # Esto es complejo de mapear directamente si la IA inventa IDs.
-                                    # Por ahora, simplemente reemplazaremos las recomendaciones.
+                            if ai_response['search_mode'] == 'property_recommendation':
+                                # Primera prioridad: intentar enriquecer las recomendaciones sugeridas por la IA si tienen IDs válidos.
+                                enriched_recommendations = []
+                                valid_rec_ids = []
 
+                                for rec in ai_response.get('recommendations', []):
+                                    prop_id = rec.get('id')
+                                    if prop_id and isinstance(prop_id, int):
+                                        try:
+                                            prop = Property.objects.get(id=prop_id)
+                                            valid_rec_ids.append(prop_id)
+                                            enriched_recommendations.append({
+                                                'id': prop.id,
+                                                'name': prop.name,
+                                                'price': float(prop.price),
+                                                'size': prop.size,
+                                                'type': prop.get_type_display(),
+                                                'has_water': prop.has_water,
+                                                'has_views': prop.has_views,
+                                                'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
+                                                'latitude': prop.latitude,
+                                                'longitude': prop.longitude,
+                                                'reason': rec.get('reason') or "Recomendado por la IA"
+                                            })
+                                        except Property.DoesNotExist:
+                                            # ID no válido, continuar
+                                            continue
+
+                                # Si encontramos recomendaciones válidas a partir de la respuesta de la IA, las usamos tal cual
+                                if enriched_recommendations:
+                                    ai_response['recommendations'] = enriched_recommendations
+                                else:
+                                    # Si la IA no proporcionó recomendaciones válidas, construimos una lista basada en los filtros sugeridos (si existen)
+                                    if ai_response.get('suggestedFilters'):
+                                        search_filters = ai_response['suggestedFilters'].copy()
+                                        real_properties = self._search_properties(search_filters)
+                                    else:
+                                        # Como último recurso, hacemos una búsqueda básica utilizando el texto del usuario
+                                        real_properties = self._search_properties({'searchText': user_query})
+
+                                    generated_recommendations = []
                                     for prop in real_properties:
-                                        real_recommendations.append({
+                                        generated_recommendations.append({
                                             'id': prop.id,
                                             'name': prop.name,
                                             'price': float(prop.price),
                                             'size': prop.size,
-                                            'type': prop.get_type_display(), # Usar display name
+                                            'type': prop.get_type_display(),
                                             'has_water': prop.has_water,
                                             'has_views': prop.has_views,
                                             'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
-                                            'latitude': prop.latitude, # Ensure this is being added
-                                            'longitude': prop.longitude, # Ensure this is being added
-                                            # 'reason': "Coincide con los filtros sugeridos." # Podríamos mejorar esto. If AI gives a reason, we should try to use it.
+                                            'latitude': prop.latitude,
+                                            'longitude': prop.longitude,
+                                            'reason': "Coincide con los filtros sugeridos."
                                         })
-                                    
-                                    ai_response['recommendations'] = real_recommendations
-                                    # Actualizar mensaje del asistente si se encontraron propiedades
-                                    if not ai_response.get('assistant_message') or "Encontré" not in ai_response['assistant_message']:
-                                         ai_response['assistant_message'] = f"Encontré {len(real_recommendations)} propiedades que podrían interesarte. {ai_response.get('assistant_message', '')}".strip()
+
+                                    ai_response['recommendations'] = generated_recommendations
+
+                                # Ajustar mensaje cuando utilizamos recomendaciones generadas y el mensaje existente es genérico
+                                generic_msgs = [
+                                    "Tu búsqueda ha sido procesada.",
+                                    "Búsqueda procesada",
+                                ]
+                                if (not enriched_recommendations) or (ai_response.get('assistant_message') in generic_msgs):
+                                    rec_count = len(ai_response['recommendations'])
+                                    if rec_count == 0:
+                                        ai_response['assistant_message'] = "No encontré propiedades que coincidan exactamente con tu búsqueda, pero aquí tienes algunas sugerencias generales."
+                                    else:
+                                        ai_response['assistant_message'] = f"Encontré {rec_count} propiedad{'es' if rec_count != 1 else ''} que podrían interesarte."
 
                             elif ai_response['search_mode'] == 'location':
                                 # Para modo 'location', nos aseguramos que no haya recomendaciones de propiedades

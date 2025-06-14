@@ -15,6 +15,7 @@ const AISuggestionPanel = ({
   currentQuery // The user's query that led to these results
 }) => {
   const [tourPreviews, setTourPreviews] = useState({});
+  const MAX_DISPLAY = 3;
 
   useEffect(() => {
     const fetchPreviews = async () => {
@@ -78,10 +79,9 @@ const AISuggestionPanel = ({
         sx={(theme) => ({
           p: 2,
           position: 'absolute',
-          top: { xs: 'auto', sm: '140px' },
-          bottom: { xs: '20px', sm: 'auto' },
-          left: '20px',
-          width: { xs: 'calc(100% - 40px)', sm: '380px' },
+          top: 140,
+          left: 20,
+          width: 380,
           zIndex: 1250,
           maxHeight: { xs: '40vh', sm: 'calc(100vh - 160px)' },
           overflowY: 'auto',
@@ -118,10 +118,10 @@ const AISuggestionPanel = ({
           <>
           <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
           <Typography variant="subtitle1" sx={{ mb: 1, fontWeight:'bold', color: 'text.primary' }}>
-             Top {Math.min(recommendations.length, 5)} Sugerencia{Math.min(recommendations.length, 5) > 1 ? 's' : ''}:
+             Top {Math.min(recommendations.length, MAX_DISPLAY)} Sugerencia{Math.min(recommendations.length, MAX_DISPLAY) > 1 ? 's' : ''}:
           </Typography>
           <List dense disablePadding>
-            {recommendations.slice(0, 5).map((rec, index) => (
+            {recommendations.slice(0, MAX_DISPLAY).map((rec, index) => (
               <motion.div
                  key={rec.id || index}
                  initial={{ opacity: 0, y: 20 }}

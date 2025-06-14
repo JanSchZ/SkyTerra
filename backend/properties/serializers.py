@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model # Import get_user_model
 from django.conf import settings # Alternative for AUTH_USER_MODEL
-from .models import Property, Tour, Image, PropertyDocument
+from .models import Property, Tour, Image, PropertyDocument, PropertyVisit
 import json
 
 User = get_user_model()
@@ -143,4 +143,15 @@ class PropertyListSerializer(serializers.ModelSerializer):
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'has_water', 'has_views', 'image_count', 'has_tour',
-                 'publication_status', 'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms'] 
+                 'publication_status', 'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms']
+
+class PropertyVisitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PropertyVisit
+        fields = ['id', 'property', 'user', 'visited_at']
+        read_only_fields = ['id', 'visited_at', 'user']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
+        return PropertyVisit.objects.create(user=user, **validated_data) 

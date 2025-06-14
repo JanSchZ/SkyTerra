@@ -30,7 +30,7 @@ const PropertyCard = ({ property }) => {
   const listingLabel = property.listing_type === 'rent' ? 'Arriendo' : (property.listing_type === 'both' ? 'Venta / Arriendo' : 'Venta');
 
   return (
-    <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 2, boxShadow: 3 }}>
+    <Card variant="glass" sx={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: 2 }}>
       <CardMedia
         component="img"
         height="160"
@@ -69,7 +69,7 @@ const PropertyCard = ({ property }) => {
             {property.has_views && <Chip label="Vistas" size="small" color="success" variant="outlined" />}
         </Box>
       </CardContent>
-      <CardActions sx={{ justifyContent: 'flex-end', pt: 0, pb:1, px:1 }}>
+      <CardActions sx={{ justifyContent: 'flex-end', pt: 0, pb:1, px:1 }} className="no-shine">
         <IconButton onClick={handleViewDetails} color="primary" title="Ver Detalles">
           <VisibilityIcon />
         </IconButton>

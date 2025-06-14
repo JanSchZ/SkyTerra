@@ -40,6 +40,7 @@ export const liquidGlassTheme = (mode = 'dark') => {
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
               border: `1px solid ${alpha('#ffffff',0.25)}`,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
             }
           }
         ],
@@ -63,9 +64,15 @@ export const liquidGlassTheme = (mode = 'dark') => {
               WebkitBackdropFilter: 'blur(14px)',
               border: `1px solid ${alpha('#ffffff',0.25)}`,
               borderRadius: 12,
+              boxShadow: 'none',
             }
           }
-        ]
+        ],
+        styleOverrides: {
+          root: {
+            boxShadow: 'none',
+          },
+        }
       },
       MuiButton: {
         styleOverrides: {

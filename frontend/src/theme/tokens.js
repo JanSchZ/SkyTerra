@@ -7,5 +7,8 @@ export const tokens = {
     surface0: '#0e0e0e',
     surface1: 'rgba(255,255,255,0.04)',
     surfaceGlass: 'rgba(255,255,255,0.12)',
+    lightBg: '#F4F5F7',
+    lightPaper: '#FFFFFF',
+    accentGreen: '#16c784',
   }
 }; 

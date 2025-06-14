@@ -18,12 +18,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 
-from .models import Property, Tour, Image, PropertyDocument
+from .models import Property, Tour, Image, PropertyDocument, PropertyVisit
 from .serializers import (
     PropertySerializer, PropertyListSerializer,
-    TourSerializer, ImageSerializer, PropertyDocumentSerializer
+    TourSerializer, ImageSerializer, PropertyDocumentSerializer, PropertyVisitSerializer
 )
 from .services import GeminiService, GeminiServiceError
+from .email_service import send_property_status_email
 
 # Create your views here.
 logger = logging.getLogger(__name__)
@@ -419,6 +420,7 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
         if not document.property.documents.filter(status__in=['pending', 'rejected']).exists():
             document.property.publication_status = 'approved'
             document.property.save()
+            send_property_status_email(document.property)
 
         return Response({'detail': 'Documento aprobado.'}, status=status.HTTP_200_OK)
 
@@ -438,5 +440,19 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
         # Mark property status as rejected (optional)
         document.property.publication_status = 'rejected'
         document.property.save()
+        send_property_status_email(document.property)
 
         return Response({'detail': 'Documento rechazado.'}, status=status.HTTP_200_OK)
+
+class PropertyVisitViewSet(viewsets.ModelViewSet):
+    queryset = PropertyVisit.objects.all().order_by('-visited_at')
+    serializer_class = PropertyVisitSerializer
+    http_method_names = ['post', 'head', 'options']
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.AllowAny()]
+        return [permissions.IsAdminUser()]
+
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)

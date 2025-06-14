@@ -1084,11 +1084,11 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               offset={15} 
               maxWidth="300px"
             >
-              <Card sx={{ 
+              <Card elevation={0} sx={{ 
                 maxWidth: 280, 
                 backgroundColor: 'rgba(255,255,255,0.9)',
                 border: 'none', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                boxShadow: 'none'
               }}>
                 {(popupInfo.images && popupInfo.images.length > 0 && popupInfo.images[0].url) || popupInfo.image_url ? (
                   <CardMedia

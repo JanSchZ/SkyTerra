@@ -30,17 +30,10 @@ import AuthPage from './components/ui/AuthForms';
 import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
-import CreateProperty from './components/property/CreateProperty';
-import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
-import AdminPublicationsPage from './components/admin/AdminPublicationsPage';
-import AdminDashboardPage from './components/admin/AdminDashboardPage';
-import AdminLayout from './components/admin/AdminLayout';
-import AdminUsersListPage from './components/admin/AdminUsersListPage';
-import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage';
-import AdminTicketsPage from './components/admin/AdminTicketsPage';
-import AdminSettingsPage from './components/admin/AdminSettingsPage';
-import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage';
 import { authService } from './services/api';
+import LandingV2 from './components/ui/LandingV2';
+import CreatePublicationWizard from './components/property/CreatePublicationWizard';
+import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage';
 import './App.css';
 
 export const ThemeModeContext = React.createContext({
@@ -75,6 +68,13 @@ const AppWrapper = () => {
 const ProtectedRoute = ({ user, element }) => {
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+  return element;
+};
+
+const StaffRoute = ({ user, element }) => {
+  if (!user || !user.is_staff) {
+    return <Navigate to="/" replace />;
   }
   return element;
 };
@@ -188,7 +188,7 @@ function App() {
 
       // Check if the logged-in user is staff/admin
       if (userData.user && userData.user.is_staff) {
-        navigate('/admin-dashboard'); // Redirect admins to a new admin dashboard route
+        navigate('/admin/documents'); // Redirect admins to a new admin dashboard route
       } else {
         navigate('/'); // Redirect regular users to the home page
       }
@@ -506,25 +506,14 @@ function App() {
                     )}
                     <MenuItem
                       onClick={() => {
-                        navigate(user && user.is_staff ? '/admin-dashboard' : '/dashboard');
+                        navigate(user && user.is_staff ? '/admin/documents' : '/dashboard');
                         closeUserMenu();
                       }}
                       sx={(theme)=>({ color: theme.palette.text.primary, pt: user ? 1.5 : 0.5 })}
                     >
                       Dashboard
                     </MenuItem>
-                    <MenuItem onClick={() => { navigate('/create-property'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary })}>Crear Propiedad</MenuItem>
-                    {user && user.is_staff && (
-                      <MenuItem 
-                        onClick={() => { 
-                          window.open('/admin/', '_blank'); // Open Django admin in a new tab
-                          closeUserMenu(); 
-                        }} 
-                        sx={(theme)=>({ color: theme.palette.text.primary })}
-                      >
-                        Panel de Administración
-                      </MenuItem>
-                    )}
+                    <MenuItem onClick={() => { navigate('/wizard-create'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary })}>Crear Propiedad</MenuItem>
                     <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, borderTop: user ? '1px solid rgba(255,255,255,0.08)' : 'none', mt: user ? 1 : 0 })}>Logout</MenuItem>
                   </Menu>
                 </>
@@ -607,72 +596,31 @@ function App() {
             }
           />
           <Route
-            path="/create-property"
+            path="/v2"
             element={
-              <ProtectedRoute user={user} element={
-                  <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                    <CreateProperty />
-                  </motion.div>
-                }
-              />
+              <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                <LandingV2 />
+              </motion.div>
             }
           />
-          <Route path="/edit-property/:id" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
-          <Route path="/property/edit/:id" element={<ProtectedRoute user={user} element={<CreateProperty />} />} />
-          <Route 
-            path="/admin/publications"
-            element={<AdminProtectedRoute element={<AdminPublicationsPage />} />} 
+          <Route
+            path="/wizard-create"
+            element={
+              <ProtectedRoute user={user} element={
+                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+                  <CreatePublicationWizard />
+                </motion.div>
+              } />
+            }
           />
-          <Route element={<AdminProtectedRoute element={<AdminLayout />} />}>
-            <Route 
-              path="/admin-dashboard" 
-              element={ 
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminDashboardPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-users-list" 
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminUsersListPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-detailed-properties-list" 
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminDetailedPropertiesPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-tickets" 
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminTicketsPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-documents" 
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminDocumentsReviewPage />
-                </motion.div>
-              }
-            />
-            <Route 
-              path="/admin-settings" 
-              element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <AdminSettingsPage />
-                </motion.div>
-              }
-            />
-          </Route>
+          <Route
+            path="/create-property"
+            element={<ProtectedRoute user={user} element={<CreatePublicationWizard />} />}
+          />
+          <Route
+            path="/admin/documents"
+            element={<StaffRoute user={user} element={<AdminDocumentsReviewPage />} />}
+          />
           <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
         </Routes>
       </AnimatePresence>

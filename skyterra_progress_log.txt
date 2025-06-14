@@ -236,6 +236,40 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
     *  Cards, Paper y métricas ahora usan variante `glass` con fondos translúcidos y bordes consistentes.
     *  Íconos y botones actualizados para seguir la paleta neutra; bordes y hovers adaptados.
     *  Gráficos en Admin Dashboard recodificados con color neutro y contenedores translúcidos.
+*   **[ACTUALIZADO - 14 Jun 2025]** UI Legacy Cleanup:
+    *   Eliminadas pestañas de filtros manuales y otros componentes redundantes (`Dashboard.jsx`, `FilterPanel.jsx`) para alinear la experiencia con la nueva filosofía *AI-first* y el roadmap "Liquid Glass".
+    *   Se aprueba iniciar un **rediseño completo Apple-style** enfocado en el flujo del Vendedor (creación de publicaciones, analíticas y gestión de planes), incorporando las sugerencias de estructura modular y nuevas pestañas detalladas en la conversación del 14-Jun.
+    *   Próximos pasos: definición detallada de pantallas, wireframes y tokens de animación.
+*   **[ACTUALIZADO - 14 Jun 2025]** Limpieza Admin Dashboard:
+    *   Se removieron rutas e importaciones de `Admin*` pages en `App.jsx` para simplificar la V2 minimal.
+    *   Los componentes admin y lógica de verificación de documentos, métricas y gestión permanecen en `frontend/src/components/admin/` para reaprovechar en una futura versión Staff-Only.
+*   **[COMPLETADO - 14 Jun 2025]** Integrado flujo de creación de publicación:
+    *   Se añadió componente `CreatePublicationWizard.jsx` (wizard 4 pasos) con estilo Liquid Glass y validación básica.
+    *   `App.jsx`: Ruta protegida `/create-property` registrada y acceso solo para usuarios autenticados.
+    *   `Dashboard.jsx`: Botón "Crear nueva publicación" ahora navega al wizard y ya no está deshabilitado.
+    *   Se emplea `Paper variant="glass"` y tokens de tema en wizard; se mantiene coherencia visual.
+*   **[COMPLETADO - 14 Jun 2025]** Visibilidad de documentos en Dashboard:
+    *   `Dashboard.jsx` ahora carga las propiedades del usuario vía `getUserProperties`.
+    *   Lista "Mis Propiedades" muestra estado de verificación de documentos con chips (Aprobados, Pendientes, Rechazados, Sin documentos).
+    *   Cada card es Paper glass y enlaza a los detalles de propiedad.
+*   **[COMPLETADO - 14 Jun 2025]** Ruta admin para revisión de documentos:
+    *   `AdminDocumentsReviewPage.jsx` conectado vía ruta `/admin/documents` con protección solo para `is_staff`.
+    *   Navegación automática tras login de admin y desde menú de usuario.
+*   **[MEJORA - 14 Jun 2025]** IA Search Bar – Panel de sugerencias refinado:
+    *   `AISuggestionPanel.jsx` limita visualización a top-3 sugerencias (`MAX_DISPLAY = 3`) y fija ancho 380 px en lateral izquierdo (20 px de margen).
+    *   Alineado con requisito de UI de mostrar 3 propiedades y panel fijo.
+*   **[COMPLETADO - 14 Jun 2025]** Notificaciones de email al propietario por cambio de estado:
+    *   Implementado `email_service.send_property_status_email` usando `django.core.mail.send_mail`.
+    *   `PropertyDocumentViewSet.approve/reject` dispara correo automático al cambiar `publication_status`.
+*   **[COMPLETADO - 14 Jun 2025]** Script de superusuario por defecto:
+    *   Management command `create_default_admin` en `properties/management/commands/` crea un superuser si no existe.
+    *   Usa variables de entorno `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL` con defaults (`admin` / `SkyTerra3008%`).
+*   **[COMPLETADO - 14 Jun 2025]** Métrica de visitas registrada:
+    *   Modelo `PropertyVisit` ya existía; se añadió `PropertyVisitSerializer`, `PropertyVisitViewSet` y ruta `/api/property-visits/` (POST).
+    *   `PropertyDetails.jsx` registra automáticamente una visita al cargar la propiedad.
+*   **[MEJORA - 14 Jun 2025]** PropertyCard convertido a estilo Glass:
+    *   `PropertyCard.jsx` usa ahora `<Card variant="glass">` removiendo sombras previas.
+*   **[RESUELTO - 13 Jun 2025]** Se eliminó `boxShadow` global y en variante glass en `liquidGlassTheme.js` para evitar halo gigante.
 
 ---
 
@@ -375,5 +409,9 @@ Cada punto se añadirá a la fase correspondiente durante planificación semanal
     6.  **UX – Migración a Liquid Glass restante (Sprint-focus)**
         *   Convertir `Dashboard`, `CreateProperty`, `PropertyCard` y formularios Auth a variantes `glass`.
         *   Eliminar estilos inline `rgba(22,27,34,*)` residuales.
+    7.  **UX – Rediseño flujo Vendedor & Pestañas Modulares (Apple-style)**
+        *   Elaborar wireframes de las nuevas secciones: Resumen, Mis Publicaciones, Crear Publicación (wizard 4 pasos), Estadísticas, Mensajes y Planes.
+        *   Priorizar animaciones fluidas (Framer-motion) y uso de `variant="glass"` en contenedores principales.
+        *   Preparar esquema de rutas y permisos (solo `role="seller"`).
 
-*   **Meta de sprint:** Todas las tareas 1-4 marcadas `[COMPLETADO]` y 5-6 `[EN PROGRESO]` antes del 21-Jun-2025.
+*   **Meta de sprint:** Todas las tareas 1-4 marcadas `[COMPLETADO]` y 5-7 `[EN PROGRESO]` antes del 21-Jun-2025.

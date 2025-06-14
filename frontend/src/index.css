@@ -54,11 +54,12 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Configuración de mapbox-gl */
 .mapboxgl-popup-content {
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(30, 58, 95, 0.15);
-  max-width: 320px;
-  border: 1px solid var(--border-light);
+  padding: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  max-width: unset;
   font-family: 'Source Code Pro', sans-serif !important;
 }
 
@@ -293,4 +294,10 @@ iframe {
 /* Enhance legibility of text over translucent backgrounds */
 .MuiPaper-root, .MuiCard-root, .MuiMenuItem-root, .MuiTypography-root {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.mapboxgl-popup-tip,
+.mapboxgl-popup-tip-inner {
+  background: transparent !important;
+  box-shadow: none !important;
 }
