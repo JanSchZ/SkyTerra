@@ -9,8 +9,8 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
 // Set global default font for Chart.js
 ChartJS.defaults.font.family = "'Source Code Pro', monospace";
-ChartJS.defaults.color = '#E5E8F0'; // Default text color for charts
-const ACCENT = '#a0a0a0'; // neutral accent color (no blue)
+ChartJS.defaults.color = '#212121'; // Default text color for charts in light mode
+const ACCENT = '#4cafef'; // subtle blue accent for charts
 
 // Importar el layout del panel de admin si ya existe uno, o crear uno básico aquí.
 // Por ahora, será un layout simple.
@@ -90,10 +90,10 @@ const AdminDashboardPage = () => {
             // borderRadius: '12px', // Not needed if transparent
           }}
         >
-          <Typography variant="h4" component="h1" sx={{ /*fontFamily: 'Code Pro, sans-serif',*/ fontWeight: 'bold', mb: 3, color: '#E5E8F0' }}> {/* Updated font */}
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1, color: 'text.primary' }}>
             SkyTerra Admin Dashboard
           </Typography>
-          <Typography variant="body1" sx={{ color: ACCENT }}>
+          <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
             Bienvenido al panel de administración de SkyTerra. Desde aquí podrás gestionar propiedades, usuarios y más.
           </Typography>
           {/* Aquí se añadirán las métricas y otros componentes del dashboard */}
@@ -105,11 +105,11 @@ const AdminDashboardPage = () => {
             <Grid container spacing={3} sx={{ mt: 4 }}>
               {metricCards.map(card => (
                 <Grid item xs={12} sm={6} md={3} key={card.key}>
-                  <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', minHeight: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="h6" sx={{ color: ACCENT, mb: 1, textAlign: 'center' }}>
+                  <Paper variant="glass" sx={{ p: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="subtitle1" sx={{ color: 'text.secondary', mb: 1 }}>
                       {card.label}
                     </Typography>
-                    <Typography variant="h3" sx={{ /*fontFamily: 'Code Pro, sans-serif',*/ fontWeight: 'bold', color: '#E5E8F0' }}> {/* Updated font */}
+                    <Typography variant="h3" sx={{ fontWeight: 700 }}>
                       {card.key === 'average_property_size' && metrics[card.key] !== null ?
                         Math.round(metrics[card.key]) + ' ha' :
                         metrics[card.key] !== null ? metrics[card.key] : 'N/A'
@@ -125,9 +125,9 @@ const AdminDashboardPage = () => {
           <Grid container spacing={3} sx={{ mt: 4 }}>
             {/* Property Type Distribution Chart */}
             {propertyData.length > 0 && (
-              <Grid item xs={12} md={6}>
-                <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', height: '400px' }}>
-                  <Typography variant="h6" sx={{ color: ACCENT, mb: 2 }}>Distribución de Propiedades por Tipo</Typography>
+              <Grid item xs={12} md={4}>
+                <Paper variant="glass" sx={{ p: 2, height: '400px' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Propiedades por Tipo</Typography>
                   <Box sx={{ height: 'calc(100% - 48px)' }}> {/* Adjust height for chart, considering title */}
                     <Bar
                       data={{
@@ -137,8 +137,8 @@ const AdminDashboardPage = () => {
                           data: [...new Set(propertyData.map(item => item.type || 'N/A'))].map(type =>
                             propertyData.filter(item => (item.type || 'N/A') === type).length
                           ),
-                          backgroundColor: ACCENT,
-                          borderColor: ACCENT,
+                          backgroundColor: 'rgba(63, 81, 181, 0.5)',
+                          borderColor: 'rgb(63, 81, 181)',
                           borderWidth: 1,
                           borderRadius: 4, // Rounded bars
                           barThickness: 'flex',
@@ -152,7 +152,7 @@ const AdminDashboardPage = () => {
                           legend: {
                             position: 'top',
                             labels: {
-                              color: '#E5E8F0',
+                              color: '#212121',
                               font: { family: "'Source Code Pro', monospace" } // Updated font
                             }
                           }
@@ -164,7 +164,7 @@ const AdminDashboardPage = () => {
                               borderColor: 'rgba(229, 232, 240, 0.2)'
                             },
                             ticks: {
-                              color: '#E5E8F0',
+                              color: '#212121',
                               font: { family: "'Source Code Pro', monospace" } // Updated font
                             }
                           },
@@ -174,7 +174,7 @@ const AdminDashboardPage = () => {
                               borderColor: 'rgba(229, 232, 240, 0.2)'
                             },
                             ticks: {
-                              color: '#E5E8F0',
+                              color: '#212121',
                               font: { family: "'Source Code Pro', monospace" } // Updated font
                             }
                           }
@@ -188,9 +188,9 @@ const AdminDashboardPage = () => {
 
             {/* Price Distribution Chart */}
             {propertyData.length > 0 && (
-              <Grid item xs={12} md={6}>
-                <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', height: '400px' }}>
-                  <Typography variant="h6" sx={{ color: ACCENT, mb: 2 }}>Distribución de Precios</Typography>
+              <Grid item xs={12} md={4}>
+                <Paper variant="glass" sx={{ p: 2, height: '400px' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Distribución de Precios</Typography>
                   <Box sx={{ height: 'calc(100% - 48px)' }}> {/* Adjust height for chart, considering title */}
                     <Line
                       data={{
@@ -198,14 +198,14 @@ const AdminDashboardPage = () => {
                         datasets: [{
                           label: 'Precio (USD)',
                           data: propertyData.map(item => item.price),
-                          borderColor: ACCENT,
-                          backgroundColor: 'rgba(160,160,160,0.25)', // Optional fill
+                          borderColor: 'rgb(255, 99, 132)',
+                          backgroundColor: 'rgba(255, 99, 132, 0.5)',
                           fill: true, // Optional fill
-                          tension: 0.1, // Smoother lines
-                          pointBackgroundColor: '#E5E8F0',
-                          pointBorderColor: ACCENT,
+                          tension: 0.4, // Smoother lines
+                          pointBackgroundColor: '#212121',
+                          pointBorderColor: 'rgb(255, 99, 132)',
                           pointHoverBackgroundColor: '#fff',
-                          pointHoverBorderColor: ACCENT,
+                          pointHoverBorderColor: 'rgb(255, 99, 132)',
                           pointRadius: 4,
                           pointHoverRadius: 6
                         }]
@@ -217,7 +217,7 @@ const AdminDashboardPage = () => {
                           legend: {
                             position: 'top',
                             labels: {
-                              color: '#E5E8F0',
+                              color: '#212121',
                               font: { family: "'Source Code Pro', monospace" } // Updated font
                             }
                           },
@@ -244,7 +244,7 @@ const AdminDashboardPage = () => {
                               borderColor: 'rgba(229, 232, 240, 0.2)'
                             },
                             ticks: {
-                              color: '#E5E8F0',
+                              color: '#212121',
                               font: { family: "'Source Code Pro', monospace" } // Updated font
                             }
                           },
@@ -255,7 +255,7 @@ const AdminDashboardPage = () => {
                               borderColor: 'rgba(229, 232, 240, 0.2)'
                             },
                             ticks: {
-                              color: '#E5E8F0',
+                              color: '#212121',
                               font: { family: "'Source Code Pro', monospace" },
                               callback: function(value) { // Format Y-axis as currency
                                 return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
@@ -272,30 +272,16 @@ const AdminDashboardPage = () => {
 
             {/* Property Status Chart */}
             {propertyStatusChartData && (
-              <Grid item xs={12} md={6}> {/* Displayed below, taking half width or full if desired */}
-                <Paper variant="glass" sx={{ p: 2, color: '#E5E8F0', height: '400px' }}>
-                  <Typography variant="h6" sx={{ color: ACCENT, mb: 2 }}>Estado de Propiedades</Typography>
+              <Grid item xs={12} md={4}>
+                <Paper variant="glass" sx={{ p: 2, height: '400px' }}>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Estado de Propiedades</Typography>
                   <Box sx={{ height: 'calc(100% - 48px)' }}> {/* Adjust height for chart, considering title */}
                     <Pie
-                      data={propertyStatusChartData} // propertyStatusChartData already defines labels and datasets
+                      data={propertyStatusChartData}
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top', // Or 'bottom', 'left', 'right'
-                            labels: {
-                              color: '#E5E8F0', // Color for legend text
-                              font: { family: "'Source Code Pro', monospace" } // Updated font
-                            }
-                          },
-                          elements: {
-                            arc: {
-                              borderColor: 'rgba(255,255,255,0.08)',
-                              borderWidth: 2
-                            }
-                          }
-                        },
+                        plugins: { legend: { position: 'top' } }
                       }}
                     />
                   </Box>

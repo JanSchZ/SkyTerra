@@ -38,7 +38,7 @@ function EnhancedTableHead({ order, orderBy, onRequestSort }) {
   const createSortHandler = property => event => onRequestSort(event, property);
   return (
     <TableHead>
-      <TableRow sx={{ '& th': { color: '#8faacc', backgroundColor: '#182534' } }}>
+      <TableRow sx={{ '& th': { color: (theme) => theme.palette.text.secondary, backgroundColor: (theme) => theme.palette.grey[100] } }}>
         {headCells.map(cell => (
           <TableCell key={cell.id} align={cell.numeric ? 'right' : 'left'}>
             {cell.sortable === false ? (
@@ -151,8 +151,8 @@ export default function AdminDocumentsReviewPage() {
   return (
     <Box sx={{ flexGrow: 1, py: 3 }}>
       <Container maxWidth="xl">
-        <Paper elevation={3} sx={{ p: 3, backgroundColor: '#182534', color: '#E5E8F0', borderRadius: '12px' }}>
-          <Typography variant="h4" sx={{ mb: 3, fontFamily: 'Code Pro, sans-serif', fontWeight: 'bold', color: '#E5E8F0' }}>
+        <Paper elevation={1} sx={{ p: 3, backgroundColor: (theme) => theme.palette.background.paper, color: (theme) => theme.palette.text.primary, borderRadius: '12px' }}>
+          <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
             Revisión de Documentos de Propiedades
           </Typography>
           {loading && (
@@ -167,7 +167,7 @@ export default function AdminDocumentsReviewPage() {
                 <EnhancedTableHead order={order} orderBy={orderBy} onRequestSort={handleRequestSort} />
                 <TableBody>
                   {documents.map(doc => (
-                    <TableRow key={doc.id} hover sx={{ '& td': { color: '#E5E8F0', borderColor: '#223449' } }}>
+                    <TableRow key={doc.id} hover sx={{ '& td': { color: (theme) => theme.palette.text.primary, borderColor: (theme) => theme.palette.divider } }}>
                       <TableCell sx={{ color: '#8faacc' }}>{doc.id}</TableCell>
                       <TableCell>{doc.property_name || doc.property}</TableCell>
                       <TableCell>
@@ -213,7 +213,7 @@ export default function AdminDocumentsReviewPage() {
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[5, 10, 25]}
-            sx={{ color: '#8faacc', '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select, & .MuiTablePagination-selectIcon': { color: '#8faacc' } }}
+            sx={{ '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select, & .MuiTablePagination-selectIcon': { color: (theme) => theme.palette.text.secondary } }}
           />
         </Paper>
       </Container>

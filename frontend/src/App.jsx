@@ -38,9 +38,11 @@ import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPag
 import CompareView from './components/property/CompareView';
 import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage.jsx';
 import SavedSearchesPage from './components/ui/SavedSearchesPage';
-import AdminV2Layout from './components/adminV2/AdminV2Layout.jsx';
-import AdminV2Dashboard from './components/adminV2/AdminV2Dashboard.jsx';
-import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
+import AdminLayout from './components/admin/AdminLayout.jsx';
+import AdminDashboardPage from './components/admin/AdminDashboardPage.jsx';
+import AdminTicketsPage from './components/admin/AdminTicketsPage.jsx';
+import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
+import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
 import './App.css';
 
 export const ThemeModeContext = React.createContext({
@@ -49,13 +51,13 @@ export const ThemeModeContext = React.createContext({
 });
 
 const AppWrapper = () => {
-  const mode = 'light';
+  const [mode, setMode] = React.useState('light');
 
   const theme = useMemo(() => liquidGlassTheme(mode), [mode]);
 
   const themeMode = useMemo(
     () => ({
-      toggleThemeMode: () => {},
+      toggleThemeMode: () => setMode((prev) => (prev === 'light' ? 'dark' : 'light')),
       mode,
       theme,
     }),
@@ -664,19 +666,18 @@ function App() {
             element={<ProtectedRoute user={user} element={<CreatePublicationWizard />} />}
           />
           <Route
-            path="/admin/documents"
-            element={<StaffRoute user={user} element={<AdminDocumentsReviewPage />} />}
+            path="/compare"
+            element={<CompareView />}
           />
-          <Route
-            path="/admin-detailed-properties-list"
-            element={<StaffRoute user={user} element={<AdminDetailedPropertiesPage />} />}
-          />
-          <Route path="/compare" element={<CompareView />} />
           <Route path="/dashboard/saved-searches" element={<ProtectedRoute user={user} element={<SavedSearchesPage />} />} />
-          <Route path="/admin/*" element={<StaffRoute user={user} element={<AdminV2Layout />} />}>
-            <Route index element={<AdminV2Dashboard />} />
-            <Route path="properties" element={<PropertyApprovalPage />} />
-            <Route path="analytics" element={<AdminV2Dashboard />} />
+          <Route path="/admin/*" element={<StaffRoute user={user} element={<AdminLayout />} />}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="properties" element={<AdminDetailedPropertiesPage />} />
+            <Route path="tickets" element={<AdminTicketsPage />} />
+            <Route path="documents" element={<AdminDocumentsReviewPage />} />
+            <Route path="users" element={<AdminUsersListPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
         </Routes>

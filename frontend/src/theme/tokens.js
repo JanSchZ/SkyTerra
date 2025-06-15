@@ -2,12 +2,12 @@
 export const tokens = {
   colors: {
     accent: '#a0a0a0', // neutral accent, adjust if a colored accent desired
-    textPrimary: '#e5e5e5',
-    textSecondary: '#c9d1d9',
+    textPrimary: '#212121',
+    textSecondary: '#555555',
     surface0: '#0e0e0e',
     surface1: 'rgba(255,255,255,0.04)',
-    surfaceGlass: 'rgba(255,255,255,0.12)',
-    lightBg: '#F4F5F7',
+    surfaceGlass: 'rgba(255, 255, 255, 0.75)',
+    lightBg: '#F4F6F8',
     lightPaper: '#FFFFFF',
     accentGreen: '#16c784',
   }

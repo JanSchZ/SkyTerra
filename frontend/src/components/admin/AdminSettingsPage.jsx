@@ -26,8 +26,8 @@ const AdminSettingsPage = () => {
   };
 
   return (
-    <Paper sx={{ p: 3, backgroundColor: '#182534', color: '#E5E8F0', borderRadius: '12px' }}>
-      <Typography variant="h4" sx={{ color: '#E5E8F0', fontFamily: 'Code Pro, sans-serif', mb: 3 }}>
+    <Paper sx={{ p: 3, backgroundColor: (theme) => theme.palette.background.paper, color: (theme) => theme.palette.text.primary, borderRadius: '12px' }}>
+      <Typography variant="h4" sx={{ mb: 3 }}>
         Configuración de la Plataforma
       </Typography>
       <form onSubmit={handleSave}>
@@ -45,11 +45,11 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, input: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
           </Grid>
 
-          <Grid item xs={12}><Divider sx={{ background: '#223449' }} /></Grid>
+          <Grid item xs={12}><Divider /></Grid>
 
           {/* Sección: Datos de Contacto */}
           <Grid item xs={12} md={4}>
@@ -64,7 +64,7 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, input: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
             <TextField
               fullWidth
@@ -74,7 +74,7 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, input: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
             <TextField
               fullWidth
@@ -84,7 +84,7 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, input: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
           </Grid>
 
@@ -101,7 +101,7 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, input: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
           </Grid>
 
@@ -120,7 +120,7 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, textarea: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
             <TextField
               fullWidth
@@ -132,12 +132,12 @@ const AdminSettingsPage = () => {
               onChange={handleChange}
               variant="outlined"
               sx={{ mb: 2, textarea: { color: '#E5E8F0' }, label: { color: '#8faacc' },
-                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: '#8faacc' }, '&:hover fieldset': { borderColor: '#E5E8F0' } } }}
+                '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'lightgrey' }, '&:hover fieldset': { borderColor: 'grey' } } }}
             />
           </Grid>
 
           <Grid item xs={12} sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button type="submit" variant="contained" sx={{ backgroundColor: '#8faacc', color: '#101923', '&:hover': { backgroundColor: '#E5E8F0' } }}>
+            <Button type="submit" variant="contained">
               Guardar Cambios
             </Button>
           </Grid>

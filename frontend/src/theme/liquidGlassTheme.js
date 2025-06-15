@@ -1,8 +1,8 @@
 import { createTheme, alpha } from '@mui/material/styles';
 import { tokens } from './tokens';
 
-export const liquidGlassTheme = (mode = 'dark') => {
-  const isDark = mode === 'dark';
+export const liquidGlassTheme = (mode = 'light') => {
+  const isDark = mode === 'dark'; // currently unused as we force light but kept for flexibility
   const { colors } = tokens;
 
   const palette = isDark ? {
@@ -44,10 +44,17 @@ export const liquidGlassTheme = (mode = 'dark') => {
   return createTheme({
     palette,
     typography: {
-      fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      fontSize: 14,
       h1: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
       h2: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
-      h3: { fontWeight: 400 },
+      h3: { fontWeight: 700 },
+      h4: { fontWeight: 600 },
+      h5: { fontWeight: 500 },
+      h6: { fontWeight: 500 },
+      subtitle1: { fontWeight: 600 },
+      subtitle2: { fontWeight: 600, color: palette.text.secondary },
+      caption: { color: palette.text.secondary }
     },
     components: {
       MuiPaper: {
@@ -55,21 +62,19 @@ export const liquidGlassTheme = (mode = 'dark') => {
           {
             props: { variant: 'glass' },
             style: {
-              backgroundColor: 'rgba(255,255,255,0.18)',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-              border: `1px solid ${alpha('#ffffff',0.25)}`,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+              backgroundColor: alpha('#FFFFFF', 0.9),
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: `1px solid ${alpha('#FFFFFF', 0.4)}`,
+              boxShadow: '0 6px 24px rgba(0,0,0,0.05)',
+              borderRadius: 16,
             }
           }
         ],
         styleOverrides: {
           root: {
-            borderRadius: 12,
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: `1px solid ${alpha('#ffffff',0.15)}`
+            borderRadius: 16,
+            backgroundImage: 'none',
           }
         }
       },
@@ -105,9 +110,9 @@ export const liquidGlassTheme = (mode = 'dark') => {
         styleOverrides: {
           root: {
             borderRadius: 8,
-            backgroundColor: 'rgba(255,255,255,0.14)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
+            backgroundColor: alpha(palette.background.paper, 0.7),
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
             boxShadow: `0 0 2px ${alpha(colors.accent,0.12)}`,
             backgroundImage: 'linear-gradient(270deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01), rgba(255,255,255,0.04))',
             backgroundSize: '400% 400%',
@@ -167,6 +172,13 @@ export const liquidGlassTheme = (mode = 'dark') => {
             '50%': { backgroundPosition: '100% 50%' },
             '100%': { backgroundPosition: '0% 50%' },
           },
+          body: {
+            backgroundColor: palette.background.default,
+          },
+          'h1, h2, h3, h4, h5, h6, p': {
+            textShadow: 'none',
+          },
+          '*': { letterSpacing: '0.01em' },
         },
       },
     }

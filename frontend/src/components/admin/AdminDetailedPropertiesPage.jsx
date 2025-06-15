@@ -59,7 +59,7 @@ function EnhancedTableHead(props) {
 
     return (
         <TableHead>
-            <TableRow sx={{ "& th": { color: "#8faacc", backgroundColor: "#182534", whiteSpace: 'nowrap' } }}>
+            <TableRow sx={{ "& th": { color: (theme) => theme.palette.text.secondary, backgroundColor: (theme) => theme.palette.grey[100], whiteSpace: 'nowrap' } }}>
                 {headCells.map((headCell) => (
                     <TableCell
                         key={headCell.id}
@@ -390,15 +390,15 @@ const AdminDetailedPropertiesPage = () => {
         <Box sx={{ flexGrow: 1, py: 3 }}>
             <Container maxWidth="xl">
                 <Paper
-                    elevation={3}
+                    elevation={1}
                     sx={{
                         p: 3,
-                        backgroundColor: '#182534',
-                        color: '#E5E8F0',
+                        backgroundColor: (theme) => theme.palette.background.paper,
+                        color: (theme) => theme.palette.text.primary,
                         borderRadius: '12px',
                     }}
                 >
-                    <Typography variant="h4" component="h1" sx={{ fontFamily: 'Code Pro, sans-serif', fontWeight: 'bold', mb: 3, color: '#E5E8F0' }}>
+                    <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 3 }}>
                         Manage Properties (Detailed List)
                     </Typography>
 
@@ -415,7 +415,7 @@ const AdminDetailedPropertiesPage = () => {
                         }}
                         sx={{
                           minWidth: 160,
-                          '& select': { color: '#E5E8F0', backgroundColor: '#223449', borderRadius: 1, p:1 },
+                          '& select': { },
                           '& fieldset': { display: 'none' },
                         }}
                       >
@@ -444,7 +444,7 @@ const AdminDetailedPropertiesPage = () => {
                                             <TableRow
                                                 hover
                                                 key={prop.id}
-                                                sx={{ "& td": { color: '#E5E8F0', borderColor: '#223449', whiteSpace: 'nowrap' } }}
+                                                sx={{ "& td": { color: (theme) => theme.palette.text.primary, borderColor: (theme) => theme.palette.divider, whiteSpace: 'nowrap' } }}
                                             >
                                                 <TableCell component="th" scope="row" sx={{ color: '#8faacc' }}>{prop.id}</TableCell>
                                                 <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -503,9 +503,9 @@ const AdminDetailedPropertiesPage = () => {
                         page={page}
                         onPageChange={handleChangePage}
                         onRowsPerPageChange={handleChangeRowsPerPage}
-                        sx={{ color: '#8faacc',
+                        sx={{ color: (theme) => theme.palette.text.secondary,
                               "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select, & .MuiTablePagination-selectIcon": {
-                                  color: '#8faacc'
+                                  color: (theme) => theme.palette.text.secondary
                               }
                         }}
                     />
@@ -515,10 +515,11 @@ const AdminDetailedPropertiesPage = () => {
                     open={Boolean(anchorEl)}
                     onClose={handleCloseActionMenu}
                     PaperProps={{
-                        style: {
-                          backgroundColor: '#223449',
-                          color: '#E5E8F0',
-                          border: '1px solid #30363d'
+                        sx: {
+                          backgroundColor: (theme) => theme.palette.background.paper,
+                          color: (theme) => theme.palette.text.primary,
+                          border: '1px solid',
+                          borderColor: (theme) => theme.palette.divider
                         },
                       }}
                 >
@@ -536,8 +537,8 @@ const AdminDetailedPropertiesPage = () => {
                     )}
                 </Menu>}
 
-                <Dialog open={openTourModal} onClose={handleCloseTourModal} PaperProps={{sx: {backgroundColor: '#182534', color: '#E5E8F0'}}}>
-                    <DialogTitle sx={{color: '#E5E8F0', borderBottom: '1px solid #30363d'}}>
+                <Dialog open={openTourModal} onClose={handleCloseTourModal} PaperProps={{sx: {backgroundColor: (theme) => theme.palette.background.paper, color: (theme) => theme.palette.text.primary}}}>
+                    <DialogTitle sx={{ borderBottom: '1px solid', borderColor: (theme) => theme.palette.divider }}>
                         Gestionar Tour para Propiedad: {currentPropertyForTour?.name || ''} (ID: {currentPropertyForTour?.id || ''})
                     </DialogTitle>
                     <DialogContent sx={{mt: 2, minWidth: '500px'}}>
@@ -549,7 +550,7 @@ const AdminDetailedPropertiesPage = () => {
                             <>
                                 {existingTourDetails && (
                                     <Box mb={3} p={2} sx={{border: '1px solid #30363d', borderRadius: '4px'}}>
-                                        <Typography variant="subtitle1" sx={{color: '#E5E8F0', fontWeight:'bold'}}>Tour Actual:</Typography>
+                                        <Typography variant="subtitle1" sx={{ fontWeight:'bold' }}>Tour Actual:</Typography>
                                         <Typography variant="body2" sx={{color: '#8faacc'}}>Nombre: {existingTourDetails.name || 'N/A'}</Typography>
                                         <Typography variant="body2" sx={{color: '#8faacc'}}>Descripción: {existingTourDetails.description || 'N/A'}</Typography>
                                         <Typography variant="body2" sx={{color: '#8faacc'}}>Tour ID: {existingTourDetails.tour_id}</Typography>
@@ -559,7 +560,7 @@ const AdminDetailedPropertiesPage = () => {
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 size="small"
-                                                sx={{mt:1, color:'#58a6ff'}}
+                                                sx={{mt:1}}
                                             >
                                                 Ver Tour Actual
                                             </Button>
@@ -572,14 +573,10 @@ const AdminDetailedPropertiesPage = () => {
                                     El ZIP debe incluir un archivo `index.html` o `tour.html` en la raíz o en una subcarpeta directa.
                                 </DialogContentText>
                                 <Button
-                                    variant="contained"
+                                    variant="outlined"
                                     component="label"
                                     fullWidth
-                                    sx={{
-                                        my: 2,
-                                        backgroundColor: '#223449',
-                                        '&:hover': {backgroundColor: '#304459'}
-                                    }}
+                                    sx={{ my: 2 }}
                                 >
                                     {existingTourDetails ? "Reemplazar Tour (ZIP)" : "Seleccionar Archivo ZIP"}
                                     <input type="file" accept=".zip" hidden onChange={handleFileChange} />
@@ -595,7 +592,7 @@ const AdminDetailedPropertiesPage = () => {
                                     variant="outlined"
                                     value={tourName}
                                     onChange={(e) => setTourName(e.target.value)}
-                                    sx={{ input: { color: '#E5E8F0' }, label: {color: '#8faacc'}, '& .MuiOutlinedInput-root': {'& fieldset': { borderColor: '#30363d' }} }}
+                                    sx={{ }}
                                 />
                                 <TextField
                                     margin="dense"
@@ -608,7 +605,7 @@ const AdminDetailedPropertiesPage = () => {
                                     variant="outlined"
                                     value={tourDescription}
                                     onChange={(e) => setTourDescription(e.target.value)}
-                                    sx={{ mt:1, input: { color: '#E5E8F0' }, label: {color: '#8faacc'}, '& .MuiOutlinedInput-root': {'& fieldset': { borderColor: '#30363d' }} }}
+                                    sx={{ mt:1 }}
                                 />
                             </>
                         )}
@@ -632,7 +629,7 @@ const AdminDetailedPropertiesPage = () => {
                     onClose={handleCloseSnackbar}
                     anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 >
-                    <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%', backgroundColor: snackbarSeverity === 'success' ? '#2e7d32' : '#d32f2f', color: 'white' }}>
+                    <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
                         {snackbarMessage}
                     </Alert>
                 </Snackbar>

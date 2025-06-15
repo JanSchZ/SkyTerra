@@ -25,7 +25,7 @@ function EnhancedTableHead(props) {
 
     return (
         <TableHead>
-            <TableRow sx={{ "& th": { color: "#8faacc", backgroundColor: "#182534" } }}>
+            <TableRow sx={{ "& th": { color: (theme) => theme.palette.text.secondary, backgroundColor: (theme) => theme.palette.grey[100] } }}>
                 {headCells.map((headCell) => (
                     <TableCell
                         key={headCell.id}
@@ -120,11 +120,11 @@ const AdminUsersListPage = () => {
         <Box sx={{ flexGrow: 1, py: 3 }}>
             <Container maxWidth="xl">
                 <Paper
-                    elevation={3}
+                    elevation={1}
                     sx={{
                         p: 3,
-                        backgroundColor: '#182534',
-                        color: '#E5E8F0',
+                        backgroundColor: (theme) => theme.palette.background.paper,
+                        color: (theme) => theme.palette.text.primary,
                         borderRadius: '12px',
                     }}
                 >
@@ -148,7 +148,7 @@ const AdminUsersListPage = () => {
                                         <TableRow
                                             hover
                                             key={user.id}
-                                            sx={{ "& td": { color: '#E5E8F0', borderColor: '#223449' } }}
+                                            sx={{ "& td": { color: (theme) => theme.palette.text.primary, borderColor: (theme) => theme.palette.divider } }}
                                         >
                                             <TableCell component="th" scope="row" sx={{ color: '#8faacc' }}>{user.id}</TableCell>
                                             <TableCell>{user.username}</TableCell>
@@ -177,9 +177,9 @@ const AdminUsersListPage = () => {
                         page={page}
                         onPageChange={handleChangePage}
                         onRowsPerPageChange={handleChangeRowsPerPage}
-                        sx={{ color: '#8faacc',
+                        sx={{ 
                               "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select, & .MuiTablePagination-selectIcon": {
-                                  color: '#8faacc'
+                                  color: (theme) => theme.palette.text.secondary
                               }
                         }}
                     />
