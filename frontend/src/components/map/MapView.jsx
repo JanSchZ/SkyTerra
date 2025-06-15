@@ -52,8 +52,10 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTourUrl, setActiveTourUrl] = useState(null);
-  const [activeTourPropertyId, setActiveTourPropertyId] = useState(null);
+  const [activeTourUrl, _setActiveTourUrl] = useState(null);
+  const activeTourUrlRef = useRef(null);
+  const [activeTourPropertyId, _setActiveTourPropertyId] = useState(null);
+  const activeTourPropertyIdRef = useRef(null);
 
   // Nuevos estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -807,7 +809,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         });
 
         const DIST_THRESHOLD = 600; // metros
-        if (nearest && minDist <= DIST_THRESHOLD && nearest.id !== activeTourPropertyId) {
+        if (nearest && minDist <= DIST_THRESHOLD && nearest.id !== activeTourPropertyIdRef.current) {
           (async () => {
             try {
               const tours = await tourService.getPropertyTours(nearest.id);
@@ -824,7 +826,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             }
           })();
         }
-      } else if (currentZoom < 13.5 && activeTourUrl) {
+      } else if (currentZoom < 13.5 && activeTourUrlRef.current) {
         // Alejando: cerrar tour
         setActiveTourUrl(null);
         setActiveTourPropertyId(null);
@@ -845,7 +847,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         handleLoadMore(); // Call the memoized and stable handleLoadMore
       }
     }, 500);
-  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, activeTourPropertyId, activeTourUrl, prefetchToursInViewport, tourCache]);
+  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, prefetchToursInViewport, tourCache]);
 
   const renderPropertyBoundaries = (property) => {
     if (property && property.boundary_polygon && property.boundary_polygon.coordinates) {
