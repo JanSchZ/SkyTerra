@@ -29,6 +29,7 @@ db.sqlite3-journal
 # staticfiles/ # Typically added by Django's collectstatic
 # media/ # User-uploaded files, location configured in Django
 +backend/media/
++media/
 # Node / React
 node_modules/
 build/

@@ -37,11 +37,26 @@ const TourViewer = () => {
         }
         
         const tour = await tourService.getTour(tourId);
+        
+        // Validación adicional de seguridad
+        if (!tour || !tour.url || !tour.url.includes('/media/tours/') ||
+            tour.url.includes('placeholder') || tour.url.includes('test')) {
+          const propId = tour?.property || tour?.property_id;
+          if (propId) {
+            navigate(`/property/${propId}`);
+            return;
+          } else {
+            setError('No se encontró el tour solicitado.');
+            setLoading(false);
+            return;
+          }
+        }
+        
         setTourData(tour);
         
         // También cargar los datos de la propiedad relacionada
         if (tour && (tour.property || tour.property_id)) {
-          const propId = tour.property || tour.property_id; // compatibilidad
+          const propId = tour.property || tour.property_id;
           const property = await propertyService.getProperty(propId);
           setPropertyData(property);
         }
@@ -58,7 +73,7 @@ const TourViewer = () => {
     };
     
     fetchTourData();
-  }, [tourId]);
+  }, [tourId, navigate]);
 
   // Función para ir a pantalla completa
   const toggleFullScreen = () => {
@@ -301,6 +316,7 @@ const TourViewer = () => {
               height="100%"
               frameBorder="0"
               allowFullScreen
+              allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
               onLoad={handleIframeLoad}
               onError={handleIframeError}
               title="Tour Virtual 360°"

@@ -22,8 +22,27 @@ const getBaseURL = () => {
     return backendUrl;
   }
   
-  // Para producción o otros entornos, usar una URL relativa
-  console.log('🌐 Configurando para producción:', '/api');
+  // Detect if we're on a dedicated frontend sub-domain (e.g. app.skyterra.cl) and map to the
+  // corresponding API sub-domain (e.g. api.skyterra.cl). This prevents requests from being
+  // sent to the same origin (which would 404 when the backend lives elsewhere).
+  if (hostname.startsWith('app.')) {
+    const backendHost = hostname.replace(/^app\./, 'api.');
+    const backendUrl = `https://${backendHost}`;
+    console.log('🌐 Configurando para sub-dominio app.* -> api.*:', `${backendUrl}/api`);
+    return `${backendUrl}/api`;
+  }
+  
+  // Similar mapping for "www." → "api." (in case the frontend is served from www.domain)
+  if (hostname.startsWith('www.')) {
+    const backendHost = hostname.replace(/^www\./, 'api.');
+    const backendUrl = `https://${backendHost}`;
+    console.log('🌐 Configurando para sub-dominio www.* -> api.*:', `${backendUrl}/api`);
+    return `${backendUrl}/api`;
+  }
+  
+  // Para producción u otros entornos donde backend y frontend comparten dominio raíz,
+  // asumimos que el backend está disponible en la misma raíz bajo /api.
+  console.log('🌐 Configurando para producción (misma raíz):', '/api');
   return '/api';
 };
 
@@ -493,83 +512,38 @@ export const tourService = {
   // Obtener tours de una propiedad
   async getTours(propertyId) {
     try {
+      // Traemos todos los tours asociados a la propiedad, sin filtrar por tipo en la solicitud.
+      // El filtrado se hará posteriormente en el cliente para descartar placeholders o tours de prueba.
       const response = await api.get(`/tours/?property=${propertyId}`);
-      const data = response.data;
-      // Si la API devuelve results vacío, crear un tour de ejemplo dinámicamente
-      if (data && Array.isArray(data.results) && data.results.length === 0) {
-        return {
-          results: [
-            {
-              id: `placeholder-${propertyId}`,
-              title: "Vista 360° de muestra",
-              url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
-              property_id: propertyId,
-              type: 'package',
-              name: 'Tour de muestra'
-            }
-          ]
-        };
-      }
-      return data;
+      return response.data;
     } catch (error) {
       console.error(`Error fetching tours for property ${propertyId}:`, error);
-      // Retornar un tour de muestra en caso de error
-      return {
-        results: [
-          {
-            id: `placeholder-${propertyId}`,
-            title: "Vista 360° de muestra",
-            url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
-            property_id: propertyId,
-            type: 'package',
-            name: 'Tour de muestra'
-          }
-        ]
-      };
+      return { results: [] };
     }
   },
 
   // Obtener un tour específico por ID
   async getTour(tourId) {
     try {
-      // Si es un ID placeholder, no hay que consultar al backend
-      if (typeof tourId === 'string' && tourId.startsWith('placeholder-')) {
-        const propId = tourId.split('placeholder-')[1];
-        return {
-          id: tourId,
-          title: "Vista 360° de muestra",
-          url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
-          property_id: propId,
-          type: 'package',
-          name: 'Tour de muestra'
-        };
-      }
-
       const response = await api.get(`/tours/${tourId}/`);
-      return response.data;
+      const tour = response.data;
+      
+      // Validar que el tour sea válido y no sea un tour de prueba o placeholder
+      if (!tour || !tour.url ||
+          tour.url.includes('placeholder') || tour.url.includes('test')) {
+        throw new Error('Invalid tour');
+      }
+      
+      return tour;
     } catch (error) {
       console.error(`Error fetching tour ${tourId}:`, error);
-      // Intentar inferir property_id si el tourId venía como número dentro de placeholder
-      let inferredPropId = null;
-      if (typeof tourId === 'string' && tourId.includes('-')) {
-        const parts = tourId.split('-');
-        inferredPropId = parts[parts.length - 1];
-      }
-      return {
-        id: tourId,
-        title: "Vista 360° de muestra",
-        url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
-        property_id: inferredPropId || 0,
-        type: 'package',
-        name: 'Tour de muestra'
-      };
+      throw error;
     }
   },
 
   // Subir nuevo tour
   async uploadTour(tourData) {
     try {
-      // Usamos axios sin el default header Content-Type para que el navegador ponga el boundary correcto
       const token = localStorage.getItem('auth_token');
       const axiosConfig = {
         headers: {
@@ -580,21 +554,34 @@ export const tourService = {
       return response.data;
     } catch (error) {
       console.error('Error uploading tour:', error);
-      // Retornar un tour de muestra en lugar de lanzar el error
-      return {
-        id: Date.now(),
-        title: tourData.title || "Nuevo tour",
-        url: tourData.url || "https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg",
-        property_id: tourData.property_id || 1
-      };
+      throw error;
     }
   },
 
   async getPropertyTours(propertyId) {
     const data = await this.getTours(propertyId);
-    const arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
-    // Filtrar tours de placeholder
-    return arr.filter(t => !(typeof t.id === 'string' && t.id.startsWith('placeholder-')));
+    // `data` puede venir como { results: [...] } (paginado) o como lista directa.
+    let arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+    
+    // Filtrado estricto de tours válidos (aceptamos cualquier tipo, pero descartamos placeholders y tests)
+    arr = arr.filter(tour => 
+      typeof tour.url === 'string' &&
+      !tour.url.includes('placeholder') &&
+      !tour.url.includes('test')
+    );
+    
+    // Ordenar por fecha de subida (uploaded_at) descendente
+    arr.sort((a, b) => {
+      const dateA = new Date(a.uploaded_at || a.created_at || 0).getTime();
+      const dateB = new Date(b.uploaded_at || b.created_at || 0).getTime();
+      if (dateA !== dateB) return dateB - dateA;
+      const idA = typeof a.id === 'number' ? a.id : parseInt(a.id, 10);
+      const idB = typeof b.id === 'number' ? b.id : parseInt(b.id, 10);
+      if (!isNaN(idA) && !isNaN(idB)) return idB - idA;
+      return 0;
+    });
+    
+    return arr;
   }
 };
 
@@ -611,22 +598,22 @@ export const imageService = {
         results: [
           {
             id: 1,
-            title: "Vista aérea",
-            type: "aerial",
-            url: "https://via.placeholder.com/800x600?text=Vista+Aerea",
-            property_id: propertyId
+            title: 'Vista aérea',
+            type: 'aerial',
+            url: 'https://via.placeholder.com/800x600?text=Vista+Aerea',
+            property_id: propertyId,
           },
           {
             id: 2,
-            title: "Mapa topográfico",
-            type: "topography",
-            url: "https://via.placeholder.com/800x600?text=Mapa+Topografico",
-            property_id: propertyId
-          }
-        ]
+            title: 'Mapa topográfico',
+            type: 'topography',
+            url: 'https://via.placeholder.com/800x600?text=Mapa+Topografico',
+            property_id: propertyId,
+          },
+        ],
       };
     }
-  }
+  },
 };
 
 // ---------------------
@@ -645,11 +632,14 @@ export const savedSearchService = {
     const resp = await api.patch(`/saved-searches/${id}/`, payload);
     return resp.data;
   },
-  async delete(id){
+  async delete(id) {
     await api.delete(`/saved-searches/${id}/`);
-  }
+  },
 };
 
+// ---------------------
+// Favorites Service
+// ---------------------
 export const favoritesService = {
   async list() {
     const resp = await api.get('/favorites/');
@@ -662,16 +652,17 @@ export const favoritesService = {
     return (await api.delete(`/favorites/${favoriteId}/`)).data;
   },
   async removeByProperty(propertyId) {
-    // get favorite id for given property first
     const favs = await favoritesService.list();
     const fav = favs.find((f) => f.property === propertyId);
     if (fav) return favoritesService.remove(fav.id);
-  }
+  },
 };
 
 export default {
   property: propertyService,
   auth: authService,
   tour: tourService,
-  image: imageService
-}; 
+  image: imageService,
+  savedSearch: savedSearchService,
+  favorites: favoritesService,
+};

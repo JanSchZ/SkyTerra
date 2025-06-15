@@ -193,9 +193,19 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'SkyTerra <noreply@example.
 SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL) # For server error notifications
 ADMINS = [('Admin', os.getenv('ADMIN_EMAIL', 'admin@example.com'))] # For site admins
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# ------------------------------------------------------------------
+# Security / Clickjacking – permitir incrustar tours (HTML) en iframe
+# ------------------------------------------------------------------
+# Necesitamos permitir que el frontend (que corre en un puerto/host distinto
+# durante el desarrollo) incruste los archivos HTML servidos desde /media/tours/
+# en un <iframe>.  Para ello configuramos X_FRAME_OPTIONS a 'ALLOWALL'.
+#
+# Si se desea un valor más restrictivo en producción (p.ej. 'SAMEORIGIN'), se
+# puede controlar con una variable de entorno X_FRAME_OPTIONS.
 
+X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'ALLOWALL')
+
+# Valor por defecto para claves primarias auto incrementales
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework settings

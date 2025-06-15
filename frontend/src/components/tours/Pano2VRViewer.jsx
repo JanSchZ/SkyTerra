@@ -49,6 +49,7 @@ const Pano2VRViewer = ({ src, title, sx }) => {
           border: 'none',
           visibility: loading ? 'hidden' : 'visible',
         }}
+        allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
         onLoad={() => setLoading(false)}
         allowFullScreen
       />

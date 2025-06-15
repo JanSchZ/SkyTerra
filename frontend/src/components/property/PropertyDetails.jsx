@@ -92,7 +92,7 @@ const PropertyDetails = () => {
   // Mantener el estado del mapa alineado con la propiedad cargada para evitar el "zoom-out" inicial.
   useEffect(() => {
     const center = getPropertyCenter();
-    if (center) {
+    if (center && !center.some((v) => isNaN(v))) {
       setMapViewState((prev) => ({
         ...prev,
         longitude: center[0],
@@ -103,40 +103,65 @@ const PropertyDetails = () => {
     }
   }, [property, autoFlyCompleted]);
 
+  // Si llegamos con skipAutoFlight activo (autoFlyCompleted=true), centra el mapa
+  // directamente en la propiedad una vez que los datos estén disponibles. Evitamos
+  // alterar la vista si el tour ya está activo, y usamos un pitch intermedio para
+  // que la transición sea menos brusca.
+  useEffect(() => {
+    const center = getPropertyCenter();
+    if (autoFlyCompleted && !activeTourUrl && center && mapRef.current) {
+      const mapInstance = mapRef.current.getMap ? mapRef.current.getMap() : mapRef.current;
+      if (mapInstance && typeof mapInstance.jumpTo === 'function') {
+        mapInstance.jumpTo({
+          center,
+          zoom: 14,
+          pitch: 45,
+          bearing: 0,
+        });
+      }
+    }
+  }, [autoFlyCompleted, property, activeTourUrl]);
+
+  // Si el vuelo automático fue omitido (skipAutoFlight) pero existen tours válidos,
+  // abrimos automáticamente el primero para evitar requerir un clic adicional.
+  useEffect(() => {
+    if (autoFlyCompleted && tours && tours.length > 0 && !activeTourUrl) {
+      setActiveTourUrl(tours[0].url);
+      setShowDetails(false);
+    }
+  }, [autoFlyCompleted, tours, activeTourUrl]);
+
   // Helper para obtener centro de la propiedad: usa lat/lng o calcula a partir del boundary polygon
   const getPropertyCenter = () => {
-    if (property?.longitude != null && property?.latitude != null) {
-      return [property.longitude, property.latitude];
+    // Convertir a número y validar
+    const rawLon = property?.longitude;
+    const rawLat = property?.latitude;
+    const lon = rawLon !== undefined && rawLon !== null ? parseFloat(rawLon) : null;
+    const lat = rawLat !== undefined && rawLat !== null ? parseFloat(rawLat) : null;
+
+    if (!isNaN(lon) && !isNaN(lat)) {
+      return [lon, lat];
     }
     // Si no hay lat/lng, intentar calcular a partir del polygon GeoJSON
     const coords = property?.boundary_polygon?.geometry?.coordinates?.[0];
     if (Array.isArray(coords) && coords.length > 2) {
       let sumX = 0, sumY = 0;
       coords.forEach(([x, y]) => {
-        sumX += x;
-        sumY += y;
+        const numX = typeof x === 'string' ? parseFloat(x) : x;
+        const numY = typeof y === 'string' ? parseFloat(y) : y;
+        if (!isNaN(numX) && !isNaN(numY)) {
+          sumX += numX;
+          sumY += numY;
+        }
       });
-      return [sumX / coords.length, sumY / coords.length];
+      const avgX = sumX / coords.length;
+      const avgY = sumY / coords.length;
+      if (!isNaN(avgX) && !isNaN(avgY)) {
+        return [avgX, avgY];
+      }
     }
     return null; // fallback
   };
-
-  // Si llegamos con skipAutoFlight activo (autoFlyCompleted=true), centra el mapa
-  // directamente en la propiedad una vez que los datos estén disponibles.
-  useEffect(() => {
-    const center = getPropertyCenter();
-    if (autoFlyCompleted && center && mapRef.current) {
-      const mapInstance = mapRef.current.getMap ? mapRef.current.getMap() : mapRef.current;
-      if (mapInstance && typeof mapInstance.jumpTo === 'function') {
-        mapInstance.jumpTo({
-          center,
-          zoom: 14,
-          pitch: 0,
-          bearing: 0,
-        });
-      }
-    }
-  }, [autoFlyCompleted, property]);
 
   // Cargar datos de la propiedad
   useEffect(() => {
@@ -713,7 +738,7 @@ const PropertyDetails = () => {
                     </Typography>
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {tours.filter(t => t.type === 'package' && t.url).map(tour => (
+                      {tours.filter(t => t && t.url && (['package', '360'].includes(t.type) || !t.type)).map(tour => (
                         <Box key={tour.id} sx={{ height: 400, borderRadius: '12px', overflow: 'hidden' }}>
                            <Pano2VRViewer src={tour.url} title={tour.name || property.name} />
                         </Box>

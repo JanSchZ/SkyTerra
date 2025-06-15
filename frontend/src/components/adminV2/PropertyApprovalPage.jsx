@@ -177,12 +177,9 @@ function PropertyManagementPage() {
               <Typography variant="body2">Tamaño: {selectedProperty.size} ha</Typography>
               <Typography variant="body2">Estado: {selectedProperty.publication_status}</Typography>
               <Typography variant="subtitle1" sx={{ mt:2 }}>Tours 360°</Typography>
-              <Stack direction="row" spacing={1} sx={{ flexWrap:'wrap' }}>
-                {tours.length === 0 && <Typography variant="body2">No hay tours para esta propiedad</Typography>}
-                {tours.map((tour)=>(
-                  <Button key={tour.id} href={tour.url} target="_blank" variant="outlined" size="small">{tour.name || 'Tour'}</Button>
-                ))}
-              </Stack>
+              {tours.length === 0 && (
+                <Typography variant="body2">No hay tours para esta propiedad</Typography>
+              )}
               {tours.length > 0 && (
                 <Box sx={{ mt:2, height:400, borderRadius:2, overflow:'hidden' }}>
                   <iframe src={tours[0].url} title="Preview tour" style={{width:'100%', height:'100%', border:0}} allowFullScreen />

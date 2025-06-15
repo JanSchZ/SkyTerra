@@ -15,6 +15,7 @@ import CardMedia from '@mui/material/CardMedia';
 import config from '../../config/environment';
 import { motion } from 'framer-motion';
 import PropertyPreviewModal from '../property/PropertyPreviewModal';
+import CloseIcon from '@mui/icons-material/Close';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => {
@@ -51,6 +52,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeTourUrl, setActiveTourUrl] = useState(null);
+  const [activeTourPropertyId, setActiveTourPropertyId] = useState(null);
 
   // Nuevos estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,6 +92,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const recommendationsTourTimeoutRef = useRef(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewPropertyId, setPreviewPropertyId] = useState(null);
+  const [tourCache, setTourCache] = useState({}); // propertyId -> tourUrl
 
   // Detectar tipo de conexión del usuario
   useEffect(() => {
@@ -385,7 +389,6 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     if (!localStorage.getItem('auth_token')) {
       setPreviewPropertyId(property.id);
       setPreviewModalOpen(true);
-      return; // don't navigate
     }
     if (!mapRef.current || navigatingToTour) return;
     setNavigatingToTour(true);
@@ -394,44 +397,29 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     const targetLongitude = property.longitude || -70.6693;
     const targetLatitude = property.latitude || -33.4489;
 
-    mapRef.current.flyTo({
-      center: [targetLongitude, targetLatitude],
-      zoom: 15, 
-      pitch: 60, // Mantener pitch 3D
-      bearing: viewState.bearing,
-      duration: 3500, 
-      essential: true,
-    });
-
-    setTimeout(async () => {
-      try {
-        const tourData = await tourService.getTours(property.id);
-        if (tourData && tourData.results && tourData.results.length > 0) {
-          const firstTourId = tourData.results[0].id;
-          localStorage.setItem('directTourNavigation', 'true');
-          navigate(`/tour/${firstTourId}`);
-        } else {
-          setSnackbar({
-            open: true,
-            message: 'No hay tours 360° disponibles para esta propiedad.',
-            severity: 'info'
-          });
-          localStorage.setItem('skipAutoFlight', 'true');
-          navigate(`/property/${property.id}`);
-        }
-      } catch (error) {
-        console.error('Error fetching tours or navigating:', error);
-        setSnackbar({
-          open: true,
-          message: 'Error al cargar el tour o detalles de la propiedad.',
-          severity: 'error'
-        });
-        localStorage.setItem('skipAutoFlight', 'true');
-        navigate(`/property/${property.id}`);
-      } finally {
-        setTimeout(() => setNavigatingToTour(false), 500);
+    // Intentar abrir el tour en cuanto tengamos URL y antes de que el usuario llegue al zoom objetivo
+    const maybeOpenTour = async () => {
+      let url = tourCache[property.id];
+      if (!url) {
+        try {
+          const tours = await tourService.getPropertyTours(property.id);
+          if (tours && tours.length > 0) {
+            url = tours[0].url;
+            if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+            if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+            setTourCache(prev => ({ ...prev, [property.id]: url }));
+          }
+        } catch (err) { console.error('prefetch click:', err); }
       }
-    }, 2600); 
+      if (url) {
+        // abrir tras un pequeño delay para que el vuelo avance y se sienta fluido
+        setTimeout(() => { setActiveTourUrl(url); setActiveTourPropertyId(property.id); }, 1200);
+      }
+    };
+
+    maybeOpenTour();
+
+    setTimeout(() => setNavigatingToTour(false), 3800);
   };
 
   const handleMarkerHover = (property) => {
@@ -747,42 +735,117 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     }
   }, [onLoad]);
 
+  // Prefetch tours when zoom is moderate
+  const prefetchToursInViewport = useCallback(async () => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    const zoom = map.getZoom();
+    if (zoom < 11) return; // solo si estamos relativamente cerca
+
+    // Obtener propiedades visibles
+    const bounds = map.getBounds();
+    const idsToPrefetch = properties
+      .filter(p => p.has_tour && !tourCache[p.id] && p.longitude != null && p.latitude != null &&
+        bounds.contains([p.longitude, p.latitude]))
+      .slice(0, 5) // límite para evitar excesos
+      .map(p => p.id);
+
+    if (idsToPrefetch.length === 0) return;
+
+    idsToPrefetch.forEach(async pid => {
+      try {
+        const tours = await tourService.getPropertyTours(pid);
+        if (tours && tours.length > 0) {
+          let url = tours[0].url;
+          if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+          if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+          setTourCache(prev => ({ ...prev, [pid]: url }));
+
+          // Prefetch resource creando iframe oculto
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = url;
+          document.body.appendChild(iframe);
+          setTimeout(() => iframe.remove(), 10000); // remover después de 10s
+        }
+      } catch (e) { console.error('prefetch error', e); }
+    });
+  }, [properties, tourCache]);
+
   // Infinite scroll logic on map move
   const handleMapMoveEnd = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
     debounceTimeoutRef.current = setTimeout(() => {
-      if (!mapRef.current || loadingMore || !hasNextPage || editable || loading) return;
-
+      if (!mapRef.current) return;
       const map = mapRef.current.getMap();
-      const currentViewport = {
-        center: map.getCenter(),
-        zoom: map.getZoom(),
-        bounds: map.getBounds()
-      };
+      // -------------- Seamless zoom-to-tour logic -----------------
+      const currentZoom = map.getZoom();
+      if (currentZoom >= 14.5) {
+        const center = map.getCenter();
+        // Función auxiliar para distancia en metros (Haversine)
+        const metersBetween = (lat1, lon1, lat2, lon2) => {
+          const R = 6371000;
+          const toRad = deg => deg * Math.PI / 180;
+          const dLat = toRad(lat2 - lat1);
+          const dLon = toRad(lon2 - lon1);
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c;
+        };
 
-      let shouldLoad = false;
-      if (lastLoadViewportRef.current) {
-        const prev = lastLoadViewportRef.current;
-        const distance = currentViewport.center.distanceTo(prev.center);
-        const zoomThreshold = 0.5; 
-        const distanceThreshold = 200000 / (Math.pow(2, currentViewport.zoom) / Math.pow(2, prev.zoom)); // Adjusted for zoom change
+        let nearest = null;
+        let minDist = Infinity;
+        properties.forEach(prop => {
+          if (prop.latitude == null || prop.longitude == null) return;
+          const dist = metersBetween(center.lat, center.lng, prop.latitude, prop.longitude);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = prop;
+          }
+        });
 
-        if (Math.abs(currentViewport.zoom - prev.zoom) > zoomThreshold || distance > distanceThreshold * 2 ) { // Increased distance tolerance a bit
-          shouldLoad = true;
+        const DIST_THRESHOLD = 600; // metros
+        if (nearest && minDist <= DIST_THRESHOLD && nearest.id !== activeTourPropertyId) {
+          (async () => {
+            try {
+              const tours = await tourService.getPropertyTours(nearest.id);
+              console.log('Zoom-trigger fetch tours', nearest.id, tours.length);
+              if (tours && tours.length > 0) {
+                let url = tours[0].url;
+                if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+                if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+                setActiveTourUrl(url);
+                setActiveTourPropertyId(nearest.id);
+              }
+            } catch (e) {
+              console.error('Error loading tour on zoom-in:', e);
+            }
+          })();
         }
-      } else {
-        shouldLoad = true; 
+      } else if (currentZoom < 13.5 && activeTourUrl) {
+        // Alejando: cerrar tour
+        setActiveTourUrl(null);
+        setActiveTourPropertyId(null);
       }
+      //-----------------------------------------------------------
 
-      if (shouldLoad) {
-        // console.log('🗺️ Map moved, attempting to load more properties via handleLoadMore...');
+      // Prefetch tours for nearby properties
+      prefetchToursInViewport();
+
+      if (!loadingMore && hasNextPage && !editable && !loading) {
+        // Logica existente de infinite scroll (mantener)
+        const currentViewport = {
+          center: map.getCenter(),
+          zoom: map.getZoom(),
+          bounds: map.getBounds()
+        };
         lastLoadViewportRef.current = currentViewport; // Update viewport ref before loading
         handleLoadMore(); // Call the memoized and stable handleLoadMore
       }
-    }, 750); 
-  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore]); // Added loading and handleLoadMore
+    }, 500);
+  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, activeTourPropertyId, activeTourUrl, prefetchToursInViewport, tourCache]);
 
   const renderPropertyBoundaries = (property) => {
     if (property && property.boundary_polygon && property.boundary_polygon.coordinates) {
@@ -992,12 +1055,14 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     const fetchPreview = async () => {
       if (!popupInfo || tourPreviews[popupInfo.id]) return;
       try {
-        const data = await tourService.getTours(popupInfo.id);
-        const tours = data?.results || data;
-        const first = Array.isArray(tours) ? tours[0] : null;
+        // Utilizar getPropertyTours para asegurar que recibimos solo tours válidos (paquetes e iframes reales)
+        const tours = await tourService.getPropertyTours(popupInfo.id);
+        // getPropertyTours ya devuelve un arreglo filtrado/ordenado. Tomamos el primero con URL válida.
+        const first = Array.isArray(tours) ? tours.find(t => t.url) : null;
         if (first && first.url) {
           let url = first.url;
-          if (!url.includes('autoLoad=true')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+          // Asegurar parámetros óptimos para carga embebida
+          if (!url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
           if (!url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
           setTourPreviews(prev => ({ ...prev, [popupInfo.id]: url }));
         }
@@ -1343,6 +1408,27 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         propertyId={previewPropertyId}
         onClose={() => setPreviewModalOpen(false)}
       />
+
+      {/* Overlay del tour 360° */}
+      {activeTourUrl && (
+        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
+          <iframe
+            src={activeTourUrl}
+            width="100%"
+            height="100%"
+            style={{ border: 'none' }}
+            allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
+            title="Tour Virtual 360°"
+          />
+          <Fab
+            size="medium"
+            onClick={() => { setActiveTourUrl(null); setActiveTourPropertyId(null); }}
+            sx={{ position: 'absolute', top: '24px', right: '24px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { backgroundColor: 'rgba(0,0,0,0.8)' } }}
+          >
+            <CloseIcon />
+          </Fab>
+        </Box>
+      )}
     </Box>
   );
 });

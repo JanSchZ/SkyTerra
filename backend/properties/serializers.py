@@ -30,6 +30,29 @@ class TourSerializer(serializers.ModelSerializer):
     # Renaming created_at to uploaded_at for clarity in the API response,
     # as it represents the upload time for packages or creation time for other tour types.
     uploaded_at = serializers.DateTimeField(source='created_at', read_only=True)
+    # Build an absolute URL so that the frontend can always load the tour correctly, even when
+    # it runs on a different sub-domain (e.g. app.skyterra.cl vs api.skyterra.cl).
+    url = serializers.SerializerMethodField()
+
+    def get_url(self, obj):
+        """Return an absolute URL for the tour.
+
+        If the stored URL already looks absolute (starts with http/https), just return it.
+        Otherwise, build it using the current request so that the domain is included.
+        """
+        if not obj.url:
+            return None
+
+        if obj.url.startswith('http://') or obj.url.startswith('https://'):
+            return obj.url
+
+        # Relative URL (e.g. "/media/tours/…") – prepend current host
+        request = self.context.get('request')
+        if request is not None:
+            return request.build_absolute_uri(obj.url)
+
+        # As a fallback (should not normally happen), just return the stored value
+        return obj.url
 
     class Meta:
         model = Tour
@@ -41,8 +64,8 @@ class TourSerializer(serializers.ModelSerializer):
             'url',
             'package_path',
             'type',
-            'property', # Property is useful to have here
-            'uploaded_at', # Renamed from created_at
+            'property',  # Property is useful to have here
+            'uploaded_at',  # Renamed from created_at
             'updated_at'
         ]
         read_only_fields = ['package_path', 'updated_at', 'uploaded_at']

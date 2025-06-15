@@ -298,7 +298,9 @@ class PropertyViewSet(viewsets.ModelViewSet):
 
 class TourViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar tours virtuales"""
-    queryset = Tour.objects.all()
+    # Mostrar primero los tours más recientes.  Esto es útil porque el frontend
+    # suele tomar el primer elemento para pre-visualización.
+    queryset = Tour.objects.all().order_by('-created_at')
     serializer_class = TourSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['property', 'type']
