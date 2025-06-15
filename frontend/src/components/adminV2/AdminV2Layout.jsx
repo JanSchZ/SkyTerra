@@ -14,11 +14,16 @@ import {
   ListItemText,
   useTheme,
   Divider,
+  Avatar,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import HomeWorkIcon from '@mui/icons-material/HomeWork';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MenuIcon from '@mui/icons-material/Menu';
+import SearchIcon from '@mui/icons-material/Search';
 import { authService } from '../../services/api';
 
 const drawerWidth = 240;
@@ -40,26 +45,34 @@ function AdminV2Layout() {
 
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ justifyContent: 'center' }}>
-        <Typography variant="h6" fontWeight={700}>
+      <Toolbar sx={{ justifyContent: 'center', bgcolor: theme.palette.primary.main }}>
+        <Typography variant="h6" fontWeight={700} color="common.white">
           SKYTERRA
         </Typography>
       </Toolbar>
-      <Divider />
-      <List sx={{ flexGrow: 1 }}>
-        {navItems.map((item) => (
-          <ListItemButton
-            key={item.text}
-            component={RouterLink}
-            to={item.path}
-            selected={location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path))}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItemButton>
-        ))}
+      <List sx={{ flexGrow: 1, pt: 2 }}>
+        {navItems.map((item) => {
+          const selected = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
+          return (
+            <ListItemButton
+              key={item.text}
+              component={RouterLink}
+              to={item.path}
+              selected={selected}
+              sx={{
+                mx: 1,
+                mb: 0.5,
+                borderRadius: 2,
+                ...(selected && { bgcolor: 'rgba(25,118,210,0.1)', '&:hover': { bgcolor: 'rgba(25,118,210,0.15)' } }),
+              }}
+            >
+              <ListItemIcon sx={{ color: selected ? 'primary.main' : 'text.secondary' }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: selected ? 600 : 400 }} />
+            </ListItemButton>
+          );
+        })}
       </List>
-      <Divider />
+      <Divider sx={{ mt: 'auto' }} />
       <ListItemButton onClick={handleLogout} sx={{ p: 2 }}>
         <ListItemIcon>
           <LogoutIcon />
@@ -70,24 +83,56 @@ function AdminV2Layout() {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: theme.palette.background.default }}>
       <CssBaseline />
+
       {/* Drawer */}
       <Drawer
         variant="permanent"
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
+          [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', borderRight: '1px solid rgba(0,0,0,0.08)' },
         }}
       >
         {drawerContent}
       </Drawer>
 
-      {/* Main */}
-      <Box component="main" sx={{ flexGrow: 1, p: 3, bgcolor: theme.palette.background.default }}>
-        <Toolbar />
-        <Outlet />
+      {/* Main content */}
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top AppBar */}
+        <AppBar position="static" color="primary" elevation={0} sx={{ zIndex: theme.zIndex.drawer + 1 }}>
+          <Toolbar>
+            <IconButton color="inherit" edge="start" sx={{ mr: 2, display: { md: 'none' } }}>
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              Admin Dashboard
+            </Typography>
+            <TextField
+              variant="outlined"
+              size="small"
+              placeholder="Search…"
+              sx={{ bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1, mr: 2, width: 240,
+                '& .MuiInputBase-input': { color: 'white' },
+                '& fieldset': { border: 'none' },
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: 'white' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Avatar sx={{ width: 32, height: 32 }}>A</Avatar>
+          </Toolbar>
+        </AppBar>
+
+        {/* Routed pages */}
+        <Box component="main" sx={{ p: 3, flexGrow: 1 }}>
+          <Outlet />
+        </Box>
       </Box>
     </Box>
   );

@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework import viewsets, filters, permissions, status
+from rest_framework import viewsets, filters, permissions, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -346,10 +346,21 @@ class TourViewSet(viewsets.ModelViewSet):
             
             os.remove(package_path)
 
-            if not os.path.exists(os.path.join(tour_dir, 'index.html')):
-                raise serializers.ValidationError("El paquete descomprimido no contiene un archivo 'index.html' en su raíz.")
+            # Buscar primer archivo .html o .htm dentro del paquete para usarlo como entrada
+            html_entry = None
+            for root_dir, _dirs, files in os.walk(tour_dir):
+                for fname in files:
+                    if fname.lower().endswith(('.html', '.htm')):
+                        rel_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir)
+                        html_entry = rel_path.replace('\\', '/')  # Normalizar separadores
+                        break
+                if html_entry:
+                    break
 
-            tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/index.html"
+            if not html_entry:
+                raise serializers.ValidationError("No se encontró ningún archivo HTML dentro del paquete para usar como entrada.")
+
+            tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/{html_entry}"
             
             instance = serializer.save(
                 url=tour_url, 
@@ -358,6 +369,9 @@ class TourViewSet(viewsets.ModelViewSet):
                 tour_id=tour_uuid
             )
             logger.info(f"Paquete de tour {instance.id} creado y descomprimido en {tour_dir}")
+
+            # Asegurar un solo tour por propiedad: eliminar cualquier otro (anteriores)
+            Tour.objects.filter(property=instance.property).exclude(id=instance.id).delete()
 
         except Exception as e:
             if os.path.exists(tour_dir):

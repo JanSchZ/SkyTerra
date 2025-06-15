@@ -11,8 +11,11 @@ class Command(BaseCommand):
         Property.objects.filter(name__startswith='Propiedad de Prueba').delete()
         self.stdout.write(self.style.SUCCESS('Existing test properties deleted.'))
 
-        # Get an owner, or use None if no users exist
-        owner = User.objects.first()
+        # Ensure there is at least one regular user to assign as owner
+        owner, _created = User.objects.get_or_create(username='demo_user', defaults={
+            'email': 'demo@example.com',
+            'is_staff': False
+        })
 
         property_types = [choice[0] for choice in Property.PROPERTY_TYPES]
         
@@ -37,7 +40,7 @@ class Command(BaseCommand):
                 description=f'Esta es la descripción de la {name}. Una propiedad ideal para {prop_type}.',
                 has_water=random.choice([True, False]),
                 has_views=random.choice([True, False]),
-                publication_status='approved'
+                publication_status='pending'
             )
             self.stdout.write(self.style.SUCCESS(f'Successfully created property: {property.name}'))
 

@@ -569,11 +569,14 @@ export const tourService = {
   // Subir nuevo tour
   async uploadTour(tourData) {
     try {
-      const response = await api.post('/tours/', tourData, {
+      // Usamos axios sin el default header Content-Type para que el navegador ponga el boundary correcto
+      const token = localStorage.getItem('auth_token');
+      const axiosConfig = {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          ...(token ? { Authorization: `Token ${token}` } : {})
         }
-      });
+      };
+      const response = await axios.post(`${baseURL}/tours/`, tourData, axiosConfig);
       return response.data;
     } catch (error) {
       console.error('Error uploading tour:', error);
@@ -588,10 +591,10 @@ export const tourService = {
   },
 
   async getPropertyTours(propertyId) {
-    try {
-      const data = await this.getTours(propertyId);
-      return Array.isArray(data.results) ? data : { results: data };
-    } catch(e){ throw e; }
+    const data = await this.getTours(propertyId);
+    const arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+    // Filtrar tours de placeholder
+    return arr.filter(t => !(typeof t.id === 'string' && t.id.startsWith('placeholder-')));
   }
 };
 
