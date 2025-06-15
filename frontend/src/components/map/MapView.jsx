@@ -12,7 +12,6 @@ import { ThemeModeContext } from '../../App';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
-import Link from '@mui/material/Link';
 import config from '../../config/environment';
 import { motion } from 'framer-motion';
 
@@ -1168,11 +1167,6 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   {popupInfo.type && (
                     <Chip label={popupInfo.type} size="small" variant="outlined" />
                   )}
-                  <Box sx={{mt: 1}}>
-                    <Link component="button" variant="body2" onClick={() => handleMarkerClick(popupInfo)} sx={{cursor: 'pointer'}}>
-                      Ver detalles / Tour 360°
-                    </Link>
-                  </Box>
                 </CardContent>
                 <Box sx={{ width: 140, height: 100, mr: 1, mt: 1, flex: '0 0 40%' }}>
                   {tourPreviews[popupInfo.id] ? (
