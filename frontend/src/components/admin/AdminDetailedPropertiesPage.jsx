@@ -21,6 +21,8 @@ const headCells = [
     { id: 'name', numeric: false, disablePadding: false, label: 'Name' },
     { id: 'price', numeric: true, disablePadding: false, label: 'Price' },
     { id: 'size', numeric: true, disablePadding: false, label: 'Size (ha)' },
+    { id: 'plusvalia_score', numeric: true, disablePadding: false, label: 'Plusvalía', sortable: true },
+    { id: 'listing_type', numeric: false, disablePadding: false, label: 'Modality' },
     { id: 'publication_status', numeric: false, disablePadding: false, label: 'Status' },
     { id: 'created_at', numeric: false, disablePadding: false, label: 'Created At' },
     { id: 'owner_details', numeric: false, disablePadding: false, label: 'Owner' },
@@ -93,6 +95,7 @@ const AdminDetailedPropertiesPage = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalProperties, setTotalProperties] = useState(0);
+    const [filterListingType, setFilterListingType] = useState(''); // '' = all, 'sale', 'rent', 'both'
     const [orderBy, setOrderBy] = useState('created_at');
     const [order, setOrder] = useState('desc');
     const [anchorEl, setAnchorEl] = useState(null);
@@ -122,6 +125,7 @@ const AdminDetailedPropertiesPage = () => {
             page: page + 1,
             page_size: rowsPerPage,
             ordering: `${order === 'desc' ? '-' : ''}${orderBy}`,
+            ...(filterListingType ? { listing_type: filterListingType } : {}),
         };
         // Using the main /api/properties/ endpoint as it should have all necessary data
         // Ensure the PropertyListSerializer or PropertySerializer includes owner_details.
@@ -139,7 +143,7 @@ const AdminDetailedPropertiesPage = () => {
             setError('Error fetching properties. ' + (err.response?.data?.detail || err.message));
             setLoading(false);
         });
-    }, [page, rowsPerPage, order, orderBy]);
+    }, [page, rowsPerPage, order, orderBy, filterListingType]);
 
     useEffect(() => {
         fetchProperties();
@@ -185,7 +189,7 @@ const AdminDetailedPropertiesPage = () => {
             });
         }, 10000); // 10 segundos
         return () => clearInterval(interval);
-    }, [page, rowsPerPage, order, orderBy, properties]);
+    }, [page, rowsPerPage, order, orderBy, properties, filterListingType]);
 
     const handleRequestSort = (event, property) => {
         const isAsc = orderBy === property && order === 'asc';
@@ -398,6 +402,30 @@ const AdminDetailedPropertiesPage = () => {
                         Manage Properties (Detailed List)
                     </Typography>
 
+                    {/* Filtro de Modalidad (Venta/Arriendo/Ambas) */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Typography variant="subtitle1" sx={{ color: '#8faacc' }}>Filtrar por modalidad:</Typography>
+                      <TextField
+                        select
+                        size="small"
+                        value={filterListingType}
+                        onChange={(e) => { setFilterListingType(e.target.value); setPage(0); }}
+                        SelectProps={{
+                          native: true,
+                        }}
+                        sx={{
+                          minWidth: 160,
+                          '& select': { color: '#E5E8F0', backgroundColor: '#223449', borderRadius: 1, p:1 },
+                          '& fieldset': { display: 'none' },
+                        }}
+                      >
+                        <option value="">Todas</option>
+                        <option value="sale">Venta</option>
+                        <option value="rent">Arriendo</option>
+                        <option value="both">Venta & Arriendo</option>
+                      </TextField>
+                    </Box>
+
                     {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress color="info" /></Box>}
                     {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
 
@@ -426,6 +454,8 @@ const AdminDetailedPropertiesPage = () => {
                                                 </TableCell>
                                                 <TableCell align="right">${prop.price ? parseFloat(prop.price).toLocaleString('es-CL') : 'N/A'}</TableCell>
                                                 <TableCell align="right">{prop.size ? parseFloat(prop.size).toLocaleString('es-CL') : 'N/A'}</TableCell>
+                                                <TableCell align="right">{prop.plusvalia_score !== null && prop.plusvalia_score !== undefined ? Number(prop.plusvalia_score).toFixed(2) : '—'}</TableCell>
+                                                <TableCell>{prop.listing_type === 'sale' ? 'Venta' : prop.listing_type === 'rent' ? 'Arriendo' : 'Ambas'}</TableCell>
                                                 <TableCell>
                                                     <Chip
                                                         icon={statusInfo.icon}

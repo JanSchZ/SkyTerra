@@ -5,25 +5,44 @@ export const liquidGlassTheme = (mode = 'dark') => {
   const isDark = mode === 'dark';
   const { colors } = tokens;
 
-  return createTheme({
-    palette: {
-      mode,
-      primary: {
-        main: colors.accent,
-        light: alpha(colors.accent, 0.7),
-        dark: alpha(colors.accent, 0.4),
-        contrastText: isDark ? '#ffffff' : '#000000'
-      },
-      background: {
-        default: colors.surface0,
-        paper: 'rgba(22,27,34,0.8)'
-      },
-      text: {
-        primary: colors.textPrimary,
-        secondary: colors.textSecondary
-      },
-      divider: 'rgba(255,255,255,0.12)'
+  const palette = isDark ? {
+    mode,
+    primary: {
+      main: colors.accent,
+      light: alpha(colors.accent, 0.7),
+      dark: alpha(colors.accent, 0.4),
+      contrastText: '#ffffff'
     },
+    background: {
+      default: colors.surface0,
+      paper: 'rgba(22,27,34,0.8)'
+    },
+    text: {
+      primary: colors.textPrimary,
+      secondary: colors.textSecondary
+    },
+    divider: 'rgba(255,255,255,0.12)'
+  } : {
+    mode,
+    primary: {
+      main: '#1976d2',
+      light: '#63a4ff',
+      dark: '#004ba0',
+      contrastText: '#ffffff',
+    },
+    background: {
+      default: colors.lightBg,
+      paper: colors.lightPaper,
+    },
+    text: {
+      primary: '#212121',
+      secondary: '#555555',
+    },
+    divider: 'rgba(0,0,0,0.12)',
+  };
+
+  return createTheme({
+    palette,
     typography: {
       fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
       h1: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },

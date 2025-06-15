@@ -17,11 +17,16 @@ import traceback
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
+import os
+import uuid
+import zipfile
+import shutil
 
-from .models import Property, Tour, Image, PropertyDocument, PropertyVisit
+from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite
 from .serializers import (
     PropertySerializer, PropertyListSerializer,
-    TourSerializer, ImageSerializer, PropertyDocumentSerializer, PropertyVisitSerializer
+    TourSerializer, ImageSerializer, PropertyDocumentSerializer, PropertyVisitSerializer,
+    PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer
 )
 from .services import GeminiService, GeminiServiceError
 from .email_service import send_property_status_email
@@ -34,16 +39,27 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size' # Allow client to override page_size
     max_page_size = 100 # Maximum page size
 
+class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
+    """Vista read-only que expone detalles mínimos de propiedades para visitantes anónimos"""
+    queryset = Property.objects.filter(publication_status='approved').order_by('-created_at')
+    serializer_class = PropertyPreviewSerializer
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['price', 'size', 'has_water', 'has_views', 'listing_type']
+    search_fields = ['name', 'description']
+    ordering_fields = ['price', 'size', 'created_at', 'plusvalia_score']
+    permission_classes = [permissions.AllowAny]
+
 class PropertyViewSet(viewsets.ModelViewSet):
     """Viewset para la gestión de propiedades inmobiliarias"""
     queryset = Property.objects.all().order_by('-created_at')
     serializer_class = PropertySerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['price', 'size', 'has_water', 'has_views', 'listing_type']
+    filterset_fields = ['price', 'size', 'has_water', 'has_views', 'listing_type', 'publication_status']
     # 'location_name' se eliminó porque no existe en el modelo
     search_fields = ['name', 'description']
-    ordering_fields = ['price', 'size', 'created_at']
+    ordering_fields = ['price', 'size', 'created_at', 'plusvalia_score']
 
     def get_permissions(self):
         """
@@ -294,6 +310,61 @@ class TourViewSet(viewsets.ModelViewSet):
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return TourPackageCreateSerializer
+        return TourSerializer
+
+    def perform_create(self, serializer):
+        package_file = serializer.validated_data.pop('package_file')
+        
+        # Validar extensión
+        allowed_extensions = ['.zip', '.ggpkg']
+        if not any(package_file.name.lower().endswith(ext) for ext in allowed_extensions):
+            raise serializers.ValidationError(f"Tipo de archivo no permitido. Permitidos: {', '.join(allowed_extensions)}")
+
+        tour_uuid = uuid.uuid4()
+        tour_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
+        os.makedirs(tour_dir, exist_ok=True)
+
+        package_path = os.path.join(tour_dir, package_file.name)
+        with open(package_path, 'wb+') as destination:
+            for chunk in package_file.chunks():
+                destination.write(chunk)
+
+        try:
+            if not zipfile.is_zipfile(package_path):
+                raise serializers.ValidationError("El archivo no es un paquete ZIP (.zip o .ggpkg) válido.")
+
+            with zipfile.ZipFile(package_path, 'r') as zip_ref:
+                # Chequeo de seguridad básico contra path traversal
+                for member in zip_ref.infolist():
+                    if member.filename.startswith('/') or '..' in member.filename:
+                        raise serializers.ValidationError(f"El paquete contiene una ruta de archivo insegura: {member.filename}")
+                
+                zip_ref.extractall(tour_dir)
+            
+            os.remove(package_path)
+
+            if not os.path.exists(os.path.join(tour_dir, 'index.html')):
+                raise serializers.ValidationError("El paquete descomprimido no contiene un archivo 'index.html' en su raíz.")
+
+            tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/index.html"
+            
+            instance = serializer.save(
+                url=tour_url, 
+                package_path=os.path.join('tours', str(tour_uuid)),
+                type='package',
+                tour_id=tour_uuid
+            )
+            logger.info(f"Paquete de tour {instance.id} creado y descomprimido en {tour_dir}")
+
+        except Exception as e:
+            if os.path.exists(tour_dir):
+                shutil.rmtree(tour_dir)
+            logger.error(f"Error procesando paquete de tour: {e}", exc_info=True)
+            raise serializers.ValidationError(str(e))
+
 class ImageViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar imágenes de propiedades"""
     queryset = Image.objects.all()
@@ -456,3 +527,56 @@ class PropertyVisitViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
+
+class ComparisonSessionViewSet(viewsets.ModelViewSet):
+    """Permite crear y actualizar sesiones de comparación (máx 4 propiedades)."""
+    queryset = ComparisonSession.objects.all().order_by('-updated_at')
+    serializer_class = ComparisonSessionSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
+    def perform_create(self, serializer):
+        if self.request.user.is_authenticated:
+            serializer.save(user=self.request.user)
+        else:
+            session_key = self.request.session.session_key or self.request.session.save() or self.request.session.session_key
+            serializer.save(session_key=session_key)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_authenticated:
+            return qs.filter(user=self.request.user)
+        else:
+            session_key = self.request.session.session_key
+            return qs.filter(session_key=session_key)
+
+class SavedSearchViewSet(viewsets.ModelViewSet):
+    queryset = SavedSearch.objects.all().order_by('-updated_at')
+    serializer_class = SavedSearchSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return SavedSearch.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+# -----------------------------
+# Favorites ViewSet
+# -----------------------------
+
+class FavoriteViewSet(viewsets.ModelViewSet):
+    """CRUD de favoritos. Lista solo favoritos del usuario autenticado."""
+    serializer_class = FavoriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Favorite.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    http_method_names = ['get', 'post', 'delete']

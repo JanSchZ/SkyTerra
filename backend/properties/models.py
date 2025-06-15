@@ -210,3 +210,68 @@ class PropertyVisit(models.Model):
 
     def __str__(self):
         return f"Visit to {self.property.name} at {self.visited_at}"
+
+# -----------------------------
+# Comparación de Propiedades
+# -----------------------------
+
+class ComparisonSession(models.Model):
+    """Agrupa hasta 4 propiedades para que un usuario registrado las compare.
+    Si el usuario no está autenticado, se almacena en base a `session_key` y expira automáticamente.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='comparison_sessions')
+    session_key = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    properties = models.ManyToManyField(Property, related_name='comparison_sessions', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.CheckConstraint(check=models.Q(user__isnull=False) | models.Q(session_key__isnull=False), name='comparison_owner_present'),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.properties.count() > 4:
+            raise ValidationError({'properties': 'No se pueden comparar más de 4 propiedades a la vez.'})
+
+    def __str__(self):
+        owner = self.user.username if self.user else f'Session {self.session_key}'
+        return f'Comparación de {self.properties.count()} propiedades para {owner}'
+
+# -----------------------------
+# Búsquedas guardadas y alertas
+# -----------------------------
+class SavedSearch(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='saved_searches')
+    name = models.CharField(max_length=100)
+    filters = models.JSONField(help_text='Objeto JSON con filtros serializados aplicables a PropertyViewSet')
+    email_alert = models.BooleanField(default=True, help_text='Si está activo se enviará email cuando haya nuevas coincidencias')
+    last_alert_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'name')
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"SavedSearch {self.name} para {self.user.username}"
+
+# -----------------------------
+# Favoritos (propiedades guardadas)
+# -----------------------------
+
+class Favorite(models.Model):
+    """Permite al usuario marcar propiedades como favoritas/guardadas."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='favorites')
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='favorited_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'property')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Favorite property {self.property_id} by {self.user.username}'

@@ -5,17 +5,67 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import SquareFootIcon from '@mui/icons-material/SquareFoot';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import { useNavigate } from 'react-router-dom';
+import { favoritesService } from '../../services/api';
 
 const PropertyCard = ({ property }) => {
   const navigate = useNavigate();
+  const [isFav, setIsFav] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchFavStatus = async () => {
+      if (!localStorage.getItem('auth_token')) return;
+      try {
+        const favs = await favoritesService.list();
+        setIsFav(!!favs.find((f) => f.property === property.id));
+      } catch (err) { console.error('Error fetching favorites', err); }
+    };
+    fetchFavStatus();
+  }, [property.id]);
 
   const handleEdit = () => {
     navigate(`/property/edit/${property.id}`); // Asumiendo que tendrás una ruta para editar
   };
 
   const handleViewDetails = () => {
+    // Avoid triggering auto-flight again on detail page
+    localStorage.setItem('skipAutoFlight', 'true');
     navigate(`/property/${property.id}`);
+  };
+
+  const handleAddToCompare = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const headers = token ? { Authorization: `Token ${token}` } : {};
+      // post to compare endpoint
+      await fetch('/api/compare/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ property_ids: [property.id] }),
+      });
+      // navigate to compare view with query param appended
+      navigate(`/compare?ids=${property.id}`);
+    } catch (err) { console.error('Error adding to compare', err); }
+  };
+
+  const toggleFavorite = async () => {
+    if (!localStorage.getItem('auth_token')) {
+       navigate('/login');
+       return;
+    }
+    try {
+      if (isFav) {
+        await favoritesService.removeByProperty(property.id);
+        setIsFav(false);
+      } else {
+        await favoritesService.add(property.id);
+        setIsFav(true);
+      }
+    } catch (err) { console.error('Fav error', err); }
   };
 
   // Intenta obtener la primera imagen de la propiedad o una imagen por defecto
@@ -67,6 +117,9 @@ const PropertyCard = ({ property }) => {
             {property.type && <Chip label={property.type === 'farm' ? 'Parcela/Granja' : property.type.charAt(0).toUpperCase() + property.type.slice(1)} size="small" variant="outlined" />}
             {property.has_water && <Chip label="Agua" size="small" color="info" variant="outlined" />}
             {property.has_views && <Chip label="Vistas" size="small" color="success" variant="outlined" />}
+            {property.has_tour && (
+                <Chip icon={<ViewInArIcon />} label="Tour 360°" size="small" color="success" variant="outlined" />
+            )}
         </Box>
       </CardContent>
       <CardActions sx={{ justifyContent: 'flex-end', pt: 0, pb:1, px:1 }} className="no-shine">
@@ -75,6 +128,12 @@ const PropertyCard = ({ property }) => {
         </IconButton>
         <IconButton onClick={handleEdit} color="secondary" title="Editar Propiedad">
           <EditIcon />
+        </IconButton>
+        <IconButton onClick={toggleFavorite} color="warning" title={isFav ? 'Quitar de Favoritos' : 'Guardar'}>
+          {isFav ? <BookmarkIcon /> : <BookmarkBorderIcon />}
+        </IconButton>
+        <IconButton onClick={handleAddToCompare} color="info" title="Comparar Propiedad">
+          <CompareArrowsIcon />
         </IconButton>
       </CardActions>
     </Card>

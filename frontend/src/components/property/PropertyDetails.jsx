@@ -32,9 +32,12 @@ import TerrainIcon from '@mui/icons-material/Terrain';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { propertyService, tourService, imageService, authService } from '../../services/api';
 import MapView from '../map/MapView';
 import axios from 'axios';
+import Pano2VRViewer from '../tours/Pano2VRViewer';
+import UploadTourDialog from '../tours/UploadTourDialog';
 
 // Países y sus recorridos de vuelo
 const countryFlightPaths = {
@@ -72,17 +75,68 @@ const PropertyDetails = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showDetails, setShowDetails] = useState(true);
-  const [autoFlyCompleted, setAutoFlyCompleted] = useState(false);
   const [activeTourUrl, setActiveTourUrl] = useState(null);
-  const [mapViewState, setMapViewState] = useState({
-    longitude: -70.6693, // Santiago, Chile
-    latitude: -33.4489,  // Santiago, Chile
-    zoom: 6.5,          // Regional zoom for Chile
-    pitch: 30,          // Initial pitch
-    bearing: 0          // Initial bearing
-  });
+  const [mapViewState, setMapViewState] = useState(null); // Será definido tras cargar propiedad
   const mapRef = useRef(null);
   const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
+
+  const initialSkipAutoFly = (()=>{
+    const flag = localStorage.getItem('skipAutoFlight');
+    if (flag) localStorage.removeItem('skipAutoFlight');
+    return flag === 'true';
+  })();
+  const [autoFlyCompleted, setAutoFlyCompleted] = useState(initialSkipAutoFly);
+
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  // Mantener el estado del mapa alineado con la propiedad cargada para evitar el "zoom-out" inicial.
+  useEffect(() => {
+    const center = getPropertyCenter();
+    if (center) {
+      setMapViewState((prev) => ({
+        ...prev,
+        longitude: center[0],
+        latitude: center[1],
+        zoom: autoFlyCompleted ? 14 : 11.5,
+        pitch: autoFlyCompleted ? 0 : 45,
+      }));
+    }
+  }, [property, autoFlyCompleted]);
+
+  // Helper para obtener centro de la propiedad: usa lat/lng o calcula a partir del boundary polygon
+  const getPropertyCenter = () => {
+    if (property?.longitude != null && property?.latitude != null) {
+      return [property.longitude, property.latitude];
+    }
+    // Si no hay lat/lng, intentar calcular a partir del polygon GeoJSON
+    const coords = property?.boundary_polygon?.geometry?.coordinates?.[0];
+    if (Array.isArray(coords) && coords.length > 2) {
+      let sumX = 0, sumY = 0;
+      coords.forEach(([x, y]) => {
+        sumX += x;
+        sumY += y;
+      });
+      return [sumX / coords.length, sumY / coords.length];
+    }
+    return null; // fallback
+  };
+
+  // Si llegamos con skipAutoFlight activo (autoFlyCompleted=true), centra el mapa
+  // directamente en la propiedad una vez que los datos estén disponibles.
+  useEffect(() => {
+    const center = getPropertyCenter();
+    if (autoFlyCompleted && center && mapRef.current) {
+      const mapInstance = mapRef.current.getMap ? mapRef.current.getMap() : mapRef.current;
+      if (mapInstance && typeof mapInstance.jumpTo === 'function') {
+        mapInstance.jumpTo({
+          center,
+          zoom: 14,
+          pitch: 0,
+          bearing: 0,
+        });
+      }
+    }
+  }, [autoFlyCompleted, property]);
 
   // Cargar datos de la propiedad
   useEffect(() => {
@@ -182,63 +236,46 @@ const PropertyDetails = () => {
 
   // Función para realizar vuelo automático inicial simplificado
   const performAutoFlight = (availableTours) => {
-    if (!mapRef.current || autoFlyCompleted || !property?.latitude || !property?.longitude) {
-      if (!property?.latitude || !property?.longitude) setAutoFlyCompleted(true);
+    const center = getPropertyCenter();
+    if (!mapRef.current || autoFlyCompleted || !center) {
+      if (!center) setAutoFlyCompleted(true);
       return;
     }
     
-    console.log('🚁 Iniciando vuelo mejorado a la propiedad...');
+    console.log('🚁 Iniciando vuelo directo a la propiedad...');
 
-    // Vista inicial: Chile más cerca (zoom regional)
-    const chileInitialView = {
-      center: [-70.6693, -33.4489], // Santiago como referencia central de Chile
-      zoom: 6.5, // Zoom regional, no global
-      pitch: 30, 
-      bearing: 0
-    };
-
-    // Primer tramo: Moverse a la vista regional de Chile
+    // Primer tramo: vuelo cinematográfico directo al área de la propiedad
     mapRef.current.flyTo({
-      ...chileInitialView,
-      duration: 1800, // Revertido a 1800ms
+      center,
+      zoom: 11.5,
+      pitch: 45,
+      bearing: 0,
+      duration: 4500,
       essential: true,
     });
 
-    // Segundo tramo: Desde la vista de Chile a la propiedad
+    // Segundo tramo: acercamiento final
     setTimeout(() => {
       if (!mapRef.current) return;
       mapRef.current.flyTo({
-        center: [property.longitude, property.latitude],
-        zoom: 12, 
-        pitch: 45, 
+        center,
+        zoom: 16,
+        pitch: 0,
         bearing: 0,
-        duration: 2500, // Revertido a 2500ms
+        duration: 2200,
         essential: true,
       });
 
-      // Tercer tramo: Zoom final a la propiedad para el tour
-      setTimeout(() => {
-        if (!mapRef.current) return;
-        mapRef.current.flyTo({
-          center: [property.longitude, property.latitude],
-          zoom: 16, 
-          pitch: 0,  
-          bearing: 0,
-          duration: 2000, // Revertido a 2000ms
-          essential: true,
-        });
-
-        if (availableTours && availableTours.length > 0 && availableTours[0]?.url) {
-          setTimeout(() => {
-            if (!mapRef.current) return;
-            setActiveTourUrl(availableTours[0].url);
-            setShowDetails(false); 
-          }, 2100); // Revertido a 2100ms
-        }
-        setAutoFlyCompleted(true);
-      }, 2600); // Revertido a 2600ms
-
-    }, 1900); // Revertido a 1900ms
+      // Si hay tours disponibles, abrir automáticamente
+      if (availableTours && availableTours.length > 0 && availableTours[0]?.url) {
+        setTimeout(() => {
+          if (!mapRef.current) return;
+          setActiveTourUrl(availableTours[0].url);
+          setShowDetails(false);
+        }, 2300);
+      }
+      setAutoFlyCompleted(true);
+    }, 4800);
   };
 
   // Formateador para precio
@@ -341,7 +378,7 @@ const PropertyDetails = () => {
   return (
     <Box sx={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>
       {/* Mapa de fondo: Solo se muestra si no hay un tour activo */}
-      {!activeTourUrl && (
+      {mapViewState && !activeTourUrl && (
         <MapView 
           ref={mapRef}
           initialViewState={mapViewState}
@@ -637,80 +674,58 @@ const PropertyDetails = () => {
                         }}
                       />
                     </ListItem>
+
+                    {property?.plusvalia_score !== null && currentUser?.is_staff && (
+                      <ListItem sx={{ px: 0, py: 1 }}>
+                        <ListItemIcon sx={{ minWidth: '40px' }}>
+                          <TrendingUpIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="Plusvalía (IA)"
+                          secondary={`${Number(property.plusvalia_score).toFixed(2)} / 100`}
+                          primaryTypographyProps={{
+                            fontSize: '0.9rem',
+                            fontWeight: 300,
+                            color: '#c9d1d9'
+                          }}
+                          secondaryTypographyProps={{ fontSize: '0.8rem', color: '#8b949e' }}
+                        />
+                      </ListItem>
+                    )}
                   </List>
                 </Box>
               )}
 
               {activeTab === 1 && (
                 <Box>
+                  {isOwnerOrAdmin ? (
+                    <Box sx={{ mb:2 }}>
+                      <Button variant="outlined" size="small" onClick={()=>setUploadOpen(true)}>Subir nuevo tour</Button>
+                    </Box>
+                  ):null}
+
                   {tours.length === 0 ? (
                     <Typography 
                       variant="body2" 
                       sx={{ color: '#8b949e', textAlign: 'center', py: 4 }}
                     >
-                      No hay tours disponibles
+                      No hay tours 360° disponibles para esta propiedad.
                     </Typography>
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {tours.map(tour => (
-                        <Card 
-                          key={tour.id}
-                          sx={{ 
-                            backgroundColor: 'rgba(13, 17, 23, 0.8)',
-                            border: '1px solid rgba(30, 41, 59, 0.2)',
-                            borderRadius: '12px',
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              borderColor: 'rgba(30, 58, 138, 0.4)',
-                              transform: 'translateY(-2px)'
-                            }
-                          }}
-                          onClick={() => {
-                            setActiveTourUrl(tour.url);
-                            setShowDetails(false);
-                          }}
-                        >
-                          <CardMedia
-                            component="img"
-                            height="120"
-                            image={tour.thumbnail}
-                            alt={tour.title}
-                          />
-                          <CardContent sx={{ p: 2 }}>
-                            <Typography 
-                              variant="subtitle2" 
-                              sx={{ 
-                                color: '#c9d1d9', 
-                                fontWeight: 300,
-                                mb: 1
-                              }}
-                            >
-                              {tour.title}
-                            </Typography>
-                            <Button 
-                              variant="outlined" 
-                              size="small"
-                              startIcon={<ViewInArIcon />}
-                              sx={{ 
-                                borderColor: 'rgba(30, 58, 138, 0.4)',
-                                color: '#60a5fa',
-                                fontWeight: 300,
-                                textTransform: 'none',
-                                '&:hover': {
-                                  borderColor: 'rgba(30, 58, 138, 0.6)',
-                                  backgroundColor: 'rgba(30, 58, 138, 0.1)'
-                                }
-                              }}
-                            >
-                              Ver tour 360°
-                            </Button>
-                          </CardContent>
-                        </Card>
+                      {tours.filter(t => t.type === 'package' && t.url).map(tour => (
+                        <Box key={tour.id} sx={{ height: 400, borderRadius: '12px', overflow: 'hidden' }}>
+                           <Pano2VRViewer src={tour.url} title={tour.name || property.name} />
+                        </Box>
                       ))}
+                      {/* Lógica para otros tipos de tour (video, etc) podría ir aquí */}
                     </Box>
                   )}
+                  <UploadTourDialog open={uploadOpen} onClose={()=>setUploadOpen(false)} propertyId={property.id} onUploaded={async()=>{
+                       try{
+                          const data = await tourService.getPropertyTours ? tourService.getPropertyTours(property.id) : tourService.getTours(property.id);
+                          setTours(data.results || data);
+                        }catch(e){console.error(e);}  }}/>
                 </Box>
               )}
 

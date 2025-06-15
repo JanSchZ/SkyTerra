@@ -40,8 +40,9 @@ const TourViewer = () => {
         setTourData(tour);
         
         // También cargar los datos de la propiedad relacionada
-        if (tour && tour.property_id) {
-          const property = await propertyService.getProperty(tour.property_id);
+        if (tour && (tour.property || tour.property_id)) {
+          const propId = tour.property || tour.property_id; // compatibilidad
+          const property = await propertyService.getProperty(propId);
           setPropertyData(property);
         }
         
@@ -93,30 +94,44 @@ const TourViewer = () => {
   // Construir la URL del tour con autoLoad=true y parámetros adicionales
   const getModifiedTourUrl = () => {
     if (!tourData || !tourData.url) return '';
-    
-    // Crear URL base
-    let baseUrl = tourData.url;
-    
-    // Asegurar que autoLoad=true esté presente y correcto.
-    // 1. Si autoLoad=false está, cambiarlo a autoLoad=true.
-    if (baseUrl.includes('autoLoad=false')) {
-      baseUrl = baseUrl.replace('autoLoad=false', 'autoLoad=true');
-    } 
-    // 2. Si 'autoLoad=' no está presente en absoluto, añadir autoLoad=true.
-    else if (!baseUrl.includes('autoLoad=')) { 
-      const separator = baseUrl.includes('?') ? '&' : '?';
-      baseUrl = `${baseUrl}${separator}autoLoad=true`;
-    }
-    // Si ya estaba autoLoad=true, o autoLoad con algún otro valor (que no sea false), se deja como está.
-    // La lógica anterior cubre los casos más importantes para forzar el autoLoad.
+    let original = tourData.url;
 
-    // Añadir autoRotate=0 si no está especificado, para prevenir rotaciones inesperadas al inicio.
-    if (!baseUrl.includes('autoRotate=')) {
-      const separator = baseUrl.includes('?') ? '&' : '?'; // Usa separador correcto
-      baseUrl = `${baseUrl}${separator}autoRotate=0`;
+    // Separar parte base y hash para tratar ambos
+    const [basePart, hashPart] = original.split('#');
+    let paramsObj = {};
+
+    // Parse querystring (?a=b) de basePart
+    if (basePart.includes('?')) {
+      const urlObj = new URL(basePart);
+      urlObj.searchParams.forEach((val, key) => {
+        paramsObj[key] = val;
+      });
     }
-    
-    return baseUrl;
+
+    // Parse parámetros dentro del hash estilo key=value&key2=val2
+    if (hashPart) {
+      hashPart.split('&').forEach(pair => {
+        const [k, v] = pair.split('=');
+        if (k) paramsObj[k] = v ?? '';
+      });
+    }
+
+    // Forzar parámetros deseados
+    paramsObj['autoLoad'] = 'true';
+    if (!('autoRotate' in paramsObj)) paramsObj['autoRotate'] = '0';
+
+    // Reconstruir hash con los parámetros
+    const newHash = Object.entries(paramsObj)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('&');
+
+    // Si la url original tenía hash, mantenemos la estructura
+    if (hashPart !== undefined) {
+      return `${basePart.split('?')[0]}#${newHash}`;
+    }
+
+    // Si no tenía hash, usar querystring
+    return `${basePart.split('?')[0]}?${newHash}`;
   };
 
   return (
@@ -267,7 +282,10 @@ const TourViewer = () => {
                 color="primary"
                 startIcon={<HomeIcon />}
                 fullWidth
-                onClick={() => navigate(`/property/${propertyData?.id}`)}
+                onClick={() => {
+                  localStorage.setItem('skipAutoFlight', 'true');
+                  navigate(`/property/${propertyData?.id}`);
+                }}
                 sx={{ mt: 2 }}
               >
                 Ver detalles completos

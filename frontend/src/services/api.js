@@ -494,17 +494,35 @@ export const tourService = {
   async getTours(propertyId) {
     try {
       const response = await api.get(`/tours/?property=${propertyId}`);
-      return response.data;
+      const data = response.data;
+      // Si la API devuelve results vacío, crear un tour de ejemplo dinámicamente
+      if (data && Array.isArray(data.results) && data.results.length === 0) {
+        return {
+          results: [
+            {
+              id: `placeholder-${propertyId}`,
+              title: "Vista 360° de muestra",
+              url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
+              property_id: propertyId,
+              type: 'package',
+              name: 'Tour de muestra'
+            }
+          ]
+        };
+      }
+      return data;
     } catch (error) {
       console.error(`Error fetching tours for property ${propertyId}:`, error);
+      // Retornar un tour de muestra en caso de error
       return {
         results: [
           {
-            id: 1,
-            title: "Vista principal 360°",
-            thumbnail: "https://via.placeholder.com/300x200?text=Tour+360",
-            url: "https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg",
-            property_id: propertyId
+            id: `placeholder-${propertyId}`,
+            title: "Vista 360° de muestra",
+            url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
+            property_id: propertyId,
+            type: 'package',
+            name: 'Tour de muestra'
           }
         ]
       };
@@ -514,17 +532,36 @@ export const tourService = {
   // Obtener un tour específico por ID
   async getTour(tourId) {
     try {
+      // Si es un ID placeholder, no hay que consultar al backend
+      if (typeof tourId === 'string' && tourId.startsWith('placeholder-')) {
+        const propId = tourId.split('placeholder-')[1];
+        return {
+          id: tourId,
+          title: "Vista 360° de muestra",
+          url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
+          property_id: propId,
+          type: 'package',
+          name: 'Tour de muestra'
+        };
+      }
+
       const response = await api.get(`/tours/${tourId}/`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching tour ${tourId}:`, error);
-      // Retornar un tour de muestra en caso de error
+      // Intentar inferir property_id si el tourId venía como número dentro de placeholder
+      let inferredPropId = null;
+      if (typeof tourId === 'string' && tourId.includes('-')) {
+        const parts = tourId.split('-');
+        inferredPropId = parts[parts.length - 1];
+      }
       return {
         id: tourId,
-        title: "Vista principal 360°",
-        url: "https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg",
-        property_id: 1,
-        name: "Tour de muestra"
+        title: "Vista 360° de muestra",
+        url: `https://cdn.pannellum.org/2.5/pannellum.htm#panorama=https://pannellum.org/images/cerro-toco-0.jpg&autoLoad=true&autoRotate=0`,
+        property_id: inferredPropId || 0,
+        type: 'package',
+        name: 'Tour de muestra'
       };
     }
   },
@@ -548,6 +585,13 @@ export const tourService = {
         property_id: tourData.property_id || 1
       };
     }
+  },
+
+  async getPropertyTours(propertyId) {
+    try {
+      const data = await this.getTours(propertyId);
+      return Array.isArray(data.results) ? data : { results: data };
+    } catch(e){ throw e; }
   }
 };
 
@@ -579,6 +623,46 @@ export const imageService = {
         ]
       };
     }
+  }
+};
+
+// ---------------------
+// Saved Search Service
+// ---------------------
+export const savedSearchService = {
+  async getAll() {
+    const resp = await api.get('/saved-searches/');
+    return resp.data;
+  },
+  async create(payload) {
+    const resp = await api.post('/saved-searches/', payload);
+    return resp.data;
+  },
+  async update(id, payload) {
+    const resp = await api.patch(`/saved-searches/${id}/`, payload);
+    return resp.data;
+  },
+  async delete(id){
+    await api.delete(`/saved-searches/${id}/`);
+  }
+};
+
+export const favoritesService = {
+  async list() {
+    const resp = await api.get('/favorites/');
+    return resp.data.results || resp.data;
+  },
+  async add(propertyId) {
+    return (await api.post('/favorites/', { property: propertyId })).data;
+  },
+  async remove(favoriteId) {
+    return (await api.delete(`/favorites/${favoriteId}/`)).data;
+  },
+  async removeByProperty(propertyId) {
+    // get favorite id for given property first
+    const favs = await favoritesService.list();
+    const fav = favs.find((f) => f.property === propertyId);
+    if (fav) return favoritesService.remove(fav.id);
   }
 };
 

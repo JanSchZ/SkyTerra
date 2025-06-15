@@ -14,6 +14,7 @@ import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import config from '../../config/environment';
 import { motion } from 'framer-motion';
+import PropertyPreviewModal from '../property/PropertyPreviewModal';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => {
@@ -86,6 +87,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const debounceTimeoutRef = useRef(null);
   const lastFetchedPage1FiltersRef = useRef(null);
   const recommendationsTourTimeoutRef = useRef(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewPropertyId, setPreviewPropertyId] = useState(null);
 
   // Detectar tipo de conexión del usuario
   useEffect(() => {
@@ -379,6 +382,11 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   };
 
   const handleMarkerClick = async (property) => {
+    if (!localStorage.getItem('auth_token')) {
+      setPreviewPropertyId(property.id);
+      setPreviewModalOpen(true);
+      return; // don't navigate
+    }
     if (!mapRef.current || navigatingToTour) return;
     setNavigatingToTour(true);
     setSelectedProperty(property.id);
@@ -408,7 +416,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             message: 'No hay tours 360° disponibles para esta propiedad.',
             severity: 'info'
           });
-          navigate(`/property/${property.id}`); 
+          localStorage.setItem('skipAutoFlight', 'true');
+          navigate(`/property/${property.id}`);
         }
       } catch (error) {
         console.error('Error fetching tours or navigating:', error);
@@ -417,6 +426,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           message: 'Error al cargar el tour o detalles de la propiedad.',
           severity: 'error'
         });
+        localStorage.setItem('skipAutoFlight', 'true');
         navigate(`/property/${property.id}`);
       } finally {
         setTimeout(() => setNavigatingToTour(false), 500);
@@ -1327,6 +1337,12 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           </Box>
         </Box>
       )}
+
+      <PropertyPreviewModal
+        open={previewModalOpen}
+        propertyId={previewPropertyId}
+        onClose={() => setPreviewModalOpen(false)}
+      />
     </Box>
   );
 });

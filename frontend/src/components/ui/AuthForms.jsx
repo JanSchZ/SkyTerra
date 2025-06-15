@@ -149,12 +149,25 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
 
 // Componente de formulario de registro
 export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose }) => {
+  // Paso 1: tipo de vendedor (null, 'individual', 'professional')
+  const [sellerType, setSellerType] = useState(null);
+
+  // Datos del formulario – se agregan campos adicionales dependiendo del tipo de vendedor
   const [formData, setFormData] = useState({
     email: '',
-    username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    /* Básicos */
+    name: '',
+    rut: '',
+    phone: '',
+    /* Profesionales */
+    companyName: '',
+    companyRUT: '',
+    certification: '',
+    listingCount: ''
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
@@ -167,6 +180,11 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
   const validateForm = () => {
     const errors = {};
     
+    if (!sellerType) {
+      errors.sellerType = 'Selecciona un tipo de vendedor';
+      return errors;
+    }
+    
     // Validación del email
     if (!formData.email) {
       errors.email = 'El correo es obligatorio';
@@ -174,13 +192,15 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
       errors.email = 'Correo no válido';
     }
     
-    // Validación del username
-    if (!formData.username) {
-      errors.username = 'El usuario es obligatorio';
-    } else if (formData.username.length < 3) {
-      errors.username = 'El usuario debe tener al menos 3 caracteres';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-      errors.username = 'El usuario solo puede contener letras, números y guiones bajos';
+    // Validaciones específicas según tipo de vendedor
+    if (sellerType === 'individual') {
+      if (!formData.name) errors.name = 'Nombre obligatorio';
+      if (!formData.rut) errors.rut = 'RUT obligatorio';
+      if (!formData.phone) errors.phone = 'Teléfono obligatorio';
+    } else if (sellerType === 'professional') {
+      if (!formData.companyName) errors.companyName = 'Nombre de empresa obligatorio';
+      if (!formData.companyRUT) errors.companyRUT = 'RUT de empresa obligatorio';
+      if (!formData.listingCount) errors.listingCount = 'Número de listados obligatorio';
     }
     
     // Validación de la contraseña
@@ -203,8 +223,8 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('🔄 Formulario de registro enviado:', {
-      email: formData.email,
-      username: formData.username,
+      sellerType,
+      ...formData,
       hasPassword: !!formData.password,
       passwordLength: formData.password.length
     });
@@ -212,10 +232,19 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
     const errors = validateForm();
     if (Object.keys(errors).length === 0) {
       console.log('✅ Validación exitosa, enviando datos...');
+      const autoUsername = formData.email ? formData.email.split('@')[0] : undefined;
       const userData = {
-        email: formData.email, 
-        username: formData.username, 
-        password: formData.password
+        seller_type: sellerType,
+        email: formData.email,
+        username: autoUsername,
+        password: formData.password,
+        name: formData.name,
+        rut: formData.rut,
+        phone: formData.phone,
+        company_name: formData.companyName,
+        company_rut: formData.companyRUT,
+        certification: formData.certification,
+        listing_count: formData.listingCount
       };
       if (onRegister) onRegister(userData);
     } else {
@@ -224,14 +253,56 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
     }
   };
 
+  // UI para seleccionar tipo de vendedor
+  if (!sellerType) {
+    return (
+      <Box sx={{ width: '100%', p: 3 }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 300, color: '#c9d1d9', mb: 3, textAlign: 'center' }}>
+          ¿Qué tipo de vendedor eres?
+        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373' }}>
+            {typeof error === 'object' ? JSON.stringify(error) : error}
+          </Alert>
+        )}
+
+        <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+          <Paper onClick={() => setSellerType('individual')} sx={{ flex: 1, p: 3, cursor: 'pointer', '&:hover': { boxShadow: 6, backgroundColor: 'rgba(255,255,255,0.08)' } }}>
+            <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 1 }}>Vendo mi terreno</Typography>
+            <Typography variant="body2" sx={{ color: '#8b949e' }}>Para dueños que quieren publicar 1-3 terrenos propios.</Typography>
+          </Paper>
+          <Paper onClick={() => setSellerType('professional')} sx={{ flex: 1, p: 3, cursor: 'pointer', '&:hover': { boxShadow: 6, backgroundColor: 'rgba(255,255,255,0.08)' } }}>
+            <Typography variant="h5" sx={{ color: '#c9d1d9', mb: 1 }}>Vendedor profesional</Typography>
+            <Typography variant="body2" sx={{ color: '#8b949e' }}>Para corredores, inmobiliarias o proyectos con múltiples terrenos.</Typography>
+          </Paper>
+        </Box>
+
+        <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.15)' }} />
+        <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
+          ¿Ya tienes una cuenta?{' '}
+          <Button onClick={onSwitchToLogin} sx={{ color: '#c9d1d9', fontWeight: 400, textTransform: 'none', p:0.5, '&:hover':{textDecoration:'underline'} }}>
+            Iniciar sesión
+          </Button>
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ width: '100%', p: 3 }}>
       <Typography variant="h4" component="h1" sx={{ fontWeight: 300, color: '#c9d1d9', mb: 1, textAlign: 'center' }}>
-        Crear Cuenta
+        {sellerType === 'individual' ? 'Registro: Vendo mi terreno' : 'Registro: Vendedor profesional'}
       </Typography>
       <Typography variant="body2" sx={{ color: '#8b949e', mb: 4, textAlign: 'center', fontWeight: 300 }}>
-        Únete a SkyTerra para explorar propiedades.
+        {sellerType === 'individual'
+          ? 'Para dueños que quieren publicar 1-3 terrenos propios.'
+          : 'Para corredores, inmobiliarias o proyectos con múltiples terrenos.'}
       </Typography>
+
+      <Button onClick={() => setSellerType(null)} size="small" startIcon={<PersonAddIcon />} sx={{ mb: 2, textTransform: 'none', color: '#c9d1d9' }}>
+        Cambiar tipo de vendedor
+      </Button>
       
       {error && (
          <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373' }}>
@@ -240,8 +311,25 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
       )}
       
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 0 }}>
+        {/* Campos específicos según tipo */}
+        {sellerType === 'individual' && (
+          <>
+            <TextField label="Nombre Completo" type="text" name="name" fullWidth required value={formData.name} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.name} helperText={formErrors.name} sx={commonTextFieldStyles} />
+            <TextField label="RUT" type="text" name="rut" fullWidth required value={formData.rut} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.rut} helperText={formErrors.rut} sx={commonTextFieldStyles} />
+            <TextField label="Teléfono" type="tel" name="phone" fullWidth required value={formData.phone} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.phone} helperText={formErrors.phone} sx={commonTextFieldStyles} />
+          </>
+        )}
+
+        {sellerType === 'professional' && (
+          <>
+            <TextField label="Nombre de Empresa" type="text" name="companyName" fullWidth required value={formData.companyName} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.companyName} helperText={formErrors.companyName} sx={commonTextFieldStyles} />
+            <TextField label="RUT de Empresa" type="text" name="companyRUT" fullWidth required value={formData.companyRUT} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.companyRUT} helperText={formErrors.companyRUT} sx={commonTextFieldStyles} />
+            <TextField label="Certificación (opcional)" type="text" name="certification" fullWidth value={formData.certification} onChange={handleChange} margin="normal" disabled={loading} sx={commonTextFieldStyles} />
+            <TextField label="Número de Listados" type="number" name="listingCount" fullWidth required value={formData.listingCount} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.listingCount} helperText={formErrors.listingCount} sx={commonTextFieldStyles} />
+          </>
+        )}
+
         <TextField label="Correo Electrónico" type="email" name="email" fullWidth required value={formData.email} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.email} helperText={formErrors.email} sx={commonTextFieldStyles} />
-        <TextField label="Nombre de Usuario" type="text" name="username" fullWidth required value={formData.username} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.username} helperText={formErrors.username} sx={commonTextFieldStyles} />
         <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
         <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles} />
         

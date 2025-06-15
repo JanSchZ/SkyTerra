@@ -149,7 +149,10 @@ const AdminPublicationsPage = () => {
                   <TableRow hover key={prop.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                     <TableCell>{prop.id}</TableCell>
                     <TableCell>
-                      <MuiLink component="button" variant="body2" onClick={() => navigate(`/property/${prop.id}`)}>
+                      <MuiLink component="button" variant="body2" onClick={() => {
+                        localStorage.setItem('skipAutoFlight', 'true');
+                        navigate(`/property/${prop.id}`);
+                      }}>
                         {prop.name}
                       </MuiLink>
                     </TableCell>

@@ -52,7 +52,7 @@
             *   **[PENDIENTE]** Frontend: Mostrar estado de verificación y lista de documentos subidos en `PropertyDetails.jsx` (sólo para owner y admin).
             *   **[DESCARTADO - 13 Jun 2025]** Filtros manuales eliminados del UI principal; la IA gestionará filtros internamente.
         *   **Admin:**
-            *   **[PENDIENTE]** Ajustar vistas de propiedades para listar y filtrar por modalidad.
+            *   **[COMPLETADO - 16 Jun 2025]** Ajustar vistas de propiedades (AdminDetailedPropertiesPage) para listar y filtrar por modalidad (venta/arriendo/ambas).
         *   **QA:**
             *   **[PENDIENTE]** Ejecutar y verificar migraciones (`makemigrations` + `migrate`).
     3.  **[RESUELTO - 13 Jun 2025]** 📈 **Métrica de Plusvalía Inteligente (Recovery Score‐style):**
@@ -60,7 +60,7 @@
         *   **Servicio `PlusvaliaService` v2:** Combina 10 factores (valor de mercado externo, tasa apreciación histórica, demanda interna por visitas, precio/hectárea, agua, vistas, tamaño, proximidad, modalidad, IA). Integra **ClearAVM / Property Valuation API** para AVM y apreciación histórica [fuente](https://www.clearcapital.com/products/property-valuation-api/). **Completado** (stub externo, pesos iniciales, cálculos y fallback a neutro).
         *   **Demanda:** Nuevo modelo `PropertyVisit` para registrar vistas; falta endpoint y frontend para registrar cada visualización de detalle de propiedad.
         *   **Seguridad:** `plusvalia_score` solo visible para usuarios `is_staff`.
-        *   **Frontend:** Pendiente mostrar métrica en vistas admin y dashboard.
+        *   **Frontend:** **[COMPLETADO - 16 Jun 2025]** Mostrar métrica en vistas admin (AdminDetailedPropertiesPage) y panel de detalles de propiedad (solo staff).
         *   **Próximos pasos:** Ajustar pesos tras recopilar datos reales y conectar servicios externos en entorno prod.
     4.  **[PENDIENTE]** 👤 **Creación de Cuenta Admin por Defecto:**
         *   **Subtarea (Backend):** Implementar un script, `management command`, o proceso de inicialización para crear un superusuario con `username='admin'` y `password='SkyTerra3008%'` (la contraseña debe ser manejada de forma segura, idealmente establecida en el primer despliegue o mediante variables de entorno para el admin inicial).
@@ -70,10 +70,10 @@
 **Fase 2: Funcionalidades de Usuario, Comunidad y UX Esencial (Alta Prioridad)**
 *   **Objetivo:** Enriquecer la interacción del usuario con la plataforma y mejorar la usabilidad general.
 *   **Tareas:**
-    1.  **[PENDIENTE]** ❤️ **Funcionalidad de Favoritos/Guardados:**
-        *   Permitir a usuarios registrados guardar propiedades.
-        *   Backend: Modelo para favoritos, API endpoints.
-        *   Frontend: Botón "Guardar" en cards/details, icono distintivo.
+    1.  **[COMPLETADO - 16 Jun 2025]** ❤️ **Funcionalidad de Favoritos/Guardados (MVP):**
+        *   Backend: Modelo `Favorite`, serializer y `FavoriteViewSet` (`/api/favorites/`).
+        *   Frontend: `PropertyCard` muestra botón bookmark para guardar/quitar; `favoritesService` en `api.js`.
+        *   Pendiente: Vista dedicada "Favoritos" en dashboard.
     2.  **[PENDIENTE]** 👤 **Página de Perfil de Usuario (Básica):**
         *   Para compradores/arrendatarios: Ver favoritos, gestionar datos básicos de perfil.
         *   Para vendedores/propietarios: Ver y gestionar sus publicaciones (venta y arriendo), datos de perfil.
@@ -182,6 +182,8 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
 *   2025-06-12: Migración MUI Grid finalizada y bug de MapView resuelto tras pruebas.
 *   2025-06-12: Añadida lógica de IA en `AISearchView` para devolver top 3 sugerencias basadas en BD.
 *   2025-06-12: Detectadas vistas admin placeholders vacías; se registra como NUEVO issue en Fase 0.
+*   2025-06-16: Implementado nuevo sistema de registro con selección de tipo de vendedor ("Vendo mi terreno" vs "Vendedor profesional") y formularios adaptativos según rol. Prototipo UI reactivo incluido en `AuthForms.jsx`; dashboard existente ya lista "Mis Propiedades" con botón "+" para nuevas publicaciones.
+*   2025-06-16: Dashboard mejorado con pestañas Resumen/Mis Propiedades/Búsquedas Guardadas/Favoritos, lógica de límite de 3 publicaciones para cuentas individuales y carga dinámica de favoritos (`favoritesService`).
 *   2025-05-29: Reestructuración completa del plan en Fases (0 a 4).
 *   2025-05-29: Elevada prioridad y alcance de la "IA Search Bar - Experiencia Central" a Fase 1.
 *   2025-05-29: Integrado "Soporte para Arriendo/Alquiler" como alta prioridad en Fase 1.
@@ -276,6 +278,14 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
 *   **[RESUELTO - 14 Jun 2025]** Halo blanco en pop-ups Mapbox eliminado:
     *   `frontend/src/index.css` – `.mapboxgl-popup-content`, `.mapboxgl-popup-tip` y `.mapboxgl-popup-tip-inner` ahora son transparentes, sin borde ni sombra.
     *   El pop-up muestra solo la tarjeta glass interior, sin doble fondo.
+*   **[EN PROGRESO - 14 Jun 2025]** Frontend: Componente `PropertyPreviewModal.jsx` creado (modal translúcido con galería, info básica y CTA a /register). Integrado en `MapView.jsx`; al hacer clic en un pin sin `auth_token` se abre la vista previa en lugar de navegar. Falta estilizar header y probar responsivo.
+*   **[MEJORA - 14 Jun 2025]** `PropertyPreviewSerializer` ahora incluye campo `images` (máx 5) para galería en modal.
+*   **[COMPLETADO - 14 Jun 2025]** Backend: Modelo `ComparisonSession`, serializer y `ComparisonSessionViewSet` expuestos en `/api/compare/` (crea/actualiza lista de hasta 4 propiedades por usuario o sesión anónima).
+*   **[EN PROGRESO - 14 Jun 2025]** Frontend: `CompareView.jsx` (liquid glass) creado y ruta `/compare` agregada en `App.jsx`. `PropertyCard.jsx` incluye botón de comparar que crea/actualiza sesión vía `/api/compare/` y navega a vista. Falta diseño responsive detallado y sincronizar múltiples adiciones.
+*   **[COMPLETADO - 15 Jun 2025]** Backend: `TourViewSet` ahora maneja subida de paquetes `.zip`/`.ggpkg`. El endpoint `create` acepta un `package_file`, lo descomprime en una ruta única (`/media/tours/<uuid>`), valida que exista `index.html`, y guarda la URL pública en el modelo `Tour`. Incluye validaciones de seguridad.
+*   **[COMPLETADO - 15 Jun 2025]** Frontend: Creado componente reutilizable `Pano2VRViewer.jsx`. Integrado en `PropertyDetails.jsx`: la pestaña "Tours" ahora renderiza directamente el tour 360° si existe uno de tipo 'package', en lugar de mostrar una lista.
+*   **[AJUSTE - 15 Jun 2025]** `PropertyPreviewModal` ahora usa carousel nativo con botones; se elimina dependencia `react-swipeable-views` para evitar conflictos de peer-deps. `package.json` actualizado.
+*   **[COMPLETADO - 15 Jun 2025]** Backend: Implementado modelo `SavedSearch`, serializer y `SavedSearchViewSet` (`/api/saved-searches/`) para que usuarios registrados guarden filtros y activen alertas por correo.
 
 ---
 
@@ -421,3 +431,32 @@ Cada punto se añadirá a la fase correspondiente durante planificación semanal
         *   Preparar esquema de rutas y permisos (solo `role="seller"`).
 
 *   **Meta de sprint:** Todas las tareas 1-4 marcadas `[COMPLETADO]` y 5-7 `[EN PROGRESO]` antes del 21-Jun-2025.
+
+### 8. Nuevas Recomendaciones Incorporadas (Asesoría 14-Jun-2025)
+
+Las siguientes tareas se derivan de la guía UX/UI recibida. Se han verificado contra el log para evitar duplicados. Se marcan como [PENDIENTE] y se asignarán formalmente a la Fase indicada en la próxima planificación semanal.
+
+1. **Vista Anónima – Vista Previa Limitada & CTA Registro** (Fase 1)
+   * Backend: Serializer `PropertyPreviewSerializer` limitado + endpoint `/properties-preview/` que expone sólo `id`, `title`, `price`, `main_image`, `location`, `surface`.
+   * Frontend: `PropertyPreviewModal.jsx` muestra 3-5 fotos, datos básicos y botón "Ver Tour 360° y Detalles Completos" que redirige a `/register`.
+2. **Integración Tours 360° (Pano2VR)** (Fase 2)
+   * Backend: Soporte de subida de paquetes Pano2VR (`.ggpkg`) a S3 y campo `tour_url` en `Property`.
+   * Frontend: Componente `<Pano2VRViewer>` embebido en `PropertyDetails.jsx` y en comparador.
+3. **Comparador de Propiedades (máx. 4)** (Fase 2)
+   * Backend: Modelo `ComparisonSession`, endpoints `/api/compare/` (GET IDs → detalles) y WS para sync.
+   * Frontend: `CompareView.jsx` con tabla de métricas, columnas side-by-side y miniaturas del tour 360°.
+4. **Búsquedas Guardadas & Alertas por Email** (Fase 2)
+   * Backend: Modelo `SavedSearch` y Celery task para notificar al publicar nueva propiedad que coincida.
+   * Frontend: Botón "Guardar búsqueda" en `AISearchBar`; panel "Alertas" en Dashboard.
+5. **Suscripciones Premium – Comprador** (Fase 3)
+   * Backend: Modelo `Subscription`, roles `premium_buyer`, integración initial Stripe Checkout.
+   * Frontend: Paywall que muestra `plusvalia_score` y filtros avanzados sólo si `role.includes('premium_buyer')`.
+6. **Niveles de Producción Visual (Normal / Pro / Premium)** (Fase 3)
+   * Backend: Tabla `ProductionLevel` y lógica de pricing; se genera `ProductionOrder` tras pago único.
+   * Frontend: Extender Paso 2 de `CreatePublicationWizard` con tarjetas comparativas y flujo de pago.
+7. **Panel de Estadísticas para Vendedor** (Fase 3)
+   * Frontend: Widgets visitas & contactos últimos 30 días, gráfico de barras y tabla top-propiedades.
+   * Backend: Endpoint `/api/seller/stats/` agregado y consultas agregadas.
+8. **Panel Logístico de Producción (Admin)** (Fase 3)
+   * Backend: CRUD `ProductionOrder`, estados `Assigned → Scheduled → Done → InReview → Approved`.
+   * Frontend: `AdminProductionPanel.jsx` con tabla, filtros por estado y asignación rápida a piloto.

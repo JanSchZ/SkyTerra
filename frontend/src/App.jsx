@@ -34,7 +34,13 @@ import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import LandingV2 from './components/ui/LandingV2';
 import CreatePublicationWizard from './components/property/CreatePublicationWizard';
-import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage';
+import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage.jsx';
+import CompareView from './components/property/CompareView';
+import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage.jsx';
+import SavedSearchesPage from './components/ui/SavedSearchesPage';
+import AdminV2Layout from './components/adminV2/AdminV2Layout.jsx';
+import AdminV2Dashboard from './components/adminV2/AdminV2Dashboard.jsx';
+import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
 import './App.css';
 
 export const ThemeModeContext = React.createContext({
@@ -43,9 +49,9 @@ export const ThemeModeContext = React.createContext({
 });
 
 const AppWrapper = () => {
-  const mode = 'dark';
+  const mode = 'light';
 
-  const theme = useMemo(() => liquidGlassTheme('dark'), []);
+  const theme = useMemo(() => liquidGlassTheme(mode), [mode]);
 
   const themeMode = useMemo(
     () => ({
@@ -190,7 +196,7 @@ function App() {
 
       // Check if the logged-in user is staff/admin
       if (userData.user && userData.user.is_staff) {
-        navigate('/admin/documents'); // Redirect admins to a new admin dashboard route
+        navigate('/admin'); // Redirect admins to the new Admin dashboard
       } else {
         navigate('/'); // Redirect regular users to the home page
       }
@@ -546,7 +552,7 @@ function App() {
                     )}
                     <MenuItem
                       onClick={() => {
-                        navigate(user && user.is_staff ? '/admin/documents' : '/dashboard');
+                        navigate(user && user.is_staff ? '/admin' : '/dashboard');
                         closeUserMenu();
                       }}
                       sx={(theme)=>({ color: theme.palette.text.primary, pt: user ? 1.5 : 0.5 })}
@@ -561,12 +567,12 @@ function App() {
                 <Button
                   variant="outlined"
                   onClick={() => navigate('/login')}
-                  sx={{
+                  sx={(theme)=>({
                     borderColor: 'rgba(120, 120, 120, 0.7)', color: theme.palette.primary.main, fontWeight: 300,
                     padding: '6px 12px', fontSize: '0.8rem',
                     backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
                     '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
-                  }}
+                  })}
                 >
                   Login
                 </Button>
@@ -661,6 +667,17 @@ function App() {
             path="/admin/documents"
             element={<StaffRoute user={user} element={<AdminDocumentsReviewPage />} />}
           />
+          <Route
+            path="/admin-detailed-properties-list"
+            element={<StaffRoute user={user} element={<AdminDetailedPropertiesPage />} />}
+          />
+          <Route path="/compare" element={<CompareView />} />
+          <Route path="/dashboard/saved-searches" element={<ProtectedRoute user={user} element={<SavedSearchesPage />} />} />
+          <Route path="/admin/*" element={<StaffRoute user={user} element={<AdminV2Layout />} />}>
+            <Route index element={<AdminV2Dashboard />} />
+            <Route path="properties" element={<PropertyApprovalPage />} />
+            <Route path="analytics" element={<AdminV2Dashboard />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
         </Routes>
       </AnimatePresence>
