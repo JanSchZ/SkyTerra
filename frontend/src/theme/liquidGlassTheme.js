@@ -25,9 +25,9 @@ export const liquidGlassTheme = (mode = 'light') => {
   } : {
     mode,
     primary: {
-      main: '#1976d2',
-      light: '#63a4ff',
-      dark: '#004ba0',
+      main: colors.accent,
+      light: alpha(colors.accent,0.7),
+      dark: alpha(colors.accent,0.5),
       contrastText: '#ffffff',
     },
     background: {
@@ -44,7 +44,7 @@ export const liquidGlassTheme = (mode = 'light') => {
   return createTheme({
     palette,
     typography: {
-      fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
       fontSize: 14,
       h1: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
       h2: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
@@ -62,11 +62,11 @@ export const liquidGlassTheme = (mode = 'light') => {
           {
             props: { variant: 'glass' },
             style: {
-              backgroundColor: alpha('#FFFFFF', 0.9),
+              backgroundColor: mode === 'light' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.06)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              border: `1px solid ${alpha('#FFFFFF', 0.4)}`,
-              boxShadow: '0 6px 24px rgba(0,0,0,0.05)',
+              border: `1px solid ${alpha('#FFFFFF', mode === 'light' ? 0.3 : 0.25)}`,
+              boxShadow: mode === 'light' ? '0 8px 24px rgba(0,0,0,0.05)' : '0 6px 24px rgba(0,0,0,0.05)',
               borderRadius: 16,
             }
           }
@@ -83,10 +83,10 @@ export const liquidGlassTheme = (mode = 'light') => {
           {
             props: { variant: 'glass' },
             style: {
-              backgroundColor: 'rgba(255,255,255,0.18)',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-              border: `1px solid ${alpha('#ffffff',0.25)}`,
+              backgroundColor: mode === 'light' ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.08)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              border: `1px solid ${alpha('#ffffff', mode === 'light' ? 0.28 : 0.25)}`,
               borderRadius: 12,
               boxShadow: 'none',
             }

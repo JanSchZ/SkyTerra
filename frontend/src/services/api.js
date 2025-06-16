@@ -563,12 +563,8 @@ export const tourService = {
     // `data` puede venir como { results: [...] } (paginado) o como lista directa.
     let arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
     
-    // Filtrado estricto de tours válidos (aceptamos cualquier tipo, pero descartamos placeholders y tests)
-    arr = arr.filter(tour => 
-      typeof tour.url === 'string' &&
-      !tour.url.includes('placeholder') &&
-      !tour.url.includes('test')
-    );
+    // Aceptamos cualquier tour que tenga URL válida
+    arr = arr.filter(tour => typeof tour.url === 'string' && tour.url.trim() !== '');
     
     // Ordenar por fecha de subida (uploaded_at) descendente
     arr.sort((a, b) => {
@@ -580,6 +576,9 @@ export const tourService = {
       if (!isNaN(idA) && !isNaN(idB)) return idB - idA;
       return 0;
     });
+    
+    // Asegurar URLs absolutas
+    arr = arr.map((t) => ({ ...t, url: makeAbsoluteUrl(t.url) }));
     
     return arr;
   }
@@ -656,6 +655,16 @@ export const favoritesService = {
     const fav = favs.find((f) => f.property === propertyId);
     if (fav) return favoritesService.remove(fav.id);
   },
+};
+
+const makeAbsoluteUrl = (partialUrl) => {
+  if (!partialUrl) return partialUrl;
+  if (partialUrl.startsWith('http://') || partialUrl.startsWith('https://')) return partialUrl;
+  // Ensure leading slash
+  const path = partialUrl.startsWith('/') ? partialUrl : `/${partialUrl}`;
+  // Remove trailing '/api' from baseURL if present
+  const root = baseURL.replace(/\/api$/, '');
+  return `${root}${path}`;
 };
 
 export default {

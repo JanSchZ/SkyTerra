@@ -119,17 +119,9 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
         <Button
           type="submit"
           variant="contained"
+          color="primary"
           fullWidth
-          sx={{ 
-            mt: 3, mb: 2, py: 1.5, borderRadius: '8px',
-            backgroundColor: 'rgba(255,255,255,0.25)', 
-            border: '1px solid rgba(255,255,255,0.35)',
-            color: '#ffffff',
-            fontWeight: 400,
-            letterSpacing: '0.02em',
-            textTransform: 'none',
-            '&:hover': { backgroundColor: 'rgba(255,255,255,0.35)' }
-          }}
+          sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', textTransform: 'none', fontWeight: 500 }}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
         >
@@ -333,7 +325,7 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
         <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
         <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles} />
         
-        <Button type="submit" variant="contained" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.35)', color: '#ffffff', fontWeight: 400, letterSpacing: '0.02em', textTransform: 'none', '&:hover': { backgroundColor: 'rgba(255,255,255,0.35)' } }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
+        <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', textTransform: 'none', fontWeight: 500 }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
           {loading ? 'Registrando...' : 'Crear Cuenta'}
         </Button>
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />

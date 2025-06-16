@@ -286,6 +286,20 @@ Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups →
 *   **[COMPLETADO - 15 Jun 2025]** Frontend: Creado componente reutilizable `Pano2VRViewer.jsx`. Integrado en `PropertyDetails.jsx`: la pestaña "Tours" ahora renderiza directamente el tour 360° si existe uno de tipo 'package', en lugar de mostrar una lista.
 *   **[AJUSTE - 15 Jun 2025]** `PropertyPreviewModal` ahora usa carousel nativo con botones; se elimina dependencia `react-swipeable-views` para evitar conflictos de peer-deps. `package.json` actualizado.
 *   **[COMPLETADO - 15 Jun 2025]** Backend: Implementado modelo `SavedSearch`, serializer y `SavedSearchViewSet` (`/api/saved-searches/`) para que usuarios registrados guarden filtros y activen alertas por correo.
+*   **[COMPLETADO - 15 Jun 2025]** Mapa – Ciudades y Puntos de Interés (POI):
+    *   Se añadió iconografía (`icon-image`) y texto a las capas de ciudades (`city-labels-major`, `city-labels-minor`) y POIs (`poi-major`, `poi-minor`).
+    *   Filtros refinados para que solo aparezcan:
+        *   Países desde zoom 0.
+        *   Ciudades principales (rank ≤ 5) desde zoom ≥3.
+        *   Ciudades menores (rank >5) desde zoom ≥7.
+        *   POI mayores desde zoom ≥10 y menores desde zoom ≥13.
+    *   Uso de `coalesce` para manejar `rank/label_rank` nulos y evitar warnings de tipo.
+    *   Eliminados errores de consola relacionados con expresiones Mapbox (`label_rank expected type number`).
+    *   Ajustado estilo de texto/iconos para evitar saturación visual y hacer progresivo el detalle.
+*   **[15 Jun] Jerarquía de etiquetas refinada: `city-labels-major` (zoom≥4, rank≤4), `city-labels-medium` (zoom≥6), `town-labels` (zoom≥8) y `village-labels` (zoom≥10).
+*   **[15 Jun] Fuentes unificadas: familia *Source Code Pro* (Bold/Semibold/Regular) para alinear con tipografía principal del sitio.
+*   **[15 Jun] Localidades pequeñas ahora filtradas: pueblos (zoom≥10 rank≤10) y aldeas (zoom≥12).
+*   **[15 Jun] POI visibles: mayores desde zoom 11, menores desde 14; tipografía Source Code Pro.
 
 ---
 
@@ -460,3 +474,31 @@ Las siguientes tareas se derivan de la guía UX/UI recibida. Se han verificado c
 8. **Panel Logístico de Producción (Admin)** (Fase 3)
    * Backend: CRUD `ProductionOrder`, estados `Assigned → Scheduled → Done → InReview → Approved`.
    * Frontend: `AdminProductionPanel.jsx` con tabla, filtros por estado y asignación rápida a piloto.
+
+### Day 15: Overhauling User Dashboards & Theming
+- **New Feature: Role-Based Dashboards.**
+  - Implemented distinct, detailed dashboards for "Administrator" and "Seller" user roles.
+  - **Admin Dashboard:**
+    - Redesigned from the ground up to focus on SaaS and business KPIs.
+    - Features 3 distinct sections:
+      1.  **Business KPIs:** MRR, Churn Rate, LTV, and CAC cards.
+      2.  **Operations & Finance:** A production/marketing queue and a donut chart for MRR breakdown by plan.
+      3.  **Profitability Analysis:** Bar chart for LTV vs. CAC and a line chart for MRR evolution.
+    - Created modular components for each part of the dashboard (`SaaSKpiCard`, `ProductionQueue`, `MrrBreakdownChart`, etc.).
+  - **Seller Dashboard:**
+    - Designed a new dashboard for professional sellers to track their performance.
+    - Features 3 main sections:
+      1.  **Plan Status:** Shows the seller's current plan, feature status (e.g., "Completed", "In Post-Production"), and an upsell card.
+      2.  **Performance:** A detailed line chart for views/consultations over time and a set of KPI cards.
+      3.  **Property Management:** A clean data table listing the seller's properties with key stats and actions.
+    - Built using reusable components like `PlanStatus`, `PerformanceChart`, `PropertiesTable`, etc.
+- **Technical Implementation:**
+  - Used `Chart.js` for all new data visualizations.
+  - Leveraged Material-UI `Grid` and components to create the structured, responsive layouts.
+  - Implemented "Glassmorphism" style cards (`GlassCard`) for a modern, clean aesthetic on both dashboards.
+  - Updated application routing in `App.jsx` to direct `is_staff` users to `/admin` and all other authenticated users to the new `/dashboard` (Seller Dashboard).
+- **Project Structure:**
+  - Created new directories to organize dashboard components: `frontend/src/components/seller/` and `frontend/src/components/admin/dashboard/`.
+- **Next Steps:**
+  - Wire up dashboards to live backend data.
+  - Implement logic for different seller plans ("Dueño Particular" vs "Vendedor Profesional").

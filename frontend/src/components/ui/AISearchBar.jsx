@@ -326,7 +326,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             WebkitBackdropFilter: 'blur(10px)',
             borderRadius: '12px',
             border: '1px solid rgba(255,255,255,0.25)',
-            color: 'text.primary',
+            color: '#ffffff',
             transition: 'box-shadow 0.35s ease',
             '& fieldset': { borderColor: 'transparent' },
             '&:hover fieldset': { borderColor: 'transparent' },
@@ -336,7 +336,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
               boxShadow: '0 0 8px rgba(255,255,255,0.35)',
             },
           },
-          input: { color: (theme)=>theme.palette.text.primary },
+          input: { color: '#ffffff', '::placeholder': { color: 'rgba(255,255,255,0.75)' } },
         }}
       />
       

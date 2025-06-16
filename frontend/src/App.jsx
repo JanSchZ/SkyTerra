@@ -43,6 +43,7 @@ import AdminDashboardPage from './components/admin/AdminDashboardPage.jsx';
 import AdminTicketsPage from './components/admin/AdminTicketsPage.jsx';
 import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
+import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
 import './App.css';
 
 export const ThemeModeContext = React.createContext({
@@ -475,7 +476,7 @@ function App() {
                       backdropFilter: 'blur(10px)',
                       WebkitBackdropFilter: 'blur(10px)',
                       border: '1px solid rgba(255,255,255,0.25)',
-                      color: theme.palette.text.primary,
+                      color: theme.palette.common.white,
                       boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
                       transition: 'box-shadow 0.8s ease, transform 0.25s ease',
                       position: 'relative',
@@ -637,7 +638,7 @@ function App() {
                 user={user}
                 element={
                   <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                    <Dashboard user={user} />
+                    <SellerDashboardPage />
                   </motion.div>
                 }
               />

@@ -1,192 +1,129 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import {
-    Box, Typography, Container, Paper, Table, TableBody, TableCell,
-    TableContainer, TableHead, TableRow, CircularProgress, Alert,
-    TablePagination, TableSortLabel
-} from '@mui/material';
+import React from 'react';
+import { Box, Typography, Chip, Avatar } from '@mui/material';
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
+import { styled } from '@mui/material/styles';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import PersonIcon from '@mui/icons-material/Person';
+import BusinessIcon from '@mui/icons-material/Business';
+import { mockProperties } from '../../_mocks/properties'; // Re-using for plausible names/locations
 
-const headCells = [
-    { id: 'id', numeric: true, disablePadding: false, label: 'ID' },
-    { id: 'username', numeric: false, disablePadding: false, label: 'Username' },
-    { id: 'email', numeric: false, disablePadding: false, label: 'Email' },
-    { id: 'date_joined', numeric: false, disablePadding: false, label: 'Date Joined' },
-    { id: 'property_count', numeric: true, disablePadding: false, label: 'Property Count' },
-    // Add is_staff, is_superuser if needed for admin view
-    { id: 'is_staff', numeric: false, disablePadding: false, label: 'Staff Status' },
-    { id: 'is_superuser', numeric: false, disablePadding: false, label: 'Superuser Status' },
-];
+const GlassContainer = styled(Box)(({ theme }) => ({
+  background: 'rgba(255, 255, 255, 0.4)',
+  backdropFilter: 'blur(12px)',
+  borderRadius: '15px',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+  padding: theme.spacing(3),
+  height: 'calc(100vh - 120px)', 
+  width: '100%',
+}));
 
-function EnhancedTableHead(props) {
-    const { order, orderBy, onRequestSort } = props;
-    const createSortHandler = (property) => (event) => {
-        onRequestSort(event, property);
+const userRoles = ['admin', 'vendedor_profesional', 'dueño_particular'];
+
+const mockUsers = mockProperties.map((prop, i) => ({
+    id: 2000 + i,
+    name: `Usuario ${i + 1}`,
+    email: `user${i+1}@skyterra.dev`,
+    avatar: `https://i.pravatar.cc/150?u=user${i+1}`,
+    role: userRoles[i % userRoles.length],
+    plan: prop.type, // Re-using property type as a stand-in for plan name
+    joinDate: prop.publicationDate,
+    propertyCount: Math.floor(Math.random() * 5),
+}));
+
+const RoleChip = ({ role }) => {
+    const roleConfig = {
+      admin: {
+        icon: <AdminPanelSettingsIcon />,
+        label: 'Administrador',
+        color: 'secondary',
+      },
+      vendedor_profesional: {
+        icon: <BusinessIcon />,
+        label: 'Vendedor Pro',
+        color: 'primary',
+      },
+      dueño_particular: {
+        icon: <PersonIcon />,
+        label: 'Dueño Particular',
+        color: 'default',
+      },
     };
+  
+    const config = roleConfig[role] || {};
+  
+    return <Chip icon={config.icon} label={config.label} color={config.color} variant="outlined" size="small" />;
+};
 
-    return (
-        <TableHead>
-            <TableRow sx={{ "& th": { color: (theme) => theme.palette.text.secondary, backgroundColor: (theme) => theme.palette.grey[100] } }}>
-                {headCells.map((headCell) => (
-                    <TableCell
-                        key={headCell.id}
-                        align={headCell.numeric ? 'right' : 'left'}
-                        padding={headCell.disablePadding ? 'none' : 'normal'}
-                        sortDirection={orderBy === headCell.id ? order : false}
-                    >
-                        <TableSortLabel
-                            active={orderBy === headCell.id}
-                            direction={orderBy === headCell.id ? order : 'asc'}
-                            onClick={createSortHandler(headCell.id)}
-                            sx={{
-                                '&.Mui-active': { color: '#E5E8F0' },
-                                '& .MuiTableSortLabel-icon': { color: '#E5E8F0 !important' },
-                            }}
-                        >
-                            {headCell.label}
-                        </TableSortLabel>
-                    </TableCell>
-                ))}
-            </TableRow>
-        </TableHead>
-    );
-}
+const columns = [
+    { 
+        field: 'name', 
+        headerName: 'Usuario', 
+        minWidth: 250,
+        flex: 1,
+        renderCell: (params) => (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Avatar src={params.row.avatar} sx={{ mr: 2 }} />
+                <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.value}</Typography>
+                    <Typography variant="caption" color="text.secondary">{params.row.email}</Typography>
+                </Box>
+            </Box>
+        )
+    },
+    {
+        field: 'role',
+        headerName: 'Rol',
+        minWidth: 180,
+        renderCell: (params) => <RoleChip role={params.value} />,
+    },
+    { field: 'plan', headerName: 'Plan Actual', minWidth: 150 },
+    { 
+        field: 'propertyCount', 
+        headerName: 'Propiedades', 
+        minWidth: 120,
+        type: 'number',
+        align: 'center',
+        headerAlign: 'center',
+    },
+    { field: 'joinDate', headerName: 'Fecha de Ingreso', minWidth: 180, type: 'date', valueGetter: (params) => new Date(params.value)},
+];
 
 
 const AdminUsersListPage = () => {
-    const [users, setUsers] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [totalUsers, setTotalUsers] = useState(0);
-    const [orderBy, setOrderBy] = useState('date_joined');
-    const [order, setOrder] = useState('desc');
-
-    const fetchUsers = useCallback(() => {
-        setLoading(true);
-        setError(null);
-        const params = {
-            page: page + 1,
-            page_size: rowsPerPage,
-            ordering: `${order === 'desc' ? '-' : ''}${orderBy}`,
-        };
-        axios.get('/api/admin/users/', {
-            params,
-            headers: { Authorization: `Token ${localStorage.getItem('auth_token')}` }
-        })
-        .then(res => {
-            setUsers(res.data.results || []);
-            setTotalUsers(res.data.count || 0);
-            setLoading(false);
-        })
-        .catch(err => {
-            console.error("Error fetching users:", err);
-            setError('Error fetching users. ' + (err.response?.data?.detail || err.message));
-            setLoading(false);
-        });
-    }, [page, rowsPerPage, order, orderBy]);
-
-    useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
-
-    const handleRequestSort = (event, property) => {
-        const isAsc = orderBy === property && order === 'asc';
-        setOrder(isAsc ? 'desc' : 'asc');
-        setOrderBy(property);
-        // Fetching will be triggered by useEffect due to orderBy/order change
-    };
-
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-        // Fetching will be triggered by useEffect due to page change
-    };
-
-    const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0); // Reset to first page
-        // Fetching will be triggered by useEffect due to rowsPerPage/page change
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('es-CL', {
-            year: 'numeric', month: 'long', day: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
-    };
-
-    return (
-        <Box sx={{ flexGrow: 1, py: 3 }}>
-            <Container maxWidth="xl">
-                <Paper
-                    elevation={1}
-                    sx={{
-                        p: 3,
-                        backgroundColor: (theme) => theme.palette.background.paper,
-                        color: (theme) => theme.palette.text.primary,
-                        borderRadius: '12px',
-                    }}
-                >
-                    <Typography variant="h4" component="h1" sx={{ fontFamily: 'Code Pro, sans-serif', fontWeight: 'bold', mb: 3, color: '#E5E8F0' }}>
-                        Manage Users
-                    </Typography>
-
-                    {loading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress color="info" /></Box>}
-                    {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
-
-                    {!loading && !error && (
-                        <TableContainer>
-                            <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle">
-                                <EnhancedTableHead
-                                    order={order}
-                                    orderBy={orderBy}
-                                    onRequestSort={handleRequestSort}
-                                />
-                                <TableBody>
-                                    {users.map((user) => (
-                                        <TableRow
-                                            hover
-                                            key={user.id}
-                                            sx={{ "& td": { color: (theme) => theme.palette.text.primary, borderColor: (theme) => theme.palette.divider } }}
-                                        >
-                                            <TableCell component="th" scope="row" sx={{ color: '#8faacc' }}>{user.id}</TableCell>
-                                            <TableCell>{user.username}</TableCell>
-                                            <TableCell>{user.email}</TableCell>
-                                            <TableCell>{formatDate(user.date_joined)}</TableCell>
-                                            <TableCell align="right">{user.property_count}</TableCell>
-                                            <TableCell>{user.is_staff ? 'Yes' : 'No'}</TableCell>
-                                            <TableCell>{user.is_superuser ? 'Yes' : 'No'}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
-                    {!loading && !error && users.length === 0 && (
-                         <Typography sx={{ textAlign: 'center', mt: 3, color: '#8faacc' }}>
-                            No users found.
-                         </Typography>
-                    )}
-
-                    <TablePagination
-                        rowsPerPageOptions={[5, 10, 25]}
-                        component="div"
-                        count={totalUsers}
-                        rowsPerPage={rowsPerPage}
-                        page={page}
-                        onPageChange={handleChangePage}
-                        onRowsPerPageChange={handleChangeRowsPerPage}
-                        sx={{ 
-                              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select, & .MuiTablePagination-selectIcon": {
-                                  color: (theme) => theme.palette.text.secondary
-                              }
-                        }}
-                    />
-                </Paper>
-            </Container>
-        </Box>
-    );
+  return (
+    <Box sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56' }}>
+            Gestión de Usuarios
+        </Typography>
+        <GlassContainer>
+            <DataGrid
+                rows={mockUsers}
+                columns={columns}
+                pageSize={10}
+                rowsPerPageOptions={[10, 25, 50]}
+                checkboxSelection
+                disableSelectionOnClick
+                components={{
+                    Toolbar: GridToolbar,
+                }}
+                sx={{
+                    border: 'none',
+                    '& .MuiDataGrid-cell': {
+                        borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                    },
+                    '& .MuiDataGrid-columnHeaders': {
+                        backgroundColor: 'rgba(0,0,0,0.05)',
+                        borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+                    },
+                    '& .MuiDataGrid-toolbarContainer': {
+                        padding: 1,
+                    }
+                }}
+            />
+        </GlassContainer>
+    </Box>
+  );
 };
 
 export default AdminUsersListPage;

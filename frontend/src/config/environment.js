@@ -251,7 +251,7 @@ const skyTerraCustomStyle = {
       filter: ["==", ["get", "type"], "country"],
       layout: {
         "text-field": ["get", "name_es"],
-        "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-font": ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           0, 10,
@@ -261,69 +261,144 @@ const skyTerraCustomStyle = {
         ],
         "text-transform": "uppercase",
         "text-letter-spacing": 0.05,
-        "text-max-width": 10
+        "text-max-width": 10,
+        "text-anchor": "center",
+        "icon-image": "dot-11",
+        "icon-size": 1,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": false
       },
       paint: {
         "text-color": "hsl(0, 0%, 95%)",
-        "text-halo-color": "hsla(0, 0%, 5%, 0.85)",
-        "text-halo-width": 1.5,
-        "text-halo-blur": 0.5
+        "text-halo-color": "hsla(210, 30%, 10%, 0.6)",
+        "text-halo-width": 1
       }
     },
-    // Ciudades principales (desde lejos)
+    // Ciudades principales (alta jerarquía)
     {
       id: "city-labels-major",
       type: "symbol",
       source: "composite",
       "source-layer": "place_label",
-      minzoom: 2, // Bajar minzoom para que aparezcan antes
+      minzoom: 4,
       filter: ["all",
         ["==", ["get", "type"], "city"],
-        ["<=", ["get", "label_rank"], 10] // Relajar filtro de label_rank
+        ["<=", ["coalesce", ["get", "rank"], ["get", "label_rank"], 999], 4]
       ],
       layout: {
-        "text-field": ["get", "name"], // Usar 'name' temporalmente para asegurar visibilidad
-        "text-font": ["Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-field": ["get", "name"],
+        "text-font": ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
-          2, 9,  // Ajustar tamaño para nuevo minzoom
-          5, 12,
-          8, 16
+          4, 14,
+          6, 20,
+          8, 26
         ],
-        "text-anchor": "center"
+        "text-anchor": "center",
+        "icon-image": "dot-11",
+        "icon-size": 1.1,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 90%)",
-        "text-halo-color": "hsla(0, 0%, 5%, 0.8)",
-        "text-halo-width": 1.2
+        "text-color": "hsl(0, 0%, 94%)",
+        "text-halo-color": "hsla(210, 30%, 10%, 0.6)",
+        "text-halo-width": 1
       }
     },
-    // Más ciudades y pueblos (al acercarse)
+    // Ciudades secundarias (mediana jerarquía)
     {
-      id: "city-labels-minor",
+      id: "city-labels-medium",
       type: "symbol",
       source: "composite",
       "source-layer": "place_label",
       minzoom: 7,
       filter: ["all",
         ["==", ["get", "type"], "city"],
-        [">", ["get", "label_rank"], 5], // Este filtro se mantiene como estaba
-        ["<=", ["get", "label_rank"], 15]
+        [">", ["coalesce", ["get", "rank"], ["get", "label_rank"], 999], 4]
       ],
       layout: {
-        "text-field": ["get", "name_es"],
-        "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-field": ["get", "name"],
+        "text-font": ["Source Code Pro Semibold", "Open Sans Semibold", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
-          7, 9,
-          12, 14
+          7, 10,
+          9, 13,
+          12, 15
         ],
-        "text-anchor": "center"
+        "text-anchor": "center",
+        "icon-image": "dot-11",
+        "icon-size": 0.9,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 85%)",
-        "text-halo-color": "hsla(0, 0%, 5%, 0.7)",
+        "text-color": "hsl(0, 0%, 88%)",
+        "text-halo-color": "hsla(210, 30%, 10%, 0.5)",
+        "text-halo-width": 0.9
+      }
+    },
+    // Pueblos / comunas
+    {
+      id: "town-labels",
+      type: "symbol",
+      source: "composite",
+      "source-layer": "place_label",
+      minzoom: 10,
+      filter: ["all",
+        ["==", ["get", "type"], "town"],
+        ["<=", ["coalesce", ["get", "rank"], ["get", "label_rank"], 999], 10]
+      ],
+      layout: {
+        "text-field": ["get", "name"],
+        "text-font": ["Source Code Pro Regular", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-size": [
+          "interpolate", ["linear"], ["zoom"],
+          10, 9,
+          12, 12,
+          14, 14
+        ],
+        "text-anchor": "center",
+        "icon-image": "dot-11",
+        "icon-size": 0.7,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": false
+      },
+      paint: {
+        "text-color": "hsl(0, 0%, 80%)",
+        "text-halo-color": "hsla(210, 30%, 10%, 0.45)",
         "text-halo-width": 1
+      }
+    },
+    // Aldeas / villas pequeñas
+    {
+      id: "village-labels",
+      type: "symbol",
+      source: "composite",
+      "source-layer": "place_label",
+      minzoom: 12,
+      filter: ["all",
+        ["==", ["get", "type"], "village"]
+      ],
+      layout: {
+        "text-field": ["get", "name"],
+        "text-font": ["Source Code Pro Regular", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-size": [
+          "interpolate", ["linear"], ["zoom"],
+          12, 8,
+          14, 10,
+          16, 12
+        ],
+        "text-anchor": "center",
+        "icon-image": "dot-11",
+        "icon-size": 0.6,
+        "icon-anchor": "bottom",
+        "icon-allow-overlap": false
+      },
+      paint: {
+        "text-color": "hsl(0, 0%, 75%)",
+        "text-halo-color": "hsla(210, 30%, 10%, 0.4)",
+        "text-halo-width": 0.8
       }
     },
     // POIs principales (aeropuertos, hospitales, universidades, parques nacionales)
@@ -332,45 +407,44 @@ const skyTerraCustomStyle = {
       type: "symbol",
       source: "composite",
       "source-layer": "poi_label",
-      minzoom: 10,
+      minzoom: 11,
       filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], true, false],
       layout: {
-        "text-field": ["get", "name_es"],
-        "text-font": ["Open Sans Semibold", "Arial Unicode MS Regular"],
-        "text-size": [
-          "interpolate", ["linear"], ["zoom"],
-          10, 10,
-          16, 16
-        ],
-        "text-anchor": "top"
+        "text-field": ["get", "name"],
+        "text-font": ["Source Code Pro Semibold", "Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 16],
+        "text-anchor": "top",
+        "icon-image": ["concat", ["get", "maki"], "-15"],
+        "icon-size": 1,
+        "icon-allow-overlap": false,
+        "text-offset": [0, 1.1]
       },
       paint: {
         "text-color": "#e0e0e0",
-        "text-halo-color": "#222",
+        "text-halo-color": "hsla(210, 30%, 10%, 0.55)",
         "text-halo-width": 1
       }
     },
-    // POIs secundarios (restaurantes, tiendas, etc.)
     {
       id: "poi-minor",
       type: "symbol",
       source: "composite",
       "source-layer": "poi_label",
-      minzoom: 13,
+      minzoom: 14,
       filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], false, true],
       layout: {
-        "text-field": ["get", "name_es"],
-        "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
-        "text-size": [
-          "interpolate", ["linear"], ["zoom"],
-          13, 9,
-          16, 13
-        ],
-        "text-anchor": "top"
+        "text-field": ["get", "name"],
+        "text-font": ["Source Code Pro Regular", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 9, 17, 13],
+        "text-anchor": "top",
+        "icon-image": ["concat", ["get", "maki"], "-11"],
+        "icon-size": 0.8,
+        "icon-allow-overlap": false,
+        "text-offset": [0, 1]
       },
       paint: {
         "text-color": "#cccccc",
-        "text-halo-color": "#222",
+        "text-halo-color": "hsla(210, 30%, 10%, 0.5)",
         "text-halo-width": 0.8
       }
     },

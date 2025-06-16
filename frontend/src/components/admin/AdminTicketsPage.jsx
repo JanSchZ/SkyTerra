@@ -1,152 +1,88 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import {
-  Box, Typography, Container, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, CircularProgress, Alert,
-  TablePagination, TableSortLabel, Chip
-} from '@mui/material';
+import React from 'react';
+import { Box, Typography, Paper, Grid, Chip, Avatar } from '@mui/material';
+import { styled } from '@mui/material/styles';
 
-const headCells = [
-  { id: 'id', label: 'ID', numeric: true },
-  { id: 'subject', label: 'Asunto', numeric: false },
-  { id: 'status', label: 'Estado', numeric: false },
-  { id: 'priority', label: 'Prioridad', numeric: false },
-  { id: 'user', label: 'Usuario', numeric: false },
-  { id: 'assigned_to', label: 'Asignado a', numeric: false },
-  { id: 'created_at', label: 'Creado', numeric: false },
+const GlassCard = styled(Paper)(({ theme }) => ({
+    background: 'rgba(255, 255, 255, 0.2)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '15px',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+    padding: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+}));
+
+const ColumnContainer = styled(Box)(({ theme }) => ({
+    padding: theme.spacing(1),
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: '10px',
+    height: '100%',
+}));
+
+const mockTickets = [
+    { id: 1, title: 'No puedo subir fotos', user: 'Usuario 1', status: 'new', priority: 'high', date: '2023-10-28' },
+    { id: 2, title: 'Error al iniciar sesión', user: 'Usuario 5', status: 'new', priority: 'high', date: '2023-10-28' },
+    { id: 3, title: '¿Cómo creo un tour 360?', user: 'Usuario 12', status: 'in_progress', priority: 'medium', date: '2023-10-27' },
+    { id: 4, title: 'Problema con la facturación', user: 'Usuario 3', status: 'in_progress', priority: 'low', date: '2023-10-26' },
+    { id: 5, title: 'El mapa no carga', user: 'Usuario 8', status: 'resolved', priority: 'medium', date: '2023-10-25' },
+    { id: 6, title: 'Sugerencia: Filtro por cercanía', user: 'Usuario 2', status: 'resolved', priority: 'low', date: '2023-10-24' },
 ];
 
-const statusColors = {
-  new: 'warning',
-  in_progress: 'info',
-  on_hold: 'secondary',
-  resolved: 'success',
-  closed: 'default'
-};
-
-function EnhancedTableHead({ order, orderBy, onRequestSort }) {
-  const createSortHandler = property => event => onRequestSort(event, property);
-  return (
-    <TableHead>
-      <TableRow sx={{ '& th': { color: (theme) => theme.palette.text.secondary, backgroundColor: (theme) => theme.palette.grey[100] } }}>
-        {headCells.map(cell => (
-          <TableCell key={cell.id} align={cell.numeric ? 'right' : 'left'}>
-            <TableSortLabel
-              active={orderBy === cell.id}
-              direction={orderBy === cell.id ? order : 'asc'}
-              onClick={createSortHandler(cell.id)}
-              sx={{ '&.Mui-active': { color: '#E5E8F0' }, '& .MuiTableSortLabel-icon': { color: '#E5E8F0 !important' } }}
-            >
-              {cell.label}
-            </TableSortLabel>
-          </TableCell>
-        ))}
-      </TableRow>
-    </TableHead>
-  );
+const TicketCard = ({ ticket }) => {
+    const priorityColors = {
+        high: 'error',
+        medium: 'warning',
+        low: 'info'
+    };
+    return (
+        <GlassCard elevation={0}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>{ticket.title}</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Avatar sx={{ width: 24, height: 24, mr: 1 }} />
+                    <Typography variant="body2">{ticket.user}</Typography>
+                </Box>
+                <Chip label={ticket.priority} color={priorityColors[ticket.priority]} size="small"/>
+            </Box>
+        </GlassCard>
+    )
 }
 
-export default function AdminTicketsPage() {
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [total, setTotal] = useState(0);
-  const [orderBy, setOrderBy] = useState('created_at');
-  const [order, setOrder] = useState('desc');
 
-  const fetchTickets = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    axios.get('/api/admin/tickets/', {
-      params: {
-        page: page + 1,
-        page_size: rowsPerPage,
-        ordering: `${order === 'desc' ? '-' : ''}${orderBy}`
-      },
-      headers: { Authorization: `Token ${localStorage.getItem('auth_token')}` }
-    })
-      .then(res => {
-        setTickets(res.data.results || []);
-        setTotal(res.data.count || 0);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching tickets:', err);
-        setError('Error fetching tickets. ' + (err.response?.data?.detail || err.message));
-        setLoading(false);
-      });
-  }, [page, rowsPerPage, orderBy, order]);
+const AdminTicketsPage = () => {
+    const columns = {
+        new: mockTickets.filter(t => t.status === 'new'),
+        in_progress: mockTickets.filter(t => t.status === 'in_progress'),
+        resolved: mockTickets.filter(t => t.status === 'resolved'),
+    };
 
-  useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
+    return (
+        <Box sx={{ p: 3 }}>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56' }}>
+                Gestión de Tickets de Soporte
+            </Typography>
+            <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                    <ColumnContainer>
+                        <Typography variant="h6" sx={{ textAlign: 'center', mb: 2 }}>Nuevos</Typography>
+                        {columns.new.map(ticket => <TicketCard key={ticket.id} ticket={ticket} />)}
+                    </ColumnContainer>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                    <ColumnContainer>
+                        <Typography variant="h6" sx={{ textAlign: 'center', mb: 2 }}>En Progreso</Typography>
+                        {columns.in_progress.map(ticket => <TicketCard key={ticket.id} ticket={ticket} />)}
+                    </ColumnContainer>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                    <ColumnContainer>
+                        <Typography variant="h6" sx={{ textAlign: 'center', mb: 2 }}>Resueltos</Typography>
+                        {columns.resolved.map(ticket => <TicketCard key={ticket.id} ticket={ticket} />)}
+                    </ColumnContainer>
+                </Grid>
+            </Grid>
+        </Box>
+    );
+};
 
-  const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
-
-  const handleChangePage = (e, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = e => {
-    setRowsPerPage(parseInt(e.target.value, 10));
-    setPage(0);
-  };
-
-  const formatDate = str => (str ? new Date(str).toLocaleString() : 'N/A');
-
-  return (
-    <Box sx={{ flexGrow: 1, py: 3 }}>
-      <Container maxWidth="xl">
-        <Paper elevation={1} sx={{ p: 3, backgroundColor: (theme) => theme.palette.background.paper, color: (theme) => theme.palette.text.primary, borderRadius: '12px' }}>
-          <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
-            Tickets de Soporte
-          </Typography>
-          {loading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress color="info" />
-            </Box>
-          )}
-          {error && <Alert severity="error" sx={{ my: 2 }}>{error}</Alert>}
-          {!loading && !error && (
-            <TableContainer>
-              <Table sx={{ minWidth: 750 }} aria-labelledby="tableTitle">
-                <EnhancedTableHead order={order} orderBy={orderBy} onRequestSort={handleRequestSort} />
-                <TableBody>
-                  {tickets.map(ticket => (
-                    <TableRow key={ticket.id} hover sx={{ '& td': { color: (theme) => theme.palette.text.primary, borderColor: (theme) => theme.palette.divider } }}>
-                      <TableCell sx={{ color: '#8faacc' }}>{ticket.id}</TableCell>
-                      <TableCell>{ticket.subject}</TableCell>
-                      <TableCell>
-                        <Chip label={ticket.status} color={statusColors[ticket.status] || 'default'} size="small" />
-                      </TableCell>
-                      <TableCell>{ticket.priority}</TableCell>
-                      <TableCell>{ticket.user}</TableCell>
-                      <TableCell>{ticket.assigned_to || '—'}</TableCell>
-                      <TableCell>{formatDate(ticket.created_at)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-          {!loading && !error && tickets.length === 0 && (
-            <Typography sx={{ mt: 3, textAlign: 'center', color: '#8faacc' }}>No tickets found.</Typography>
-          )}
-          <TablePagination
-            component="div"
-            count={total}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25]}
-            sx={{ '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows, & .MuiTablePagination-select, & .MuiTablePagination-selectIcon': { color: (theme) => theme.palette.text.secondary } }}
-          />
-        </Paper>
-      </Container>
-    </Box>
-  );
-} 
+export default AdminTicketsPage; 

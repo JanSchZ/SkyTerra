@@ -16,6 +16,7 @@ import config from '../../config/environment';
 import { motion } from 'framer-motion';
 import PropertyPreviewModal from '../property/PropertyPreviewModal';
 import CloseIcon from '@mui/icons-material/Close';
+import PropertySidePreview from '../property/PropertySidePreview';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => {
@@ -95,6 +96,21 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewPropertyId, setPreviewPropertyId] = useState(null);
   const [tourCache, setTourCache] = useState({}); // propertyId -> tourUrl
+
+  // Side preview panel state
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [sidePanelProperty, setSidePanelProperty] = useState(null);
+
+  // Helper setters to keep React state and refs in sync (needed for tour overlay)
+  const setActiveTourUrl = (url) => {
+    activeTourUrlRef.current = url;
+    _setActiveTourUrl(url);
+  };
+
+  const setActiveTourPropertyId = (id) => {
+    activeTourPropertyIdRef.current = id;
+    _setActiveTourPropertyId(id);
+  };
 
   // Detectar tipo de conexión del usuario
   useEffect(() => {
@@ -388,40 +404,81 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   };
 
   const handleMarkerClick = async (property) => {
+    // Si el usuario no está autenticado, mantenemos la lógica existente de modal rápido
     if (!localStorage.getItem('auth_token')) {
       setPreviewPropertyId(property.id);
       setPreviewModalOpen(true);
     }
-    if (!mapRef.current || navigatingToTour) return;
-    setNavigatingToTour(true);
+
+    // Abrir panel lateral con información de la propiedad
     setSelectedProperty(property.id);
+    setSidePanelProperty(property);
+    setSidePanelOpen(true);
 
-    const targetLongitude = property.longitude || -70.6693;
-    const targetLatitude = property.latitude || -33.4489;
-
-    // Intentar abrir el tour en cuanto tengamos URL y antes de que el usuario llegue al zoom objetivo
-    const maybeOpenTour = async () => {
-      let url = tourCache[property.id];
-      if (!url) {
-        try {
-          const tours = await tourService.getPropertyTours(property.id);
-          if (tours && tours.length > 0) {
-            url = tours[0].url;
-            if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
-            if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
-            setTourCache(prev => ({ ...prev, [property.id]: url }));
-          }
-        } catch (err) { console.error('prefetch click:', err); }
+    // Prefetch del tour para mostrar preview
+    if (!tourPreviews[property.id]) {
+      try {
+        const tours = await tourService.getPropertyTours(property.id);
+        if (tours && tours.length > 0) {
+          let url = tours[0].url;
+          if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+          if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+          setTourPreviews(prev => ({ ...prev, [property.id]: url }));
+          setTourCache(prev => ({ ...prev, [property.id]: url }));
+        }
+      } catch (err) {
+        console.error('Error prefetching tour for side panel:', err);
       }
+    }
+  };
+
+  // Ejecuta animación de zoom y abre tour virtual
+  const handleGoToTour = async () => {
+    if (!sidePanelProperty || !mapRef.current) return;
+
+    const property = sidePanelProperty;
+    let url = tourCache[property.id] || tourPreviews[property.id];
+
+    // Si aún no tenemos la URL, intenta obtenerla del backend
+    if (!url) {
+      try {
+        const tours = await tourService.getPropertyTours(property.id);
+        if (tours && tours.length > 0) {
+          url = tours[0].url;
+          if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+          if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+          setTourCache(prev => ({ ...prev, [property.id]: url }));
+        }
+      } catch (err) {
+        console.error('Error fetching tour on Go:', err);
+      }
+    }
+
+    setSidePanelOpen(false);
+    setNavigatingToTour(true);
+
+    const map = mapRef.current.getMap();
+    const lat = parseFloat(property.latitude);
+    const lon = parseFloat(property.longitude);
+    if (map && !isNaN(lat) && !isNaN(lon)) {
+      map.flyTo({
+        center: [lon, lat],
+        zoom: 16,
+        pitch: 0,
+        bearing: 0,
+        duration: 2500,
+        essential: true,
+      });
+    }
+
+    // Tras terminar la animación, abrir el tour
+    setTimeout(() => {
       if (url) {
-        // abrir tras un pequeño delay para que el vuelo avance y se sienta fluido
-        setTimeout(() => { setActiveTourUrl(url); setActiveTourPropertyId(property.id); }, 1200);
+        setActiveTourUrl(url);
+        setActiveTourPropertyId(property.id);
       }
-    };
-
-    maybeOpenTour();
-
-    setTimeout(() => setNavigatingToTour(false), 3800);
+      setNavigatingToTour(false);
+    }, 2600);
   };
 
   const handleMarkerHover = (property) => {
@@ -1317,7 +1374,6 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   fontWeight: 700,
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                   color: 'rgba(255, 255, 255, 0.95)',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.4)',
                   mb: 2,
                   letterSpacing: '-0.02em'
                 }}
@@ -1332,7 +1388,6 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   fontWeight: 300,
                   fontSize: { xs: '1.1rem', md: '1.4rem' },
                   color: 'rgba(255, 255, 255, 0.85)',
-                  textShadow: '0 1px 6px rgba(0,0,0,0.35)',
                   mb: 1,
                   letterSpacing: '-0.01em'
                 }}
@@ -1347,7 +1402,6 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                   fontWeight: 300,
                   fontSize: { xs: '0.95rem', md: '1.1rem' },
                   color: 'rgba(255, 255, 255, 0.75)',
-                  textShadow: '0 1px 4px rgba(0,0,0,0.3)',
                   lineHeight: 1.6,
                   maxWidth: '400px',
                   mx: 'auto'
@@ -1431,6 +1485,16 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           </Fab>
         </Box>
       )}
+
+      {/* Panel lateral de preview */}
+      <PropertySidePreview
+        open={sidePanelOpen}
+        property={sidePanelProperty}
+        previewUrl={sidePanelProperty ? tourPreviews[sidePanelProperty.id] : null}
+        onClose={() => setSidePanelOpen(false)}
+        onGo={handleGoToTour}
+        getPriceDisplay={getPriceDisplay}
+      />
     </Box>
   );
 });
