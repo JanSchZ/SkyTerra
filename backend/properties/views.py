@@ -348,19 +348,22 @@ class TourViewSet(viewsets.ModelViewSet):
             
             os.remove(package_path)
 
-            # Buscar primer archivo .html o .htm dentro del paquete para usarlo como entrada
-            html_entry = None
+            # Buscar todos los archivos .html o .htm y elegir el que esté más cerca de la raíz
+            html_files = []
             for root_dir, _dirs, files in os.walk(tour_dir):
                 for fname in files:
                     if fname.lower().endswith(('.html', '.htm')):
                         rel_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir)
-                        html_entry = rel_path.replace('\\', '/')  # Normalizar separadores
-                        break
-                if html_entry:
-                    break
+                        rel_path_posix = rel_path.replace('\\', '/')  # Normalizar separadores
+                        # Guardar también la "profundidad" para priorizar los más cercanos a la raíz
+                        depth = rel_path_posix.count('/')
+                        html_files.append((depth, rel_path_posix))
 
-            if not html_entry:
-                raise serializers.ValidationError("No se encontró ningún archivo HTML dentro del paquete para usar como entrada.")
+            if not html_files:
+                raise serializers.ValidationError("No se encontró ningún archivo HTML dentro del paquete para usarlo como entrada.")
+
+            # Elegir el archivo con menor profundidad (más cercano a la raíz). En caso de empate, el primero.
+            html_entry = sorted(html_files, key=lambda t: t[0])[0][1]
 
             tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/{html_entry}"
             

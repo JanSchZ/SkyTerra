@@ -94,7 +94,11 @@ function PropertyManagementPage() {
         const labelMap = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada' };
         return <Chip label={labelMap[value] || value} color={colorMap[value] || 'default'} size="small" />;
       } },
-    { field: 'price', headerName: 'Precio', width: 120, valueFormatter: ({ value }) => `US$ ${Number(value).toLocaleString()}` },
+    { field: 'price', headerName: 'Precio', width: 140, valueFormatter: ({ value }) => {
+        if (value === null || value === undefined || value === '' || isNaN(Number(value))) return '—';
+        const num = Number(value);
+        return `US$ ${num.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+      } },
     { field: 'size', headerName: 'Tamaño (ha)', width: 120 },
     {
       field: 'actions',

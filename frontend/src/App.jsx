@@ -36,7 +36,7 @@ import LandingV2 from './components/ui/LandingV2';
 import CreatePublicationWizard from './components/property/CreatePublicationWizard';
 import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage.jsx';
 import CompareView from './components/property/CompareView';
-import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage.jsx';
+import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
 import SavedSearchesPage from './components/ui/SavedSearchesPage';
 import AdminLayout from './components/admin/AdminLayout.jsx';
 import AdminDashboardPage from './components/admin/AdminDashboardPage.jsx';
@@ -437,7 +437,7 @@ function App() {
       <Route path="/admin" element={<StaffRoute user={finalUser} element={<AdminLayout />} />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
-        <Route path="properties" element={<AdminDetailedPropertiesPage />} />
+        <Route path="properties" element={<PropertyApprovalPage />} />
         <Route path="tickets" element={<AdminTicketsPage />} />
         <Route path="documents" element={<AdminDocumentsReviewPage />} />
         <Route path="users" element={<AdminUsersListPage />} />
@@ -585,7 +585,13 @@ function App() {
                         <Typography variant="caption">{user.groups[0]}</Typography>
                       </MenuItem>
                     )}
-                    <MenuItem onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>Dashboard</MenuItem>
+                    <MenuItem onClick={() => { 
+                      const dest = user?.is_staff ? '/admin/dashboard' : '/dashboard';
+                      navigate(dest);
+                      closeUserMenu();
+                    }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>
+                      Dashboard
+                    </MenuItem>
                     <MenuItem onClick={() => { navigate('/wizard-create'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
                     <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
                     <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
