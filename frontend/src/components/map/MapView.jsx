@@ -141,8 +141,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   const descriptiveTexts = [
     {
       title: "SkyTerra",
-      subtitle: "Descubre propiedades únicas desde el cielo",
-      description: "Explora terrenos y propiedades con vistas aéreas cinematográficas"
+      subtitle: "Propiedades elevadas a otra perspectiva",
+      description: "Compra y vende terrenos con tours aéreos inmersivos impulsados por IA"
     },
     {
       title: "Tecnología Inmersiva",
@@ -1349,7 +1349,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.05)',
-            backdropFilter: 'blur(6px)',
+            backdropFilter: 'none',
+            WebkitBackdropFilter: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

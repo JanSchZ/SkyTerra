@@ -103,12 +103,96 @@ class Command(BaseCommand):
                 'description': 'Pequeño viñedo en producción en el corazón del Valle de Colchagua. Incluye cepas de Carmenere y Cabernet Sauvignon, con una pequeña bodega equipada. Ideal para un proyecto enoturístico.',
                 'publication_status': 'approved', 'has_water': True, 'has_views': True
             },
-             {
+            {
                 'owner_username': 'vp_start_1', 'name': 'Loteo Campestre en Paine', 'type': 'ranch',
                 'price': decimal.Decimal('55000000'), 'size': 0.5, 'latitude': -33.8083, 'longitude': -70.7417,
                 'description': 'Parcela de agrado de 5000 m² en un consolidado loteo en la comuna de Paine. A solo 45 minutos de Santiago, ideal para construir tu residencia principal o de fin de semana.',
                 'publication_status': 'approved', 'has_water': False, 'has_views': False
-            }
+            },
+            {
+                'owner_username': 'dp_basico_1', 'name': 'Terreno Urbano en Las Condes', 'type': 'urban', 
+                'price': decimal.Decimal('280000000'), 'size': 0.05, 'latitude': -33.4075, 'longitude': -70.5794,
+                'description': 'Pequeño terreno en exclusiva zona residencial de Las Condes, Santiago. Ideal para construir una casa moderna o un proyecto de departamentos de baja altura. Acceso a todos los servicios y cercano a parques y colegios.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': False
+            },
+            {
+                'owner_username': 'dp_avanzado_1', 'name': 'Casa con Vista al Mar, Valparaíso', 'type': 'coastal', 
+                'price': decimal.Decimal('180000000'), 'size': 0.02, 'latitude': -33.0458, 'longitude': -71.6190,
+                'description': 'Encantadora casa en cerro Alegre, Valparaíso, con inmejorable vista al océano Pacífico. Conserva la arquitectura tradicional porteña y ofrece un ambiente bohemio. Ideal para inversión turística o residencia.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'vp_growth_1', 'name': 'Sitio Industrial, San Bernardo', 'type': 'industrial', 
+                'price': decimal.Decimal('500000000'), 'size': 1.5, 'latitude': -33.5936, 'longitude': -70.7042,
+                'description': 'Amplio sitio de uso industrial en consolidado sector de San Bernardo, con excelente conectividad a autopistas. Apto para bodegas, centros de distribución o fábricas. Cuenta con empalme eléctrico trifásico.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': False
+            },
+            {
+                'owner_username': 'vp_enterprise_1', 'name': 'Isla Privada en la Patagonia', 'type': 'island', 
+                'price': decimal.Decimal('1200000000'), 'size': 10.0, 'latitude': -45.0000, 'longitude': -73.0000,
+                'description': 'Oportunidad única: isla virgen de 10 hectáreas en el corazón de la Patagonia chilena. Ideal para desarrollo turístico exclusivo, proyecto de conservación o refugio privado. Acceso por vía marítima o aérea.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'dp_pro_1', 'name': 'Cabaña Rústica en Pucón', 'type': 'forest', 
+                'price': decimal.Decimal('95000000'), 'size': 0.3, 'latitude': -39.2700, 'longitude': -71.9500,
+                'description': 'Acogedora cabaña de madera en parcela con bosque nativo, a pocos kilómetros de Pucón. Entorno tranquilo y natural, ideal para disfrutar de la tranquilidad del sur de Chile. Cercana a termas y centros de esquí.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'dp_basico_2', 'name': 'Parcela en Valle del Elqui', 'type': 'farm', 
+                'price': decimal.Decimal('70000000'), 'size': 1.0, 'latitude': -30.0000, 'longitude': -70.5000,
+                'description': 'Parcela de agrado en el místico Valle del Elqui, ideal para descanso o proyecto turístico. Cielos despejados para observación astronómica y clima cálido. Cuenta con noria de agua.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'dp_basico_1', 'name': 'Sitio Céntrico en Temuco', 'type': 'urban', 
+                'price': decimal.Decimal('150000000'), 'size': 0.03, 'latitude': -38.7359, 'longitude': -72.5904,
+                'description': 'Terreno en pleno centro de Temuco, ideal para desarrollo comercial o habitacional. Alta plusvalía y conectividad. Cercano a servicios, comercio y transporte público.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': False
+            },
+            {
+                'owner_username': 'dp_avanzado_1', 'name': 'Terreno frente al Mar, La Serena', 'type': 'coastal', 
+                'price': decimal.Decimal('300000000'), 'size': 0.1, 'latitude': -29.9140, 'longitude': -71.2619,
+                'description': 'Parcela con acceso directo a la playa en exclusiva zona de La Serena. Ideal para construir una residencia de lujo con vistas ininterrumpidas al Pacífico. Excelente inversión.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'vp_start_1', 'name': 'Campo Ganadero, Coyhaique', 'type': 'ranch', 
+                'price': decimal.Decimal('600000000'), 'size': 100.0, 'latitude': -45.5700, 'longitude': -72.0700,
+                'description': 'Extenso campo de 100 hectáreas apto para ganadería en la Región de Aysén. Con praderas naturales y abundante agua. Oportunidad para proyecto agropecuario o turístico rural.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': False
+            },
+            {
+                'owner_username': 'vp_growth_1', 'name': 'Parcela con Estero, Puerto Varas', 'type': 'forest', 
+                'price': decimal.Decimal('110000000'), 'size': 0.8, 'latitude': -41.3200, 'longitude': -72.9800,
+                'description': 'Hermosa parcela con orilla de estero en un entorno boscoso cerca de Puerto Varas. Ideal para construir una cabaña de ensueño en el sur de Chile. Acceso controlado y urbanización básica.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'vp_enterprise_1', 'name': 'Predio Agrícola, San Fernando', 'type': 'farm', 
+                'price': decimal.Decimal('220000000'), 'size': 8.0, 'latitude': -34.3800, 'longitude': -71.0000,
+                'description': 'Campo agrícola de 8 hectáreas con derechos de agua en San Fernando, Región de O'Higgins. Tierra fértil apta para frutales o cultivos tradicionales. Excelente ubicación y conectividad.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': False
+            },
+            {
+                'owner_username': 'dp_pro_1', 'name': 'Terreno con Laguna Propia, Curacautín', 'type': 'lake', 
+                'price': decimal.Decimal('400000000'), 'size': 4.0, 'latitude': -38.4500, 'longitude': -71.8800,
+                'description': 'Espectacular terreno de 4 hectáreas con una laguna privada, rodeado de bosque nativo en Curacautín. Ideal para proyecto turístico o residencia exclusiva. Vistas impresionantes a volcanes.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'dp_basico_2', 'name': 'Parcela Ecológica, Pichilemu', 'type': 'coastal', 
+                'price': decimal.Decimal('90000000'), 'size': 0.7, 'latitude': -34.4000, 'longitude': -72.0000,
+                'description': 'Parcela ideal para proyecto ecológico o de surf en Pichilemu. Cerca de las mejores playas y olas de la zona central. Con factibilidad de agua y luz.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
+            {
+                'owner_username': 'vp_start_1', 'name': 'Fundo con Vistas al Volcán, Lican Ray', 'type': 'ranch', 
+                'price': decimal.Decimal('380000000'), 'size': 30.0, 'latitude': -39.6000, 'longitude': -72.1000,
+                'description': 'Gran fundo con 30 hectáreas de praderas y bosque, con vistas privilegiadas al volcán Villarrica. Ideal para desarrollo turístico, ganadería o proyecto de vida autosustentable.',
+                'publication_status': 'approved', 'has_water': True, 'has_views': True
+            },
         ]
 
         for prop_data in properties_to_create:

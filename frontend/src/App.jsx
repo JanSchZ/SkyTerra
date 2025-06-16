@@ -514,8 +514,8 @@ function App() {
                     onMouseLeave={handleAvatarMouseLeave}
                     sx={(theme) => ({
                       backgroundColor: 'rgba(255,255,255,0.18)',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
+                      backdropFilter: 'blur(18px)',
+                      WebkitBackdropFilter: 'blur(18px)',
                       border: '1px solid rgba(255,255,255,0.25)',
                       color: theme.palette.common.white,
                       boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
@@ -564,8 +564,9 @@ function App() {
                         WebkitBackdropFilter: 'blur(18px)',
                         border: '1px solid rgba(255, 255, 255, 0.25)',
                         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                        color: 'white',
                         '& .MuiMenuItem-root': {
-                          color: 'text.primary',
+                          color: 'white',
                           borderBottom: '1px solid rgba(255,255,255,0.08)',
                           '&:last-child': {
                             borderBottom: 'none',
@@ -584,11 +585,11 @@ function App() {
                         <Typography variant="caption">{user.groups[0]}</Typography>
                       </MenuItem>
                     )}
-                    <MenuItem onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, pt: user ? 1.5 : 0.5 })}>Dashboard</MenuItem>
-                    <MenuItem onClick={() => { navigate('/wizard-create'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary })}>Crear Propiedad</MenuItem>
-                    <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }}>Búsquedas Guardadas</MenuItem>
-                    <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }}>Planes</MenuItem>
-                    <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 })}>Logout</MenuItem>
+                    <MenuItem onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>Dashboard</MenuItem>
+                    <MenuItem onClick={() => { navigate('/wizard-create'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
+                    <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
+                    <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
+                    <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
                   </Menu>
                 </>
               ) : (

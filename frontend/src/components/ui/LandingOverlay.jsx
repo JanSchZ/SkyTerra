@@ -18,7 +18,7 @@ const LandingOverlay = () => {
         justifyContent: 'center',
         pointerEvents: 'auto',
         background: 'rgba(13,17,23,0.75)',
-        backdropFilter: 'blur(4px)',
+        backdropFilter: 'none',
       }}
     >
       <Paper elevation={6} sx={{
