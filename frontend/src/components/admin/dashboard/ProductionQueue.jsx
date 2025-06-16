@@ -26,18 +26,18 @@ const ProductionQueue = () => {
     return (
         <GlassCard>
             <CardContent>
-                <Typography variant="h6" gutterBottom>Cola de Producción y Marketing</Typography>
+                <Typography variant="h6" gutterBottom sx={{color: 'text.primary', fontWeight:'bold'}}>Cola de Producción y Marketing</Typography>
                 <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Producciones Pendientes</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'text.primary' }} gutterBottom>Producciones Pendientes</Typography>
                     <List dense>
                         {Object.entries(productionData).map(([plan, properties]) => (
                             <React.Fragment key={plan}>
                                 <ListItem>
-                                    <ListItemText primary={<Typography sx={{ fontWeight: 'bold' }}>{plan}</Typography>} />
+                                    <ListItemText primary={<Typography sx={{ fontWeight: 'bold', color: 'text.primary' }}>{plan}</Typography>} />
                                 </ListItem>
                                 {properties.map(prop => (
                                     <ListItem key={prop} sx={{ pl: 4 }}>
-                                        <ListItemText primary={prop} />
+                                        <ListItemText primary={prop} primaryTypographyProps={{color:'text.primary'}} />
                                     </ListItem>
                                 ))}
                             </React.Fragment>
@@ -46,11 +46,11 @@ const ProductionQueue = () => {
                 </Box>
                 <Divider sx={{ my: 2 }} />
                 <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }} gutterBottom>Compromisos de Marketing</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'text.primary' }} gutterBottom>Compromisos de Marketing</Typography>
                     <List dense>
                         {marketingData.map((item, index) => (
                              <ListItem key={index}>
-                                <ListItemText primary={item.task} secondary={item.property} />
+                                <ListItemText primary={item.task} secondary={item.property} primaryTypographyProps={{color:'text.primary'}} secondaryTypographyProps={{color:'text.secondary'}} />
                              </ListItem>
                         ))}
                     </List>

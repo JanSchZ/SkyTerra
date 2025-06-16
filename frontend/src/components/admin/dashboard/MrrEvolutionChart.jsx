@@ -90,7 +90,7 @@ const MrrEvolutionChart = () => {
     return (
         <GlassCard>
             <CardContent>
-                <Typography variant="h6" gutterBottom>Evolución del MRR</Typography>
+                <Typography variant="h6" gutterBottom sx={{color:'text.primary', fontWeight:'bold'}}>Evolución del MRR</Typography>
                 <Line options={options} data={data} />
             </CardContent>
         </GlassCard>

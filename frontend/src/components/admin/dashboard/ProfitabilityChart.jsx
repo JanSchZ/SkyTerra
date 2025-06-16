@@ -89,7 +89,7 @@ const ProfitabilityChart = () => {
     return (
         <GlassCard>
             <CardContent>
-                <Typography variant="h6" gutterBottom>Salud de Rentabilidad (LTV vs. CAC)</Typography>
+                <Typography variant="h6" gutterBottom sx={{color:'text.primary', fontWeight:'bold'}}>Salud de Rentabilidad (LTV vs. CAC)</Typography>
                 <Bar options={options} data={data} />
             </CardContent>
         </GlassCard>

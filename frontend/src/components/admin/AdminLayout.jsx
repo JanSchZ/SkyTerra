@@ -6,7 +6,6 @@ import BusinessIcon from '@mui/icons-material/Business';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
-import DescriptionIcon from '@mui/icons-material/Description';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
@@ -41,7 +40,7 @@ const AdminLayout = () => {
     };
 
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8f9fb' }}>
             <Box
                 component="nav"
                 sx={{
@@ -66,17 +65,18 @@ const AdminLayout = () => {
                                 end={item.path.endsWith('/dashboard')}
                                 sx={{
                                     mb: 1,
-                                    mx: 2,
+                                    mx: isCollapsed ? 0 : 2,
                                     borderRadius: 2,
                                     width: 'auto',
-                                    color: theme.palette.text.secondary,
+                                    color: theme.palette.text.primary,
+                                    justifyContent: isCollapsed ? 'center' : 'flex-start',
                                     '&:hover': {
                                         backgroundColor: theme.palette.action.hover,
                                     },
                                     '&.active': activeLinkStyle,
                                 }}
                             >
-                                <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>{item.icon}</ListItemIcon>
+                                <ListItemIcon sx={{ minWidth: 40, color: 'inherit', justifyContent: 'center' }}>{item.icon}</ListItemIcon>
                                 {!isCollapsed && <ListItemText primary={item.text} />}
                             </ListItem>
                         </Tooltip>
@@ -102,7 +102,7 @@ const AdminLayout = () => {
                 sx={{
                     flexGrow: 1,
                     width: `calc(100% - ${isCollapsed ? collapsedDrawerWidth : drawerWidth}px)`,
-                    backgroundColor: theme.palette.background.default, // Use theme background
+                    backgroundColor: '#f8f9fb',
                 }}
             >
                 <Outlet />

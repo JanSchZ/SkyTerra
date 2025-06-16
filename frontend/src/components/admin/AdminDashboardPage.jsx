@@ -5,6 +5,7 @@ import ProductionQueue from './dashboard/ProductionQueue';
 import MrrBreakdownChart from './dashboard/MrrBreakdownChart';
 import ProfitabilityChart from './dashboard/ProfitabilityChart';
 import MrrEvolutionChart from './dashboard/MrrEvolutionChart';
+import PlanDistributionChart from './dashboard/PlanDistributionChart';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import LeaderboardIcon from '@mui/icons-material/Leaderboard';
@@ -49,29 +50,38 @@ const AdminDashboardPage = () => {
                 Dashboard del Administrador
           </Typography>
             <Grid container spacing={3}>
-                {/* Franja 1: KPIs de Negocio (SaaS) */}
-                {kpiData.map((kpi, index) => (
-                    <Grid item xs={12} sm={6} md={3} key={index}>
-                        <SaaSKpiCard kpi={kpi} />
-                    </Grid>
-                ))}
+                {/* First Row */}
+                <Grid item xs={12} md={4}>
+                    <SaaSKpiCard kpi={kpiData[0]} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                    <SaaSKpiCard kpi={kpiData[1]} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                    <SaaSKpiCard kpi={kpiData[2]} />
+                </Grid>
 
-                {/* Franja 2: Operaciones y Finanzas */}
-                <Grid item xs={12} md={8}>
+                {/* Second Row */}
+                <Grid item xs={12} lg={8}>
+                    <MrrEvolutionChart />
+                </Grid>
+                <Grid item xs={12} lg={4}>
+                    <PlanDistributionChart />
+                </Grid>
+
+                {/* Third Row */}
+                <Grid item xs={12} lg={4}>
+                    <MrrBreakdownChart />
+                </Grid>
+                <Grid item xs={12} lg={8}>
+                    <ProfitabilityChart />
+                </Grid>
+
+                {/* Fourth row */}
+                <Grid item xs={12}>
                     <ProductionQueue />
                 </Grid>
-              <Grid item xs={12} md={4}>
-                    <MrrBreakdownChart />
-              </Grid>
-
-                {/* Franja 3: Análisis de Rentabilidad y Crecimiento */}
-                <Grid item xs={12} md={6}>
-                    <ProfitabilityChart />
-              </Grid>
-                <Grid item xs={12} md={6}>
-                    <MrrEvolutionChart />
-              </Grid>
-          </Grid>
+            </Grid>
     </Box>
   );
 };

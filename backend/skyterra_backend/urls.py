@@ -28,7 +28,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView  # Import stats view
+from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView, AdminPlanMetricsView  # Import stats view
 from rest_framework import routers
 from support_tickets.views import TicketViewSet, TicketResponseViewSet
 
@@ -68,6 +68,7 @@ def login_view(request):
 
     if user and user.is_active:
         token, created = Token.objects.get_or_create(user=user)
+        groups = list(user.groups.values_list('name', flat=True))
         print(f"Token created: {created}, token: {token.key[:10]}...")  # Debug
         return Response({
             'token': token.key,
@@ -78,7 +79,8 @@ def login_view(request):
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser
+                'is_superuser': user.is_superuser,
+                'groups': groups,
             }
         })
     else:
@@ -150,6 +152,7 @@ def register_view(request):
         print(f"✅ [REGISTER] Usuario creado en base de datos: ID={user.id}, is_staff={user.is_staff}, is_superuser={user.is_superuser}")
 
         token, created = Token.objects.get_or_create(user=user)
+        groups = list(user.groups.values_list('name', flat=True))
         
         print(f"✅ [REGISTER] Usuario creado exitosamente: ID={user.id}, Token={'creado' if created else 'existente'}")
         
@@ -162,7 +165,8 @@ def register_view(request):
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser
+                'is_superuser': user.is_superuser,
+                'groups': groups,
             }
         }, status=status.HTTP_201_CREATED)
     except Exception as e:
@@ -197,6 +201,7 @@ urlpatterns = [
     path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
     path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('api/admin/dashboard/stats/', AdminDashboardStatsView.as_view(), name='admin-dashboard-stats'),
+    path('api/admin/dashboard/plan-metrics/', AdminPlanMetricsView.as_view(), name='admin-dashboard-plan-metrics'),
     path('api/', include('properties.urls')),
     path('api/', include(router.urls)),
 ]

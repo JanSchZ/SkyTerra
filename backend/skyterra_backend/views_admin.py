@@ -8,8 +8,9 @@ from properties.models import Property
 from support_tickets.models import Ticket
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import Avg
+from django.db.models import Avg, Count, Sum
 from .serializers import UserSerializer # Import the new serializer
+from django.contrib.auth.models import Group
 
 User = get_user_model()
 
@@ -77,4 +78,28 @@ class AdminDashboardStatsView(APIView):
             "pending_properties": pending,
             "approved_properties": approved,
             "rejected_properties": rejected,
+        })
+
+class AdminPlanMetricsView(APIView):
+    """
+    Provides metrics related to user subscription plans for the admin dashboard.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Returns the distribution of users across different subscription plans.
+        """
+        plan_distribution = Group.objects.annotate(
+            user_count=Count('user')
+        ).values(
+            'name', 
+            'user_count'
+        ).order_by('-user_count')
+
+        # Opcional: filtrar solo grupos que representen planes si hay otros tipos de grupos
+        # plan_distribution = plan_distribution.filter(name__contains='-')
+
+        return Response({
+            'plan_distribution': list(plan_distribution)
         })

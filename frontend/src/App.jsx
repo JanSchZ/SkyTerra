@@ -44,12 +44,15 @@ import AdminTicketsPage from './components/admin/AdminTicketsPage.jsx';
 import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
+import PricingPage from './components/pricing/PricingPage.jsx';
 import './App.css';
 
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
   mode: 'light',
 });
+
+export const AuthContext = React.createContext(null);
 
 const AppWrapper = () => {
   const [mode, setMode] = React.useState('light');
@@ -76,14 +79,14 @@ const AppWrapper = () => {
 };
 
 const ProtectedRoute = ({ user, element }) => {
-  if (!user) {
+  if (!user?.id) {
     return <Navigate to="/login" replace />;
   }
   return element;
 };
 
 const StaffRoute = ({ user, element }) => {
-  if (!user || !user.is_staff) {
+  if (!user?.is_staff) {
     return <Navigate to="/" replace />;
   }
   return element;
@@ -112,12 +115,20 @@ function App() {
   const hoverTimeoutRef = useRef(null);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      // No mostramos snackbar aquí para evitarlo en cada carga si ya está logueado
-    }
-    setLoadingAuth(false);
+    const loadUser = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error("Failed to load user from local storage:", error);
+        setUser(null); // Ensure user is null on error
+      } finally {
+        setLoadingAuth(false);
+      }
+    };
+    loadUser();
   }, []);
   
   const handleAISearch = (aiGeneratedFilters) => {
@@ -154,7 +165,7 @@ function App() {
         center: locationData.center,
         zoom: locationData.zoom || 12,
         pitch: locationData.pitch || 60,
-        bearing: locationData.bearing || 0,
+        bearing: 0,
         duration: 4500,
         essential: true,
       });
@@ -198,7 +209,7 @@ function App() {
       setSnackbarOpen(true);
 
       // Check if the logged-in user is staff/admin
-      if (userData.user && userData.user.is_staff) {
+      if (userData?.user?.is_staff) {
         navigate('/admin'); // Redirect admins to the new Admin dashboard
       } else {
         navigate('/'); // Redirect regular users to the home page
@@ -330,14 +341,8 @@ function App() {
 
   // Determine if the top bar should be shown
   const showTopBar = 
-    !location.pathname.startsWith('/property/') &&
-    !location.pathname.startsWith('/tour/') &&
-    !location.pathname.startsWith('/dashboard') &&
-    !location.pathname.startsWith('/admin') &&
-    location.pathname !== '/login' &&
-    location.pathname !== '/register' &&
-    location.pathname !== '/create-property' &&
-    !location.pathname.startsWith('/edit-property/');
+    location.pathname === '/' || 
+    location.pathname.startsWith('/property/');
 
   // Helper function to format ranges (price, size)
   const formatRange = (range, unit = '', prefix = '') => {
@@ -404,6 +409,42 @@ function App() {
       </Paper>
     );
   };
+
+  // Ensure finalUser is safely determined
+  const finalUser = user?.user || user; // Safely access user.user or use user directly
+
+  const mainContent = (
+    <Routes>
+      <Route 
+        path="/" 
+        element={
+          <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} />
+          </motion.div>
+        } 
+      />
+      <Route path="/login" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
+      <Route path="/register" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} initialForm="register" />} />
+      <Route path="/property/:id" element={<PropertyDetails user={finalUser} />} />
+      <Route path="/tour/:tourId" element={<TourViewer />} />
+      <Route path="/compare" element={<ProtectedRoute user={finalUser} element={<CompareView user={finalUser} />} />} />
+      <Route path="/new-publication" element={<ProtectedRoute user={finalUser} element={<CreatePublicationWizard user={finalUser} />} />} />
+      <Route path="/my-searches" element={<ProtectedRoute user={finalUser} element={<SavedSearchesPage />} />} />
+      <Route path="/dashboard" element={<ProtectedRoute user={finalUser} element={<SellerDashboardPage user={finalUser} />} />} />
+      <Route path="/pricing" element={<ProtectedRoute user={finalUser} element={<PricingPage />} />} />
+
+      {/* Admin Routes */}
+      <Route path="/admin" element={<StaffRoute user={finalUser} element={<AdminLayout />} />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboardPage />} />
+        <Route path="properties" element={<AdminDetailedPropertiesPage />} />
+        <Route path="tickets" element={<AdminTicketsPage />} />
+        <Route path="documents" element={<AdminDocumentsReviewPage />} />
+        <Route path="users" element={<AdminUsersListPage />} />
+        <Route path="settings" element={<AdminSettingsPage />} />
+      </Route>
+    </Routes>
+  );
 
   return (
     <>
@@ -508,6 +549,7 @@ function App() {
                     <AccountCircleIcon />
                   </IconButton>
                   <Menu
+                    id="user-menu"
                     anchorEl={userMenuAnchorEl}
                     open={Boolean(userMenuAnchorEl)}
                     onClose={closeUserMenu}
@@ -515,55 +557,38 @@ function App() {
                     onMouseLeave={handleMenuMouseLeave}
                     TransitionComponent={Grow}
                     PaperProps={{
-                      className: 'no-shine',
                       sx: {
-                        mt: 1.5,
-                        minWidth: 220,
-                        width: '260px',
                         backgroundColor: 'rgba(255,255,255,0.18)',
-                        backgroundImage: 'none',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                        backdropFilter: 'blur(14px)',
-                        WebkitBackdropFilter: 'blur(14px)',
-                        borderRadius: 2,
-                        py: 1,
-                        '& .MuiAvatar-root': {
-                          width: 32,
-                          height: 32,
-                          ml: -0.5,
-                          mr: 1,
-                        },
+                        borderRadius: '12px',
+                        backdropFilter: 'blur(18px)',
+                        WebkitBackdropFilter: 'blur(18px)',
+                        border: '1px solid rgba(255, 255, 255, 0.25)',
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
                         '& .MuiMenuItem-root': {
-                          color: '#fafafa',
-                          '&:hover': {
-                            backgroundColor: 'rgba(255,255,255,0.22)',
+                          color: 'text.primary',
+                          borderBottom: '1px solid rgba(255,255,255,0.08)',
+                          '&:last-child': {
+                            borderBottom: 'none',
                           },
-                        },
-                        '& .MuiMenuItem-root.Mui-focused': { backgroundColor: 'rgba(255,255,255,0.18)' },
-                      },
+                        }
+                      }
                     }}
-                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                   >
                     {user && (
-                      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.15)' }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 500, color: '#fafafa' }}>
-                          {user.username || 'Usuario'}
-                        </Typography>
-                      </Box>
+                      <MenuItem sx={{ color: 'text.primary', pt: 1.5, pb: 0.5, opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{user.username}</Typography>
+                      </MenuItem>
                     )}
-                    <MenuItem
-                      onClick={() => {
-                        navigate(user && user.is_staff ? '/admin' : '/dashboard');
-                        closeUserMenu();
-                      }}
-                      sx={(theme)=>({ color: theme.palette.text.primary, pt: user ? 1.5 : 0.5 })}
-                    >
-                      Dashboard
-                    </MenuItem>
+                    {user && user.groups && user.groups.length > 0 && (
+                      <MenuItem sx={{ color: 'text.secondary', pb: 1.5, pt: 0.5, borderBottom: '1px solid rgba(255,255,255,0.15)', opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                        <Typography variant="caption">{user.groups[0]}</Typography>
+                      </MenuItem>
+                    )}
+                    <MenuItem onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, pt: user ? 1.5 : 0.5 })}>Dashboard</MenuItem>
                     <MenuItem onClick={() => { navigate('/wizard-create'); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary })}>Crear Propiedad</MenuItem>
-                    <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, borderTop: user ? '1px solid rgba(255,255,255,0.08)' : 'none', mt: user ? 1 : 0 })}>Logout</MenuItem>
+                    <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }}>Búsquedas Guardadas</MenuItem>
+                    <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }}>Planes</MenuItem>
+                    <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={(theme)=>({ color: theme.palette.text.primary, borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 })}>Logout</MenuItem>
                   </Menu>
                 </>
               ) : (
@@ -599,89 +624,7 @@ function App() {
       </Snackbar>
 
       <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route
-            path="/"
-            element={
-              <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} />
-              </motion.div>
-            }
-          />
-          <Route
-            path="/property/:id"
-            element={
-              <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                <PropertyDetails />
-              </motion.div>
-            }
-          />
-          <Route path="/tour/:id" element={
-            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <TourViewer />
-            </motion.div>
-          } />
-          <Route path="/login" element={
-            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <AuthPage formType="login" onLogin={handleLogin} />
-            </motion.div>
-          } />
-          <Route path="/register" element={
-            <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-              <AuthPage formType="register" onRegister={handleRegister} />
-            </motion.div>
-          } />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute
-                user={user}
-                element={
-                  <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                    <SellerDashboardPage />
-                  </motion.div>
-                }
-              />
-            }
-          />
-          <Route
-            path="/v2"
-            element={
-              <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                <LandingV2 />
-              </motion.div>
-            }
-          />
-          <Route
-            path="/wizard-create"
-            element={
-              <ProtectedRoute user={user} element={
-                <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-                  <CreatePublicationWizard />
-                </motion.div>
-              } />
-            }
-          />
-          <Route
-            path="/create-property"
-            element={<ProtectedRoute user={user} element={<CreatePublicationWizard />} />}
-          />
-          <Route
-            path="/compare"
-            element={<CompareView />}
-          />
-          <Route path="/dashboard/saved-searches" element={<ProtectedRoute user={user} element={<SavedSearchesPage />} />} />
-          <Route path="/admin/*" element={<StaffRoute user={user} element={<AdminLayout />} />}>
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="dashboard" element={<AdminDashboardPage />} />
-            <Route path="properties" element={<AdminDetailedPropertiesPage />} />
-            <Route path="tickets" element={<AdminTicketsPage />} />
-            <Route path="documents" element={<AdminDocumentsReviewPage />} />
-            <Route path="users" element={<AdminUsersListPage />} />
-            <Route path="settings" element={<AdminSettingsPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" />} /> {/* Catch-all to redirect to home */}
-        </Routes>
+        {mainContent}
       </AnimatePresence>
 
       {/* Render AI suggestion panel on left */}

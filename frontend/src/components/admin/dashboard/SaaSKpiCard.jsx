@@ -34,7 +34,7 @@ const SaaSKpiCard = ({ kpi }) => {
         <GlassCard>
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Typography variant="subtitle1" color="text.secondary">{kpi.title}</Typography>
+                    <Typography variant="subtitle1" color="text.primary">{kpi.title}</Typography>
                     {kpi.icon}
                 </Box>
                 <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1 }} color="text.primary">{kpi.value}</Typography>

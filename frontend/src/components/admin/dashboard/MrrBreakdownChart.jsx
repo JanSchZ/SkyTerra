@@ -58,7 +58,7 @@ const MrrBreakdownChart = () => {
     return (
         <GlassCard>
             <CardContent>
-                <Typography variant="h6" gutterBottom>Desglose de MRR por Plan</Typography>
+                <Typography variant="h6" gutterBottom sx={{color:'text.primary', fontWeight:'bold'}}>Desglose de MRR por Plan</Typography>
                 <Doughnut data={data} options={options} />
             </CardContent>
         </GlassCard>

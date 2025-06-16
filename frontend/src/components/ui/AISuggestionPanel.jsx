@@ -119,7 +119,7 @@ const AISuggestionPanel = ({
         </Box>
 
         {(isLoading || displayedAssistant) && (
-          <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', fontStyle: 'italic', whiteSpace:'pre-wrap' }}>
+          <Typography variant="body2" sx={{ mb: 1, color: 'white', fontStyle: 'italic', whiteSpace:'pre-wrap' }}>
             {displayedAssistant || 'Escribiendo...'}
           </Typography>
         )}
@@ -127,12 +127,12 @@ const AISuggestionPanel = ({
         {/* Chat / follow-up input on top */}
         <Box sx={{ mb:2, display:'flex', gap:1 }}>
           <TextField size="small" fullWidth type="text" autoComplete="off" variant="outlined" placeholder="Continuar conversación..." value={followUp} onChange={(e)=>setFollowUp(e.target.value)} onKeyPress={(e)=>{ if(e.key==='Enter' && followUp.trim()){ onFollowUpQuery && onFollowUpQuery(followUp.trim()); setFollowUp(''); } }}
-            sx={{ '& .MuiOutlinedInput-root':{ backgroundColor:'rgba(255,255,255,0.12)', backdropFilter:'blur(6px)', borderRadius:2, '& fieldset':{ border:'none' } }, input:{ color:(theme)=>theme.palette.text.primary, fontSize:'0.8rem'} }}
+            sx={{ '& .MuiOutlinedInput-root':{ backgroundColor:'rgba(255,255,255,0.12)', backdropFilter:'blur(6px)', borderRadius:2, '& fieldset':{ border:'none' } }, input:{ color:'white', fontSize:'0.8rem'} }}
           />
         </Box>
 
         {searchMode === 'location' && flyToLocation && !hasRecommendations && (
-          <Typography variant="body2" sx={{ mt: 1, color: 'text.primary' }}>
+          <Typography variant="body2" sx={{ mt: 1, color: 'white' }}>
             Navegando al área de interés que indicaste.
           </Typography>
         )}
@@ -183,20 +183,20 @@ const AISuggestionPanel = ({
                   )}
                 </Box>
                 <CardContent sx={{p: 1.5}}>
-                  <Typography variant="subtitle1" component="div" sx={{ fontWeight: 500, fontSize: '1rem', color: 'text.primary', letterSpacing: 0 }}>
+                  <Typography variant="subtitle1" component="div" sx={{ fontWeight: 500, fontSize: '1rem', color: 'white', letterSpacing: 0 }}>
                     {rec.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
                     Precio: {rec.price ? `$${Number(rec.price).toLocaleString()}` : 'No disponible'}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
                     Tamaño: {rec.size ? `${rec.size} ha` : 'No disponible'}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ textTransform: 'capitalize', mb: 1 }}>
+                  <Typography variant="body2" color="white" sx={{ textTransform: 'capitalize', mb: 1 }}>
                     Tipo: {rec.type || 'No especificado'}
                   </Typography>
                   {rec.reason && (
-                    <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                    <Typography variant="caption" color="white" sx={{ fontStyle: 'italic' }}>
                       {rec.reason}
                     </Typography>
                   )}

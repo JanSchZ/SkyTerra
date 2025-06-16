@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -20,7 +20,9 @@ import {
   Fade,
   useTheme,
   useMediaQuery,
-  Fab
+  Fab,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -32,12 +34,15 @@ import TerrainIcon from '@mui/icons-material/Terrain';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import CloseIcon from '@mui/icons-material/Close';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import { propertyService, tourService, imageService, authService } from '../../services/api';
+import { propertyService, tourService, imageService, authService, favoritesService } from '../../services/api';
 import MapView from '../map/MapView';
 import axios from 'axios';
 import Pano2VRViewer from '../tours/Pano2VRViewer';
 import UploadTourDialog from '../tours/UploadTourDialog';
+import { AuthContext } from '../../App';
 
 // Países y sus recorridos de vuelo
 const countryFlightPaths = {
@@ -65,7 +70,7 @@ const PropertyDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Estados
   const [property, setProperty] = useState(null);
@@ -78,7 +83,7 @@ const PropertyDetails = () => {
   const [activeTourUrl, setActiveTourUrl] = useState(null);
   const [mapViewState, setMapViewState] = useState(null); // Será definido tras cargar propiedad
   const mapRef = useRef(null);
-  const [currentUser, setCurrentUser] = useState(() => authService.getCurrentUser());
+  const { currentUser, isAuthenticated, loading: authLoading } = useContext(AuthContext);
 
   const initialSkipAutoFly = (()=>{
     const flag = localStorage.getItem('skipAutoFlight');
@@ -88,6 +93,13 @@ const PropertyDetails = () => {
   const [autoFlyCompleted, setAutoFlyCompleted] = useState(initialSkipAutoFly);
 
   const [uploadOpen, setUploadOpen] = useState(false);
+
+  const { isFavorited, setIsFavorited } = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
 
   // Mantener el estado del mapa alineado con la propiedad cargada para evitar el "zoom-out" inicial.
   useEffect(() => {
@@ -364,6 +376,60 @@ const PropertyDetails = () => {
     }
   }, [property]);
 
+  useEffect(() => {
+    if (isAuthenticated && currentUser && property?.id) {
+      favoritesService.list()
+        .then(favs => {
+          setIsFavorited(favs.some(fav => fav.property === property.id));
+        })
+        .catch(err => console.error('Error fetching favorites:', err));
+    }
+  }, [isAuthenticated, currentUser, property?.id]);
+
+  const handleFavoriteToggle = async () => {
+    if (!isAuthenticated) {
+      setSnackbar({
+        open: true,
+        message: 'Por favor, inicia sesión para guardar propiedades.',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    try {
+      if (isFavorited) {
+        // Encontrar y eliminar el favorito
+        const favs = await favoritesService.list();
+        const fav = favs.find(f => f.property === property.id);
+        if (fav) {
+          await favoritesService.remove(fav.id);
+          setIsFavorited(false);
+          setSnackbar({
+            open: true,
+            message: 'Propiedad eliminada de favoritos.',
+            severity: 'info'
+          });
+        }
+      } else {
+        // Añadir a favoritos
+        await favoritesService.add(property.id);
+        setIsFavorited(true);
+        setSnackbar({
+          open: true,
+          message: 'Propiedad guardada en favoritos!',
+          severity: 'success'
+        });
+      }
+    } catch (error) {
+      console.error('Error al alternar favorito:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error al guardar/eliminar propiedad. Intenta de nuevo.',
+        severity: 'error'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ 
@@ -554,6 +620,21 @@ const PropertyDetails = () => {
                   {property?.size?.toFixed(1)} ha
                 </Typography>
               </Box>
+              {/* Botón de favoritos */}
+              {!authLoading && isAuthenticated && (
+                <IconButton
+                  onClick={handleFavoriteToggle}
+                  sx={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '50px',
+                    color: isFavorited ? '#ef4444' : '#8b949e', // Rojo si es favorito, gris si no
+                    '&:hover': { color: isFavorited ? '#dc2626' : '#c9d1d9' }
+                  }}
+                >
+                  {isFavorited ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+                </IconButton>
+              )}
 
               {/* Características rápidas */}
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -863,6 +944,22 @@ const PropertyDetails = () => {
           </Paper>
         </Fade>
       )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', bgcolor: snackbar.severity === 'success' ? '#28a745' : snackbar.severity === 'error' ? '#dc3545' : '#ffc107' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -1203,25 +1203,37 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             showCompass={true}
             showZoom={true}
             visualizePitch={true}
-            style={{ 
-                position: 'absolute', 
-                bottom: '30px', 
-                right: '30px', 
-                zIndex: 5 
+            style={{
+                position: 'absolute',
+                bottom: '30px',
+                right: '30px',
+                zIndex: 5,
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                borderRadius: '12px',
+                backdropFilter: 'blur(18px)',
+                WebkitBackdropFilter: 'blur(18px)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                color: 'white',
             }}
             aria-label="Controles de navegación del mapa"
           />
           <AttributionControl 
             position="bottom-left" 
             compact={true} 
-            style={{ 
-                position: 'absolute', 
-                bottom: '10px', 
-                left: '10px', 
-                zIndex: 5, 
-                backgroundColor: 'rgba(255,255,255,0.5)', 
+            style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '10px',
+                zIndex: 5,
+                backgroundColor: 'rgba(255,255,255,0.18)',
                 padding: '2px 5px',
-                borderRadius: '4px'
+                borderRadius: '12px',
+                backdropFilter: 'blur(18px)',
+                WebkitBackdropFilter: 'blur(18px)',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                color: 'white',
              }}
           />
           {isDrawingMode && mapRef.current && (

@@ -504,7 +504,17 @@ export const propertyService = {
     delete prepared.country;
     
     return prepared;
-  }
+  },
+
+  getDashboardStats: async () => {
+    const response = await api.get('/api/admin/dashboard/stats/');
+    return response.data;
+  },
+
+  getPlanMetrics: async () => {
+    const response = await api.get('/api/admin/dashboard/plan-metrics/');
+    return response.data;
+  },
 };
 
 // Servicio para tours 360°
