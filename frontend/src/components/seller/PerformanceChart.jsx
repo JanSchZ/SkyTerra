@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Card, CardContent, ButtonGroup, Button } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { Line } from 'react-chartjs-2';
@@ -88,53 +88,62 @@ const options = {
     },
 };
 
+const generateData = (canvas, labels) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { labels, datasets: [] };
+
+    const vizGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    vizGradient.addColorStop(0, 'rgba(53, 162, 235, 0.5)');
+    vizGradient.addColorStop(1, 'rgba(53, 162, 235, 0)');
+
+    const consultGradient = ctx.createLinearGradient(0, 0, 0, 300);
+    consultGradient.addColorStop(0, 'rgba(255, 99, 132, 0.5)');
+    consultGradient.addColorStop(1, 'rgba(255, 99, 132, 0)');
+
+    return {
+        labels,
+        datasets: [
+            {
+                label: 'Visualizaciones',
+                data: labels.map(() => Math.floor(Math.random() * 200)),
+                borderColor: 'rgb(53, 162, 235)',
+                backgroundColor: vizGradient,
+                yAxisID: 'y',
+                tension: 0.4,
+                fill: true,
+            },
+            {
+                label: 'Consultas',
+                data: labels.map(() => Math.floor(Math.random() * 30)),
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: consultGradient,
+                yAxisID: 'y1',
+                tension: 0.4,
+                fill: true,
+            },
+        ],
+    };
+};
+
 const PerformanceChart = () => {
     const [timeframe, setTimeframe] = useState('Mes');
+    const [chartData, setChartData] = useState({ labels: [], datasets: [] });
+    const canvasRef = useRef(null);
 
-    const generateData = (canvas, labels) => {
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return { labels, datasets: [] };
-    
-        const vizGradient = ctx.createLinearGradient(0, 0, 0, 300);
-        vizGradient.addColorStop(0, 'rgba(53, 162, 235, 0.5)');
-        vizGradient.addColorStop(1, 'rgba(53, 162, 235, 0)');
-    
-        const consultGradient = ctx.createLinearGradient(0, 0, 0, 300);
-        consultGradient.addColorStop(0, 'rgba(255, 99, 132, 0.5)');
-        consultGradient.addColorStop(1, 'rgba(255, 99, 132, 0)');
-    
-        return {
-            labels,
-            datasets: [
-                {
-                    label: 'Visualizaciones',
-                    data: labels.map(() => Math.floor(Math.random() * 200)),
-                    borderColor: 'rgb(53, 162, 235)',
-                    backgroundColor: vizGradient,
-                    yAxisID: 'y',
-                    tension: 0.4,
-                    fill: true,
-                },
-                {
-                    label: 'Consultas',
-                    data: labels.map(() => Math.floor(Math.random() * 30)),
-                    borderColor: 'rgb(255, 99, 132)',
-                    backgroundColor: consultGradient,
-                    yAxisID: 'y1',
-                    tension: 0.4,
-                    fill: true,
-                },
-            ],
-        };
-    };
-    
-    const dataMap = {
-        'Día': (canvas) => generateData(canvas, dayLabels.slice(0, 7)),
-        'Semana': (canvas) => generateData(canvas, weekLabels),
-        'Mes': (canvas) => generateData(canvas, monthLabels),
-    };
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+            let labels;
+            if (timeframe === 'Día') labels = dayLabels.slice(0,7);
+            else if (timeframe === 'Semana') labels = weekLabels;
+            else labels = monthLabels;
 
-  return (
+            const data = generateData(canvas, labels);
+            setChartData(data);
+        }
+    }, [timeframe]);
+    
+    return (
     <GlassCard>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -148,7 +157,7 @@ const PerformanceChart = () => {
           </ButtonGroup>
         </Box>
         <Box sx={{ height: 300 }}>
-            <Line options={options} data={dataMap[timeframe]} />
+            <Line ref={canvasRef} options={options} data={chartData} />
         </Box>
       </CardContent>
     </GlassCard>

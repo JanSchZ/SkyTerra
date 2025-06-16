@@ -37,7 +37,7 @@ const SaaSKpiCard = ({ kpi }) => {
                     <Typography variant="subtitle1" color="text.secondary">{kpi.title}</Typography>
                     {kpi.icon}
                 </Box>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1 }}>{kpi.value}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1 }} color="text.primary">{kpi.value}</Typography>
                 {kpi.trend && <Box sx={{height: '50px'}}><Line options={lineOptions} data={lineData} /></Box>}
                 {kpi.note && <Typography variant="caption" sx={{color: kpi.note.color}}>{kpi.note.text}</Typography>}
             </CardContent>

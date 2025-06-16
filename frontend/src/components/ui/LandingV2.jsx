@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box } from '@mui/material';
 import MapView from '../map/MapView';
 import AISearchBar from './AISearchBar';
+import AppHeader from './AppHeader';
 
 export default function LandingV2() {
   const [filters, setFilters] = useState({});
@@ -9,6 +10,7 @@ export default function LandingV2() {
 
   return (
     <Box sx={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      <AppHeader />
       {/* Mapa de fondo a pantalla completa */}
       <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
         <MapView

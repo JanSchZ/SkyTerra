@@ -19,6 +19,12 @@ const locations = [
 const propertyTypes = ["Fundo", "Parcela", "Loteo", "Terreno"];
 const statuses = ["approved", "pending", "rejected"];
 
+const mockDocuments = [
+    { id: 1, name: 'Contrato Compraventa', type: 'Contrato' },
+    { id: 2, name: 'Plano del Terreno', type: 'Plano' },
+    { id: 3, name: 'Certificado de Dominio Vigente', type: 'Certificado' },
+];
+
 export const mockProperties = Array.from({ length: 50 }, (_, i) => {
     const location = locations[i % locations.length];
     return {
@@ -30,6 +36,8 @@ export const mockProperties = Array.from({ length: 50 }, (_, i) => {
         price: Math.floor(Math.random() * (250000 - 20000 + 1) + 20000) * 1000,
         size: Math.floor(Math.random() * (100 - 2 + 1) + 2), // Hectares
         publicationDate: getRandomDate(new Date(2022, 0, 1), new Date()).toISOString().split('T')[0],
+        plusvalia_score: Math.floor(Math.random() * 95) + 5, // Score from 5 to 100
+        documents: mockDocuments.map(doc => ({ ...doc, id: doc.id * 1000 + i, status: statuses[Math.floor(Math.random() * statuses.length)] })),
         agent: {
             name: `Agent ${i % 5 + 1}`,
             avatar: `https://i.pravatar.cc/150?u=agent${i%5+1}`

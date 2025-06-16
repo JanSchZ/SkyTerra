@@ -17,7 +17,6 @@ const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
     { text: 'Propiedades', icon: <BusinessIcon />, path: '/admin/properties' },
     { text: 'Tickets', icon: <ConfirmationNumberIcon />, path: '/admin/tickets' },
-    { text: 'Documentos', icon: <DescriptionIcon />, path: '/admin/documents' },
     { text: 'Usuarios', icon: <PeopleIcon />, path: '/admin/users' },
     { text: 'Ajustes', icon: <SettingsIcon />, path: '/admin/settings' },
 ];

@@ -29,12 +29,18 @@ const AdminSettingsPage = () => {
                             defaultValue="SkyTerra"
                             variant="outlined"
                             sx={{ mb: 2 }}
+                            InputLabelProps={{
+                                sx: { color: 'text.secondary' }
+                            }}
                         />
                         <TextField
                             fullWidth
                             label="Email de Contacto Principal"
                             defaultValue="contacto@skyterra.dev"
                             variant="outlined"
+                            InputLabelProps={{
+                                sx: { color: 'text.secondary' }
+                            }}
                         />
                     </GlassPaper>
 

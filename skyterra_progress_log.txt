@@ -502,3 +502,36 @@ Las siguientes tareas se derivan de la guía UX/UI recibida. Se han verificado c
 - **Next Steps:**
   - Wire up dashboards to live backend data.
   - Implement logic for different seller plans ("Dueño Particular" vs "Vendedor Profesional").
+
+## Session Date: 2024-07-26
+
+### Summary of Changes:
+
+Completed a major overhaul of the Admin Dashboard based on user feedback to improve functionality, UI, and centralization of management tasks.
+
+### Detailed Changes:
+
+1.  **Admin UI/Style Fixes:**
+    *   Resolved an issue in the **Admin Dashboard** where KPI card values were displayed in white text, making them unreadable. They now correctly use the primary text color from the theme.
+    *   Fixed an identical issue on the **Settings Page**, ensuring all form field labels are clearly visible.
+
+2.  **Property Management Overhaul (`AdminDetailedPropertiesPage`):**
+    *   **Centralized Management:** This page is now the central hub for managing properties, deprecating the separate "Documents" page.
+    *   **Plusvalía Score:** Added a "Plusvalía Score" column with a visually intuitive `LinearProgress` bar and color-coding (red/yellow/green) to quickly assess property potential. The column is sortable.
+    *   **Actions Menu:** Implemented a new "Actions" column with a menu for each property, providing access to management functions without leaving the page.
+    *   **360 Tour Management:** The actions menu now contains a "Gestionar Tour 360" option, which opens a modal allowing the admin to upload a ZIP file for the property's virtual tour.
+    *   **Integrated Document Review:** The "Documentos" tab has been removed from the main navigation. Functionality is now inside the property actions menu under "Ver Documentos". This opens a modal listing all documents for the selected property, showing their name, type, and verification status (`approved`, `pending`, `rejected`).
+
+3.  **Ticket Management Enhancement (`AdminTicketsPage`):**
+    *   **AI-Powered Priority:** Created a new mock `aiService` that automatically assigns a priority (`high`, `medium`, `low`) to each ticket based on keywords in its title.
+    *   **Simulated Email Alerts:** The AI service now simulates an immediate email notification (via a `console.log`) for any ticket that is assigned a 'high' priority.
+    *   **Interactive Ticket Response:** The ticket page is no longer static. Ticket cards are now clickable, opening a full-featured dialog box.
+    *   **Conversation View:** Inside the dialog, admins can see the ticket's conversation history and post a new response, making the page a functional ticket management interface.
+
+4.  **Data Mocks:**
+    *   Updated `_mocks/properties.js` to include `plusvalia_score` and a `documents` array for each property.
+    *   Created `_mocks/tickets.js` with more realistic data, including conversation history and priorities assigned by the new `aiService`.
+
+5.  **Code Structure:**
+    *   Removed the "Documentos" link from `AdminLayout.jsx`.
+    *   The `AdminDocumentsReviewPage.jsx` component is now unused and can be deleted.

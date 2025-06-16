@@ -43,11 +43,11 @@ const kpiData = [
 
 
 const AdminDashboardPage = () => {
-    return (
+  return (
         <Box sx={{ p: 3, backgroundColor: '#f4f6f8', minHeight: '100vh' }}>
             <Typography variant="h3" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56', mb: 3 }}>
                 Dashboard del Administrador
-            </Typography>
+          </Typography>
             <Grid container spacing={3}>
                 {/* Franja 1: KPIs de Negocio (SaaS) */}
                 {kpiData.map((kpi, index) => (
@@ -60,20 +60,20 @@ const AdminDashboardPage = () => {
                 <Grid item xs={12} md={8}>
                     <ProductionQueue />
                 </Grid>
-                <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                     <MrrBreakdownChart />
-                </Grid>
+              </Grid>
 
                 {/* Franja 3: Análisis de Rentabilidad y Crecimiento */}
                 <Grid item xs={12} md={6}>
                     <ProfitabilityChart />
-                </Grid>
+              </Grid>
                 <Grid item xs={12} md={6}>
                     <MrrEvolutionChart />
-                </Grid>
-            </Grid>
-        </Box>
-    );
+              </Grid>
+          </Grid>
+    </Box>
+  );
 };
 
 export default AdminDashboardPage; 
