@@ -3,6 +3,17 @@
 echo "🚀 INICIANDO SKYTERRA - PLATAFORMA INMOBILIARIA"
 echo "============================================="
 
+# Detectar si estamos en Codespaces
+if [ -n "$CODESPACE_NAME" ]; then
+    echo "🌐 Detectado GitHub Codespaces: $CODESPACE_NAME"
+    FRONTEND_URL="https://${CODESPACE_NAME}-5173.app.github.dev"
+    BACKEND_URL="https://${CODESPACE_NAME}-8000.app.github.dev"
+else
+    echo "💻 Detectado entorno local"
+    FRONTEND_URL="http://localhost:5173"
+    BACKEND_URL="http://localhost:8000"
+fi
+
 # Función para verificar si un puerto está en uso
 check_port() {
     if lsof -Pi :$1 -sTCP:LISTEN -t >/dev/null ; then
@@ -30,7 +41,35 @@ wait_for_port() {
     return 1
 }
 
+# Función para crear archivo .env si no existe
+create_env_files() {
+    echo "📝 Verificando archivos de configuración..."
+    
+    # Backend .env
+    if [ ! -f "backend/.env" ]; then
+        echo "⚠️  Creando backend/.env - RECUERDA configurar las API keys"
+        cat > backend/.env << EOF
+SECRET_KEY=django-insecure-oz7k_zw9rjk8qc_01i9ataa7a0-1=z&2pq7=l14lq@w-9)%a&n
+DEBUG=True
+GOOGLE_GEMINI_API_KEY=
+FRONTEND_URL=$FRONTEND_URL
+EOF
+    fi
+    
+    # Frontend .env
+    if [ ! -f "frontend/.env" ]; then
+        echo "⚠️  Creando frontend/.env - RECUERDA configurar MAPBOX_TOKEN"
+        cat > frontend/.env << EOF
+VITE_MAPBOX_ACCESS_TOKEN=
+VITE_API_BASE_URL=$BACKEND_URL
+EOF
+    fi
+}
+
 cd /workspaces/SkyTerra
+
+# Crear archivos .env si no existen
+create_env_files
 
 echo "📋 Verificando estado de los servicios..."
 
@@ -40,8 +79,47 @@ if check_port 8000; then
 else
     echo "🔄 Iniciando backend Django..."
     cd backend
-    source .venv/Scripts/activate
-    python manage.py migrate
+    
+    # Crear virtual environment si no existe
+    if [ ! -d ".venv" ]; then
+        echo "📦 Creando entorno virtual Python..."
+        python3 -m venv .venv
+    fi
+    
+    # Activar virtual environment
+    source .venv/bin/activate
+    
+    # Instalar dependencias básicas
+    echo "📥 Instalando dependencias Python..."
+    pip install --quiet django djangorestframework django-cors-headers python-dotenv django-filter
+    
+    # Ejecutar migraciones
+    echo "🗄️  Ejecutando migraciones de base de datos..."
+    python manage.py migrate --run-syncdb
+    
+    # Crear superusuario si no existe
+    echo "👤 Configurando usuario administrador..."
+    python manage.py shell -c "
+from django.contrib.auth.models import User
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@skyterra.com', 'SkyTerra3008%')
+    print('✅ Usuario admin creado')
+else:
+    print('✅ Usuario admin ya existe')
+"
+    
+    # Crear datos de prueba si no existen
+    echo "🏠 Verificando datos de prueba..."
+    python manage.py shell -c "
+from properties.models import Property
+if Property.objects.count() == 0:
+    print('⚠️  No hay propiedades. Ejecuta: python manage.py create_demo_data')
+else:
+    print(f'✅ {Property.objects.count()} propiedades encontradas')
+"
+    
+    # Iniciar servidor
+    echo "🚀 Iniciando servidor Django..."
     python manage.py runserver 0.0.0.0:8000 > /tmp/backend.log 2>&1 &
     BACKEND_PID=$!
     echo "🆔 Backend PID: $BACKEND_PID"

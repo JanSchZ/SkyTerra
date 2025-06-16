@@ -34,8 +34,14 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',') if host.strip()]
 
 # Ensure at least localhost is allowed in development mode
-if DEBUG and 'localhost' not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append('localhost')
+if DEBUG:
+    if 'localhost' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('localhost')
+    if '127.0.0.1' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('127.0.0.1')
+    # Allow Codespaces URLs
+    ALLOWED_HOSTS.append('.app.github.dev')
+    ALLOWED_HOSTS.append('*')  # Allow all hosts in development
 
 
 # Application definition
