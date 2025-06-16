@@ -201,3 +201,25 @@ iframe {
 
 /* Removed legacy global glass overrides and text shadows to allow theme variants to control style */
 /* Mapbox ctrl overrides kept in map components if needed */
+
+/* Custom Map Popup Override */
+.skyterra-popup .mapboxgl-popup-tip {
+  display: none; /* Hide default triangle */
+}
+
+.skyterra-popup .mapboxgl-popup-content {
+  position: relative; /* Needed for ::after positioning */
+}
+
+/* Replace triangle with subtle vertical line */
+.skyterra-popup .mapboxgl-popup-content::after {
+  content: "";
+  position: absolute;
+  bottom: -10px; /* Distance below popup */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 1px;
+}

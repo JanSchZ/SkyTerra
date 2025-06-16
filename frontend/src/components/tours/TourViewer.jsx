@@ -252,9 +252,13 @@ const TourViewer = () => {
                 width: 320,
                 boxSizing: 'border-box',
                 top: 80,
-                backgroundColor: 'rgba(0,0,0,0.75)',
+                backgroundColor: 'rgba(255,255,255,0.14)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
                 color: 'white',
-                borderRight: 'none'
+                borderRight: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '0 16px 16px 0',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.35)'
               },
             }}
           >

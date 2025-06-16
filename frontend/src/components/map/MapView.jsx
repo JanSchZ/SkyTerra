@@ -1284,6 +1284,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           )}
           {popupInfo && (
             <Popup
+              className="skyterra-popup"
               longitude={popupInfo.longitude}
               latitude={popupInfo.latitude}
               closeButton={false}
@@ -1296,22 +1297,26 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               <Card elevation={0} sx={{ 
                 maxWidth: 320, 
                 display: 'flex',
-                backgroundColor: 'rgba(255,255,255,0.9)',
-                border: 'none',
-                boxShadow: 'none'
+                backgroundColor: 'rgba(40,40,40,0.4)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.25)',
+                borderRadius: '16px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                color: 'white'
               }}>
                 <CardContent sx={{ p: 1.5, pr: 1, '&:last-child': { pb: 1.5 }, flex: '1 1 60%' }}>
-                  <Typography gutterBottom variant="subtitle1" component="div" sx={{fontSize: '0.95rem', fontWeight: 'bold'}}>
+                  <Typography gutterBottom variant="subtitle1" component="div" sx={{fontSize: '0.95rem', fontWeight: 'bold', color:'white'}}>
                     {popupInfo.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, color:'white', opacity:0.85 }}>
                     Precio: {getPriceDisplay(popupInfo)}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ mb: 0.5, color:'white', opacity:0.85 }}>
                     Tamaño: {popupInfo.size} ha
                   </Typography>
                   {popupInfo.type && (
-                    <Chip label={popupInfo.type} size="small" variant="outlined" />
+                    <Chip label={popupInfo.type} size="small" variant="outlined" sx={{ borderColor:'rgba(255,255,255,0.6)', color:'white' }} />
                   )}
                 </CardContent>
                 <Box sx={{ width: 140, height: 100, mr: 1, mt: 1, flex: '0 0 40%' }}>
