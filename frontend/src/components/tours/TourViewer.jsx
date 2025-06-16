@@ -8,8 +8,11 @@ import RoomIcon from '@mui/icons-material/Room';
 import HomeIcon from '@mui/icons-material/Home';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import AspectRatioIcon from '@mui/icons-material/AspectRatio';
+import MapIcon from '@mui/icons-material/Map';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { useParams, useNavigate } from 'react-router-dom';
-import { tourService, propertyService } from '../../services/api';
+import { tourService, propertyService, favoritesService } from '../../services/api';
 
 const TourViewer = () => {
   const { tourId } = useParams();
@@ -20,6 +23,7 @@ const TourViewer = () => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
   const [error, setError] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     const fetchTourData = async () => {
@@ -59,6 +63,13 @@ const TourViewer = () => {
           const propId = tour.property || tour.property_id;
           const property = await propertyService.getProperty(propId);
           setPropertyData(property);
+          // Check if property is a favorite
+          try {
+            const favorites = await favoritesService.list();
+            setIsFavorite(favorites.some(fav => fav.property === property.id));
+          } catch (favError) {
+            console.error('Error fetching favorites:', favError);
+          }
         }
         
         // Solo cambiar a false si no era navegación directa
@@ -221,6 +232,14 @@ const TourViewer = () => {
             </IconButton>
             
             <IconButton 
+              onClick={() => navigate('/')}
+              sx={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
+              title="Volver al mapa"
+            >
+              <MapIcon />
+            </IconButton>
+            
+            <IconButton 
               onClick={toggleFullScreen}
               sx={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
             >
@@ -240,6 +259,31 @@ const TourViewer = () => {
             >
               <InfoIcon />
             </IconButton>
+            
+            {propertyData && (
+              <IconButton 
+                onClick={async () => {
+                  try {
+                    if (isFavorite) {
+                      const favorites = await favoritesService.list();
+                      const favToRemove = favorites.find(fav => fav.property === propertyData.id);
+                      if (favToRemove) {
+                        await favoritesService.remove(favToRemove.id);
+                      }
+                    } else {
+                      await favoritesService.add(propertyData.id);
+                    }
+                    setIsFavorite(!isFavorite);
+                  } catch (err) {
+                    console.error('Error toggling favorite:', err);
+                  }
+                }}
+                sx={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
+                title={isFavorite ? "Quitar de favoritos" : "Agregar a favoritos"}
+              >
+                {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+              </IconButton>
+            )}
           </Box>
           
           {/* Panel lateral con info */}
@@ -289,6 +333,47 @@ const TourViewer = () => {
                   {propertyData?.address || 'Ubicación no disponible'}
                 </Typography>
               </Box>
+              
+              {propertyData?.plusvalia_score && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
+                    Plusvalía:
+                  </Typography>
+                  <Typography variant="body1">
+                    {propertyData.plusvalia_score}%
+                  </Typography>
+                </Box>
+              )}
+              {propertyData?.bedrooms && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
+                    Dormitorios:
+                  </Typography>
+                  <Typography variant="body1">
+                    {propertyData.bedrooms}
+                  </Typography>
+                </Box>
+              )}
+              {propertyData?.bathrooms && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
+                    Baños:
+                  </Typography>
+                  <Typography variant="body1">
+                    {propertyData.bathrooms}
+                  </Typography>
+                </Box>
+              )}
+              {propertyData?.parking_spaces && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
+                    Estacionamientos:
+                  </Typography>
+                  <Typography variant="body1">
+                    {propertyData.parking_spaces}
+                  </Typography>
+                </Box>
+              )}
               
               <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
               

@@ -17,10 +17,10 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
           <Paper
             variant="glass"
             elevation={6}
-            sx={{ width: 340, p: 2, backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', backgroundColor:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', flexDirection:'column' }}
+            sx={{ width: 340, p: 2, backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', backgroundColor:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', flexDirection:'column', color:'#ffffff' }}
           >
             {/* Preview */}
-            <Box sx={{ position:'relative', width:'100%', height:140, mb:1.5, borderRadius:1, overflow:'hidden' }}>
+            <Box sx={{ position:'relative', width:'100%', height:180, mb:1.5, borderRadius:1, overflow:'hidden' }}>
               {previewUrl ? (
                 <iframe
                   src={previewUrl}
@@ -43,7 +43,20 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
             {/* Details */}
             <Typography variant="subtitle1" sx={{ fontWeight:600, mb:0.5 }}>{property.name}</Typography>
             <Typography variant="body2" sx={{ mb:0.5 }}>Precio: {getPriceDisplay ? getPriceDisplay(property) : 'N/D'}</Typography>
-            <Typography variant="body2" sx={{ mb:2 }}>Tamaño: {property.size} ha</Typography>
+            <Typography variant="body2" sx={{ mb:0.5 }}>Tamaño: {property.size} ha</Typography>
+            {property.plusvalia_score !== undefined && (
+              <Typography variant="body2" sx={{ mb:0.5 }}>Plusvalía: {property.plusvalia_score}%</Typography>
+            )}
+            {property.bedrooms && (
+              <Typography variant="body2" sx={{ mb:0.5 }}>Dormitorios: {property.bedrooms}</Typography>
+            )}
+            {property.bathrooms && (
+              <Typography variant="body2" sx={{ mb:0.5 }}>Baños: {property.bathrooms}</Typography>
+            )}
+            {property.parking_spaces && (
+              <Typography variant="body2" sx={{ mb:0.5 }}>Estacionamientos: {property.parking_spaces}</Typography>
+            )}
+            <Box sx={{ mb:2 }} />
 
             <Button variant="contained" fullWidth onClick={onGo}>Ir</Button>
           </Paper>
