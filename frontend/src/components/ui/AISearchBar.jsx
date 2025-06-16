@@ -322,8 +322,8 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         sx={{
           '& .MuiOutlinedInput-root': {
             backgroundColor: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
             borderRadius: '12px',
             border: '1px solid rgba(255,255,255,0.25)',
             color: '#ffffff',
@@ -348,7 +348,8 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         </Box>
       )}
       
-      <Collapse in={showResults} timeout={300}>
+      {/* Show detailed results only for non-location types */}
+      {showResults && searchResult && searchResult.type !== 'location' && (
         <Paper
           elevation={0}
           sx={{
@@ -356,7 +357,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             width: '100%',
             mt: 0.5,
             backgroundColor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(18px)',
+            backdropFilter: 'blur(14px)',
             borderRadius: '16px',
             border: '1px solid rgba(255,255,255,0.25)',
             zIndex: 10,
@@ -386,25 +387,10 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             )}
 
             {searchResult && searchResult.type === 'location' && (
-              <>
-                <Typography variant="body2" sx={{ color: '#c9d1d9', fontWeight: 300 }} gutterBottom>
-                  {searchResult.interpretation}
-                </Typography>
-                <Box sx={{ mb: 1.5, mt: 0.5 }}>
-                  <Chip 
-                    icon={<TravelExploreIcon fontSize="small"/>}
-                    label={`${searchResult.locationName}`}
-                    size="medium"
-                    sx={{ 
-                      fontWeight: 300,
-                      borderRadius: '8px',
-                      backgroundColor: 'rgba(80, 80, 80, 0.15)',
-                      color: theme.palette.primary.main,
-                      border: '1px solid rgba(80, 80, 80, 0.3)',
-                    }}
-                  />
-                </Box>
-              </>
+              <Typography variant="body2" sx={{ color:'#ffffff', fontWeight:300, textAlign:'center', py:1 }}>
+                 Volando<span style={{ animation: 'dots 1.4s infinite steps(3)', display:'inline-block', width:'1.2em'}}></span>
+                 <style>{`@keyframes dots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}`}</style>
+              </Typography>
             )}
 
             {(searchResult && (searchResult.type === 'properties' || searchResult.type === 'ai_response')) && (() => {
@@ -511,7 +497,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             })()}
           </Box>
         </Paper>
-      </Collapse>
+      )}
     </Box>
   );
 };

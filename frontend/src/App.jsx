@@ -514,8 +514,8 @@ function App() {
                     onMouseLeave={handleAvatarMouseLeave}
                     sx={(theme) => ({
                       backgroundColor: 'rgba(255,255,255,0.18)',
-                      backdropFilter: 'blur(18px)',
-                      WebkitBackdropFilter: 'blur(18px)',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
                       border: '1px solid rgba(255,255,255,0.25)',
                       color: theme.palette.common.white,
                       boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
@@ -560,8 +560,8 @@ function App() {
                       sx: {
                         backgroundColor: 'rgba(255,255,255,0.18)',
                         borderRadius: '12px',
-                        backdropFilter: 'blur(18px)',
-                        WebkitBackdropFilter: 'blur(18px)',
+                        backdropFilter: 'blur(14px)',
+                        WebkitBackdropFilter: 'blur(14px)',
                         border: '1px solid rgba(255, 255, 255, 0.25)',
                         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
                         color: 'white',
@@ -599,7 +599,7 @@ function App() {
                   sx={(theme)=>({
                     borderColor: 'rgba(120, 120, 120, 0.7)', color: theme.palette.primary.main, fontWeight: 300,
                     padding: '6px 12px', fontSize: '0.8rem',
-                    backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(8px)',
+                    backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(6px)',
                     '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
                   })}
                 >

@@ -103,15 +103,24 @@ const AISuggestionPanel = ({
           overflowY: 'hidden',
           scrollbarWidth: 'none',
           '&::-webkit-scrollbar': { display: 'none' },
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
           backgroundColor: 'rgba(255,255,255,0.14)',
           border: `1px solid rgba(255,255,255,0.25)`,
         })}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 500, color: 'text.primary', fontSize: '1.1rem', letterSpacing: 0 }}>
-            Asistente IA SkyTerra
+          <Typography variant="h6" sx={{ 
+              fontWeight: 500, 
+              fontSize: '1.1rem', 
+              letterSpacing: 0,
+              animation: 'glow 2.5s ease-in-out infinite',
+              '@keyframes glow': {
+                '0%, 100%': { color: 'white', textShadow: '0 0 5px rgba(255,255,255,0.4)' },
+                '50%': { color: '#E0E0E0', textShadow: '0 0 20px rgba(255,255,255,0.8)' },
+              }
+            }}>
+            Sam
           </Typography>
           <IconButton size="small" onClick={()=>setCollapsed(true)} sx={{ ml:1, color:'rgba(255,255,255,0.8)' }}>
              <ArrowForwardIosIcon fontSize="small" />
@@ -127,7 +136,7 @@ const AISuggestionPanel = ({
         {/* Chat / follow-up input on top */}
         <Box sx={{ mb:2, display:'flex', gap:1 }}>
           <TextField size="small" fullWidth type="text" autoComplete="off" variant="outlined" placeholder="Continuar conversación..." value={followUp} onChange={(e)=>setFollowUp(e.target.value)} onKeyPress={(e)=>{ if(e.key==='Enter' && followUp.trim()){ onFollowUpQuery && onFollowUpQuery(followUp.trim()); setFollowUp(''); } }}
-            sx={{ '& .MuiOutlinedInput-root':{ backgroundColor:'rgba(255,255,255,0.12)', backdropFilter:'blur(6px)', borderRadius:2, '& fieldset':{ border:'none' } }, input:{ color:'white', fontSize:'0.8rem'} }}
+            sx={{ '& .MuiOutlinedInput-root':{ backgroundColor:'rgba(0,0,0,0.2)', backdropFilter:'blur(4px)', borderRadius:2, '& fieldset':{ border:'none' } }, input:{ color:'white', fontSize:'0.8rem'} }}
           />
         </Box>
 
@@ -140,7 +149,7 @@ const AISuggestionPanel = ({
         {hasRecommendations && (
           <>
           <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight:'bold', color: 'text.primary' }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight:'bold', color: 'white' }}>
              Top {Math.min(recommendations.length, MAX_DISPLAY)} Sugerencia{Math.min(recommendations.length, MAX_DISPLAY) > 1 ? 's' : ''}:
           </Typography>
           <List dense disablePadding sx={{ overflowY: 'auto', maxHeight: { xs: '50vh', sm: '55vh' }, pr:0.5, '&::-webkit-scrollbar':{ width:0}, scrollbarWidth:'none' }}>
@@ -156,6 +165,7 @@ const AISuggestionPanel = ({
                 sx={(theme)=>({
                   mb: 1.5,
                   cursor: 'pointer',
+                  backgroundColor: 'rgba(40,40,40,0.4)',
                   transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.35s cubic-bezier(0.4,0,0.2,1)',
                   '&:hover': {
                     transform: 'translateY(-3px)',
