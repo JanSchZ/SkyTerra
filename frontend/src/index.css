@@ -1,20 +1,41 @@
 /* Estilos globales - SkyTerra Portal */
 
 /* Import professional fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
 @font-face {
   font-family: 'Source Code Pro';
   src: url('/fonts/SourceCodePro-VariableFont_wght.ttf') format('truetype-variations');
-  font-weight: 100 900; /* Assuming it's a variable font */
+  font-weight: 100 900;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Source Code Pro';
   src: url('/fonts/SourceCodePro-Italic-VariableFont_wght.ttf') format('truetype-variations');
-  font-weight: 100 900; /* Assuming it's a variable font */
+  font-weight: 100 900;
   font-style: italic;
+}
+
+@font-face {
+  font-family: 'Clear Sans';
+  src: url('/fonts/clear-sans/ClearSans-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Clear Sans';
+  src: url('/fonts/clear-sans/ClearSans-Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Clear Sans';
+  src: url('/fonts/clear-sans/ClearSans-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
 }
 
 /* Resetear márgenes y padding */
@@ -22,7 +43,6 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Source Code Pro', monospace !important;
 }
 
 :root {
@@ -34,6 +54,7 @@
 }
 
 body {
+  font-family: 'Clear Sans', sans-serif;
   font-weight: 400;
   line-height: 1.6;
   color: var(--glass-text-primary);
@@ -46,7 +67,7 @@ body {
 
 /* Headings over glass surfaces */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Source Code Pro', sans-serif !important;
+  font-family: 'Source Code Pro', monospace;
   font-weight: 600;
   color: var(--glass-text-primary);
   line-height: 1.3;
@@ -60,7 +81,7 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: none !important;
   border: none !important;
   max-width: unset;
-  font-family: 'Source Code Pro', sans-serif !important;
+  font-family: 'Clear Sans', sans-serif;
 }
 
 .mapboxgl-popup-close-button {
@@ -167,7 +188,7 @@ iframe {
   padding: 12px 16px;
   border: 1px solid var(--border-medium);
   border-radius: 8px;
-  font-family: 'Source Code Pro', sans-serif !important;
+  font-family: 'Clear Sans', sans-serif;
   font-size: 14px;
   background-color: var(--bg-primary);
   color: var(--text-primary);

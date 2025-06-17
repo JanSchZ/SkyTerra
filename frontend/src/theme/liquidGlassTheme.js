@@ -44,14 +44,14 @@ export const liquidGlassTheme = (mode = 'light') => {
   return createTheme({
     palette,
     typography: {
-      fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      fontFamily: '"Clear Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
       fontSize: 14,
-      h1: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
-      h2: { fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
-      h3: { fontWeight: 700 },
-      h4: { fontWeight: 600 },
-      h5: { fontWeight: 500 },
-      h6: { fontWeight: 500 },
+      h1: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
+      h2: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
+      h3: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 700 },
+      h4: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 600 },
+      h5: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 500 },
+      h6: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 500 },
       subtitle1: { fontWeight: 600 },
       subtitle2: { fontWeight: 600, color: palette.text.secondary },
       caption: { color: palette.text.secondary }
