@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0', // Importante para Codespaces
-    port: 5173,
+    port: 3000,
     proxy: {
       '/api': {
         target: process.env.CODESPACE_NAME 

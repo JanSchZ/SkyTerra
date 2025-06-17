@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'ordering': ['-updated_at'],
-                'constraints': [models.CheckConstraint(condition=models.Q(('user__isnull', False), ('session_key__isnull', False), _connector='OR'), name='comparison_owner_present')],
+                'constraints': [models.CheckConstraint(check=models.Q(('user__isnull', False), ('session_key__isnull', False), _connector='OR'), name='comparison_owner_present')],
             },
         ),
         migrations.CreateModel(
