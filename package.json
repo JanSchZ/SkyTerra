@@ -11,6 +11,7 @@
     "chart.js": "^4.4.9",
     "framer-motion": "^12.12.1",
     "mapbox-gl": "^3.12.0",
+    "react-apple-login": "^1.1.6",
     "react-map-gl": "^8.0.4",
     "react-router-dom": "^7.6.0"
   }

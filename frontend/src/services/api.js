@@ -233,6 +233,59 @@ export const authService = {
     }
   },
 
+  // Iniciar sesión con X (anteriormente Twitter)
+  async xLogin(authData) {
+    try {
+      console.log('🔄 Intentando iniciar sesión con X');
+      const response = await api.post('/auth/twitter/', { // El endpoint del backend sigue siendo 'twitter'
+        access_token: authData.oauth_token,
+        token_secret: authData.oauth_token_secret, 
+      });
+      console.log('✅ Inicio de sesión con X exitoso:', response.data);
+      
+      const user = response.data.user || response.data;
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error durante el inicio de sesión con X:', error);
+      const errorMessage = error.response?.data?.non_field_errors?.[0] || 
+                           error.response?.data?.error || 
+                           'Error de autenticación con X';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Iniciar sesión con Apple
+  async appleLogin(authData) {
+    try {
+      console.log('🔄 Intentando iniciar sesión con Apple');
+      // 'code' es el token de autorización de Apple
+      const response = await api.post('/auth/apple/', {
+        code: authData.authorization.code,
+        id_token: authData.authorization.id_token,
+      });
+      console.log('✅ Inicio de sesión con Apple exitoso:', response.data);
+      
+      const user = response.data.user || response.data;
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Si Apple proporciona datos del usuario (solo la primera vez), podemos usarlos
+      if (authData.user) {
+        // Podrías enviar estos datos a una API para actualizar el perfil del usuario
+        console.log('🍏 Datos del usuario de Apple:', authData.user);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error durante el inicio de sesión con Apple:', error);
+      const errorMessage = error.response?.data?.non_field_errors?.[0] || 
+                           error.response?.data?.error || 
+                           'Error de autenticación con Apple';
+      throw new Error(errorMessage);
+    }
+  },
+
   // Cerrar sesión
   async logout() {
     try {

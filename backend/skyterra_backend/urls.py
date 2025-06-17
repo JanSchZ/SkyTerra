@@ -22,6 +22,8 @@ from rest_framework.authtoken import views as token_views
 from properties.views import AISearchView
 from django.http import JsonResponse
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.twitter.views import TwitterOAuthAdapter
+from allauth.socialaccount.providers.apple.views import AppleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
 from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView, AdminPlanMetricsView  # Import stats view
@@ -49,6 +51,14 @@ class GoogleLogin(SocialLoginView):
     callback_url = 'http://localhost:8000/api/auth/google/callback/'
     client_class = OAuth2Client
 
+class TwitterLogin(SocialLoginView):
+    adapter_class = TwitterOAuthAdapter
+
+class AppleLogin(SocialLoginView):
+    adapter_class = AppleOAuth2Adapter
+    client_class = OAuth2Client
+    callback_url = 'http://localhost:5173/login' # O la URL de tu frontend que maneje el callback
+
 router = routers.DefaultRouter()
 router.register(r'admin/tickets', TicketViewSet, basename='admin-tickets')
 router.register(r'admin/ticket-responses', TicketResponseViewSet, basename='admin-ticket-responses')
@@ -60,6 +70,8 @@ urlpatterns = [
     path('api/auth/', include('dj_rest_auth.urls')),
     path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
     path('api/auth/google/', GoogleLogin.as_view(), name='google_login'),
+    path('api/auth/twitter/', TwitterLogin.as_view(), name='twitter_login'),
+    path('api/auth/apple/', AppleLogin.as_view(), name='apple_login'),
     path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
     path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('api/admin/dashboard/stats/', AdminDashboardStatsView.as_view(), name='admin-dashboard-stats'),

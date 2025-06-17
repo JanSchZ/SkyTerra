@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.twitter',
+    'allauth.socialaccount.providers.apple',
 
     'properties',   # Nuestra app principal
     'support_tickets', # Nueva app para tickets de soporte
@@ -274,8 +276,9 @@ ACCOUNT_EMAIL_VERIFICATION = 'optional' # Cambiar a 'mandatory' en producción
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
-            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
-            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID'),
+            'secret': os.environ.get('GOOGLE_CLIENT_SECRET'),
+            'key': ''
         },
         'SCOPE': [
             'profile',
@@ -284,5 +287,21 @@ SOCIALACCOUNT_PROVIDERS = {
         'AUTH_PARAMS': {
             'access_type': 'online',
         }
+    },
+    'twitter': {
+        'APP': {
+            'client_id': os.environ.get('X_CONSUMER_KEY'),
+            'secret': os.environ.get('X_CONSUMER_SECRET'),
+        }
+    },
+    'apple': {
+        'APP': {
+            'client_id': os.environ.get('APPLE_CLIENT_ID'),
+            'secret': os.environ.get('APPLE_KEY_SECRET'),
+            'key': os.environ.get('APPLE_KEY_ID'),
+            'certificate_key': os.environ.get('APPLE_CERTIFICATE_KEY_CONTENT')
+        },
+        'SCOPE': ['name', 'email'],
+        'SOCIALACCOUNT_EMAIL_AUTHENTICATION': True,
     }
 }

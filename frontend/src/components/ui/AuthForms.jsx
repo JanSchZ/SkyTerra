@@ -19,6 +19,9 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LoginIcon from '@mui/icons-material/Login';
 import CloseIcon from '@mui/icons-material/Close';
 import { GoogleLogin } from '@react-oauth/google';
+import LoginWithTwitter from 'react-login-with-twitter';
+import XIcon from '@mui/icons-material/X';
+import AppleLogin from 'react-apple-login';
 
 // Estilos comunes para los TextField
 const commonTextFieldStyles = {
@@ -57,7 +60,7 @@ const commonTextFieldStyles = {
 };
 
 // Componente de formulario de inicio de sesión
-export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
+export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose, onGoogleLoginSuccess, onGoogleLoginError, onTwitterLoginSuccess, onTwitterLoginError, onAppleLoginSuccess }) => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -131,15 +134,70 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
         
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }}>O</Divider>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <GoogleLogin
             onSuccess={onGoogleLoginSuccess}
             onError={onGoogleLoginError}
-            disabled={loading}
-            text={formType === 'login' ? 'signin_with' : 'signup_with'}
-            shape="rectangular"
-            theme="filled_blue"
-            width="200"
+            width="100%"
+            useOneTap
+          />
+          <LoginWithTwitter
+            authCallback={onTwitterLoginSuccess}
+            onFailure={onTwitterLoginError}
+            consumerKey={import.meta.env.VITE_X_CONSUMER_KEY}
+            consumerSecret={import.meta.env.VITE_X_CONSUMER_SECRET}
+            style={{ width: '100%' }}
+          >
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<XIcon />}
+              sx={{
+                justifyContent: 'center',
+                textTransform: 'none',
+                height: '40px',
+                color: '#000000',
+                borderColor: '#000000',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                  borderColor: '#000000',
+                },
+              }}
+            >
+              Iniciar sesión con X
+            </Button>
+          </LoginWithTwitter>
+          <AppleLogin 
+            clientId={import.meta.env.VITE_APPLE_CLIENT_ID}
+            redirectURI={import.meta.env.VITE_APPLE_CALLBACK_URL}
+            responseType={"code id_token"}
+            responseMode={"form_post"}
+            usePopup={true}
+            callback={onAppleLoginSuccess}
+            scope="email name"
+            render={renderProps => (
+              <Button
+                onClick={renderProps.onClick}
+                disabled={renderProps.disabled}
+                fullWidth
+                variant="outlined"
+                sx={{
+                  justifyContent: 'center',
+                  textTransform: 'none',
+                  height: '40px',
+                  color: '#000',
+                  backgroundColor: '#fff',
+                  borderColor: '#000',
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5',
+                    borderColor: '#000',
+                  },
+                }}
+              >
+                <Box component="span" sx={{ fontFamily: '-apple-system, BlinkMacSystemFont', fontSize: '18px', mr: 1 }}></Box>
+                Iniciar sesión con Apple
+              </Button>
+            )}
           />
         </Box>
 
@@ -156,7 +214,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
 };
 
 // Componente de formulario de registro
-export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
+export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose, onGoogleLoginSuccess, onGoogleLoginError, onTwitterLoginSuccess, onTwitterLoginError, onAppleLoginSuccess }) => {
   // Paso 1: tipo de vendedor (null, 'individual', 'professional')
   const [sellerType, setSellerType] = useState(null);
 
@@ -347,15 +405,69 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
 
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }}>O</Divider>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <GoogleLogin
             onSuccess={onGoogleLoginSuccess}
             onError={onGoogleLoginError}
-            disabled={loading}
-            text={formType === 'login' ? 'signin_with' : 'signup_with'}
-            shape="rectangular"
-            theme="filled_blue"
-            width="200"
+            width="100%"
+          />
+          <LoginWithTwitter
+            authCallback={onTwitterLoginSuccess}
+            onFailure={onTwitterLoginError}
+            consumerKey={import.meta.env.VITE_X_CONSUMER_KEY}
+            consumerSecret={import.meta.env.VITE_X_CONSUMER_SECRET}
+            style={{ width: '100%' }}
+          >
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<XIcon />}
+              sx={{
+                justifyContent: 'center',
+                textTransform: 'none',
+                height: '40px',
+                color: '#000000',
+                borderColor: '#000000',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                  borderColor: '#000000',
+                },
+              }}
+            >
+              Registrarse con X
+            </Button>
+          </LoginWithTwitter>
+          <AppleLogin 
+            clientId={import.meta.env.VITE_APPLE_CLIENT_ID}
+            redirectURI={import.meta.env.VITE_APPLE_CALLBACK_URL}
+            responseType={"code id_token"}
+            responseMode={"form_post"}
+            usePopup={true}
+            callback={onAppleLoginSuccess}
+            scope="email name"
+            render={renderProps => (
+              <Button
+                onClick={renderProps.onClick}
+                disabled={renderProps.disabled}
+                fullWidth
+                variant="outlined"
+                sx={{
+                  justifyContent: 'center',
+                  textTransform: 'none',
+                  height: '40px',
+                  color: '#000',
+                  backgroundColor: '#fff',
+                  borderColor: '#000',
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5',
+                    borderColor: '#000',
+                  },
+                }}
+              >
+                <Box component="span" sx={{ fontFamily: '-apple-system, BlinkMacSystemFont', fontSize: '18px', mr: 1 }}></Box>
+                Registrarse con Apple
+              </Button>
+            )}
           />
         </Box>
 

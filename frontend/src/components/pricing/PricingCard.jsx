@@ -4,11 +4,11 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
-const PricingCard = ({ title, price, price_period, features, isFeatured = false }) => {
+const PricingCard = ({ title, price, price_period, features, isFeatured = false, priceId }) => {
   const navigate = useNavigate();
 
   const handleSelectPlan = () => {
-    navigate('/checkout', { state: { plan: { title, price, price_period, features, isFeatured } } });
+    navigate('/checkout', { state: { plan: { title, price, priceId, price_period } } });
   };
 
   return (

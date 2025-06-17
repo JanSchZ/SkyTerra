@@ -49,67 +49,46 @@ class CouponViewSet(viewsets.ModelViewSet):
 
 class CreateCheckoutSessionView(APIView):
     """
-    Creates a Stripe Checkout Session for the selected plan.
+    Creates a Stripe Checkout Session for the selected subscription plan.
     """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        plan = request.data.get('plan')
-        coupon_code = request.data.get('coupon_code')
+        # El frontend debe enviar el ID del precio de Stripe (ej. price_xxxxxxxx)
+        price_id = request.data.get('priceId')
+        coupon_id = request.data.get('couponId') # El frontend debe enviar un ID de cupón de Stripe
 
-        if not plan:
-            return Response({'error': 'Plan not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not price_id:
+            return Response({'error': 'Price ID not provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
         stripe.api_key = settings.STRIPE_SECRET_KEY
         
         try:
-            # Basic price parsing from string like "1,5 UF" or "Desde 5 UF"
-            price_str = plan.get('price', '0').replace(',', '.').split(' ')[-2]
-            unit_amount = int(float(price_str) * 100) # Convert to cents
-            
-            line_items = [{
-                'price_data': {
-                    'currency': 'clp', # Assuming CLP, Stripe does not support UF
-                    'product_data': {
-                        'name': plan.get('title', 'Sin Título'),
-                        'description': f"Plan {plan.get('title')} en SkyTerra",
-                    },
-                    'unit_amount': unit_amount, # This should be adjusted based on real UF to CLP conversion
-                },
-                'quantity': 1,
-            }]
-            
-            discounts = []
-            if coupon_code:
-                try:
-                    # We can reuse the coupon validation logic or just fetch it
-                    coupon = Coupon.objects.get(code__iexact=coupon_code, is_active=True)
-                    # This is a simplification. Stripe needs a coupon ID created via the Stripe API.
-                    # For a real implementation, you'd sync your coupons with Stripe.
-                    # For now, we are creating a Stripe coupon on the fly.
-                    stripe_coupon = stripe.Coupon.create(
-                        percent_off=float(coupon.value) if coupon.discount_type == 'percentage' else None,
-                        amount_off=int(coupon.value * 100) if coupon.discount_type == 'fixed' else None,
-                        currency='clp',
-                        duration='once'
-                    )
-                    discounts.append({'coupon': stripe_coupon.id})
+            # Configuración para la sesión de checkout
+            session_params = {
+                'payment_method_types': ['card', 'webpay'], # Habilitamos tarjeta y Webpay
+                'line_items': [{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                'mode': 'subscription', # Cambiamos a modo de suscripción
+                'success_url': settings.CLIENT_URL + '/payment-success?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url': settings.CLIENT_URL + '/payment-cancelled',
+                'customer_email': request.user.email,
+                'allow_promotion_codes': True, # Permitimos que los usuarios ingresen códigos de descuento en la página de Stripe
+            }
 
-                except Coupon.DoesNotExist:
-                    return Response({'error': 'Coupon not found.'}, status=status.HTTP_400_BAD_REQUEST)
+            # Si se proporciona un ID de cupón, lo aplicamos
+            if coupon_id:
+                session_params['discounts'] = [{'coupon': coupon_id}]
 
-
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=line_items,
-                mode='payment',
-                success_url=settings.CLIENT_URL + '/payment-success?session_id={CHECKOUT_SESSION_ID}',
-                cancel_url=settings.CLIENT_URL + '/payment-cancelled',
-                customer_email=request.user.email,
-                discounts=discounts
-            )
+            checkout_session = stripe.checkout.Session.create(**session_params)
             
             return JsonResponse({'id': checkout_session.id})
 
+        except stripe.error.StripeError as e:
+            # Errores específicos de Stripe
+            return Response({'error': f"Stripe error: {e.user_message}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Otros errores
+            return Response({'error': f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

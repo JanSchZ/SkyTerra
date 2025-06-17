@@ -10,6 +10,7 @@ const particularPlans = [
     title: 'Básico',
     price: '1,5 UF',
     price_period: '/ mensual',
+    priceId: 'price_xxxxxxxxxxxxxx1',
     features: [
       '1 Aviso activo',
       'Tour 360 con 2 vistas aéreas',
@@ -21,6 +22,7 @@ const particularPlans = [
     title: 'Avanzado',
     price: '3 UF',
     price_period: '/ mensual',
+    priceId: 'price_xxxxxxxxxxxxxx2',
     features: [
       '1 Aviso activo',
       'Tour virtual con 5 vistas aéreas',
@@ -34,6 +36,7 @@ const particularPlans = [
     title: 'Pro',
     price: '9 UF',
     price_period: '/ mensual',
+    priceId: 'price_xxxxxxxxxxxxxx3',
     features: [
       'Todo lo de Avanzado +',
       '7 vistas aéreas + 10 terrestres',
@@ -50,6 +53,7 @@ const profesionalPlans = [
       title: 'Start',
       price: 'Desde 5 UF',
       price_period: '/ mensual',
+      priceId: 'price_xxxxxxxxxxxxxx4',
       features: [
         'Hasta 3 avisos activos',
         'Gestión y datos de propiedades',
@@ -61,6 +65,7 @@ const profesionalPlans = [
       title: 'Growth',
       price: 'Desde 13 UF',
       price_period: '/ mensual',
+      priceId: 'price_xxxxxxxxxxxxxx5',
       features: [
         'Hasta 10 avisos activos',
         'Gestión y datos de propiedades',
@@ -74,6 +79,7 @@ const profesionalPlans = [
       title: 'Enterprise',
       price: 'Desde 36.5 UF',
       price_period: '/ mensual',
+      priceId: 'price_xxxxxxxxxxxxxx6',
       features: [
         'Hasta 30 avisos activos',
         'Función TEAMS para equipos',

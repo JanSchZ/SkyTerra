@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   Box, Stepper, Step, StepLabel, Button, Paper, Typography, TextField, MenuItem, Slider, Grid, Card, CardActionArea, CardContent, Snackbar, Alert
 } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import { liquidGlassTheme } from '../../theme/liquidGlassTheme';
 import { motion, AnimatePresence } from 'framer-motion';
 import MapView from '../map/MapView';
 import { propertyService } from '../../services/api';
@@ -13,6 +15,14 @@ const planOptions = [
   { key: 'pro', title: 'Pro', price: 79990, description: 'Tour extendido, 50 fotos Pro, video aéreo' },
   { key: 'premium', title: 'Premium', price: 149990, description: 'Todo lo anterior + Plusvalía Score' }
 ];
+
+const propertyTypes = [
+  { value: 'farm', label: 'Parcela / Granja', icon: '🌿' },
+  { value: 'lot', label: 'Sitio urbano', icon: '🏙️' },
+  { value: 'house', label: 'Casa', icon: '🏠' }
+];
+
+const theme = liquidGlassTheme('light');
 
 export default function CreatePublicationWizard() {
   const [activeStep, setActiveStep] = useState(0);
@@ -66,26 +76,86 @@ export default function CreatePublicationWizard() {
       case 0:
         return (
           <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <TextField fullWidth label="Nombre" value={propertyData.name} onChange={(e) => setPropertyData({ ...propertyData, name: e.target.value })} />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField select fullWidth label="Tipo" value={propertyData.type} onChange={(e) => setPropertyData({ ...propertyData, type: e.target.value })}>
-                <MenuItem value="farm">Parcela / Granja</MenuItem>
-                <MenuItem value="lot">Sitio urbano</MenuItem>
-                <MenuItem value="house">Casa</MenuItem>
-              </TextField>
-            </Grid>
             <Grid item xs={12}>
-              <TextField fullWidth multiline minRows={3} label="Descripción" value={propertyData.description} onChange={(e) => setPropertyData({ ...propertyData, description: e.target.value })} />
+              <TextField 
+                fullWidth 
+                label="Nombre de la propiedad" 
+                value={propertyData.name} 
+                onChange={(e) => setPropertyData({ ...propertyData, name: e.target.value })}
+                variant="outlined"
+                sx={{ mb: 3 }}
+              />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography gutterBottom>Precio (CLP)</Typography>
-              <Slider value={propertyData.price} min={10000000} max={1000000000} step={1000000} onChange={(e, v)=> setPropertyData({ ...propertyData, price: v })} valueLabelDisplay="auto" />
+            
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" sx={{ mb: 2 }}>Tipo de propiedad</Typography>
+              <Grid container spacing={2}>
+                {propertyTypes.map((type) => (
+                  <Grid item xs={4} key={type.value}>
+                    <Card 
+                      variant={propertyData.type === type.value ? 'outlined' : 'elevation'}
+                      sx={{ 
+                        p: 2, 
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        border: propertyData.type === type.value ? '2px solid ' + theme.palette.primary.main : '1px solid #ddd',
+                        backgroundColor: propertyData.type === type.value ? 'rgba(25, 118, 210, 0.08)' : '#fff'
+                      }}
+                      onClick={() => setPropertyData({ ...propertyData, type: type.value })}
+                    >
+                      <Typography variant="h4" sx={{ mb: 1 }}>{type.icon}</Typography>
+                      <Typography variant="body1">{type.label}</Typography>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography gutterBottom>Tamaño (ha)</Typography>
-              <Slider value={propertyData.size} min={0.1} max={1000} step={0.1} onChange={(e, v)=> setPropertyData({ ...propertyData, size: v })} valueLabelDisplay="auto" />
+            
+            <Grid item xs={12}>
+              <TextField 
+                fullWidth 
+                multiline 
+                minRows={4} 
+                label="Descripción" 
+                value={propertyData.description} 
+                onChange={(e) => setPropertyData({ ...propertyData, description: e.target.value })} 
+                variant="outlined"
+                sx={{ mt: 2 }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6} sx={{ mt: 3 }}>
+              <Typography variant="subtitle1" gutterBottom>Precio (CLP)</Typography>
+              <Slider 
+                value={propertyData.price} 
+                min={10000000} 
+                max={1000000000} 
+                step={1000000} 
+                onChange={(e, v) => setPropertyData({ ...propertyData, price: v })} 
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => `$${value.toLocaleString()}`}
+                sx={{ color: theme.palette.primary.main }}
+              />
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                Valor: ${propertyData.price.toLocaleString()}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12} md={6} sx={{ mt: 3 }}>
+              <Typography variant="subtitle1" gutterBottom>Tamaño (hectáreas)</Typography>
+              <Slider 
+                value={propertyData.size} 
+                min={0.1} 
+                max={1000} 
+                step={0.1} 
+                onChange={(e, v) => setPropertyData({ ...propertyData, size: v })} 
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => `${value} ha`}
+                sx={{ color: theme.palette.primary.main }}
+              />
+              <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                Tamaño: {propertyData.size} hectáreas
+              </Typography>
             </Grid>
           </Grid>
         );
@@ -105,27 +175,120 @@ export default function CreatePublicationWizard() {
         );
       case 2:
         return (
-          <Grid container spacing={2}>
-            {planOptions.map((plan) => (
-              <Grid item xs={12} md={4} key={plan.key}>
-                <Card variant={propertyData.plan === plan.key ? 'outlined' : undefined}>
-                  <CardActionArea onClick={() => setPropertyData({ ...propertyData, plan: plan.key })}>
-                    <CardContent>
-                      <Typography variant="h6">{plan.title}</Typography>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>{plan.description}</Typography>
-                      <Typography variant="h5">{plan.price === 0 ? 'Gratis' : `$${plan.price.toLocaleString()}`}</Typography>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+          <Box>
+            <Typography variant="h5" sx={{ mb: 3, textAlign: 'center' }}>Elige tu plan de publicación</Typography>
+            <Grid container spacing={3} justifyContent="center">
+              {planOptions.map((plan) => (
+                <Grid item xs={12} md={4} key={plan.key}>
+                  <Card 
+                    variant="glass"
+                    sx={{
+                      p: 3,
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      border: propertyData.plan === plan.key ? '2px solid ' + theme.palette.primary.main : '1px solid rgba(255,255,255,0.3)',
+                      backgroundColor: propertyData.plan === plan.key ? 'rgba(25, 118, 210, 0.15)' : undefined,
+                      position: 'relative',
+                      overflow: 'visible',
+                      minHeight: 300,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}
+                    onClick={() => setPropertyData({ ...propertyData, plan: plan.key })}
+                  >
+                    {propertyData.plan === plan.key && (
+                      <Box sx={{
+                        position: 'absolute',
+                        top: -12,
+                        right: -12,
+                        backgroundColor: theme.palette.primary.main,
+                        borderRadius: '50%',
+                        width: 40,
+                        height: 40,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        zIndex: 1
+                      }}>
+                        ✓
+                      </Box>
+                    )}
+                    <Box>
+                      <Typography variant="h3" sx={{ mb: 2, fontSize: '3rem' }}>
+                        {plan.key === 'basic' && '📷'}
+                        {plan.key === 'pro' && '📹'}
+                        {plan.key === 'premium' && '📈'}
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>{plan.title}</Typography>
+                      <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>{plan.description}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.primary.main }}>
+                        {plan.price === 0 ? 'Gratis' : `$${plan.price.toLocaleString()}`}
+                      </Typography>
+                      {plan.price > 0 && (
+                        <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                          Pago único
+                        </Typography>
+                      )}
+                    </Box>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
         );
       case 3:
         return (
           <Box>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Revisión final (placeholder)</Typography>
-            <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{JSON.stringify(propertyData, null, 2)}</pre>
+            <Typography variant="h5" sx={{ mb: 3, textAlign: 'center' }}>Resumen de publicación</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Card variant="glass" sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, borderBottom: '1px solid rgba(0,0,0,0.12)', pb: 1 }}>Información básica</Typography>
+                  <Typography><strong>Nombre:</strong> {propertyData.name}</Typography>
+                  <Typography><strong>Tipo:</strong> {propertyTypes.find(t => t.value === propertyData.type)?.label}</Typography>
+                  <Typography><strong>Descripción:</strong> {propertyData.description}</Typography>
+                  <Typography><strong>Precio:</strong> ${propertyData.price.toLocaleString()} CLP</Typography>
+                  <Typography><strong>Tamaño:</strong> {propertyData.size} hectáreas</Typography>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card variant="glass" sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, borderBottom: '1px solid rgba(0,0,0,0.12)', pb: 1 }}>Ubicación</Typography>
+                  <Typography><strong>Latitud:</strong> {propertyData.latitude}</Typography>
+                  <Typography><strong>Longitud:</strong> {propertyData.longitude}</Typography>
+                  <Box sx={{ mt: 2, height: 150 }}>
+                    <MapView
+                      staticView
+                      filters={{}}
+                      appliedFilters={{}}
+                      initialViewState={{
+                        longitude: propertyData.longitude,
+                        latitude: propertyData.latitude,
+                        zoom: 12
+                      }}
+                    />
+                  </Box>
+                </Card>
+              </Grid>
+              <Grid item xs={12}>
+                <Card variant="glass" sx={{ p: 3 }}>
+                  <Typography variant="h6" sx={{ mb: 2, borderBottom: '1px solid rgba(0,0,0,0.12)', pb: 1 }}>Plan de publicación</Typography>
+                  {propertyData.plan ? (
+                    <>
+                      <Typography><strong>Plan:</strong> {planOptions.find(p => p.key === propertyData.plan)?.title}</Typography>
+                      <Typography><strong>Descripción:</strong> {planOptions.find(p => p.key === propertyData.plan)?.description}</Typography>
+                      <Typography><strong>Precio:</strong> {planOptions.find(p => p.key === propertyData.plan)?.price === 0 ? 'Gratis' : `$${planOptions.find(p => p.key === propertyData.plan)?.price.toLocaleString()} CLP`}</Typography>
+                    </>
+                  ) : (
+                    <Typography>No se ha seleccionado ningún plan</Typography>
+                  )}
+                </Card>
+              </Grid>
+            </Grid>
           </Box>
         );
       default:
@@ -134,7 +297,8 @@ export default function CreatePublicationWizard() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
+    <ThemeProvider theme={theme}>
+      <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
         {steps.map((label) => (
           <Step key={label}>
@@ -163,6 +327,7 @@ export default function CreatePublicationWizard() {
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({...snackbar, open:false})}>
         <Alert severity={snackbar.severity} onClose={() => setSnackbar({...snackbar, open:false})}>{snackbar.message}</Alert>
       </Snackbar>
-    </Box>
+      </Box>
+    </ThemeProvider>
   );
-} 
+}

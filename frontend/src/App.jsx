@@ -354,6 +354,68 @@ function App() {
     setSnackbarOpen(true);
   };
 
+  const handleXLoginSuccess = async (response) => {
+    // La respuesta de react-login-with-twitter es una URL con parámetros
+    const params = new URLSearchParams(response.split('?')[1]);
+    const authData = {
+      oauth_token: params.get('oauth_token'),
+      oauth_verifier: params.get('oauth_verifier'),
+      // La librería no nos devuelve el oauth_token_secret, dj-rest-auth lo gestiona.
+    };
+
+    try {
+      const data = await authService.xLogin(authData);
+      const authenticatedUser = data.user;
+      setUser(authenticatedUser);
+      setSnackbarMessage('¡Inicio de sesión con X exitoso!');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      if (authenticatedUser?.is_staff) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
+    } catch (error) {
+      handleAuthError(error, 'Error al iniciar sesión con X.');
+    }
+  };
+
+  const handleXLoginError = (error) => {
+    console.error("X login failed:", error);
+    handleAuthError(error, 'El proceso de inicio de sesión con X fue cancelado o falló.');
+  };
+
+  const handleAppleLoginSuccess = async (response) => {
+    if (response.error) {
+      console.error("Apple login error:", response.error);
+      handleAuthError({ message: response.error }, 'El proceso de inicio de sesión con Apple falló.');
+      return;
+    }
+
+    try {
+      const data = await authService.appleLogin(response);
+      const authenticatedUser = data.user;
+      setUser(authenticatedUser);
+      setSnackbarMessage('¡Inicio de sesión con Apple exitoso!');
+      setSnackbarSeverity('success');
+      setSnackbarOpen(true);
+      if (authenticatedUser?.is_staff) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
+    } catch (error) {
+      handleAuthError(error, 'Error al iniciar sesión con Apple.');
+    }
+  };
+
+  const handleAuthError = (error, defaultMessage) => {
+    console.error("Auth error:", error);
+    setSnackbarMessage(error.message || defaultMessage);
+    setSnackbarSeverity('error');
+    setSnackbarOpen(true);
+  };
+
   if (loadingAuth) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
@@ -464,8 +526,8 @@ function App() {
           </motion.div>
         } 
       />
-      <Route path="/login" element={<AuthPage formType="login" onLogin={handleLogin} onRegister={handleRegister} onGoogleLoginSuccess={handleGoogleLoginSuccess} onGoogleLoginError={handleGoogleLoginError} />} />
-      <Route path="/register" element={<AuthPage formType="register" onLogin={handleLogin} onRegister={handleRegister} onGoogleLoginSuccess={handleGoogleLoginSuccess} onGoogleLoginError={handleGoogleLoginError} />} />
+      <Route path="/login" element={<AuthPage formType="login" onLogin={handleLogin} onRegister={handleRegister} onGoogleLoginSuccess={handleGoogleLoginSuccess} onGoogleLoginError={handleGoogleLoginError} onTwitterLoginSuccess={handleXLoginSuccess} onTwitterLoginError={handleXLoginError} onAppleLoginSuccess={handleAppleLoginSuccess} />} />
+      <Route path="/register" element={<AuthPage formType="register" onLogin={handleLogin} onRegister={handleRegister} onGoogleLoginSuccess={handleGoogleLoginSuccess} onGoogleLoginError={handleGoogleLoginError} onTwitterLoginSuccess={handleXLoginSuccess} onTwitterLoginError={handleXLoginError} onAppleLoginSuccess={handleAppleLoginSuccess} />} />
       <Route path="/property/:id" element={<PropertyDetails user={user?.user || user} />} />
       <Route path="/tour/:tourId" element={<TourViewer />} />
       <Route path="/compare" element={<ProtectedRoute user={user} element={<CompareView />} />} />
@@ -496,209 +558,211 @@ function App() {
   );
 
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <div className="App">
-        {/* UI principal siempre visible (Header Minimalista, etc.) */}
-        {/* Condición para no mostrar en property, tour, o dashboard */}
-        {showTopBar && (
-          <Box // This Box is the main container for the top bar elements
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              p: isMobile ? 1 : 2,
-              zIndex: 1200,
-              display: 'flex', // Changed to flex to allow vertical stacking of AISearchBar and FiltersDisplay
-              flexDirection: 'column', // Stack vertically
-              alignItems: 'center', // Center items horizontally in the column
-            }}
-          >
-            <Box // This Box wraps the original top bar content (Logo, Search, UserMenu)
+    <AuthContext.Provider value={{ user, handleLogin, handleRegister, handleLogout, handleGoogleLoginSuccess, handleGoogleLoginError, handleXLoginSuccess, handleXLoginError, handleAppleLoginSuccess }}>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <div className="App">
+          {/* UI principal siempre visible (Header Minimalista, etc.) */}
+          {/* Condición para no mostrar en property, tour, o dashboard */}
+          {showTopBar && (
+            <Box // This Box is the main container for the top bar elements
               sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                width: '100%',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                p: isMobile ? 1 : 2,
+                zIndex: 1200,
+                display: 'flex', // Changed to flex to allow vertical stacking of AISearchBar and FiltersDisplay
+                flexDirection: 'column', // Stack vertically
+                alignItems: 'center', // Center items horizontally in the column
               }}
             >
-              <Typography 
-                variant={isMobile ? "h6" : "h5"}
-                component="div" 
-                onClick={() => navigate('/')}
+              <Box // This Box wraps the original top bar content (Logo, Search, UserMenu)
                 sx={{
-                  color: '#e0e0e0',
-                  fontFamily: 'Poppins, sans-serif',
-                  fontWeight: 300,
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  paddingRight: 2,
-                  paddingLeft: isMobile ? 1 : 3,
-                  transition: 'color 0.3s ease-in-out',
-                  '&:hover': {
-                    color: '#ffffff',
-                  }
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  width: '100%',
                 }}
               >
-                SKYTERRA
-              </Typography>
+                <Typography 
+                  variant={isMobile ? "h6" : "h5"}
+                  component="div" 
+                  onClick={() => navigate('/')}
+                  sx={{
+                    color: '#e0e0e0',
+                    fontFamily: 'Poppins, sans-serif',
+                    fontWeight: 300,
+                    letterSpacing: '0.05em',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    paddingRight: 2,
+                    paddingLeft: isMobile ? 1 : 3,
+                    transition: 'color 0.3s ease-in-out',
+                    '&:hover': {
+                      color: '#ffffff',
+                    }
+                  }}
+                >
+                  SKYTERRA
+                </Typography>
 
-              <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
-                <Box sx={{ width: '100%', maxWidth: '700px' }}> {/* This ensures AISearchBar keeps its width */}
-                  <AISearchBar 
-                    onSearch={handleAISearch} 
-                    onLocationSearch={handleLocationSearch}
-                    onSearchStart={handleSearchStart}
-                    onSearchComplete={handleSearchComplete}
-                  />
+                <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
+                  <Box sx={{ width: '100%', maxWidth: '700px' }}> {/* This ensures AISearchBar keeps its width */}
+                    <AISearchBar 
+                      onSearch={handleAISearch} 
+                      onLocationSearch={handleLocationSearch}
+                      onSearchStart={handleSearchStart}
+                      onSearchComplete={handleSearchComplete}
+                    />
+                  </Box>
                 </Box>
-              </Box>
 
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                {user ? (
-                  <>
-                    <IconButton
-                      onClick={openUserMenu}
-                      onMouseEnter={handleAvatarMouseEnter}
-                      onMouseLeave={handleAvatarMouseLeave}
-                      sx={(theme) => ({
-                        backgroundColor: 'rgba(255,255,255,0.18)',
-                        backdropFilter: 'blur(8px)',
-                        WebkitBackdropFilter: 'blur(8px)',
-                        border: '1px solid rgba(255,255,255,0.25)',
-                        color: theme.palette.common.white,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                        transition: 'box-shadow 0.8s ease, transform 0.25s ease',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: '50%',
-                          backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.15) 100%)',
-                          backgroundSize: '200% 100%',
-                          opacity: 0,
-                          transform: 'scale(0.9)',
-                          transition: 'opacity 1s cubic-bezier(0.25,0.1,0.25,1), transform 1s cubic-bezier(0.25,0.1,0.25,1), background-position 5s ease',
-                          pointerEvents: 'none',
-                        },
-                        '&:hover': {
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  {user ? (
+                    <>
+                      <IconButton
+                        onClick={openUserMenu}
+                        onMouseEnter={handleAvatarMouseEnter}
+                        onMouseLeave={handleAvatarMouseLeave}
+                        sx={(theme) => ({
                           backgroundColor: 'rgba(255,255,255,0.18)',
-                          transform: 'scale(1.05)',
-                          boxShadow: '0 0 12px rgba(255,255,255,0.3)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(255,255,255,0.25)',
+                          color: theme.palette.common.white,
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                          transition: 'box-shadow 0.8s ease, transform 0.25s ease',
+                          position: 'relative',
+                          overflow: 'hidden',
                           '&::before': {
-                            opacity: 0.4,
-                            transform: 'scale(1)',
-                            backgroundPosition: '180% 0',
+                            content: '""',
+                            position: 'absolute',
+                            inset: 0,
+                            borderRadius: '50%',
+                            backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.15) 100%)',
+                            backgroundSize: '200% 100%',
+                            opacity: 0,
+                            transform: 'scale(0.9)',
+                            transition: 'opacity 1s cubic-bezier(0.25,0.1,0.25,1), transform 1s cubic-bezier(0.25,0.1,0.25,1), background-position 5s ease',
+                            pointerEvents: 'none',
                           },
-                        },
+                          '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.18)',
+                            transform: 'scale(1.05)',
+                            boxShadow: '0 0 12px rgba(255,255,255,0.3)',
+                            '&::before': {
+                              opacity: 0.4,
+                              transform: 'scale(1)',
+                              backgroundPosition: '180% 0',
+                            },
+                          },
+                        })}
+                      >
+                        <AccountCircleIcon />
+                      </IconButton>
+                      <Menu
+                        id="user-menu"
+                        anchorEl={userMenuAnchorEl}
+                        open={Boolean(userMenuAnchorEl)}
+                        onClose={closeUserMenu}
+                        onMouseEnter={handleMenuMouseEnter}
+                        onMouseLeave={handleMenuMouseLeave}
+                        TransitionComponent={Grow}
+                        PaperProps={{
+                          sx: {
+                            backgroundColor: 'rgba(255,255,255,0.18)',
+                            borderRadius: '12px',
+                            backdropFilter: 'blur(14px)',
+                            WebkitBackdropFilter: 'blur(14px)',
+                            border: '1px solid rgba(255, 255, 255, 0.25)',
+                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                            color: 'white',
+                            '& .MuiMenuItem-root': {
+                              color: 'white',
+                              borderBottom: '1px solid rgba(255,255,255,0.08)',
+                              '&:last-child': {
+                                borderBottom: 'none',
+                              },
+                            }
+                          }
+                        }}
+                      >
+                        {user && (
+                          <MenuItem sx={{ color: 'text.primary', pt: 1.5, pb: 0.5, opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{user.username}</Typography>
+                          </MenuItem>
+                        )}
+                        {user && user.groups && user.groups.length > 0 && (
+                          <MenuItem sx={{ color: 'text.secondary', pb: 1.5, pt: 0.5, borderBottom: '1px solid rgba(255,255,255,0.15)', opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                            <Typography variant="caption">{user.groups[0]}</Typography>
+                          </MenuItem>
+                        )}
+                        <MenuItem onClick={() => { 
+                          const dest = user?.is_staff ? '/admin/dashboard' : '/dashboard';
+                          navigate(dest);
+                          closeUserMenu();
+                        }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>
+                          Dashboard
+                        </MenuItem>
+                        <MenuItem onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
+                        <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
+                        <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
+                        <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
+                      </Menu>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      onClick={() => navigate('/login')}
+                      sx={(theme)=>({
+                        borderColor: 'rgba(120, 120, 120, 0.7)', color: theme.palette.primary.main, fontWeight: 300,
+                        padding: '6px 12px', fontSize: '0.8rem',
+                        backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(6px)',
+                        '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
                       })}
                     >
-                      <AccountCircleIcon />
-                    </IconButton>
-                    <Menu
-                      id="user-menu"
-                      anchorEl={userMenuAnchorEl}
-                      open={Boolean(userMenuAnchorEl)}
-                      onClose={closeUserMenu}
-                      onMouseEnter={handleMenuMouseEnter}
-                      onMouseLeave={handleMenuMouseLeave}
-                      TransitionComponent={Grow}
-                      PaperProps={{
-                        sx: {
-                          backgroundColor: 'rgba(255,255,255,0.18)',
-                          borderRadius: '12px',
-                          backdropFilter: 'blur(14px)',
-                          WebkitBackdropFilter: 'blur(14px)',
-                          border: '1px solid rgba(255, 255, 255, 0.25)',
-                          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-                          color: 'white',
-                          '& .MuiMenuItem-root': {
-                            color: 'white',
-                            borderBottom: '1px solid rgba(255,255,255,0.08)',
-                            '&:last-child': {
-                              borderBottom: 'none',
-                            },
-                          }
-                        }
-                      }}
-                    >
-                      {user && (
-                        <MenuItem sx={{ color: 'text.primary', pt: 1.5, pb: 0.5, opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{user.username}</Typography>
-                        </MenuItem>
-                      )}
-                      {user && user.groups && user.groups.length > 0 && (
-                        <MenuItem sx={{ color: 'text.secondary', pb: 1.5, pt: 0.5, borderBottom: '1px solid rgba(255,255,255,0.15)', opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
-                          <Typography variant="caption">{user.groups[0]}</Typography>
-                        </MenuItem>
-                      )}
-                      <MenuItem onClick={() => { 
-                        const dest = user?.is_staff ? '/admin/dashboard' : '/dashboard';
-                        navigate(dest);
-                        closeUserMenu();
-                      }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>
-                        Dashboard
-                      </MenuItem>
-                      <MenuItem onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
-                      <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
-                      <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
-                      <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
-                    </Menu>
-                  </>
-                ) : (
-                  <Button
-                    variant="outlined"
-                    onClick={() => navigate('/login')}
-                    sx={(theme)=>({
-                      borderColor: 'rgba(120, 120, 120, 0.7)', color: theme.palette.primary.main, fontWeight: 300,
-                      padding: '6px 12px', fontSize: '0.8rem',
-                      backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(6px)',
-                      '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
-                    })}
-                  >
-                    Login
-                  </Button>
-                )}
+                      Login
+                    </Button>
+                  )}
+                </Box>
               </Box>
+              {/* Removed AppliedFiltersDisplay to keep filters internal and invisible to user */}
             </Box>
-            {/* Removed AppliedFiltersDisplay to keep filters internal and invisible to user */}
-          </Box>
-        )}
+          )}
 
-        {/* Snackbar para notificaciones */}
-        <Snackbar 
-          open={snackbarOpen} 
-          autoHideDuration={6000} 
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
-            {snackbarMessage}
-          </Alert>
-        </Snackbar>
+          {/* Snackbar para notificaciones */}
+          <Snackbar 
+            open={snackbarOpen} 
+            autoHideDuration={6000} 
+            onClose={handleCloseSnackbar}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+              {snackbarMessage}
+            </Alert>
+          </Snackbar>
 
-        <AnimatePresence mode="wait">
-          {mainContent}
-        </AnimatePresence>
+          <AnimatePresence mode="wait">
+            {mainContent}
+          </AnimatePresence>
 
-        {/* Render AI suggestion panel on left */}
-        <AISuggestionPanel 
-           isLoading={aiSearchLoading}
-           assistantMessage={aiSearchResult?.assistant_message}
-           recommendations={aiSearchResult?.recommendations}
-           searchMode={aiSearchResult?.search_mode}
-           flyToLocation={aiSearchResult?.flyToLocation}
-           onSuggestionClick={handleSuggestionClick}
-           onSuggestionHover={null}
-           onClearAISearch={() => { setAiSearchResult(null); setAiAppliedFilters(null);} }
-           onFollowUpQuery={handleFollowUpQuery}
-           currentQuery={aiSearchResult?.interpretation}
-        />
-      </div>
-    </GoogleOAuthProvider>
+          {/* Render AI suggestion panel on left */}
+          <AISuggestionPanel 
+             isLoading={aiSearchLoading}
+             assistantMessage={aiSearchResult?.assistant_message}
+             recommendations={aiSearchResult?.recommendations}
+             searchMode={aiSearchResult?.search_mode}
+             flyToLocation={aiSearchResult?.flyToLocation}
+             onSuggestionClick={handleSuggestionClick}
+             onSuggestionHover={null}
+             onClearAISearch={() => { setAiSearchResult(null); setAiAppliedFilters(null);} }
+             onFollowUpQuery={handleFollowUpQuery}
+             currentQuery={aiSearchResult?.interpretation}
+          />
+        </div>
+      </GoogleOAuthProvider>
+    </AuthContext.Provider>
   );
 }
 
