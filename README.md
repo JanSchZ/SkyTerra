@@ -36,9 +36,11 @@ cd SkyTerraV1 # Or your repository's root folder name
 
 ### 2. Configure Environment Variables
 
-*   Copy the example `.env.example` file to a new file named `.env` in the **root** of the project.
+# Environment setup
+
+*   Copy the example `env.example` file to a new file named `.env` in the **root** of the project:
     ```bash
-    cp .env.example .env
+    cp env.example .env
     ```
 *   Edit the `.env` file with your specific configurations:
     *   `SECRET_KEY`: A unique secret key for your Django application. You can generate one using:
@@ -48,7 +50,10 @@ cd SkyTerraV1 # Or your repository's root folder name
     *   `DEBUG`: Set to `True` for development, `False` for production.
     *   `DATABASE_URL`: Your PostgreSQL connection string (e.g., `postgres://user:password@host:port/dbname`). For initial development, Django will default to SQLite if this is not set or is misconfigured, creating a `db.sqlite3` file in the `backend/` directory.
     *   `GEMINI_API_KEY`: Your Google Gemini API key.
-    *   `VITE_MAPBOX_TOKEN`: Your Mapbox access token (this will be used by the frontend).
+    *   `VITE_MAPBOX_TOKEN`: Your Mapbox access token (used by the frontend).
+    *   `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`: Your Stripe secret and publishable keys (Dashboard → Developers → API keys).
+    *   `STRIPE_WEBHOOK_SECRET`: The signing secret generated when you create a webhook endpoint (use Stripe CLI or Dashboard → Developers → Webhooks).
+    *   `VITE_STRIPE_PUBLISHABLE_KEY`: Same value as `STRIPE_PUBLISHABLE_KEY`, but prefixed with `VITE_` so the frontend can access it.
 
 ### 3. Backend Setup (Django)
 
