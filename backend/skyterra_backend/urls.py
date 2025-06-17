@@ -21,13 +21,9 @@ from django.conf.urls.static import static
 from rest_framework.authtoken import views as token_views
 from properties.views import AISearchView
 from django.http import JsonResponse
-from django.contrib.auth import authenticate, views as auth_views
-from django.contrib.auth.models import User
-from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from rest_framework import status
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from dj_rest_auth.registration.views import SocialLoginView
 from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView, AdminPlanMetricsView  # Import stats view
 from rest_framework import routers
 from support_tickets.views import TicketViewSet, TicketResponseViewSet
@@ -48,132 +44,10 @@ def home_view(request):
         }
     })
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def login_view(request):
-    """Vista para iniciar sesión con email/username y contraseña"""
-    print(f"Login attempt with data: {request.data}")
-
-    login_identifier = request.data.get('login_identifier') # Expecting 'login_identifier' from frontend
-    password = request.data.get('password')
-
-    if not login_identifier or not password:
-        return Response({
-            'error': 'Identificador de inicio de sesión y contraseña son requeridos'
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-    # Authenticate using the custom backend which handles email or username
-    user = authenticate(request, username=login_identifier, password=password)
-    print(f"Authentication result: {user}")
-
-    if user and user.is_active:
-        token, created = Token.objects.get_or_create(user=user)
-        groups = list(user.groups.values_list('name', flat=True))
-        print(f"Token created: {created}, token: {token.key[:10]}...")  # Debug
-        return Response({
-            'token': token.key,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser,
-                'groups': groups,
-            }
-        })
-    else:
-        return Response({
-            'error': 'Credenciales inválidas o usuario inactivo'
-        }, status=status.HTTP_401_UNAUTHORIZED)
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def register_view(request):
-    """Vista para registrar usuario"""
-    print(f"🔄 [REGISTER] Intento de registro con datos: {request.data}")
-    
-    email = request.data.get('email')
-    username = request.data.get('username')
-    password = request.data.get('password')
-    
-    # Validación de campos requeridos
-    if not email or not username or not password:
-        error_msg = 'Email, username y contraseña son requeridos'
-        print(f"❌ [REGISTER] Campos faltantes: {error_msg}")
-        return Response({
-            'error': error_msg
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    print(f"✅ [REGISTER] Campos requeridos presentes: email={email}, username={username}, password_length={len(password) if password else 0}")
-
-    # Validación del formato del email
-    import re
-    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_regex, email):
-        print(f"❌ Email inválido: {email}")
-        return Response({
-            'error': 'Formato de email inválido'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Validación de la contraseña
-    if len(password) < 8:
-        print(f"❌ Contraseña muy corta: {len(password)} caracteres")
-        return Response({
-            'error': 'La contraseña debe tener al menos 8 caracteres'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Verificar si el usuario ya existe por email
-    if User.objects.filter(email=email).exists():
-        print(f"❌ Email ya existe: {email}")
-        return Response({
-            'error': 'Ya existe un usuario con este email'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Verificar si el usuario ya existe por username
-    if User.objects.filter(username=username).exists():
-        print(f"❌ [REGISTER] Username ya existe: {username}")
-        return Response({
-            'error': 'Ya existe un usuario con este nombre de usuario'
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Crear usuario
-    try:
-        print(f"✅ [REGISTER] Creando usuario: {username} ({email})")
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password
-        )
-        user.is_staff = False # Explicitly set is_staff to False
-        user.is_superuser = False # Explicitly set is_superuser to False
-        user.save()
-        print(f"✅ [REGISTER] Usuario creado en base de datos: ID={user.id}, is_staff={user.is_staff}, is_superuser={user.is_superuser}")
-
-        token, created = Token.objects.get_or_create(user=user)
-        groups = list(user.groups.values_list('name', flat=True))
-        
-        print(f"✅ [REGISTER] Usuario creado exitosamente: ID={user.id}, Token={'creado' if created else 'existente'}")
-        
-        return Response({
-            'token': token.key,
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_staff': user.is_staff,
-                'is_superuser': user.is_superuser,
-                'groups': groups,
-            }
-        }, status=status.HTTP_201_CREATED)
-    except Exception as e:
-        print(f"❌ [REGISTER] Error al crear usuario: {str(e)}")
-        return Response({
-            'error': f'Error al crear usuario: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+class GoogleLogin(SocialLoginView):
+    adapter_class = GoogleOAuth2Adapter
+    callback_url = 'http://localhost:8000/api/auth/google/callback/'
+    client_class = OAuth2Client
 
 router = routers.DefaultRouter()
 router.register(r'admin/tickets', TicketViewSet, basename='admin-tickets')
@@ -183,21 +57,9 @@ urlpatterns = [
     path('', home_view, name='home'),  # Ruta raíz
     path('admin/', admin.site.urls),
     path('api/ai-search/', AISearchView.as_view(), name='project-ai-search'),
-    path('api/auth/login/', login_view, name='auth-login'),
-    path('api/auth/register/', register_view, name='auth-register'),
-    # Password Reset URLs (namespaced for clarity, though not strictly necessary here)
-    path('api/auth/password_reset/', 
-         auth_views.PasswordResetView.as_view(template_name='registration/password_reset_form.html', email_template_name='registration/password_reset_email.html', subject_template_name='registration/password_reset_subject.txt'), 
-         name='password_reset'),
-    path('api/auth/password_reset/done/', 
-         auth_views.PasswordResetDoneView.as_view(template_name='registration/password_reset_done.html'), 
-         name='password_reset_done'),
-    path('api/auth/reset/<uidb64>/<token>/', 
-         auth_views.PasswordResetConfirmView.as_view(template_name='registration/password_reset_confirm.html'), 
-         name='password_reset_confirm'),
-    path('api/auth/reset/done/', 
-         auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'), 
-         name='password_reset_complete'),
+    path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
+    path('api/auth/google/', GoogleLogin.as_view(), name='google_login'),
     path('api/admin/dashboard-summary/', AdminDashboardSummaryView.as_view(), name='admin-dashboard-summary'),
     path('api/admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('api/admin/dashboard/stats/', AdminDashboardStatsView.as_view(), name='admin-dashboard-stats'),

@@ -60,9 +60,7 @@ export const api = axios.create({
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('auth_token');
-    
-    // DEBUG: Log every request being made
+    // Ya no es necesario añadir el token manualmente, las cookies se envían automáticamente.
     console.log('🌐 [API Request]', {
       method: config.method?.toUpperCase(),
       url: config.url,
@@ -70,13 +68,6 @@ api.interceptors.request.use(
       fullURL: `${config.baseURL}${config.url}`,
       headers: config.headers
     });
-    
-    // Siempre enviar el token si está disponible. 
-    // El backend determinará si es necesario y si el usuario tiene los permisos adecuados.
-    if (token) {
-      config.headers.Authorization = `Token ${token}`;
-    }
-    
     return config;
   },
   error => {
@@ -141,9 +132,10 @@ export const authService = {
     try {
       console.log('Attempting login with:', { login_identifier: credentials.login_identifier });
       const response = await api.post('/auth/login/', credentials);
-      console.log('Login successful:', response.data);
+      console.log('Login successful, user data received:', response.data);
       
-      localStorage.setItem('auth_token', response.data.token);
+      // El token JWT se establece en una cookie HttpOnly por el backend.
+      // Solo guardamos los datos del usuario en localStorage.
       localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     } catch (error) {
@@ -173,7 +165,8 @@ export const authService = {
       const response = await api.post('/auth/register/', userData);
       console.log('✅ Registro exitoso:', response.data);
       
-      localStorage.setItem('auth_token', response.data.token);
+      // El backend manejará el login después del registro y enviará la cookie.
+      // Guardamos los datos del usuario.
       localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     } catch (error) {
@@ -216,10 +209,42 @@ export const authService = {
     }
   },
 
+  // Iniciar sesión con Google
+  async googleLogin(token) {
+    try {
+      console.log('🔄 Intentando iniciar sesión con Google con ID token');
+      const response = await api.post('/auth/google/', { access_token: token });
+      console.log('✅ Inicio de sesión con Google exitoso:', response.data);
+      
+      // El token JWT se establece en una cookie HttpOnly.
+      // Solo guardamos los datos del usuario.
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error durante el inicio de sesión con Google:', error);
+      if (error.response && error.response.data) {
+        const errorMessage = error.response.data.error || 'Error de autenticación con Google';
+        throw new Error(errorMessage);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Error de conexión con el servidor');
+      }
+    }
+  },
+
   // Cerrar sesión
-  logout() {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+  async logout() {
+    try {
+      // Llama al endpoint de logout del backend para invalidar el token/cookie.
+      await api.post('/auth/logout/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    } finally {
+      // Limpia el estado del frontend independientemente del resultado del backend.
+      localStorage.removeItem('user');
+      // No necesitamos quitar 'auth_token' porque ya no lo usamos.
+    }
   },
 
   // Obtener usuario actual

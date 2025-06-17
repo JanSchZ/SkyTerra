@@ -18,6 +18,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LoginIcon from '@mui/icons-material/Login';
 import CloseIcon from '@mui/icons-material/Close';
+import { GoogleLogin } from '@react-oauth/google';
 
 // Estilos comunes para los TextField
 const commonTextFieldStyles = {
@@ -56,7 +57,7 @@ const commonTextFieldStyles = {
 };
 
 // Componente de formulario de inicio de sesión
-export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose }) => {
+export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -127,6 +128,21 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
         >
           {loading ? 'Iniciando...' : 'Iniciar Sesión'}
         </Button>
+        
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }}>O</Divider>
+
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <GoogleLogin
+            onSuccess={onGoogleLoginSuccess}
+            onError={onGoogleLoginError}
+            disabled={loading}
+            text={formType === 'login' ? 'signin_with' : 'signup_with'}
+            shape="rectangular"
+            theme="filled_blue"
+            width="200"
+          />
+        </Box>
+
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
         <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
           ¿No tienes una cuenta?
@@ -140,7 +156,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
 };
 
 // Componente de formulario de registro
-export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose }) => {
+export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
   // Paso 1: tipo de vendedor (null, 'individual', 'professional')
   const [sellerType, setSellerType] = useState(null);
 
@@ -328,6 +344,21 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
         <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', textTransform: 'none', fontWeight: 500 }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
           {loading ? 'Registrando...' : 'Crear Cuenta'}
         </Button>
+
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }}>O</Divider>
+
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <GoogleLogin
+            onSuccess={onGoogleLoginSuccess}
+            onError={onGoogleLoginError}
+            disabled={loading}
+            text={formType === 'login' ? 'signin_with' : 'signup_with'}
+            shape="rectangular"
+            theme="filled_blue"
+            width="200"
+          />
+        </Box>
+
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
         <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
           ¿Ya tienes una cuenta?
@@ -376,6 +407,28 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
     navigate('/'); // Navigate to home or previous page on close
   };
 
+  const handleGoogleLoginSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Aquí iría la lógica para iniciar sesión con Google
+      // Por ahora, solo simularé el éxito
+      console.log('Simulando inicio de sesión con Google...');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular carga
+      console.log('Simulación de Google Login exitosa.');
+      // Aquí deberías llamar a la función onGoogleLoginSuccess del prop
+      onGoogleLoginSuccess(credentialResponse);
+    } catch (err) {
+      setError(err.message || 'Error al iniciar sesión con Google.');
+    }
+    setIsLoading(false);
+  };
+
+  const handleGoogleLoginError = (error) => {
+    setIsLoading(false);
+    setError(error.errorMessage || 'Error al iniciar sesión con Google.');
+  };
+
   return (
     <Fade in={true} timeout={500}>
       <Box
@@ -385,47 +438,37 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
           left: 0,
           width: '100vw',
           height: '100vh',
+          backgroundColor: 'rgba(13,17,23,0.75)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          zIndex: 1300,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'rgba(13, 17, 23, 0.7)',
-          backdropFilter: 'blur(10px)',
-          zIndex: 1300,
         }}
       >
-        <Paper 
-          elevation={12} 
-          sx={{ 
-            position: 'relative',
-            p: 0,
-            width: '100%',
-            maxWidth: '420px',
-            borderRadius: '16px',
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
-            border: '1px solid rgba(255,255,255,0.25)',
-            boxShadow: '0 10px 24px rgba(0,0,0,0.25)',
-            overflow: 'hidden',
+        <IconButton
+          sx={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            color: 'white',
+            zIndex: 1301,
           }}
+          onClick={handleClose}
         >
-          <IconButton 
-            onClick={handleClose}
-            sx={{ 
-              position: 'absolute', 
-              top: 12, 
-              right: 12, 
-              color: '#e5e5e5',
-              backgroundColor: 'rgba(255,255,255,0.10)',
-              '&:hover': { 
-                color: '#ffffff',
-                backgroundColor: 'rgba(255,255,255,0.18)',
-              } 
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
+          <CloseIcon />
+        </IconButton>
 
+        <Paper elevation={6} sx={{
+          p: { xs: 3, md: 6 },
+          borderRadius: 4,
+          background: 'rgba(30, 41, 59, 0.95)',
+          color: 'white',
+          maxWidth: 480,
+          textAlign: 'center',
+          boxShadow: '0 8px 32px rgba(30, 58, 95, 0.25)',
+        }}>
           {currentForm === 'login' ? (
             <LoginForm 
               onLogin={handleLoginSubmit} 
@@ -433,6 +476,8 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
               error={error}
               onSwitchToRegister={() => { setCurrentForm('register'); setError(null); }}
               onClose={handleClose}
+              onGoogleLoginSuccess={handleGoogleLoginSuccess}
+              onGoogleLoginError={handleGoogleLoginError}
             />
           ) : (
             <RegisterForm 
@@ -441,6 +486,8 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
               error={error}
               onSwitchToLogin={() => { setCurrentForm('login'); setError(null); }}
               onClose={handleClose}
+              onGoogleLoginSuccess={handleGoogleLoginSuccess}
+              onGoogleLoginError={handleGoogleLoginError}
             />
           )}
         </Paper>

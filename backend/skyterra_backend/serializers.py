@@ -24,3 +24,12 @@ class UserSerializer(serializers.ModelSerializer):
         Calculates the number of properties owned by the user.
         """
         return Property.objects.filter(owner=obj).count()
+
+class UserDetailsSerializer(serializers.ModelSerializer):
+    """
+    User model w/o password
+    """
+    class Meta:
+        model = User
+        fields = ('pk', 'username', 'email', 'first_name', 'last_name')
+        read_only_fields = ('email', )

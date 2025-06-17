@@ -53,17 +53,33 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',  # Requerido por allauth
+
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',  # Para manejar CORS con el frontend
     'django_filters',  # Añadimos django-filter
     'storages',  # Soporte para AWS S3 y storage backends
+
+    # dj-rest-auth y allauth
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+
     'properties',   # Nuestra app principal
     'support_tickets', # Nueva app para tickets de soporte
     'payments', # App para cupones y pagos
 ]
 
+SITE_ID = 1
+
 AUTHENTICATION_BACKENDS = [
+    # allauth
+    'allauth.account.auth_backends.AuthenticationBackend',
+    # Django
     'skyterra_backend.backends.EmailOrUsernameModelBackend', # Custom backend
     'django.contrib.auth.backends.ModelBackend', # Default backend
 ]
@@ -78,6 +94,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware', # Middleware de allauth
 ]
 
 # Configuración de API Keys
@@ -227,6 +244,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
+        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -235,4 +253,36 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10
+}
+
+# Configuración de dj-rest-auth
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': 'skyterra-auth',
+    'JWT_AUTH_REFRESH_COOKIE': 'skyterra-refresh-token',
+    'SESSION_LOGIN': False,
+    'USER_DETAILS_SERIALIZER': 'skyterra_backend.serializers.UserDetailsSerializer',
+}
+
+# Configuración de allauth
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_EMAIL_VERIFICATION = 'optional' # Cambiar a 'mandatory' en producción
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    }
 }
