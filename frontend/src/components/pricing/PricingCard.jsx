@@ -2,8 +2,15 @@ import React from 'react';
 import { Card, CardContent, Typography, Box, Button, List, ListItem, ListItemIcon, ListItemText, Divider, Chip } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const PricingCard = ({ title, price, price_period, features, isFeatured = false }) => {
+  const navigate = useNavigate();
+
+  const handleSelectPlan = () => {
+    navigate('/checkout', { state: { plan: { title, price, price_period, features, isFeatured } } });
+  };
+
   return (
     <motion.div whileHover={{ y: -10, scale: 1.02 }} style={{ height: '100%' }}>
       <Card 
@@ -11,14 +18,21 @@ const PricingCard = ({ title, price, price_period, features, isFeatured = false 
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          bgcolor: isFeatured ? 'background.paper' : 'background.default',
+          backgroundColor: isFeatured ? '#f5f9ff' : 'white',
           border: '1px solid',
-          borderColor: isFeatured ? 'primary.main' : 'grey.800',
+          borderColor: isFeatured ? 'primary.main' : 'grey.300',
           borderRadius: 4,
-          boxShadow: isFeatured ? '0 10px 30px rgba(0, 123, 255, 0.25)' : '0 4px 12px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
           position: 'relative',
           overflow: 'hidden',
           p: 2,
+          transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+          '&:hover': {
+            transform: 'translateY(-5px)',
+            boxShadow: isFeatured 
+              ? '0 12px 24px rgba(0, 123, 255, 0.2)' 
+              : '0 8px 16px rgba(0,0,0,0.12)',
+          }
         }}
       >
         {isFeatured && (
@@ -36,11 +50,11 @@ const PricingCard = ({ title, price, price_period, features, isFeatured = false 
         )}
         <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: { xs: 1, md: 2 } }}>
           <Box sx={{ mb: 2 }}>
-            <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', mb: 1 }}>
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', mb: 1 }}>
               {title}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 2 }}>
-              <Typography variant="h3" component="p" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 1.5 }}>
+            <Typography variant="h4" component="p" sx={{ fontWeight: 'bold', color: isFeatured ? 'primary.dark' : 'primary.main' }}>
                 {price}
               </Typography>
               <Typography variant="subtitle1" color="text.secondary" sx={{ ml: 1 }}>
@@ -65,6 +79,7 @@ const PricingCard = ({ title, price, price_period, features, isFeatured = false 
               variant={isFeatured ? 'contained' : 'outlined'} 
               color="primary"
               size="large"
+              onClick={handleSelectPlan}
               sx={{ 
                 borderRadius: 2, 
                 fontWeight: 'bold', 
@@ -82,4 +97,4 @@ const PricingCard = ({ title, price, price_period, features, isFeatured = false 
   );
 };
 
-export default PricingCard; 
+export default PricingCard;

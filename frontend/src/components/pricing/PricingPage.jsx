@@ -99,7 +99,12 @@ const PricingPage = () => {
   const title = planType === 'particular' ? 'Para Dueños Particulares' : 'Para Vendedores Profesionales';
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 8, color: 'text.primary' }}>
+<Box sx={{ 
+  backgroundColor: 'white',
+  minHeight: '100vh', 
+  py: 6, 
+  color: 'text.primary',
+}}>
       <Container maxWidth={false}>
         <Box sx={{ mb: 2 }}>
           <IconButton onClick={() => navigate(-1)} aria-label="Volver" sx={{ color: 'text.primary' }}>
@@ -107,10 +112,10 @@ const PricingPage = () => {
           </IconButton>
         </Box>
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <Typography variant="h2" component="h1" align="center" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Typography variant="h3" component="h1" align="center" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
             Planes de Suscripción
           </Typography>
-          <Typography variant="h5" align="center" color="text.primary" paragraph sx={{ mb: 5 }}>
+          <Typography variant="h6" align="center" color="text.secondary" paragraph sx={{ mb: 4 }}>
             Elige el plan que mejor se adapte a tus necesidades.
           </Typography>
         </motion.div>
@@ -147,19 +152,19 @@ const PricingPage = () => {
         </Box>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }}>
-          <Typography variant="h3" component="h2" align="center" gutterBottom sx={{ mb: 6, fontWeight: 600, color: 'text.primary' }}>
+        <Typography variant="h4" component="h2" align="center" gutterBottom sx={{ mb: 4, fontWeight: 600, color: 'text.primary' }}>
             {title}
           </Typography>
         </motion.div>
 
-        <Grid container columnSpacing={1} rowSpacing={4} alignItems="stretch" justifyContent="center">
+        <Grid container spacing={3} alignItems="stretch" justifyContent="center" sx={{ maxWidth: '1300px', margin: '0 auto', flexWrap: 'nowrap' }}>
           {plans.map((plan, index) => (
-            <Grid item key={index} xs={12} sm={6} md={3} lg={3}>
+            <Grid item key={index} xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', justifyContent: 'center', minWidth: '300px', flex: '1 0 auto' }}>
               <motion.div
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                style={{ height: '100%' }}
+                style={{ width: '100%', height: '100%' }}
               >
                 <PricingCard {...plan} />
               </motion.div>
@@ -171,4 +176,4 @@ const PricingPage = () => {
   );
 };
 
-export default PricingPage; 
+export default PricingPage;

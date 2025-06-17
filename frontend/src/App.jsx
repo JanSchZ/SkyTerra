@@ -43,8 +43,12 @@ import AdminDashboardPage from './components/admin/AdminDashboardPage.jsx';
 import AdminTicketsPage from './components/admin/AdminTicketsPage.jsx';
 import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
+import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
 import PricingPage from './components/pricing/PricingPage.jsx';
+import CheckoutPage from './components/checkout/CheckoutPage.jsx';
+import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
+import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
 import './App.css';
 
 export const ThemeModeContext = React.createContext({
@@ -441,8 +445,16 @@ function App() {
         <Route path="tickets" element={<AdminTicketsPage />} />
         <Route path="documents" element={<AdminDocumentsReviewPage />} />
         <Route path="users" element={<AdminUsersListPage />} />
+        <Route path="coupons" element={<AdminCouponsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
+
+      <Route path="/checkout" element={<ProtectedRoute user={finalUser} element={<CheckoutPage />} />} />
+      <Route path="/payment-success" element={<ProtectedRoute user={finalUser} element={<PaymentSuccess />} />} />
+      <Route path="/payment-cancelled" element={<ProtectedRoute user={finalUser} element={<PaymentCancelled />} />} />
+
+      {/* Catch-all for unknown routes */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 
