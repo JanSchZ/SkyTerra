@@ -5,17 +5,6 @@ import FolderIcon from '@mui/icons-material/Folder';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 
-const GlassPaper = styled(Paper)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.4)',
-    backdropFilter: 'blur(12px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    padding: theme.spacing(3),
-    height: 'calc(100vh - 120px)',
-    overflowY: 'auto',
-}));
-
 const mockDocuments = [
     { id: 1, name: 'Contrato Compraventa Fundo Los Aromos', user: 'Usuario 15', date: '2023-10-28', type: 'Contrato' },
     { id: 2, name: 'Plano Loteo El Arrayán', user: 'Usuario 22', date: '2023-10-27', type: 'Plano' },
@@ -26,10 +15,16 @@ const mockDocuments = [
 const AdminDocumentsReviewPage = () => {
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56' }}>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
                 Revisión de Documentos
             </Typography>
-            <GlassPaper>
+            <Paper elevation={0} sx={{ 
+              p: 3,
+              height: 'calc(100vh - 120px)',
+              overflowY: 'auto',
+              border: '1px solid rgba(0,0,0,0.08)',
+              borderRadius: '4px',
+            }}>
                 <List>
                     {mockDocuments.map((doc, index) => (
                         <React.Fragment key={doc.id}>
@@ -68,7 +63,7 @@ const AdminDocumentsReviewPage = () => {
                         </React.Fragment>
                     ))}
                 </List>
-            </GlassPaper>
+            </Paper>
         </Box>
     );
 };

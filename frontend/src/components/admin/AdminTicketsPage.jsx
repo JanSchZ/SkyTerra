@@ -3,29 +3,6 @@ import { Box, Typography, Grid, Paper, Chip, Avatar, Dialog, DialogTitle, Dialog
 import { styled } from '@mui/material/styles';
 import { mockTickets } from './tickets/mockTickets';
 
-const GlassPaper = styled(Paper)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.2)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    padding: theme.spacing(2),
-    marginBottom: theme.spacing(2),
-}));
-
-const TicketCard = styled(GlassPaper)({
-    padding: '16px',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    cursor: 'pointer',
-    transition: 'transform 0.2s',
-    '&:hover': {
-        transform: 'scale(1.03)',
-    }
-});
-
 const priorityColors = {
     high: 'error',
     medium: 'warning',
@@ -64,17 +41,35 @@ const AdminTicketsPage = () => {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56' }}>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
                 Gestión de Tickets de Soporte
             </Typography>
 
             <Grid container spacing={3}>
                 {Object.entries(ticketsByStatus).map(([status, tickets]) => (
                     <Grid item xs={12} md={4} key={status}>
-                        <Typography variant="h6" sx={{ textTransform: 'capitalize', mb: 2, color: '#34495e' }}>{status.replace('-', ' ')}</Typography>
+                        <Typography variant="h6" sx={{ textTransform: 'capitalize', mb: 2 }}>{status.replace('-', ' ')}</Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             {tickets.map(ticket => (
-                                <TicketCard key={ticket.id} onClick={() => handleOpen(ticket)}>
+                                <Paper 
+                                  key={ticket.id} 
+                                  onClick={() => handleOpen(ticket)}
+                                  elevation={0} 
+                                  sx={{
+                                    p: 2, 
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s',
+                                    border: '1px solid rgba(0,0,0,0.08)',
+                                    borderRadius: '4px',
+                                    '&:hover': {
+                                        transform: 'scale(1.02)',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                                    }
+                                  }}>
                                     <Typography variant="body1" sx={{mb: 2}}>{ticket.title}</Typography>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1}}>
@@ -83,14 +78,14 @@ const AdminTicketsPage = () => {
                                         </Box>
                                         <Chip label={ticket.priority} color={priorityColors[ticket.priority]} size="small" sx={{ textTransform: 'capitalize' }} />
                                     </Box>
-                                </TicketCard>
+                                </Paper>
                             ))}
                         </Box>
                     </Grid>
                 ))}
             </Grid>
             {selectedTicket && (
-                <StyledDialog open={open} onClose={handleClose}>
+                <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
                     <DialogTitle>{selectedTicket.title}</DialogTitle>
                     <DialogContent>
                         <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
@@ -109,7 +104,7 @@ const AdminTicketsPage = () => {
                         />
                         <Button variant="contained" sx={{ mt: 2 }}>Enviar Respuesta</Button>
                     </DialogContent>
-                </StyledDialog>
+                </Dialog>
             )}
         </Box>
     );

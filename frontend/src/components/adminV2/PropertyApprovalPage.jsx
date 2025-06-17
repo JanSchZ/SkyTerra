@@ -142,13 +142,14 @@ function PropertyManagementPage() {
         </Select>
       </FormControl>
 
-      <Paper variant="outlined" sx={{ height: 600, width: '100%', borderRadius: 2, boxShadow: '0 2px 4px rgba(0,0,0,0.05)', p:1 }}>
+      <Paper elevation={0} sx={{ height: 600, width: '100%', borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)', p:1 }}>
         <DataGrid
           rows={rows}
           columns={columns}
           sx={{
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: 'rgba(25,118,210,0.07)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(25,118,210,0.04)' },
+            '& .MuiDataGrid-columnHeaders': { backgroundColor: 'rgba(0,0,0,0.02)' },
+            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(0,0,0,0.01)' },
+            border: 'none',
           }}
           pageSizeOptions={[10, 25, 50]}
           autoHeight

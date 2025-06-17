@@ -3,15 +3,6 @@ import { Card, CardContent, Typography, Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { Line } from 'react-chartjs-2';
 
-const GlassCard = styled(Card)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.2)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    height: '100%',
-}));
-
 const SaaSKpiCard = ({ kpi }) => {
     const lineOptions = {
         responsive: true,
@@ -31,7 +22,7 @@ const SaaSKpiCard = ({ kpi }) => {
     };
 
     return (
-        <GlassCard>
+        <Card elevation={0} sx={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: '4px', height: '100%' }}>
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Typography variant="subtitle1" color="text.primary">{kpi.title}</Typography>
@@ -41,7 +32,7 @@ const SaaSKpiCard = ({ kpi }) => {
                 {kpi.trend && <Box sx={{height: '50px'}}><Line options={lineOptions} data={lineData} /></Box>}
                 {kpi.note && <Typography variant="caption" sx={{color: kpi.note.color}}>{kpi.note.text}</Typography>}
             </CardContent>
-        </GlassCard>
+        </Card>
     );
 };
 

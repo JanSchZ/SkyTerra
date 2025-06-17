@@ -108,6 +108,11 @@ const AdminCouponsPage = () => {
                 columns={columns}
                 loading={loading}
                 autoHeight
+                sx={{
+                    '& .MuiDataGrid-columnHeaders': { backgroundColor: 'rgba(0,0,0,0.02)' },
+                    '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(0,0,0,0.01)' },
+                    border: 'none',
+                }}
             />
             <Dialog open={open} onClose={handleClose}>
                 <DialogTitle>{currentCoupon?.id ? 'Editar Cupón' : 'Crear Cupón'}</DialogTitle>

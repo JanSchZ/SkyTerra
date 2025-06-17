@@ -11,26 +11,6 @@ import TourIcon from '@mui/icons-material/Tour';
 import DescriptionIcon from '@mui/icons-material/Description';
 import FolderIcon from '@mui/icons-material/Folder';
 
-const GlassContainer = styled(Box)(({ theme }) => ({
-  background: 'rgba(255, 255, 255, 0.4)',
-  backdropFilter: 'blur(12px)',
-  borderRadius: '15px',
-  border: '1px solid rgba(255, 255, 255, 0.2)',
-  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-  padding: theme.spacing(3),
-  height: 'calc(100vh - 120px)', 
-  width: '100%',
-}));
-
-const StyledDialog = styled(Dialog)(({ theme }) => ({
-    '& .MuiPaper-root': {
-        background: 'rgba(255, 255, 255, 0.7)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: '15px',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-    }
-}));
-
 const StatusChip = ({ status }) => {
     const statusConfig = {
     approved: {
@@ -163,11 +143,17 @@ const AdminDetailedPropertiesPage = () => {
     ];
 
     return (
-    <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56' }}>
+    <Box sx={{ p: 3, minHeight: '100vh' }}>
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
             Gestión de Propiedades
                     </Typography>
-        <GlassContainer>
+        <Box sx={{ 
+          height: 'calc(100vh - 120px)', 
+          width: '100%',
+          border: '1px solid rgba(0,0,0,0.08)',
+          borderRadius: '4px',
+          p: 1
+        }}>
             <DataGrid
                 rows={mockProperties}
                 columns={columns}
@@ -192,7 +178,7 @@ const AdminDetailedPropertiesPage = () => {
                               }
                         }}
                     />
-        </GlassContainer>
+        </Box>
         <Menu
                     anchorEl={anchorEl}
                     open={Boolean(anchorEl)}
@@ -204,7 +190,7 @@ const AdminDetailedPropertiesPage = () => {
 
         {selectedProperty && (
             <>
-                <StyledDialog open={tourModalOpen} onClose={() => setTourModalOpen(false)} maxWidth="sm" fullWidth>
+                <Dialog open={tourModalOpen} onClose={() => setTourModalOpen(false)} maxWidth="sm" fullWidth>
                     <DialogTitle>Gestionar Tour para: {selectedProperty.name}</DialogTitle>
                     <DialogContent>
                         <Typography sx={{mb: 2}}>Sube un archivo ZIP para el tour virtual.</Typography>
@@ -213,9 +199,9 @@ const AdminDetailedPropertiesPage = () => {
                             <input type="file" hidden accept=".zip"/>
                                         </Button>
                     </DialogContent>
-                </StyledDialog>
+                </Dialog>
 
-                <StyledDialog open={docsModalOpen} onClose={() => setDocsModalOpen(false)} maxWidth="md" fullWidth>
+                <Dialog open={docsModalOpen} onClose={() => setDocsModalOpen(false)} maxWidth="md" fullWidth>
                     <DialogTitle>Documentos de: {selectedProperty.name}</DialogTitle>
                     <DialogContent>
                         <List>
@@ -229,7 +215,7 @@ const AdminDetailedPropertiesPage = () => {
                             ))}
                         </List>
                     </DialogContent>
-                </StyledDialog>
+                </Dialog>
             </>
         )}
         </Box>

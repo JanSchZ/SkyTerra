@@ -16,7 +16,7 @@ ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip,
 
 function StatsCard({ label, value, subtitle, color }) {
   return (
-    <Paper elevation={3} sx={{ p: 2, borderLeft: `6px solid ${color}` }}>
+    <Paper elevation={0} sx={{ p: 2, borderTop: `4px solid ${color}`, borderRadius: '4px', border: '1px solid rgba(0,0,0,0.08)' }}>
       <Typography variant="subtitle2" color="textSecondary" gutterBottom>{label}</Typography>
       <Typography variant="h5" fontWeight={700}>{value}</Typography>
       {subtitle && <Typography variant="body2" color="textSecondary">{subtitle}</Typography>}

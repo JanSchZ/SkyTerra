@@ -45,8 +45,8 @@ function AdminV2Layout() {
 
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ justifyContent: 'center', bgcolor: theme.palette.primary.main }}>
-        <Typography variant="h6" fontWeight={700} color="common.white">
+      <Toolbar sx={{ justifyContent: 'center', bgcolor: 'background.paper', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+        <Typography variant="h6" fontWeight={700} color="text.primary">
           SKYTERRA
         </Typography>
       </Toolbar>
@@ -101,26 +101,26 @@ function AdminV2Layout() {
       {/* Main content */}
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Top AppBar */}
-        <AppBar position="static" color="primary" elevation={0} sx={{ zIndex: theme.zIndex.drawer + 1 }}>
-          <Toolbar>
+        <AppBar position="static" color="inherit" elevation={1} sx={{ zIndex: theme.zIndex.drawer + 1, bgcolor: 'background.paper' }}>
+          <Toolbar sx={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
             <IconButton color="inherit" edge="start" sx={{ mr: 2, display: { md: 'none' } }}>
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: 'text.primary' }}>
               Admin Dashboard
             </Typography>
             <TextField
               variant="outlined"
               size="small"
               placeholder="Search…"
-              sx={{ bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1, mr: 2, width: 240,
-                '& .MuiInputBase-input': { color: 'white' },
+              sx={{ bgcolor: 'action.hover', borderRadius: 1, mr: 2, width: 240,
+                '& .MuiInputBase-input': { color: 'text.primary' },
                 '& fieldset': { border: 'none' },
               }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: 'white' }} />
+                    <SearchIcon sx={{ color: 'text.secondary' }} />
                   </InputAdornment>
                 ),
               }}

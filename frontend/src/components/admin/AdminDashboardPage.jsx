@@ -45,7 +45,7 @@ const kpiData = [
 
 const AdminDashboardPage = () => {
   return (
-        <Box sx={{ p: 3, backgroundColor: '#f4f6f8', minHeight: '100vh' }}>
+        <Box sx={{ p: 3, minHeight: '100vh' }}>
             <Typography variant="h3" gutterBottom sx={{ fontWeight: 'bold', color: '#192a56', mb: 3 }}>
                 Dashboard del Administrador
           </Typography>

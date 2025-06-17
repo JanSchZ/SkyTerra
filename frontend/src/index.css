@@ -49,8 +49,8 @@
   /* Glassmorphism base palette */
   --glass-bg: rgba(22,27,34,0.75);
   --glass-border: rgba(255,255,255,0.10);
-  --glass-text-primary: #e5e7eb;
-  --glass-text-secondary: #9ca3af;
+  --glass-text-primary: #212121;
+  --glass-text-secondary: #555555;
 }
 
 body {

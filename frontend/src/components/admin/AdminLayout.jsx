@@ -32,9 +32,9 @@ const AdminLayout = () => {
 
     const activeLinkStyle = {
         backgroundColor: theme.palette.action.selected,
-        color: theme.palette.primary.main,
+        color: theme.palette.text.primary,
         '& .MuiListItemIcon-root': {
-            color: theme.palette.primary.main,
+            color: theme.palette.text.primary,
         },
         '& .MuiListItemText-primary': {
             fontWeight: 'bold',
@@ -42,7 +42,7 @@ const AdminLayout = () => {
     };
 
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8f9fb' }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
             <Box
                 component="nav"
                 sx={{
@@ -104,7 +104,7 @@ const AdminLayout = () => {
                 sx={{
                     flexGrow: 1,
                     width: `calc(100% - ${isCollapsed ? collapsedDrawerWidth : drawerWidth}px)`,
-                    backgroundColor: '#f8f9fb',
+                    backgroundColor: 'background.default',
                 }}
             >
                 <Outlet />
