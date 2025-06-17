@@ -83,17 +83,19 @@ const AppWrapper = () => {
 };
 
 const ProtectedRoute = ({ user, element }) => {
-  if (!user?.id) {
+  const finalUser = user?.user || user;
+  if (!finalUser?.id) {
     return <Navigate to="/login" replace />;
   }
-  return element;
+  return React.cloneElement(element, { user: finalUser });
 };
 
 const StaffRoute = ({ user, element }) => {
-  if (!user?.is_staff) {
+  const finalUser = user?.user || user;
+  if (!finalUser?.is_staff) {
     return <Navigate to="/" replace />;
   }
-  return element;
+  return React.cloneElement(element, { user: finalUser });
 };
 
 function App() {
@@ -414,9 +416,6 @@ function App() {
     );
   };
 
-  // Ensure finalUser is safely determined
-  const finalUser = user?.user || user; // Safely access user.user or use user directly
-
   const mainContent = (
     <Routes>
       <Route 
@@ -429,16 +428,16 @@ function App() {
       />
       <Route path="/login" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} />} />
       <Route path="/register" element={<AuthPage onLogin={handleLogin} onRegister={handleRegister} initialForm="register" />} />
-      <Route path="/property/:id" element={<PropertyDetails user={finalUser} />} />
+      <Route path="/property/:id" element={<PropertyDetails user={user?.user || user} />} />
       <Route path="/tour/:tourId" element={<TourViewer />} />
-      <Route path="/compare" element={<ProtectedRoute user={finalUser} element={<CompareView user={finalUser} />} />} />
-      <Route path="/new-publication" element={<ProtectedRoute user={finalUser} element={<CreatePublicationWizard user={finalUser} />} />} />
-      <Route path="/my-searches" element={<ProtectedRoute user={finalUser} element={<SavedSearchesPage />} />} />
-      <Route path="/dashboard" element={<ProtectedRoute user={finalUser} element={<SellerDashboardPage user={finalUser} />} />} />
-      <Route path="/pricing" element={<ProtectedRoute user={finalUser} element={<PricingPage />} />} />
+      <Route path="/compare" element={<ProtectedRoute user={user} element={<CompareView />} />} />
+      <Route path="/new-publication" element={<ProtectedRoute user={user} element={<CreatePublicationWizard />} />} />
+      <Route path="/my-searches" element={<ProtectedRoute user={user} element={<SavedSearchesPage />} />} />
+      <Route path="/dashboard" element={<ProtectedRoute user={user} element={<SellerDashboardPage />} />} />
+      <Route path="/pricing" element={<ProtectedRoute user={user} element={<PricingPage />} />} />
 
       {/* Admin Routes */}
-      <Route path="/admin" element={<StaffRoute user={finalUser} element={<AdminLayout />} />}>
+      <Route path="/admin" element={<StaffRoute user={user} element={<AdminLayout />} />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="properties" element={<PropertyApprovalPage />} />
@@ -449,9 +448,9 @@ function App() {
         <Route path="settings" element={<AdminSettingsPage />} />
       </Route>
 
-      <Route path="/checkout" element={<ProtectedRoute user={finalUser} element={<CheckoutPage />} />} />
-      <Route path="/payment-success" element={<ProtectedRoute user={finalUser} element={<PaymentSuccess />} />} />
-      <Route path="/payment-cancelled" element={<ProtectedRoute user={finalUser} element={<PaymentCancelled />} />} />
+      <Route path="/checkout" element={<ProtectedRoute user={user} element={<CheckoutPage />} />} />
+      <Route path="/payment-success" element={<ProtectedRoute user={user} element={<PaymentSuccess />} />} />
+      <Route path="/payment-cancelled" element={<ProtectedRoute user={user} element={<PaymentCancelled />} />} />
 
       {/* Catch-all for unknown routes */}
       <Route path="*" element={<Navigate to="/" replace />} />

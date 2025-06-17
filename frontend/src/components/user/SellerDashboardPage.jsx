@@ -60,7 +60,7 @@ const SellerDashboardPage = ({ user }) => {
                     <Button 
                         variant="outlined" 
                         sx={{ mt: 2 }}
-                        onClick={() => navigate('/wizard-create')}
+                        onClick={() => navigate('/new-publication')}
                     >
                         Crear mi primera publicación
                     </Button>
