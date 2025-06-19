@@ -48,7 +48,6 @@ def home_view(request):
 
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
-    callback_url = 'http://localhost:8000/api/auth/google/callback/'
     client_class = OAuth2Client
 
 class TwitterLogin(SocialLoginView):

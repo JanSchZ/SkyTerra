@@ -19,9 +19,6 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LoginIcon from '@mui/icons-material/Login';
 import CloseIcon from '@mui/icons-material/Close';
 import { GoogleLogin } from '@react-oauth/google';
-import LoginWithTwitter from 'react-login-with-twitter';
-import XIcon from '@mui/icons-material/X';
-import AppleLogin from 'react-apple-login';
 
 // Estilos comunes para los TextField
 const commonTextFieldStyles = {
@@ -59,8 +56,12 @@ const commonTextFieldStyles = {
   }
 };
 
+// REDIRECT URL must be same with URL where the (reactjs-social-login) components is locate
+// MAKE SURE the (reactjs-social-login) components aren't unmounted or destroyed before the ask permission dialog closes
+const REDIRECT_URI = window.location.href;
+
 // Componente de formulario de inicio de sesión
-export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose, onGoogleLoginSuccess, onGoogleLoginError, onTwitterLoginSuccess, onTwitterLoginError, onAppleLoginSuccess }) => {
+export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -141,64 +142,6 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
             width="100%"
             useOneTap
           />
-          <LoginWithTwitter
-            authCallback={onTwitterLoginSuccess}
-            onFailure={onTwitterLoginError}
-            consumerKey={import.meta.env.VITE_X_CONSUMER_KEY}
-            consumerSecret={import.meta.env.VITE_X_CONSUMER_SECRET}
-            style={{ width: '100%' }}
-          >
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<XIcon />}
-              sx={{
-                justifyContent: 'center',
-                textTransform: 'none',
-                height: '40px',
-                color: '#000000',
-                borderColor: '#000000',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: '#000000',
-                },
-              }}
-            >
-              Iniciar sesión con X
-            </Button>
-          </LoginWithTwitter>
-          <AppleLogin 
-            clientId={import.meta.env.VITE_APPLE_CLIENT_ID}
-            redirectURI={import.meta.env.VITE_APPLE_CALLBACK_URL}
-            responseType={"code id_token"}
-            responseMode={"form_post"}
-            usePopup={true}
-            callback={onAppleLoginSuccess}
-            scope="email name"
-            render={renderProps => (
-              <Button
-                onClick={renderProps.onClick}
-                disabled={renderProps.disabled}
-                fullWidth
-                variant="outlined"
-                sx={{
-                  justifyContent: 'center',
-                  textTransform: 'none',
-                  height: '40px',
-                  color: '#000',
-                  backgroundColor: '#fff',
-                  borderColor: '#000',
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5',
-                    borderColor: '#000',
-                  },
-                }}
-              >
-                <Box component="span" sx={{ fontFamily: '-apple-system, BlinkMacSystemFont', fontSize: '18px', mr: 1 }}></Box>
-                Iniciar sesión con Apple
-              </Button>
-            )}
-          />
         </Box>
 
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
@@ -214,7 +157,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
 };
 
 // Componente de formulario de registro
-export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose, onGoogleLoginSuccess, onGoogleLoginError, onTwitterLoginSuccess, onTwitterLoginError, onAppleLoginSuccess }) => {
+export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
   // Paso 1: tipo de vendedor (null, 'individual', 'professional')
   const [sellerType, setSellerType] = useState(null);
 
@@ -411,64 +354,6 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
             onError={onGoogleLoginError}
             width="100%"
           />
-          <LoginWithTwitter
-            authCallback={onTwitterLoginSuccess}
-            onFailure={onTwitterLoginError}
-            consumerKey={import.meta.env.VITE_X_CONSUMER_KEY}
-            consumerSecret={import.meta.env.VITE_X_CONSUMER_SECRET}
-            style={{ width: '100%' }}
-          >
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<XIcon />}
-              sx={{
-                justifyContent: 'center',
-                textTransform: 'none',
-                height: '40px',
-                color: '#000000',
-                borderColor: '#000000',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                  borderColor: '#000000',
-                },
-              }}
-            >
-              Registrarse con X
-            </Button>
-          </LoginWithTwitter>
-          <AppleLogin 
-            clientId={import.meta.env.VITE_APPLE_CLIENT_ID}
-            redirectURI={import.meta.env.VITE_APPLE_CALLBACK_URL}
-            responseType={"code id_token"}
-            responseMode={"form_post"}
-            usePopup={true}
-            callback={onAppleLoginSuccess}
-            scope="email name"
-            render={renderProps => (
-              <Button
-                onClick={renderProps.onClick}
-                disabled={renderProps.disabled}
-                fullWidth
-                variant="outlined"
-                sx={{
-                  justifyContent: 'center',
-                  textTransform: 'none',
-                  height: '40px',
-                  color: '#000',
-                  backgroundColor: '#fff',
-                  borderColor: '#000',
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5',
-                    borderColor: '#000',
-                  },
-                }}
-              >
-                <Box component="span" sx={{ fontFamily: '-apple-system, BlinkMacSystemFont', fontSize: '18px', mr: 1 }}></Box>
-                Registrarse con Apple
-              </Button>
-            )}
-          />
         </Box>
 
         <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
@@ -484,7 +369,13 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
 };
 
 // Main AuthPage component that acts as a modal-like container
-const AuthPage = ({ formType, onLogin, onRegister }) => {
+const AuthPage = ({ 
+  formType, 
+  onLogin, 
+  onRegister, 
+  onGoogleLoginSuccess, 
+  onGoogleLoginError 
+}) => {
   // formType can be 'login' or 'register'
   const [currentForm, setCurrentForm] = useState(formType || 'login');
   const [isLoading, setIsLoading] = useState(false);
@@ -517,28 +408,6 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
   
   const handleClose = () => {
     navigate('/'); // Navigate to home or previous page on close
-  };
-
-  const handleGoogleLoginSuccess = async (credentialResponse) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Aquí iría la lógica para iniciar sesión con Google
-      // Por ahora, solo simularé el éxito
-      console.log('Simulando inicio de sesión con Google...');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular carga
-      console.log('Simulación de Google Login exitosa.');
-      // Aquí deberías llamar a la función onGoogleLoginSuccess del prop
-      onGoogleLoginSuccess(credentialResponse);
-    } catch (err) {
-      setError(err.message || 'Error al iniciar sesión con Google.');
-    }
-    setIsLoading(false);
-  };
-
-  const handleGoogleLoginError = (error) => {
-    setIsLoading(false);
-    setError(error.errorMessage || 'Error al iniciar sesión con Google.');
   };
 
   return (
@@ -588,8 +457,8 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
               error={error}
               onSwitchToRegister={() => { setCurrentForm('register'); setError(null); }}
               onClose={handleClose}
-              onGoogleLoginSuccess={handleGoogleLoginSuccess}
-              onGoogleLoginError={handleGoogleLoginError}
+              onGoogleLoginSuccess={onGoogleLoginSuccess}
+              onGoogleLoginError={onGoogleLoginError}
             />
           ) : (
             <RegisterForm 
@@ -598,8 +467,8 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
               error={error}
               onSwitchToLogin={() => { setCurrentForm('login'); setError(null); }}
               onClose={handleClose}
-              onGoogleLoginSuccess={handleGoogleLoginSuccess}
-              onGoogleLoginError={handleGoogleLoginError}
+              onGoogleLoginSuccess={onGoogleLoginSuccess}
+              onGoogleLoginError={onGoogleLoginError}
             />
           )}
         </Paper>
@@ -608,4 +477,4 @@ const AuthPage = ({ formType, onLogin, onRegister }) => {
   );
 };
 
-export default AuthPage; 
+export default AuthPage;

@@ -260,24 +260,64 @@ REST_FRAMEWORK = {
 # Configuración de dj-rest-auth
 REST_AUTH = {
     'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'skyterra-auth',
-    'JWT_AUTH_REFRESH_COOKIE': 'skyterra-refresh-token',
-    'SESSION_LOGIN': False,
-    'USER_DETAILS_SERIALIZER': 'skyterra_backend.serializers.UserDetailsSerializer',
+    'JWT_AUTH_COOKIE': 'jwt-access-token',
+    'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
+    'USER_DETAILS_SERIALIZER': 'properties.serializers.UserSerializer', # Update with your user serializer
+    'TOKEN_MODEL': None, # Disable default token (use JWT)
+    # Use allauth's registration serializer directly
+    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
+    'OLD_PASSWORD_FIELD_ENABLED': True,
+    'LOGOUT_ON_PASSWORD_CHANGE': True,
+    'EMAIL_VERIFICATION': 'mandatory', # This should match ACCOUNT_EMAIL_VERIFICATION
+    'PASSWORD_RESET_USE_SITES_DOMAIN': True,
+    'PASSWORD_RESET_CONFIRM_URL': CLIENT_URL + '/password-reset-confirm/{uid}/{token}/',
+    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons
+    'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
+    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_auth.serializers.PasswordChangeSerializer',
+    'PASSWORD_RESET_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetSerializer',
+    'USER_DETAILS_SERIALIZER': 'dj_rest_auth.serializers.UserDetailsSerializer', # You might want to customize this
+    'TOKEN_SERIALIZER': 'dj_rest_auth.serializers.TokenSerializer',
+    'JWT_SERIALIZER': 'dj_rest_auth.serializers.JWTSerializer',
+    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
+    'VERIFY_EMAIL_SERIALIZER': 'dj_rest_auth.registration.serializers.VerifyEmailSerializer',
+    'REST_AUTH_REGISTER_USES_ACCOUNT_EMAIL_VERIFICATION': True,
+    'OLD_PASSWORD_FIELD_ENABLED': True,
 }
 
-# Configuración de allauth
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_EMAIL_VERIFICATION = 'optional' # Cambiar a 'mandatory' en producción
+# Configuración de los campos de registro para dj-rest-auth
+# Esto es para alinearse con la nueva forma de allauth
+# Deprecated warning message suggests this
+ACCOUNT_SIGNUP_FIELDS = {
+    'email': {'required': True},
+    'password': {'required': True},
+}
 
+# allauth configuration
+# https://django-allauth.readthedocs.io/en/latest/configuration.html
+ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_FORMS = {
+    'signup': 'skyterra_backend.forms.CustomSignupForm',
+}
+# New recommended settings for allauth:
+ACCOUNT_LOGIN_METHODS = ['email'] # Replaces ACCOUNT_AUTHENTICATION_METHOD
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password'] # Define signup fields and mark email as required
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory' # or 'optional', 'none'
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
+ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SkyTerra] '
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'
+ACCOUNT_CHANGE_EMAIL = True
+ACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomAccountAdapter'
+# allauth social login
+SOCIALACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomSocialAccountAdapter'
+ACCOUNT_RATE_LIMITS = {'login_failed': '5/5m'} # New recommended setting for rate limits
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
-            'client_id': os.environ.get('GOOGLE_CLIENT_ID'),
-            'secret': os.environ.get('GOOGLE_CLIENT_SECRET'),
+            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
             'key': ''
         },
         'SCOPE': [
@@ -285,23 +325,23 @@ SOCIALACCOUNT_PROVIDERS = {
             'email',
         ],
         'AUTH_PARAMS': {
-            'access_type': 'online',
-        }
-    },
-    'twitter': {
-        'APP': {
-            'client_id': os.environ.get('X_CONSUMER_KEY'),
-            'secret': os.environ.get('X_CONSUMER_SECRET'),
-        }
+            'access_type': 'offline',
+        },
+        'VERIFIED_EMAIL': True
     },
     'apple': {
         'APP': {
-            'client_id': os.environ.get('APPLE_CLIENT_ID'),
-            'secret': os.environ.get('APPLE_KEY_SECRET'),
-            'key': os.environ.get('APPLE_KEY_ID'),
-            'certificate_key': os.environ.get('APPLE_CERTIFICATE_KEY_CONTENT')
+            'client_id': os.getenv('APPLE_CLIENT_ID'),
+            'secret': os.getenv('APPLE_CLIENT_SECRET'),
+            'key': ''
         },
         'SCOPE': ['name', 'email'],
-        'SOCIALACCOUNT_EMAIL_AUTHENTICATION': True,
-    }
+    },
+    # 'twitter': {
+    #     'APP': {
+    #         'client_id': os.getenv('TWITTER_CLIENT_ID'),
+    #         'secret': os.getenv('TWITTER_CLIENT_SECRET'),
+    #         'key': ''
+    #     },
+    # },
 }

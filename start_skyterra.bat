@@ -31,6 +31,6 @@ IF NOT EXIST "%FRONTEND_DIR%" (
     pause
     exit /b 1
 )
-start "SkyTerra Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm run dev"
+start "SkyTerra Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm install && npm run dev"
 
-echo SkyTerra ha sido iniciado. Se abrieron dos ventanas separadas. 
+echo SkyTerra ha sido iniciado. Se abrieron dos ventanas separadas.
