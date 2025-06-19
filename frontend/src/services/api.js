@@ -162,7 +162,7 @@ export const authService = {
         hasPassword: !!userData.password 
       });
       
-      const response = await api.post('/auth/register/', userData);
+      const response = await api.post('/auth/registration/', userData);
       console.log('✅ Registro exitoso:', response.data);
       
       // El backend manejará el login después del registro y enviará la cookie.

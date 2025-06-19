@@ -50,6 +50,7 @@ import PricingPage from './components/pricing/PricingPage.jsx';
 import CheckoutPage from './components/checkout/CheckoutPage.jsx';
 import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
 import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
+import Login from './components/auth/Login';
 import './App.css';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -552,7 +553,9 @@ function App() {
       <Route path="/payment-success" element={<ProtectedRoute user={user} element={<PaymentSuccess />} />} />
       <Route path="/payment-cancelled" element={<ProtectedRoute user={user} element={<PaymentCancelled />} />} />
 
-      {/* Catch-all for unknown routes */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Fallback route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

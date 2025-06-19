@@ -337,11 +337,11 @@ SOCIALACCOUNT_PROVIDERS = {
         },
         'SCOPE': ['name', 'email'],
     },
-    # 'twitter': {
-    #     'APP': {
-    #         'client_id': os.getenv('TWITTER_CLIENT_ID'),
-    #         'secret': os.getenv('TWITTER_CLIENT_SECRET'),
-    #         'key': ''
-    #     },
-    # },
+    'twitter': {
+        'APP': {
+            'client_id': os.getenv('TWITTER_CLIENT_ID'),
+            'secret': os.getenv('TWITTER_CLIENT_SECRET'),
+            'key': ''
+        },
+    },
 }
