@@ -54,6 +54,21 @@ class Property(models.Model):
         ('rent', 'Rent'),
         ('both', 'Both'),
     ]
+    TERRAIN_CHOICES = [
+        ('flat', 'Plano'),
+        ('hills', 'Colinas'),
+        ('mountains', 'Montañoso'),
+        ('mixed', 'Mixto'),
+    ]
+    ACCESS_CHOICES = [
+        ('paved', 'Pavimentado'),
+        ('unpaved', 'No pavimentado'),
+    ]
+    LEGAL_STATUS_CHOICES = [
+        ('clear', 'Saneado'),
+        ('mortgaged', 'Con hipoteca'),
+    ]
+    # Utilities can be a JSONField storing a list of strings
     
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='properties', null=True, blank=True)
     name = models.CharField(max_length=255)
@@ -81,6 +96,10 @@ class Property(models.Model):
     rent_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     rental_terms = models.TextField(blank=True)
     plusvalia_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Métrica interna que refleja el potencial de plusvalía (0-100). Solo visible para admin.")
+    terrain = models.CharField(max_length=50, choices=TERRAIN_CHOICES, default='flat', blank=True)
+    access = models.CharField(max_length=50, choices=ACCESS_CHOICES, default='paved', blank=True)
+    legal_status = models.CharField(max_length=50, choices=LEGAL_STATUS_CHOICES, default='clear', blank=True)
+    utilities = models.JSONField(default=list, blank=True, help_text="Lista de servicios disponibles (ej. ['water', 'electricity'])")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

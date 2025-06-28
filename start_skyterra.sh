@@ -3,8 +3,8 @@
 # Script de inicio rápido para SkyTerra en macOS
 # Este script inicia el backend (Django) y el frontend (React) en segundo plano.
 
-# Ruta base del proyecto (usando la ruta absoluta del workspace)
-BASE_DIR="/Users/Manuel/Desktop/Carpeta Hacker/SkyTerra"
+# Ruta base del proyecto (script directory)
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Definir las rutas completas del backend y frontend
 BACKEND_DIR="$BASE_DIR/backend"

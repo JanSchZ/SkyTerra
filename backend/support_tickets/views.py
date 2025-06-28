@@ -4,6 +4,7 @@ from rest_framework.generics import ListAPIView
 from .models import Ticket, TicketResponse
 from .serializers import TicketSerializer, TicketResponseSerializer
 from rest_framework.pagination import PageNumberPagination
+from skyterra_backend.permissions import IsOwnerOrAdmin
 
 # Create your views here.
 
@@ -22,20 +23,17 @@ class TicketViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'priority', 'status']
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
-            # Allow any authenticated user to view their own tickets; admins view all
+        if self.action in ['list', 'retrieve', 'create']:
             return [permissions.IsAuthenticated()]
-        else:
-            # create is allowed for authenticated, update/delete for staff only
-            if self.action == 'create':
-                return [permissions.IsAuthenticated()]
-            return [permissions.IsAdminUser()]
+        # For update, partial_update, destroy
+        return [IsOwnerOrAdmin()]
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if not self.request.user.is_staff:
-            qs = qs.filter(user=self.request.user)
-        return qs
+        # Admins can see all tickets, regular users only their own
+        if self.request.user.is_staff:
+            return qs
+        return qs.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -43,7 +41,17 @@ class TicketViewSet(viewsets.ModelViewSet):
 class TicketResponseViewSet(viewsets.ModelViewSet):
     queryset = TicketResponse.objects.all().order_by('created_at')
     serializer_class = TicketResponseSerializer
-    permission_classes = [permissions.IsAdminUser]
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAdminUser()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if not self.request.user.is_staff:
+            qs = qs.filter(ticket__user=self.request.user)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(user_admin=self.request.user)

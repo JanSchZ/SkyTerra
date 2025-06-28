@@ -43,28 +43,7 @@ import axios from 'axios';
 import Pano2VRViewer from '../tours/Pano2VRViewer';
 import UploadTourDialog from '../tours/UploadTourDialog';
 import { AuthContext } from '../../App';
-
-// Países y sus recorridos de vuelo
-const countryFlightPaths = {
-  chile: [
-    { center: [-70.6693, -33.4489], zoom: 6, pitch: 45, bearing: 0 }, // Santiago
-    { center: [-72.6927, -45.4023], zoom: 7, pitch: 50, bearing: 30 }, // Aysén
-    { center: [-72.9895, -41.3139], zoom: 8, pitch: 55, bearing: 60 }, // Puerto Varas
-    { center: [-73.2459, -39.8142], zoom: 7, pitch: 45, bearing: 90 }, // Valdivia
-    { center: [-70.9171, -53.1638], zoom: 6, pitch: 40, bearing: 120 }, // Punta Arenas
-  ],
-  usa: [
-    { center: [-95.7129, 37.0902], zoom: 4, pitch: 30, bearing: 0 }, // Centro USA
-    { center: [-119.7871, 36.7783], zoom: 6, pitch: 45, bearing: 45 }, // California
-    { center: [-105.0178, 39.7392], zoom: 6, pitch: 50, bearing: 90 }, // Colorado
-    { center: [-87.6298, 41.8781], zoom: 7, pitch: 45, bearing: 135 }, // Chicago
-  ],
-  default: [
-    { center: [0, 20], zoom: 2, pitch: 30, bearing: 0 },
-    { center: [-70, -30], zoom: 4, pitch: 45, bearing: 60 },
-    { center: [120, 30], zoom: 4, pitch: 40, bearing: 120 },
-  ]
-};
+import { formatPrice, formatRentPrice } from '../../utils/formatters';
 
 const PropertyDetails = () => {
   const { id } = useParams();
@@ -94,7 +73,7 @@ const PropertyDetails = () => {
 
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  const { isFavorited, setIsFavorited } = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -194,33 +173,14 @@ const PropertyDetails = () => {
           setTours([]);
         }
         
-        // Cargar imágenes (simuladas)
-        const imagesData = {
-          results: [
-            {
-              id: 1,
-              title: "Vista aérea",
-              type: "aerial",
-              url: "https://via.placeholder.com/800x600?text=Vista+Aerea",
-              property_id: id
-            },
-            {
-              id: 2,
-              title: "Mapa topográfico",
-              type: "topography",
-              url: "https://via.placeholder.com/800x600?text=Mapa+Topografico",
-              property_id: id
-            },
-            {
-              id: 3,
-              title: "Estudio legal",
-              type: "legal",
-              url: "https://via.placeholder.com/800x600?text=Documentos+Legales",
-              property_id: id
-            }
-          ]
-        };
-        setImages(imagesData.results);
+        // Cargar imágenes reales
+        try {
+          const actualImages = await imageService.getPropertyImages(id);
+          setImages(actualImages.results || actualImages || []);
+        } catch (imageError) {
+          console.warn('No se pudieron cargar las imágenes para la propiedad:', imageError);
+          setImages([]);
+        }
         
         setLoading(false);
       } catch (err) {
@@ -315,27 +275,6 @@ const PropertyDetails = () => {
     }, 4800);
   };
 
-  // Formateador para precio
-  const formatPrice = (price) => {
-    if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(1)}M`;
-    } else if (price >= 1000) {
-      return `$${(price / 1000).toFixed(0)}K`;
-    }
-    return `$${price?.toLocaleString()}`;
-  };
-
-  // Formateador para precio de arriendo (mensual)
-  const formatRentPrice = (price) => {
-    if (!price) return 'Precio no disponible';
-    if (price >= 1000000) {
-      return `$${(price / 1000000).toFixed(1)}M/mes`;
-    } else if (price >= 1000) {
-      return `$${(price / 1000).toFixed(0)}K/mes`;
-    }
-    return `$${price?.toLocaleString()}/mes`;
-  };
-
   // Calcular texto de precio según modalidad
   const getPriceDisplay = () => {
     if (!property) return '';
@@ -371,7 +310,7 @@ const PropertyDetails = () => {
   useEffect(() => {
     if (property) {
       // registrar visita
-      axios.post('/api/property-visits/', { property: property.id })
+      axios.post(`${config.api.baseURL}/property-visits/`, { property: property.id })
         .catch(err => console.warn('Error registrando visita', err));
     }
   }, [property]);

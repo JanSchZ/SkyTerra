@@ -107,7 +107,8 @@ class PropertySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
-                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score']
+                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score',
+                 'terrain', 'access', 'legal_status', 'utilities']
         
     def validate_boundary_polygon(self, value):
         """Validar que boundary_polygon sea un GeoJSON válido"""
@@ -164,7 +165,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
-                 'boundary_polygon', 'has_water', 'has_views', 'image_count', 'has_tour',
+                 'has_water', 'has_views', 'image_count', 'has_tour',
                  'publication_status', 'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms', 'plusvalia_score']
 
     def get_plusvalia_score(self, obj):

@@ -1,610 +1,88 @@
-## SkyTerra Project - Progress and Issue Log
-
-**NOTA PARA EL USUARIO/DESARROLLADOR:** Por favor, actualiza este archivo a medida que se completan las tareas o surgen nuevos problemas. Esto ayudará a mantener un seguimiento claro del progreso y facilitará la colaboración, incluso si trabajas con diferentes asistentes de IA o en diferentes sesiones. Marca las tareas completadas con `[COMPLETADO]` o `[RESUELTO]`.
-
-**Fecha de Última Actualización:** 2025-06-13 (PropertyDetails.jsx actualizado con soporte de arriendo, en curso filtros de modalidad; Backend documentos: Modelo y API completados; pendiente approve/reject)
-
-### **PLAN DE IMPLEMENTACIÓN GLOBAL AJUSTADO**
-
-**Principios Guía:**
-1.  Estabilidad y Seguridad PRIMERO.
-2.  Funcionalidad Core para el MVP (Producto Mínimo Viable) y Experiencia IA Central después.
-3.  Mejoras UX incrementales y continuas.
-4.  Expansión a largo plazo (móvil, internacionalización).
-
----
-
-**Fase 0: Estabilización Inmediata (Urgente)**
-*   **Objetivo:** Asegurar una base técnica sólida y resolver problemas críticos antes de añadir nuevas funcionalidades mayores.
-*   **Tareas:**
-   
-    1.  **[COMPLETADO - 12 Jun 2025]** 🛠 Migración MUI Grid v2.
-        *   **Subtarea:** `AdminDashboardPage.jsx` y resto de componentes revisados; todos usan Grid de `@mui/material` correctamente.
-        *   **Subtarea:** Revisión global completa, sin instancias restantes de Grid v1.
-    2.  **[RESUELTO - 12 Jun 2025]** 🐛 Error "Maximum update depth exceeded" en `MapView.jsx`.
-        *   **Contexto:** Ajustes en dependencias de `useEffect` verificados en pruebas locales; no se reproduce el error.
-    3.  **[RESUELTO - 12 Jun 2025]** Vistas admin placeholders iniciales reemplazadas (Usuarios, Propiedades, Tickets, Configuración) y API tickets creada.
-
----
-
-**Fase 1: Núcleo de Negocio y Experiencia IA Central (Máxima Prioridad)**
-*   **Objetivo:** Implementar las funcionalidades centrales que definen la propuesta de valor de SkyTerra, con un fuerte énfasis en la búsqueda inteligente y la versatilidad del listado de propiedades.
-*   **Tareas:**
-    1.  **[EN PROGRESO]** 🧠 **IA Search Bar - Experiencia Central (Alcance Extendido):**
-        *   **Subtarea (Backend):** Se añadió lógica en `AISearchView` para interpretar consultas complejas mediante `GeminiService` y devolver top-3 propiedades (commit 12-Jun-2025).
-        *   **Subtarea (Backend):** Pendiente integración con APIs geoespaciales externas.
-        *   **Subtarea (Frontend):** Pendiente UI de resultados y fly-to.
-        *   **Subtarea (IA/Contenido):** Pendiente FAQs.
-        *   **Estado:** Backend funcional básico, faltan refinamientos y frontend.
-    2.  **[EN PROGRESO]** ➕ Soporte para Arriendo/Alquiler:
-        *   **Backend:** Modelo `Property` y serializers actualizados (campos `listing_type`, `rent_price`, `rental_terms`). Falta aplicar migraciones en entorno de producción.
-        *   **Frontend:**
-            *   **[COMPLETADO]** Formulario `PropertyForm` con select de modalidad y campos condicionales `rentPrice` y `rentalTerms`.
-            *   **[COMPLETADO]** Servicio API mapea correctamente los nuevos campos.
-            *   **[COMPLETADO]** `PropertyCard` muestra precio según modalidad (venta o arriendo).
-            *   **[COMPLETADO - 13 Jun 2025]** Actualizar `PropertyDetails.jsx` para exhibir modalidad y precio de arriendo.
-            *   **[COMPLETADO - 13 Jun 2025]** Se añadió pestaña "Documentos" en `PropertyForm.jsx` para permitir subida de PDFs, DOC y planos (hasta 10 archivos). UI con listado, remover y alerta informativa.
-            *   **[COMPLETADO - 13 Jun 2025]** Backend: Modelo `PropertyDocument` implementado (relación 1-a-N), con campos `file`, `doc_type`, `description`, `uploaded_at`.
-            *   **[COMPLETADO - 13 Jun 2025]** API: Se añadió `PropertyDocumentViewSet` (CRUD), ruta `/api/documents/`, serializer y registro en `urls.py`; `PropertySerializer` actualizado y manejo de `new_documents` en vistas.
-            *   **[COMPLETADO - 26 Jun 2025]** Backend: Acciones `approve` / `reject` añadidas a `PropertyDocumentViewSet`; actualización de estado y transición automática de `publication_status`. **Verificado: `send_property_status_email` ya se llama.**
-            *   **[PENDIENTE]** Notificaciones: Email al propietario cuando su propiedad cambia de estado (pendiente → approved/rejected).
-            *   **[PENDIENTE]** Frontend: Mostrar estado de verificación y lista de documentos subidos en `PropertyDetails.jsx` (sólo para owner y admin).
-            *   **[DESCARTADO - 13 Jun 2025]** Filtros manuales eliminados del UI principal; la IA gestionará filtros internamente.
-        *   **Admin:**
-            *   **[COMPLETADO - 16 Jun 2025]** Ajustar vistas de propiedades (AdminDetailedPropertiesPage) para listar y filtrar por modalidad (venta/arriendo/ambas).
-        *   **QA:**
-            *   **[PENDIENTE]** Ejecutar y verificar migraciones (`makemigrations` + `migrate`).
-    3.  **[RESUELTO - 13 Jun 2025]** 📈 **Métrica de Plusvalía Inteligente (Recovery Score‐style):**
-        *   **Backend:** Campo `plusvalia_score` en modelo `Property` con cálculo automático; migraciones aplicadas.
-        *   **Servicio `PlusvaliaService` v2:** Combina 10 factores (valor de mercado externo, tasa apreciación histórica, demanda interna por visitas, precio/hectárea, agua, vistas, tamaño, proximidad, modalidad, IA). Integra **ClearAVM / Property Valuation API** para AVM y apreciación histórica [fuente](https://www.clearcapital.com/products/property-valuation-api/). **Completado** (stub externo, pesos iniciales, cálculos y fallback a neutro).
-        *   **Demanda:** Nuevo modelo `PropertyVisit` para registrar vistas; falta endpoint y frontend para registrar cada visualización de detalle de propiedad.
-        *   **Seguridad:** `plusvalia_score` solo visible para usuarios `is_staff`.
-        *   **Frontend:** **[COMPLETADO - 16 Jun 2025]** Mostrar métrica en vistas admin (AdminDetailedPropertiesPage) y panel de detalles de propiedad (solo staff).
-        *   **Próximos pasos:** Ajustar pesos tras recopilar datos reales y conectar servicios externos en entorno prod.
-    4.  **[COMPLETADO - 26 Jun 2025]** 👤 **Creación de Cuenta Admin por Defecto:**
-        *   **Subtarea (Backend):** Implementar un script, `management command`, o proceso de inicialización para crear un superusuario con `username='admin'` y `password='SkyTerra3008%'` (la contraseña debe ser manejada de forma segura, idealmente establecida en el primer despliegue o mediante variables de entorno para el admin inicial). **Verificado: `create_default_admin.py` ya existe y funciona.**
-
----
-
-**Fase 2: Funcionalidades de Usuario, Comunidad y UX Esencial (Alta Prioridad)**
-*   **Objetivo:** Enriquecer la interacción del usuario con la plataforma y mejorar la usabilidad general.
-*   **Tareas:**
-    1.  **[COMPLETADO - 16 Jun 2025]** ❤️ **Funcionalidad de Favoritos/Guardados (MVP):**
-        *   Backend: Modelo `Favorite`, serializer y `FavoriteViewSet` (`/api/favorites/`).
-        *   Frontend: `PropertyCard` muestra botón bookmark para guardar/quitar; `favoritesService` en `api.js`.
-        *   Pendiente: Vista dedicada "Favoritos" en dashboard.
-    2.  **[EN PROGRESO - 26 Jun 2025]** 👤 **Página de Perfil de Usuario (Básica):**
-        *   **Frontend:** Añadida pestaña "Mi Perfil" en `Dashboard.jsx` y componente `UserProfile.jsx` para edición de datos básicos.
-        *   **Backend:** Añadido endpoint `/api/auth/profile/` (`ProfileUpdateView`) para actualizar el perfil del usuario.
-        *   Para compradores/arrendatarios: Ver favoritos, gestionar datos básicos de perfil.
-        *   Para vendedores/propietarios: Ver y gestionar sus publicaciones (venta y arriendo), datos de perfil.
-        *   Requiere lógica de autenticación y roles.
-    3.  **[PENDIENTE]** 💬 **Mensajería Interna (Básica) o Flujo de Contacto Mejorado:**
-        *   Diseñar e implementar un sistema para que los usuarios puedan contactar a los publicadores sobre propiedades específicas.
-        *   Considerar si se implementa un chat interno completo o un formulario de contacto robusto con notificaciones por email al propietario.
-    4.  **[PENDIENTE]** ✨ **Feedback Visual Claro y Consistente:**
-        *   Revisar y mejorar el uso de Snackbars, loaders, modales de confirmación, y mensajes de éxito/error en toda la aplicación para una UX más pulida.
-    5.  **[PENDIENTE]** 🏡 **Rediseño UI `Dashboard.jsx` (Panel de Usuario Propietario/Vendedor/Admin):**
-        *   Aplicar diseño minimalista y moderno con cards para propiedades.
-        *   Paginación. Botón "Crear Nueva Propiedad".
-        *   Asegurar que la UX esté personalizada según el rol del usuario logueado (qué acciones y vistas están disponibles).
-
----
-
-**Fase 3: Expansión de Funcionalidad y Maduración (Media Prioridad)**
-*   **Objetivo:** Añadir funcionalidades más complejas y refinar la plataforma.
-*   **Tareas:**
-    1.  **[PENDIENTE]** 💳 **Implementar Sistema de Transacciones Básico:**
-        *   **Primero:** Definición clara del alcance (¿Son ofertas formales, reservas, un sistema de pago inicial?).
-        *   Diseño detallado de la UX y los flujos antes de la implementación.
-        *   Backend: Modelos, lógica de negocio, posibles integraciones con pasarelas de pago.
-        *   Frontend: Interfaz para gestionar estas transacciones.
-    2.  **[EN PROGRESO]** 🎨 **Unificar Tema Oscuro y Estilo Visual Globalmente:**
-        *   Asegurar consistencia de diseño, tipografía, colores, y componentes en toda la aplicación. **Problema identificado:** Persistencia de estilos `backgroundColor` inline y en reglas CSS específicas con mayor prioridad (`!important`) sobre el tema global Liquid Glass. Requiere una refactorización exhaustiva para eliminar estilos `hard-coded` y confiar plenamente en las variantes de tema de MUI (`variant="glass"`) y clases auxiliares.
-    3.  **[PENDIENTE]** 📱 **Optimización Móvil Detallada (para la Web App) y Pruebas de Accesibilidad.**
-        *   Asegurar que la PWA o web app sea completamente responsive y accesible.
-    4.  **[PENDIENTE]** 💡 **Onboarding/Ayuda Rápida para nuevos usuarios:**
-        *   Tooltips, guías interactivas cortas, o integración con la IA para ayudar a los usuarios a entender cómo usar las funciones clave.
-
----
-
-**Fase 4: Crecimiento y Plataformas Adicionales (Largo Plazo / Estratégico)**
-*   **Objetivo:** Expandir el alcance y las capacidades de SkyTerra.
-*   **Tareas:**
-    1.  **[PENDIENTE]** 📊 **Panel Analítico para Administradores:**
-        *   Estadísticas sobre propiedades, usuarios, búsquedas, etc.
-    2.  **[PENDIENTE]** 🔔 **Notificaciones Avanzadas (Email/In-app):**
-        *   Alertas personalizadas, resúmenes, etc.
-    3.  **[PENDIENTE]** 🌍 **Internacionalización:**
-        *   Soporte para múltiples idiomas (ej. inglés) en contenido y UI.
-    4.  **[PENDIENTE]** 📱 **Desarrollo de Aplicaciones Móviles Nativas (Android & iOS):**
-        *   **Consideraciones Iniciales:**
-            *   **Alcance MVP Móvil:** Definir funcionalidades esenciales para la v1 de las apps.
-            *   **Tecnología:** Evaluar React Native, Flutter, o Nativo (Swift/Kotlin).
-            *   **API Backend:** Debe estar preparada para soportar clientes móviles.
-            *   **Diseño UX/UI Específico para Móvil:** No una simple adaptación de la web.
-            *   **Gestión de Estado y Datos Offline:** Considerar si se requiere.
-            *   **Push Notifications:** Planificar integración (FCM/APNs).
-            *   **Recursos:** Evaluar necesidades de equipo.
-
----
-
-**ROADMAP DE REDISEÑO UI "LIQUID GLASS" (Estilo macOS)** — *[DETALLADO - 13 Jun 2025]*
-
-*Visión:* Transicionar todo el frontend a un diseño minimalista inspirado en macOS con fondos translúcidos, tipografía limpia y micro-interacciones fluidas. Se introduce un *theme* unificado `liquidGlassTheme` y variantes `glass` en los componentes MUI. El backend proveerá assets retina, versionado de diseño y feature-flags para gradual rollout.
-
-### Fase GL-0 • Auditoría & Definición (1 sem)
-1. Inventario completo de componentes React/MUI y estilos CSS/inline.  
-2. Matriz de dependencias visuales ↔ payload backend (ej. `publication_status`, `listing_type`).  
-3. Informe de inconsistencias + propuesta de tokens.
-
-### Fase GL-1 • Fundaciones de Diseño (1 sem)
-1. Crear `src/theme/tokens.js` con:  
-   • `surface-0` #0e0e0e, `surface-1` rgba(255,255,255,.04), `surface-glass` rgba(255,255,255,.12) + blur(10px).  
-   • `accent` #66ccff.  
-   • Escala tipográfica `14/18/22/28/40`, grid 4 px.  
-2. Implementar `liquidGlassTheme.js` y registrar variantes `glass` para `Paper`, `Card`, `AppBar`, `Drawer`.  
-3. Página interna `/styleguide` (Storybook o ruta React) para previsualizar tokens.
-
-### Fase GL-2 • Layout & Navegación (2 sem)
-1. Sidebar → off-canvas `Drawer` (`permanent` desktop / `temporary` mobile) con `surface-glass`.  
-2. TopBar minimal (56 px) autohide on-scroll móvil.  
-3. Reescritura de grids: `repeat(auto-fit,minmax(280px,1fr))`.  
-4. Tablas → `@mui/x-data-grid` sin sombras.
-
-### Fase GL-3 • Conversión de Componentes (3 sem, rolling)
-Para cada componente: migrar a `sx` + tokens, sustituir sombras por bordes semitransparentes, aplicar variante `glass` si es contenedor.
-Prioridad: `Dashboard` → `CreateProperty` → `PropertyCard`+Mapbox popups → Vistas Admin → Formularios Auth → `AISuggestionPanel`.
-
-### Fase GL-4 • Animaciones & Micro-interacciones (1 sem)
-1. Wrapper `GlassFade` (opacity+blur+scale) con Framer-motion.  
-2. Ripple buttons (`scale(.96)` + inset-shadow 150 ms).  
-3. Page-transitions vía `AnimatePresence`.  
-4. Map fly-to duration 4.5 s.
-
-### Fase GL-5 • Backend & Assets (1 sem paralela)
-1. Header `X-Design-Version: liquid-v1` para compatibilidad.  
-2. Endpoints `/images` sirven WebP 2× retina.  
-3. Streaming progresivo de tours.
-
-### Fase GL-6 • Performance & QA (1 sem)
-1. Lighthouse ≥ 85 móvil/escritorio.  
-2. Test cross-browser; fallback sólido cuando no haya `backdrop-filter`.  
-3. WCAG 2.1 AA.
-
-### Fase GL-7 • Lanzamiento & Gobernanza (continuo)
-1. Feature-flag `liquidGlass` por usuario.  
-2. Documentación de tokens y patrones en Notion.  
-3. ESLint rule: prohibido usar hex directo, sólo tokens.
-
----
-
-**Historial de Cambios Recientes en el Log:**
-*   2025-06-12: Migración MUI Grid finalizada y bug de MapView resuelto tras pruebas.
-*   2025-06-12: Añadida lógica de IA en `AISearchView` para devolver top 3 sugerencias basadas en BD.
-*   2025-06-12: Detectadas vistas admin placeholders vacías; se registra como NUEVO issue en Fase 0.
-*   2025-06-16: Implementado nuevo sistema de registro con selección de tipo de vendedor ("Vendo mi terreno" vs "Vendedor profesional") y formularios adaptativos según rol. Prototipo UI reactivo incluido en `AuthForms.jsx`; dashboard existente ya lista "Mis Propiedades" con botón "+" para nuevas publicaciones.
-*   2025-06-16: Dashboard mejorado con pestañas Resumen/Mis Propiedades/Búsquedas Guardadas/Favoritos, lógica de límite de 3 publicaciones para cuentas individuales y carga dinámica de favoritos (`favoritesService`).
-*   2025-05-29: Reestructuración completa del plan en Fases (0 a 4).
-*   2025-05-29: Elevada prioridad y alcance de la "IA Search Bar - Experiencia Central" a Fase 1.
-*   2025-05-29: Integrado "Soporte para Arriendo/Alquiler" como alta prioridad en Fase 1.
-*   2025-05-29: Añadida tarea "Creación de Cuenta Admin por Defecto" a Fase 1.
-*   2025-05-29: Añadida "Desarrollo de Aplicaciones Móviles Nativas (Android & iOS)" a Fase 4 con consideraciones iniciales.
-*   2025-05-29: Re-priorizadas otras tareas según el nuevo enfoque estratégico.
-*   2025-05-30: Actualizado el estado de los puntos 3 y 4 de la Fase 0 (edificios 3D resuelto, error de update depth pospuesto/no prioritario).
-*   **[RESUELTO - 3 Jun 2025]** 🐛 **BUG DE REGISTRO DE USUARIOS SOLUCIONADO:**
-    * **Problema identificado:** Bug que impedía crear nuevas cuentas de usuario
-    * **Causa raíz:** 
-        - Migraciones de Django no aplicadas completamente
-        - Configuración incorrecta de URLs en entorno Codespaces
-        - Manejo de errores insuficiente en frontend y backend
-    * **Soluciones implementadas:**
-        1. ✅ Aplicación completa de migraciones Django
-        2. ✅ Mejora en detección automática de entorno (Codespaces vs localhost)
-        3. ✅ Validaciones mejoradas en formulario de registro:
-            - Email único y formato válido
-            - Username con caracteres permitidos (3+ chars)
-            - Contraseña segura (8+ chars, mayús/minús/número)
-        4. ✅ Logging detallado para debugging en backend y frontend
-        5. ✅ Mejor manejo de errores con mensajes específicos
-    * **Testing realizado:**
-        - Endpoint `/api/auth/register/` funciona correctamente
-        - Formulario frontend valida datos correctamente
-        - Respuestas de error claras y específicas
-        - Usuarios creados exitosamente (IDs 5, 6 durante testing)
-    * **Estado:** Completamente funcional
-    * **Próximos pasos:** Continuar con testing de flujo completo registro → login → dashboard
-*   2025-06-12: Rutas de administración actualizadas en `App.jsx` para integrar Usuarios, Propiedades detalladas, Tickets y Configuración.
-*   2025-06-12: Implementada lista de Tickets en Admin y API REST para tickets (endpoints /api/admin/tickets/).
-*   2025-06-12: Backend de soporte para arriendo actualizado (campos nuevos en Property y serializers).
-*   2025-06-12: Frontend integrado con soporte de arriendo en formulario y card; pendiente detalles y filtros.
-*   2025-06-13: Añadido `plusvalia_score` con cálculo IA + datos externos; modelo `PropertyVisit`; servicio `ExternalMarketDataService` y actualización de `PlusvaliaService` v2.
-*   2025-06-13: Actualizado Fase 1 con la nueva tarea 'Métrica de Plusvalía Inteligente'.
-*   2025-06-13: Añadido Roadmap detallado de Rediseño UI "Liquid Glass" y marcada la tarea general de unificación de tema como parte del nuevo roadmap GL.
-*   2025-06-13: Crítica de diseño fuerte y lineamientos minimalistas incorporados.
-*   **[RESUELTO - 13 Jun 2025]** Filtros de Modalidad (Venta/Arriendo) implementados en frontend:
-    *   MapView.jsx ahora envía `listing_type` en parámetros API (manual y AI).
-    *   AISearchBar.jsx soporta `listingType` en chips y filtros sugeridos.
-    *   Propagación via `aiAppliedFilters` garantizada.
-*   **[COMPLETADO - 13 Jun 2025]** Se implementó `liquidGlassTheme` con tokens y se reemplazó azul primario por paleta neutra; componentes principales actualizados (App, Dashboard, AISearchBar, AdminLayout) para usar colores del tema.
-*   2025-06-13: **Refactor UI – Apple-style Liquid Glass Phase**
-    * Global theme updated: `MuiPaper` and `MuiCard` variant `glass` → fondo `rgba(255,255,255,0.12)` + borde 25 % alpha + blur.
-    * Avatar `IconButton` + `Menu` aclarados; animación `glassGlow` deshabilitada en popup.
-    * `AISearchBar` input y panel de resultados migrados al nuevo look translúcido.
-    * `AISuggestionPanel` ahora usa fondo claro y borde acorde.
-    * Token `surface-glass` aplicado a inputs (OutlinedInput root).
-    * **Pendiente:** Migrar Dashboard, PropertyDetails, CreateProperty y demás vistas que aún usan `rgba(22,27,34,*)` directo a `variant="glass"` o al nuevo token.
-*   **[COMPLETADO - 14 Jun 2025]** Rediseño de Dashboards (Usuario y Admin) al estilo Liquid Glass minimalista:
-    *  Se reemplazaron colores azules (#3b82f6, #8faacc, etc.) por acento neutro (#a0a0a0) y colores de tema.
-    *  Cards, Paper y métricas ahora usan variante `glass` con fondos translúcidos y bordes consistentes.
-    *  Íconos y botones actualizados para seguir la paleta neutra; bordes y hovers adaptados.
-    *  Gráficos en Admin Dashboard recodificados con color neutro y contenedores translúcidos.
-*   **[ACTUALIZADO - 14 Jun 2025]** UI Legacy Cleanup:
-    *   Eliminadas pestañas de filtros manuales y otros componentes redundantes (`Dashboard.jsx`, `FilterPanel.jsx`) para alinear la experiencia con la nueva filosofía *AI-first* y el roadmap "Liquid Glass".
-    *   Se aprueba iniciar un **rediseño completo Apple-style** enfocado en el flujo del Vendedor (creación de publicaciones, analíticas y gestión de planes), incorporando las sugerencias de estructura modular y nuevas pestañas detalladas en la conversación del 14-Jun.
-    *   Próximos pasos: definición detallada de pantallas, wireframes y tokens de animación.
-*   **[ACTUALIZADO - 14 Jun 2025]** Limpieza Admin Dashboard:
-    *   Se removieron rutas e importaciones de `Admin*` pages en `App.jsx` para simplificar la V2 minimal.
-    *   Los componentes admin y lógica de verificación de documentos, métricas y gestión permanecen en `frontend/src/components/admin/` para reaprovechar en una futura versión Staff-Only.
-*   **[COMPLETADO - 14 Jun 2025]** Integrado flujo de creación de publicación:
-    *   Se añadió componente `CreatePublicationWizard.jsx` (wizard 4 pasos) con estilo Liquid Glass y validación básica.
-    *   `App.jsx`: Ruta protegida `/create-property` registrada y acceso solo para usuarios autenticados.
-    *   `Dashboard.jsx`: Botón "Crear nueva publicación" ahora navega al wizard y ya no está deshabilitado.
-    *   Se emplea `Paper variant="glass"` y tokens de tema en wizard; se mantiene coherencia visual.
-*   **[COMPLETADO - 14 Jun 2025]** Visibilidad de documentos en Dashboard:
-    *   `Dashboard.jsx` ahora carga las propiedades del usuario vía `getUserProperties`.
-    *   Lista "Mis Propiedades" muestra estado de verificación de documentos con chips (Aprobados, Pendientes, Rechazados, Sin documentos).
-    *   Cada card es Paper glass y enlaza a los detalles de propiedad.
-*   **[COMPLETADO - 14 Jun 2025]** Ruta admin para revisión de documentos:
-    *   `AdminDocumentsReviewPage.jsx` conectado vía ruta `/admin/documents` con protección solo para `is_staff`.
-    *   Navegación automática tras login de admin y desde menú de usuario.
-*   **[MEJORA - 14 Jun 2025]** IA Search Bar – Panel de sugerencias refinado:
-    *   `AISuggestionPanel.jsx` limita visualización a top-3 sugerencias (`MAX_DISPLAY = 3`) y fija ancho 380 px en lateral izquierdo (20 px de margen).
-    *   Alineado con requisito de UI de mostrar 3 propiedades y panel fijo.
-*   **[COMPLETADO - 14 Jun 2025]** Notificaciones de email al propietario por cambio de estado:
-    *   Implementado `email_service.send_property_status_email` usando `django.core.mail.send_mail`.
-    *   `PropertyDocumentViewSet.approve/reject` dispara correo automático al cambiar `publication_status`.
-*   **[COMPLETADO - 14 Jun 2025]** Script de superusuario por defecto:
-    *   Management command `create_default_admin` en `properties/management/commands/` crea un superuser si no existe.
-    *   Usa variables de entorno `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL` con defaults (`admin` / `SkyTerra3008%`).
-*   **[COMPLETADO - 14 Jun 2025]** Métrica de visitas registrada:
-    *   Modelo `PropertyVisit` ya existía; se añadió `PropertyVisitSerializer`, `PropertyVisitViewSet` y ruta `/api/property-visits/` (POST).
-    *   `PropertyDetails.jsx` registra automáticamente una visita al cargar la propiedad.
-*   **[MEJORA - 14 Jun 2025]** PropertyCard convertido a estilo Glass:
-    *   `PropertyCard.jsx` usa ahora `<Card variant="glass">` removiendo sombras previas.
-*   **[RESUELTO - 13 Jun 2025]** Se eliminó `boxShadow` global y en variante glass en `liquidGlassTheme.js` para evitar halo gigante.
-*   **[MEJORA - 14 Jun 2025]** IA Search – GeminiService refinado:
-    *   `backend/properties/services.py` ahora conserva recomendaciones con IDs válidos de la IA y solo genera sugerencias nuevas cuando es necesario.
-    *   Mensajes del asistente se mantienen coherentes y se evita mostrar 3 tarjetas irrelevantes.
-*   **[RESUELTO - 14 Jun 2025]** Halo blanco en pop-ups Mapbox eliminado:
-    *   `frontend/src/index.css` – `.mapboxgl-popup-content`, `.mapboxgl-popup-tip` y `.mapboxgl-popup-tip-inner` ahora son transparentes, sin borde ni sombra.
-    *   El pop-up muestra solo la tarjeta glass interior, sin doble fondo.
-*   **[EN PROGRESO - 14 Jun 2025]** Frontend: Componente `PropertyPreviewModal.jsx` creado (modal translúcido con galería, info básica y CTA a /register). Integrado en `MapView.jsx`; al hacer clic en un pin sin `auth_token` se abre la vista previa en lugar de navegar. Falta estilizar header y probar responsivo.
-*   **[MEJORA - 14 Jun 2025]** `PropertyPreviewSerializer` ahora incluye campo `images` (máx 5) para galería en modal.
-*   **[COMPLETADO - 14 Jun 2025]** Backend: Modelo `ComparisonSession`, serializer y `ComparisonSessionViewSet` expuestos en `/api/compare/` (crea/actualiza lista de hasta 4 propiedades por usuario o sesión anónima).
-*   **[EN PROGRESO - 14 Jun 2025]** Frontend: `CompareView.jsx` (liquid glass) creado y ruta `/compare` agregada en `App.jsx`. `PropertyCard.jsx` incluye botón de comparar que crea/actualiza sesión vía `/api/compare/` y navega a vista. Falta diseño responsive detallado y sincronizar múltiples adiciones.
-*   **[COMPLETADO - 15 Jun 2025]** Backend: `TourViewSet` ahora maneja subida de paquetes `.zip`/`.ggpkg`. El endpoint `create` acepta un `package_file`, lo descomprime en una ruta única (`/media/tours/<uuid>`), valida que exista `index.html`, y guarda la URL pública en el modelo `Tour`. Incluye validaciones de seguridad.
-*   **[COMPLETADO - 15 Jun 2025]** Frontend: Creado componente reutilizable `Pano2VRViewer.jsx`. Integrado en `PropertyDetails.jsx`: la pestaña "Tours" ahora renderiza directamente el tour 360° si existe uno de tipo 'package', en lugar de mostrar una lista.
-*   **[AJUSTE - 15 Jun 2025]** `PropertyPreviewModal` ahora usa carousel nativo con botones; se elimina dependencia `react-swipeable-views` para evitar conflictos de peer-deps. `package.json` actualizado.
-*   **[COMPLETADO - 15 Jun 2025]** Backend: Implementado modelo `SavedSearch`, serializer y `SavedSearchViewSet` (`/api/saved-searches/`) para que usuarios registrados guarden filtros y activen alertas por correo.
-*   **[COMPLETADO - 15 Jun 2025]** Mapa – Ciudades y Puntos de Interés (POI):
-    *   Se añadió iconografía (`icon-image`) y texto a las capas de ciudades (`city-labels-major`, `city-labels-minor`) y POIs (`poi-major`, `poi-minor`).
-    *   Filtros refinados para que solo aparezcan:
-        *   Países desde zoom 0.
-        *   Ciudades principales (rank ≤ 5) desde zoom ≥3.
-        *   Ciudades menores (rank >5) desde zoom ≥7.
-        *   POI mayores desde zoom ≥10 y menores desde zoom ≥13.
-    *   Uso de `coalesce` para manejar `rank/label_rank` nulos y evitar warnings de tipo.
-    *   Eliminados errores de consola relacionados con expresiones Mapbox (`label_rank expected type number`).
-    *   Ajustado estilo de texto/iconos para evitar saturación visual y hacer progresivo el detalle.
-*   **[15 Jun] Jerarquía de etiquetas refinada: `city-labels-major` (zoom≥4, rank≤4), `city-labels-medium` (zoom≥6), `town-labels` (zoom≥8) y `village-labels` (zoom≥10).
-*   **[15 Jun] Fuentes unificadas: familia *Source Code Pro* (Bold/Semibold/Regular) para alinear con tipografía principal del sitio.
-*   **[15 Jun] Localidades pequeñas ahora filtradas: pueblos (zoom≥10 rank≤10) y aldeas (zoom≥12).
-*   **[15 Jun] POI visibles: mayores desde zoom 11, menores desde 14; tipografía Source Code Pro.
-
----
-
-## **PLAN DE DESPLIEGUE A PRODUCCIÓN (AWS)**
-
-> **Objetivo:** Tener un entorno productivo robusto, seguro y escalable en AWS para el MVP de SkyTerra antes de Q3-2025.
-
-### 1. Arquitectura Propuesta (Alta Disponibilidad)
-* **VPC** con subredes públicas y privadas en 2 AZ (us-east-1a / 1b)
-* **ALB (Application Load Balancer)** frente a 2× instancias **EC2** (Autoscaling group) con Docker + Gunicorn + Nginx (Backend Django)
-* **RDS PostgreSQL** (Multi-AZ, gp3  db.t3.medium, backups 7 días)
-* **Elasticache Redis** (para sesiones y caching)
-* **S3**: Media (imágenes, tours, documentos) + versión ‑> CloudFront para servir estático
-* **S3** bucket adicional para artefactos de CI/CD (builds)
-* **Route 53** para DNS (skyterra.cl, api.skyterra.cl, cdn.skyterra.cl)
-* **ACM** – TLS certificados para ALB y CloudFront
-* **ECR** para almacenamiento de imágenes Docker
-* **AWS Step Functions + Lambda (futuro)** para procesamiento pesado (ej: IA, generador de thumbnails)
-
-### 2. Flujo CI/CD (GitHub Actions)
-1. **build_frontend**: `npm ci → npm run build` → artefacto comprimido → upload a S3 (`frontend-builds/commitSHA.zip`)
-2. **build_backend**: `docker build` → push a ECR con tag commitSHA
-3. **deploy_staging** (branch *develop*):
-   * EB CLI ó ECS task (Fargate) actualiza containers 
-   * Frontend build sin compresión, servido por CloudFront-dev
-   * Corre migraciones `python manage.py migrate --noinput`
-   * Smoke tests (`pytest -m smoke`)
-4. **deploy_prod** (merge *main* + tag vX.Y.Z):
-   * Blue-green en EC2 ASG → health-check antes de cortar tráfico
-   * Frontend build se sube a bucket S3-prod y se invalida CloudFront
-   * Migraciones + comando para crear superadmin si no existe
-   * Notificación Slack (#deploys) con changelog auto-generado
-
-### 3. Seguridad y Gobernanza
-* **IAM roles** mínimos (EC2, GitHub OIDC)
-* SG restrictivos (solo ALB → EC2, EC2 → RDS/Redis)
-* Secrets en **AWS Secrets Manager** (DB creds, email SMTP)
-* **WAF** delante de ALB + reglas OWASP top-10
-* Backups automatizados (RDS + S3 lifecycle)
-* **CloudTrail** & AWS Config habilitados
-
-### 4. Observabilidad / DevOps
-* **CloudWatch Logs** + métricas custom (latencia API, errores 5xx, duración de migraciones)
-* **Prometheus + Grafana Cloud** (opcional) para métricas de aplicación
-* **Sentry** para errores JS y Django
-* **StatusCake** (heartbeat)
-
-### 5. Costeo Estimado Mensual (USD)
-| Componente | Inicial | Escalable |
-|------------|---------|-----------|
-| EC2 t3.medium ×2 | $35 | +$35 por inst extra |
-| RDS db.t3.medium | $75 | según storage |
-| ALB | $20 | tráfico |
-| S3 + CloudFront | $10 | uso |
-| Otros (Redis, transfer, backups) | $15 | uso |
-| **Total** | **≈ $155** | variable |
-
-### 6. Roadmap Próximos Pasos
-1. **[PENDIENTE]** Crear repo `skyterra-infra` con Terraform IaC (modular)
-2. **[PENDIENTE]** Configurar GitHub Actions con OIDC hacia AWS
-3. **[PENDIENTE]** Dockerizar backend (multi-stage) y frontend (Nginx static)
-4. **[PENDIENTE]** Implementar S3 storage en Django (`django-storages`, presigned URLs)
-5. **[PENDIENTE]** Configurar CloudFront + custom domain para frontend
-6. **[PENDIENTE]** Ajustar CORS y CSRF (api.skyterra.cl ↔ app)
-7. **[PENDIENTE]** Pruebas de carga (k6) antes de GA
-8. **[PENDIENTE]** Revisión de seguridad por OWASP ZAP
-9. **[PENDIENTE]** Manual de rollback y playbook incidentes
-
-### 7. Brechas Detectadas en Revisión 13-Jun-2025
-Tras revisar frontend y backend actuales se identifican los siguientes vacíos adicionales:
-
-1. **Filtros de Modalidad (Venta/Arriendo)**
-   * Falta en SearchBar y en lista de resultados (`PropertyList`, `MapResultsOverlay`).
-   * Endpoint backend ya acepta `listing_type` en `filterset_fields`, solo falta consumirlo.
-
-2. **Gestión de Documentos en Admin**
-   * Crear vista `AdminDocumentsReviewPage.jsx` dentro de `/admin` para aprobar/rechazar documentos.
-   * **[EN PROGRESO]** Endpoint backend: `PropertyDocumentViewSet` implementado (CRUD). Pendiente añadir acciones `approve` / `reject` y lógica de verificación.
-
-3. **Visibilidad de Documentos para Propietario**
-   * En `Dashboard.jsx` y `PropertyDetails.jsx` (si owner==viewer) mostrar lista y estado de verificación.
-
-4. **Flujo de Correo de Verificación de Cuenta**
-   * Implementar correo con token JWT y endpoint `verify-email/`.
-
-5. **Funcionalidad de Favoritos (dependiente de Fase 2)**
-   * Modelo `Favorite`, endpoints `/favorites/`, botón en `PropertyCard` y `PropertyDetails`.
-
-6. **Mensajería / Contacto**
-   * API `Conversation` + WebSocket (Django Channels) o fallback email.
-   * UI: Chat minimal en `PropertyDetails`.
-
-7. **Accesibilidad y SEO**
-   * Revisar `alt` en imágenes, contraste WCAG AA, meta tags React Helmet.
-
-8. **Pruebas Automáticas**
-   * Aumentar cobertura Jest (frontend) y PyTest (backend) a >70 %.
-
-9. **Políticas de Retención de Datos**
-   * GDPR – página Privacy Policy, endpoint `delete-account` y anonimización.
-
-10. **Configuración PWA**
-   * `manifest.json`, Service Worker con precache de rutas críticas.
-
-11. **Optimización Build & Calidad de Código**
-    * Configurar ESLint + Prettier pre-commit (husky) y CI.
-    * Dividir código con React.lazy/Suspense y Vite chunks para reducir TTFB.
-
-12. **Error Boundaries Globales**
-    * Crear componente `AppErrorBoundary` y log a Sentry.
-
-Cada punto se añadirá a la fase correspondiente durante planificación semanal.
-
-> Todas las tareas marcadas `[PENDIENTE]` se irán trasladando a las Fases correspondientes conforme avance la implementación.
-
-### Próximas Acciones Inmediatas (14 Jun 2025)
-*   **Objetivo General:** Cerrar brechas críticas identificadas en revisión del 13-Jun y preparar groundwork para despliegue AWS.
-*   **Tareas Prioritarias (orden sugerido):**
-    1.  **Backend – Completar flujo de verificación de documentos**
-        *   Añadir métodos `approve` y `reject` definitivos en `PropertyDocumentViewSet`.
-        *   Señalar transición automática de `publication_status` en `Property` y emitir señal para notificación.
-        *   Tests PyTest para casos `approve`, `reject` y permisos.
-    2.  **Frontend – Visibilidad de documentos y estados**
-        *   `PropertyDetails.jsx`: sección "Documentos" visible para owner/admin; listar archivos con estado.
-        *   `Dashboard.jsx`: Indicador de verificación en card de propiedad.
-        *   `AdminDocumentsReviewPage.jsx`: conectar con endpoints `approve`/`reject` y feedback en tiempo real.
-    3.  **IA Search Bar – Resultados y animación de vuelo**
-        *   Renderizar panel con top-3 sugerencias alineado a lado izquierdo (token `surface-glass`).
-        *   Al seleccionar sugerencia, ejecutar `map.flyTo` con duración 4.5 s.
-        *   Indicador de carga consistente entre búsqueda y flyTo.
-    4.  **Script de superusuario por defecto**
-        *   Management command `create_default_admin` usando variables de entorno para credenciales.
-        *   Incluir ejecución automática en pipeline `deploy_prod` si no existe usuario `admin`.
-    5.  **Infra – Bootstrap repo `skyterra-infra`**
-        *   Estructura Terraform modular (`vpc`, `ecs`, `rds`, `s3`, `iam`, `alb`).
-        *   README con pasos para `terraform init/plan/apply` y variables requeridas.
-    6.  **UX – Migración a Liquid Glass restante (Sprint-focus)**
-        *   Convertir `Dashboard`, `CreateProperty`, `PropertyCard` y formularios Auth a variantes `glass`.
-        *   Eliminar estilos inline `rgba(22,27,34,*)` residuales.
-    7.  **UX – Rediseño flujo Vendedor & Pestañas Modulares (Apple-style)**
-        *   Elaborar wireframes de las nuevas secciones: Resumen, Mis Publicaciones, Crear Publicación (wizard 4 pasos), Estadísticas, Mensajes y Planes.
-        *   Priorizar animaciones fluidas (Framer-motion) y uso de `variant="glass"` en contenedores principales.
-        *   Preparar esquema de rutas y permisos (solo `role="seller"`).
-
-*   **Meta de sprint:** Todas las tareas 1-4 marcadas `[COMPLETADO]` y 5-7 `[EN PROGRESO]` antes del 21-Jun-2025.
-
-### 8. Nuevas Recomendaciones Incorporadas (Asesoría 14-Jun-2025)
-
-Las siguientes tareas se derivan de la guía UX/UI recibida. Se han verificado contra el log para evitar duplicados. Se marcan como [PENDIENTE] y se asignarán formalmente a la Fase indicada en la próxima planificación semanal.
-
-1. **Vista Anónima – Vista Previa Limitada & CTA Registro** (Fase 1)
-   * Backend: Serializer `PropertyPreviewSerializer` limitado + endpoint `/properties-preview/` que expone sólo `id`, `title`, `price`, `main_image`, `location`, `surface`.
-   * Frontend: `PropertyPreviewModal.jsx` muestra 3-5 fotos, datos básicos y botón "Ver Tour 360° y Detalles Completos" que redirige a `/register`.
-2. **Integración Tours 360° (Pano2VR)** (Fase 2)
-   * Backend: Soporte de subida de paquetes Pano2VR (`.ggpkg`) a S3 y campo `tour_url` en `Property`.
-   * Frontend: Componente `<Pano2VRViewer>` embebido en `PropertyDetails.jsx` y en comparador.
-3. **Comparador de Propiedades (máx. 4)** (Fase 2)
-   * Backend: Modelo `ComparisonSession`, endpoints `/api/compare/` (GET IDs → detalles) y WS para sync.
-   * Frontend: `CompareView.jsx` con tabla de métricas, columnas side-by-side y miniaturas del tour 360°.
-4. **Búsquedas Guardadas & Alertas por Email** (Fase 2)
-   * Backend: Modelo `SavedSearch` y Celery task para notificar al publicar nueva propiedad que coincida.
-   * Frontend: Botón "Guardar búsqueda" en `AISearchBar`; panel "Alertas" en Dashboard.
-5. **Suscripciones Premium – Comprador** (Fase 3)
-   * Backend: Modelo `Subscription`, roles `premium_buyer`, integración initial Stripe Checkout.
-   * Frontend: Paywall que muestra `plusvalia_score` y filtros avanzados sólo si `role.includes('premium_buyer')`.
-6. **Niveles de Producción Visual (Normal / Pro / Premium)** (Fase 3)
-   * Backend: Tabla `ProductionLevel` y lógica de pricing; se genera `ProductionOrder` tras pago único.
-   * Frontend: Extender Paso 2 de `CreatePublicationWizard` con tarjetas comparativas y flujo de pago.
-7. **Panel de Estadísticas para Vendedor** (Fase 3)
-   * Frontend: Widgets visitas & contactos últimos 30 días, gráfico de barras y tabla top-propiedades.
-   * Backend: Endpoint `/api/seller/stats/` agregado y consultas agregadas.
-8. **Panel Logístico de Producción (Admin)** (Fase 3)
-   * Backend: CRUD `ProductionOrder`, estados `Assigned → Scheduled → Done → InReview → Approved`.
-   * Frontend: `AdminProductionPanel.jsx` con tabla, filtros por estado y asignación rápida a piloto.
-
-### Day 15: Overhauling User Dashboards & Theming
-- **New Feature: Role-Based Dashboards.**
-  - Implemented distinct, detailed dashboards for "Administrator" and "Seller" user roles.
-  - **Admin Dashboard:**
-    - Redesigned from the ground up to focus on SaaS and business KPIs.
-    - Features 3 distinct sections:
-      1.  **Business KPIs:** MRR, Churn Rate, LTV, and CAC cards.
-      2.  **Operations & Finance:** A production/marketing queue and a donut chart for MRR breakdown by plan.
-      3.  **Profitability Analysis:** Bar chart for LTV vs. CAC and a line chart for MRR evolution.
-    - Created modular components for each part of the dashboard (`SaaSKpiCard`, `ProductionQueue`, `MrrBreakdownChart`, etc.).
-  - **Seller Dashboard:**
-    - Designed a new dashboard for professional sellers to track their performance.
-    - Features 3 main sections:
-      1.  **Plan Status:** Shows the seller's current plan, feature status (e.g., "Completed", "In Post-Production"), and an upsell card.
-      2.  **Performance:** A detailed line chart for views/consultations over time and a set of KPI cards.
-      3.  **Property Management:** A clean data table listing the seller's properties with key stats and actions.
-    - Built using reusable components like `PlanStatus`, `PerformanceChart`, `PropertiesTable`, etc.
-- **Technical Implementation:**
-  - Used `Chart.js` for all new data visualizations.
-  - Leveraged Material-UI `Grid` and components to create the structured, responsive layouts.
-  - Implemented "Glassmorphism" style cards (`GlassCard`) for a modern, clean aesthetic on both dashboards.
-  - Updated application routing in `App.jsx` to direct `is_staff` users to `/admin` and all other authenticated users to the new `/dashboard` (Seller Dashboard).
-- **Project Structure:**
-  - Created new directories to organize dashboard components: `frontend/src/components/seller/` and `frontend/src/components/admin/dashboard/`.
-- **Next Steps:**
-  - Wire up dashboards to live backend data.
-  - Implement logic for different seller plans ("Dueño Particular" vs "Vendedor Profesional").
-
-## Session Date: 2024-07-26
-
-### Summary of Changes:
-
-Completed a major overhaul of the Admin Dashboard based on user feedback to improve functionality, UI, and centralization of management tasks.
-
-### Detailed Changes:
-
-1.  **Admin UI/Style Fixes:**
-    *   Resolved an issue in the **Admin Dashboard** where KPI card values were displayed in white text, making them unreadable. They now correctly use the primary text color from the theme.
-    *   Fixed an identical issue on the **Settings Page**, ensuring all form field labels are clearly visible.
-
-2.  **Property Management Overhaul (`AdminDetailedPropertiesPage`):**
-    *   **Centralized Management:** This page is now the central hub for managing properties, deprecating the separate "Documents" page.
-    *   **Plusvalía Score:** Added a "Plusvalía Score" column with a visually intuitive `LinearProgress` bar and color-coding (red/yellow/green) to quickly assess property potential. The column is sortable.
-    *   **Actions Menu:** Implemented a new "Actions" column with a menu for each property, providing access to management functions without leaving the page.
-    *   **360 Tour Management:** The actions menu now contains a "Gestionar Tour 360" option, which opens a modal allowing the admin to upload a ZIP file for the property's virtual tour.
-    *   **Integrated Document Review:** The "Documentos" tab has been removed from the main navigation. Functionality is now inside the property actions menu under "Ver Documentos". This opens a modal listing all documents for the selected property, showing their name, type, and verification status (`approved`, `pending`, `rejected`).
-
-3.  **Ticket Management Enhancement (`AdminTicketsPage`):**
-    *   **AI-Powered Priority:** Created a new mock `aiService` that automatically assigns a priority (`high`, `medium`, `low`) to each ticket based on keywords in its title.
-    *   **Simulated Email Alerts:** The AI service now simulates an immediate email notification (via a `console.log`) for any ticket that is assigned a 'high' priority.
-    *   **Interactive Ticket Response:** The ticket page is no longer static. Ticket cards are now clickable, opening a full-featured dialog box.
-    *   **Conversation View:** Inside the dialog, admins can see the ticket's conversation history and post a new response, making the page a functional ticket management interface.
-
-4.  **Data Mocks:**
-    *   Updated `_mocks/properties.js` to include `plusvalia_score` and a `documents` array for each property.
-    *   Created `_mocks/tickets.js` with more realistic data, including conversation history and priorities assigned by the new `aiService`.
-
-5.  **Code Structure:**
-    *   Removed the "Documentos" link from `AdminLayout.jsx`.
-    *   The `AdminDocumentsReviewPage.jsx` component is now unused and can be deleted.
-
-## Session Date: 2025-06-26 (Continuación)
-
-### Summary of Changes:
-
-Se abordaron problemas de autenticación, incluyendo mensajes de error detallados en el login y la configuración de inicio de sesión social.
-
-### Detailed Changes:
-
-1.  **[RESUELTO]** Eliminación de componente obsoleto:
-    *   Se eliminó `frontend/src/components/admin/AdminDocumentsReviewPage.jsx` y sus referencias en `frontend/src/App.jsx`.
-
-2.  **[VERIFICADO]** Bug de registro de usuarios:
-    *   Se confirmó que el bug de registro de usuarios (`SMTPAuthenticationError`) no es un problema de código de la aplicación, sino de configuración de credenciales de correo electrónico para el envío de emails de verificación.
-    *   Se verificó que el `management command` `create_default_admin.py` ya existe y funciona para crear un superusuario por defecto.
-
-3.  **[VERIFICADO]** Notificaciones por email al propietario:
-    *   Se confirmó que la funcionalidad de envío de emails al propietario cuando el estado de su propiedad cambia ya está implementada en `backend/properties/views.py` (`PropertyDocumentViewSet`) y `backend/properties/email_service.py`.
-
-4.  **[EN PROGRESO]** Página de Perfil de Usuario (Básica):
-    *   **Frontend:** Se añadió la pestaña "Mi Perfil" en `frontend/src/components/ui/Dashboard.jsx` y se creó el componente `frontend/src/components/ui/UserProfile.jsx` para la edición de datos básicos del usuario.
-    *   **Backend:** Se añadió el endpoint `/api/auth/profile/` (`ProfileUpdateView` en `backend/skyterra_backend/views.py`) para manejar la actualización del perfil.
-
-5.  **[EN PROGRESO]** Mejora de la autenticación y mensajes de error detallados:
-    *   **Backend:** Se implementó `CustomLoginSerializer` en `backend/skyterra_backend/serializers.py` para proporcionar mensajes de error más específicos ("Contraseña incorrecta", "Usuario o correo electrónico no registrado") durante el inicio de sesión.
-    *   **Frontend:** Se actualizó `frontend/src/components/ui/AuthForms.jsx` para interpretar y mostrar estos mensajes de error detallados.
-    *   **Frontend:** Se añadió la interfaz de usuario para la recuperación de contraseña (`ForgotPasswordForm` en `AuthForms.jsx`) y se integró con el endpoint de `dj-rest-auth`.
-
-6.  **[PENDIENTE - Requiere Configuración Externa]** Inicios de sesión con Google y X (Twitter):
-    *   **Problema identificado:** Los errores como `The given origin is not allowed for the given client ID.` y `FedCM get() rejects with NetworkError: Error retrieving a token.` indican problemas de configuración en las consolas de desarrolladores de Google y Twitter, no en el código de la aplicación.
-    *   **Acciones requeridas por el usuario:**
-        *   **Configuración de Correo Electrónico (para registro y recuperación de contraseña):**
-            *   Asegurarse de que las variables de entorno `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, y `ADMIN_EMAIL` estén configuradas correctamente en el archivo `.env`.
-            *   **Importante:** Si se usa Gmail con 2FA, `EMAIL_HOST_PASSWORD` debe ser una "Contraseña de aplicación" generada en la configuración de seguridad de Google.
-        *   **Configuración de Google OAuth:**
-            *   En Google Cloud Console (APIs y servicios -> Credenciales -> ID de cliente de OAuth 2.0 para la aplicación web):
-                *   Verificar que "Orígenes de JavaScript autorizados" incluya **todas las URLs exactas** del frontend (ej. `http://localhost:3000`, `http://localhost:5173`, `http://127.0.0.1:3000`, y URLs de producción).
-                *   Verificar que "URI de redirección autorizados" incluya las URLs de callback (ej. `http://localhost:3000/login`, `http://localhost:5173/login`).
-        *   **Configuración de Twitter (X) OAuth:**
-            *   En el Twitter Developer Portal (Proyecto -> Aplicación -> Configuración):
-                *   Verificar que los "Callback URLs" estén configurados correctamente.
-    *   **Cambios en el código:**
-        *   Se actualizó `CLIENT_URL` en `backend/skyterra_backend/settings.py` a `http://localhost:5173` para desarrollo local.
-        *   Se mejoró el manejo de errores en `authService.googleLogin` y `authService.xLogin` en `frontend/src/services/api.js` para propagar mensajes de error más detallados desde el backend.
-
-### Day 15: Overhauling User Dashboards & Theming
-- **New Feature: Role-Based Dashboards.**
-  - Implemented distinct, detailed dashboards for "Administrator" and "Seller" user roles.
-  - **Admin Dashboard:**
-    - Redesigned from the ground up to focus on SaaS and business KPIs.
-    - Features 3 distinct sections:
-      1.  **Business KPIs:** MRR, Churn Rate, LTV, and CAC cards.
-      2.  **Operations & Finance:** A production/marketing queue and a donut chart for MRR breakdown by plan.
-      3.  **Profitability Analysis:** Bar chart for LTV vs. CAC and a line chart for MRR evolution.
-    - Created modular components for each part of the dashboard (`SaaSKpiCard`, `ProductionQueue`, `MrrBreakdownChart`, etc.).
-  - **Seller Dashboard:**
-    - Designed a new dashboard for professional sellers to track their performance.
-    - Features 3 main sections:
-      1.  **Plan Status:** Shows the seller's current plan, feature status (e.g., "Completed", "In Post-Production"), and an upsell card.
-      2.  **Performance:** A detailed line chart for views/consultations over time and a set of KPI cards.
-      3.  **Property Management:** A clean data table listing the seller's properties with key stats and actions.
-    - Built using reusable components like `PlanStatus`, `PerformanceChart`, `PropertiesTable`, etc.
-- **Technical Implementation:**
-  - Used `Chart.js` for all new data visualizations.
-  - Leveraged Material-UI `Grid` and components to create the structured, responsive layouts.
-  - Implemented "Glassmorphism" style cards (`GlassCard`) for a modern, clean aesthetic on both dashboards.
-  - Updated application routing in `App.jsx` to direct `is_staff` users to `/admin` and all other authenticated users to the new `/dashboard` (Seller Dashboard).
-- **Project Structure:**
-  - Created new directories to organize dashboard components: `frontend/src/components/seller/` and `frontend/src/components/admin/dashboard/`.
-- **Next Steps:**
-  - Wire up dashboards to live backend data.
-  - Implement logic for different seller plans ("Dueño Particular" vs "Vendedor Profesional").
+# SkyTerra Progress Log
+
+## Audit Summary (2025-06-28)
+
+This log tracks the systematic audit and improvement of the SkyTerra platform. Each entry represents a concrete task performed.
+
+### Completed Tasks
+
+- [x] **(Infra) Initial Project Cleanup:**
+    - Removed duplicate `.env.example`.
+    - Corrected `.gitignore` to properly ignore the `media` directory.
+    - Standardized startup scripts (`.sh` and `.bat`) for portability and correctness.
+    - Removed redundant root `package.json` and `package-lock.json`.
+    - Pinned `stripe` dependency in `requirements.txt` to version `12.2.0`.
+
+- [x] **(Frontend) Refactored `Login.jsx` Component:**
+    - **Problem:** Hardcoded API URLs, no-op email login, no user feedback or error handling.
+    - **Fix:** Replaced hardcoded URLs with centralized config. Implemented API call logic for email login using `axios`. Added loading indicators (`CircularProgress`) and error display (`Alert`) for better UX.
+
+- [x] **(Backend) Optimized Property List Endpoint (`PropertyViewSet`):**
+    - **Problem:** N+1 query issue causing excessive database calls when fetching property lists.
+    - **Fix:** Implemented `select_related('owner')` and `prefetch_related('images')` to efficiently load related objects, drastically reducing DB queries.
+
+- [x] **(Backend) Optimized Property List Payload:**
+    - **Problem:** `PropertyListSerializer` included the large `boundary_polygon` field, increasing payload size unnecessarily.
+    - **Fix:** Removed `boundary_polygon` from the list serializer. It remains available in the detail view (`PropertySerializer`).
+
+- [x] **(Backend) Critical Security Fix in `PropertyViewSet`:**
+    - **Problem:** Missing object-level permission checks allowed any authenticated user to `DELETE` any property.
+    - **Fix:** Created a reusable `IsOwnerOrAdmin` permission class. Applied it to the `PropertyViewSet` to ensure only the owner or an admin can modify or delete a property. Refactored the view to remove redundant manual checks.
+
+- [x] **(Backend) Implemented Stripe Webhook and Subscription Management:**
+    - **Problem:** No reliable mechanism to track user subscriptions or confirm payments from Stripe. Missing webhook endpoint.
+    - **Fix:** Created `Subscription` model to store user subscription status. Implemented `StripeWebhookView` to securely handle Stripe events (e.g., `checkout.session.completed`, `customer.subscription.updated`). Updated `CreateCheckoutSessionView` to reuse existing Stripe customer IDs.
+
+- [x] **(Backend) Audited and Secured `support_tickets` App:**
+    - **Problem 1:** `TicketResponseViewSet` only allowed admins to view responses, preventing users from seeing replies to their own tickets.
+    - **Fix 1:** Modified `TicketResponseViewSet` permissions and queryset to allow authenticated users to view responses to their own tickets, while admins can view all.
+    - **Problem 2:** `TicketViewSet` had redundant and less secure permission logic, potentially allowing unauthorized access to ticket details.
+    - **Fix 2:** Refactored `TicketViewSet` to use the `IsOwnerOrAdmin` permission class for modification/deletion, ensuring proper object-level security. Simplified `get_queryset` as the permission class now handles authorization.
+
+- [x] **(Frontend) Improved `PropertyDetails.jsx` Component:**
+    - **Problem 1:** Typo in `Login.jsx` (`e.targe.value`) prevented password input.
+    - **Fix 1:** Corrected typo to `e.target.value`.
+    - **Problem 2:** `isFavorited` state was incorrectly destructured, causing favorite functionality to fail.
+    - **Fix 2:** Corrected `useState` destructuring.
+    - **Problem 3:** Property images were hardcoded/simulated instead of fetched from the backend.
+    - **Fix 3:** Implemented fetching real images using `imageService.getPropertyImages(id)`.
+    - **Problem 4:** Unused `countryFlightPaths` variable.
+    - **Fix 4:** Removed dead code.
+    - **Problem 5:** `axios.post('/api/property-visits/')` used a relative URL, potentially failing in production.
+    - **Fix 5:** Updated to use `config.api.baseURL` for robustness.
+    - **Problem 6:** `Pano2VRViewer` was rendered multiple times, impacting performance.
+    - **Fix 6:** Refactored to render a single `Pano2VRViewer` instance and use a selection mechanism for tours.
+
+- [x] **(Frontend & Backend) Implemented Persistence for Additional Property Fields:**
+    - **Problem:** `PropertyForm.jsx` collected data for `terrain`, `access`, `legalStatus`, and `utilities`, but these were not persisted to the backend.
+    - **Fix:**
+        - Added `terrain`, `access`, `legal_status`, and `utilities` fields to the `Property` model in `backend/properties/models.py`.
+        - Created and applied new database migrations for these model changes.
+        - Updated `PropertySerializer` in `backend/properties/serializers.py` to include the new fields.
+        - Updated `initialFormState` and `useEffect` in `PropertyForm.jsx` to correctly handle these fields.
+        - Modified `handleChange` in `PropertyForm.jsx` to manage the `utilities` array.
+        - Updated `preparePropertyData` in `frontend/src/services/api.js` to correctly map and send these new fields to the backend.
+
+- [x] **(Backend) Unit Test for `IsOwnerOrAdmin` Permission:**
+    - **Problem:** Critical security permission lacked dedicated unit tests.
+    - **Fix:** Created `backend/skyterra_backend/tests/test_permissions.py` with a comprehensive `APITestCase` to verify `IsOwnerOrAdmin` behavior for various user roles and HTTP methods. Tests passed successfully.
+
+### Next Steps & Recommendations
+
+#### P1: High-Priority Tasks
+
+1.  **User Experience (UX) & UI Review - Property Creation/Editing Flow:**
+    - **Objective:** Improve usability and create a more polished user interface for the property creation and editing process.
+    - **Next Action:** Conduct a full walkthrough of the property creation and editing flow, focusing on `CreateProperty.jsx` and `PropertyForm.jsx`, to identify UI inconsistencies, confusing interactions, and areas for improved user guidance.
+
+#### P2: Medium-Priority Tasks
+
+2.  **Documentation Overhaul:**
+    - **Objective:** Create clear, comprehensive, and up-to-date documentation.
+    - **Next Action:** Begin by rewriting the root `README.md` to reflect the current state of the project and provide clear setup instructions.
+
+#### P3: Low-Priority Tasks
+
+3.  **Testing Strategy Enhancement:**
+    - **Objective:** Increase test coverage and ensure application stability.
+    - **Next Action:** Write a unit test for the new `IsOwnerOrAdmin` permission class to ensure it behaves as expected.

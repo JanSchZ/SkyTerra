@@ -1,94 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
-  TextField,
-  Button,
   Typography,
-  Paper,
   Container,
-  Grid,
-  FormControlLabel,
-  Checkbox,
-  Stepper,
-  Step,
-  StepLabel,
-  MenuItem,
-  InputAdornment,
   CircularProgress,
   Snackbar,
   Alert,
-  Slider,
-  Card,
-  CardContent,
   IconButton,
-  Divider,
-  Stack,
-  Chip
 } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { propertyService } from '../../services/api';
-import MapView from '../map/MapView';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import StraightenIcon from '@mui/icons-material/Straighten';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import HomeWorkIcon from '@mui/icons-material/HomeWork';
-import DescriptionIcon from '@mui/icons-material/Description';
-import WaterDropIcon from '@mui/icons-material/WaterDrop';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import TerrainIcon from '@mui/icons-material/Terrain';
-import EditIcon from '@mui/icons-material/Edit';
-import { useTheme } from '@mui/material/styles';
+import PropertyForm from './PropertyForm'; // Import the generic form component
 
-const CreateProperty = ({ editMode = false }) => {
+const CreateProperty = () => {
   const navigate = useNavigate();
   const { propertyId } = useParams();
-  const theme = useTheme();
 
-  const [activeStep, setActiveStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [property, setProperty] = useState(null); // State to hold property data for editing
+  const [pageLoading, setPageLoading] = useState(true); // Loading state for initial data fetch
+  const [submitLoading, setSubmitLoading] = useState(false); // Loading state for form submission
+  const [error, setError] = useState(null); // Error state for initial data fetch
+  const [submitError, setSubmitError] = useState(null); // Error state for form submission
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
-  const initialPropertyData = {
-    name: '',
-    description: '',
-    price: 50000000, // 50M CLP inicial
-    size: 10, // 10 hectáreas inicial
-    propertyType: 'farm',
-    hasWater: false,
-    hasViews: false,
-    latitude: null,
-    longitude: null,
-    boundary_polygon: null,
-    // Campos adicionales para mejor estructura
-    propertyFeatures: [],
-    terrain: 'flat',
-    access: 'paved',
-    utilities: [],
-    legalStatus: 'clear',
-    publication_status: 'pending'
-  };
-  const [propertyData, setPropertyData] = useState(initialPropertyData);
-
+  // Fetch property data if in edit mode
   useEffect(() => {
     if (propertyId) {
       setPageLoading(true);
       setError(null);
-      propertyService.getPropertyDetails(propertyId)
+      propertyService.getProperty(propertyId)
         .then(data => {
-          setPropertyData({
-            ...initialPropertyData,
-            ...data,
-            propertyType: data.type || 'farm',
-            boundary_polygon: typeof data.boundary_polygon === 'string' 
-                              ? JSON.parse(data.boundary_polygon) 
-                              : data.boundary_polygon,
-            price: data.price || 50000000,
-            size: data.size || 10,
-          });
+          setProperty(data);
           setPageLoading(false);
         })
         .catch(err => {
@@ -97,115 +40,38 @@ const CreateProperty = ({ editMode = false }) => {
           setSnackbar({ open: true, message: 'Error al cargar datos para editar.', severity: 'error' });
           setPageLoading(false);
         });
+    } else {
+      setPageLoading(false); // No propertyId, so not loading for edit
     }
   }, [propertyId]);
 
-  const steps = ['Información Básica', 'Ubicación', 'Características', 'Revisar'];
-
-  const handleInputChange = (field) => (e) => {
-    setPropertyData(prev => ({ ...prev, [field]: e.target.value }));
-  };
-
-  const handleCheckboxChange = (field) => (e) => {
-    setPropertyData(prev => ({ ...prev, [field]: e.target.checked }));
-  };
-
-  const handlePriceChange = (event, newValue) => {
-    setPropertyData(prev => ({ ...prev, price: newValue }));
-  };
-
-  const handleSizeChange = (event, newValue) => {
-    setPropertyData(prev => ({ ...prev, size: newValue }));
-  };
-
-  const handleBoundariesUpdate = (boundaries) => {
-    if (boundaries && boundaries.geojson && boundaries.geojson.geometry) {
-      setPropertyData(prev => ({
-        ...prev,
-        latitude: boundaries.center?.[1] ?? prev.latitude,
-        longitude: boundaries.center?.[0] ?? prev.longitude,
-        size: boundaries.area ? parseFloat(boundaries.area.toFixed(2)) : prev.size,
-        boundary_polygon: boundaries.geojson,
-      }));
-      setSnackbar({
-        open: true,
-        message: `Área delimitada: ${boundaries.area?.toFixed(2) || 0} hectáreas`,
-        severity: 'success'
-      });
-    }
-  };
-
-  const handleNext = () => {
-    if (activeStep === 0) {
-      if (!propertyData.name || !propertyData.description) {
-        setSnackbar({ open: true, message: 'Por favor complete el nombre y descripción.', severity: 'error' });
-        return;
-      }
-    } else if (activeStep === 1) {
-      if (!propertyData.latitude || !propertyData.longitude) {
-        setSnackbar({ open: true, message: 'Por favor ingresa la latitud y longitud.', severity: 'error' });
-        return;
-      }
-    }
-    setActiveStep((prevStep) => prevStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevStep) => prevStep - 1);
-  };
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    setError(null);
-
-    const payload = { ...propertyData };
-    
-    // Mapear propertyType a type para el backend
-    if (payload.propertyType) {
-      payload.type = payload.propertyType;
-      delete payload.propertyType;
-    }
-    
-    if (payload.boundary_polygon && typeof payload.boundary_polygon !== 'string') {
-      payload.boundary_polygon = JSON.stringify(payload.boundary_polygon);
-    }
-
-    // Asegurar publication_status
-    if (!payload.publication_status) {
-      payload.publication_status = 'pending';
-    }
-
+  const handleSaveProperty = async (formData) => {
+    setSubmitLoading(true);
+    setSubmitError(null);
     try {
       let result;
       if (propertyId) {
-        result = await propertyService.updateProperty(propertyId, payload);
+        result = await propertyService.updateProperty(propertyId, formData);
         setSnackbar({ open: true, message: 'Propiedad actualizada exitosamente', severity: 'success' });
       } else {
-        result = await propertyService.createProperty(payload);
+        result = await propertyService.createProperty(formData);
         setSnackbar({ open: true, message: 'Propiedad creada exitosamente', severity: 'success' });
       }
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/dashboard'); // Redirect after successful save
       }, 1500);
     } catch (err) {
-      console.error('Error guardando la propiedad:', err.response?.data || err.message);
+      console.error('Error saving property:', err.response?.data || err.message);
       const errorMsg = err.response?.data ? JSON.stringify(err.response.data) : 'Error al guardar. Intente nuevamente.';
-      setError(errorMsg);
+      setSubmitError(errorMsg);
       setSnackbar({ open: true, message: `Error: ${errorMsg}`, severity: 'error' });
     } finally {
-      setLoading(false);
+      setSubmitLoading(false);
     }
   };
 
-  const formatPrice = (value) => {
-    if (value >= 1000000000) {
-      return `$${(value / 1000000000).toFixed(1)}B`;
-    } else if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}K`;
-    }
-    return `$${value?.toLocaleString()}`;
+  const handleCancel = () => {
+    navigate('/dashboard'); // Go back to dashboard or previous page
   };
 
   if (pageLoading) {
@@ -219,6 +85,28 @@ const CreateProperty = ({ editMode = false }) => {
       }}>
         <CircularProgress sx={{ color: '#3b82f6' }} />
         <Typography sx={{ ml: 2, color: 'white' }}>Cargando...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ 
+        height: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: '#0d1117',
+        color: 'white',
+        textAlign: 'center',
+        p: 3
+      }}>
+        <Box>
+          <Typography variant="h6" gutterBottom>{error}</Typography>
+          <Button variant="contained" onClick={() => navigate('/dashboard')} sx={{ mt: 2 }}>
+            Volver al Dashboard
+          </Button>
+        </Box>
       </Box>
     );
   }
@@ -248,440 +136,13 @@ const CreateProperty = ({ editMode = false }) => {
           </Typography>
         </Box>
 
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 4, 
-            borderRadius: 3,
-            backgroundColor: 'rgba(22, 27, 34, 0.95)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(30, 41, 59, 0.3)',
-          }}
-        >
-          {/* Stepper */}
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel sx={{ 
-                  '& .MuiStepLabel-label': { color: '#8b949e' },
-                  '& .MuiStepLabel-label.Mui-active': { color: '#3b82f6' },
-                  '& .MuiStepLabel-label.Mui-completed': { color: '#10b981' }
-                }}>
-                  {label}
-                </StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-
-          {/* Step Content */}
-          {activeStep === 0 && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Información Principal</Typography>
-              <Grid container spacing={3}>
-                <Grid xs={12}>
-                  <TextField
-                    label="Nombre de la Propiedad"
-                    fullWidth
-                    value={propertyData.name}
-                    onChange={handleInputChange('name')}
-                    required
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <HomeWorkIcon sx={{ color: '#8b949e' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid xs={12}>
-                  <TextField
-                    label="Descripción"
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={propertyData.description}
-                    onChange={handleInputChange('description')}
-                    required
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <DescriptionIcon sx={{ color: '#8b949e' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <Typography gutterBottom sx={{ color: '#8b949e' }}>Precio (CLP)</Typography>
-                  <Slider
-                    value={propertyData.price}
-                    onChange={handlePriceChange}
-                    min={10000000} // 10M
-                    max={1000000000} // 1B
-                    step={5000000} // 5M
-                    sx={{
-                      color: '#3b82f6',
-                      '& .MuiSlider-track': { backgroundColor: '#3b82f6' },
-                      '& .MuiSlider-thumb': { 
-                        backgroundColor: '#3b82f6',
-                        '&:hover': { boxShadow: '0 0 0 8px rgba(59, 130, 246, 0.16)' }
-                      }
-                    }}
-                  />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>$10M</Typography>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>$1B</Typography>
-                  </Box>
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <Typography gutterBottom sx={{ color: '#8b949e' }}>Tamaño (Hectáreas)</Typography>
-                  <Slider
-                    value={propertyData.size}
-                    onChange={handleSizeChange}
-                    min={0.1}
-                    max={1000}
-                    step={0.1}
-                    sx={{
-                      color: '#10b981',
-                      '& .MuiSlider-track': { backgroundColor: '#10b981' },
-                      '& .MuiSlider-thumb': { 
-                        backgroundColor: '#10b981',
-                        '&:hover': { boxShadow: '0 0 0 8px rgba(16, 185, 129, 0.16)' }
-                      }
-                    }}
-                  />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>0.1 ha</Typography>
-                    <Typography variant="caption" sx={{ color: '#8b949e' }}>1,000 ha</Typography>
-                  </Box>
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <TextField
-                    select
-                    label="Tipo de propiedad"
-                    value={propertyData.propertyType}
-                    onChange={handleInputChange('propertyType')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  >
-                    <MenuItem value="farm">Parcela/Granja</MenuItem>
-                    <MenuItem value="ranch">Rancho</MenuItem>
-                    <MenuItem value="forest">Bosque</MenuItem>
-                    <MenuItem value="lake">Terreno con Lago</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FormControlLabel
-                    control={<Checkbox checked={propertyData.hasWater} onChange={handleCheckboxChange('hasWater')} sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#10b981' } }} />}
-                    label="Acceso a agua"
-                    sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
-                  />
-                </Grid>
-                <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FormControlLabel
-                    control={<Checkbox checked={propertyData.hasViews} onChange={handleCheckboxChange('hasViews')} sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#10b981' } }} />}
-                    label="Vistas panorámicas"
-                    sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9' } }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-
-          {activeStep === 1 && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 2 }}>
-                Ubicación de la Propiedad
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#8b949e', mb: 3 }}>
-                Ingresa la latitud y longitud de la propiedad. Puedes obtener tu ubicación actual automáticamente.
-              </Typography>
-              <Grid container spacing={3} sx={{ mb: 3, maxWidth: 600 }}>
-                <Grid xs={12} md={6}>
-                  <TextField
-                    label="Latitud"
-                    fullWidth
-                    value={propertyData.latitude || ''}
-                    onChange={handleInputChange('latitude')}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LocationOnIcon sx={{ color: '#8b949e' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <TextField
-                    label="Longitud"
-                    fullWidth
-                    value={propertyData.longitude || ''}
-                    onChange={handleInputChange('longitude')}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <LocationOnIcon sx={{ color: '#8b949e' }} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ 
-                      '& .MuiInputLabel-root': { color: '#8b949e' },
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid xs={12}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            setPropertyData(prev => ({
-                              ...prev,
-                              latitude: position.coords.latitude.toFixed(6),
-                              longitude: position.coords.longitude.toFixed(6)
-                            }));
-                            setSnackbar({ open: true, message: 'Ubicación obtenida correctamente.', severity: 'success' });
-                          },
-                          () => setSnackbar({ open: true, message: 'No se pudo obtener la ubicación.', severity: 'error' })
-                        );
-                      } else {
-                        setSnackbar({ open: true, message: 'Geolocalización no soportada.', severity: 'warning' });
-                      }
-                    }}
-                    sx={{ mt: 1, color: '#3b82f6', borderColor: '#3b82f6' }}
-                  >
-                    Obtener mi ubicación
-                  </Button>
-                </Grid>
-              </Grid>
-              <Typography variant="caption" sx={{ color: '#8b949e' }}>
-                Podrás ajustar la ubicación y límites exactos más adelante desde el panel de administración.
-              </Typography>
-            </Box>
-          )}
-
-          {activeStep === 2 && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Detalles Adicionales y Características</Typography>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
-                  <TextField
-                    select
-                    label="Estado Legal (ej: saneado, con hipoteca)"
-                    value={propertyData.legalStatus}
-                    onChange={handleInputChange('legalStatus')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  >
-                    <MenuItem value="clear">Saneado</MenuItem>
-                    <MenuItem value="mortgaged">Con hipoteca</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <TextField
-                    select
-                    label="Acceso"
-                    value={propertyData.access}
-                    onChange={handleInputChange('access')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  >
-                    <MenuItem value="paved">Pavimentado</MenuItem>
-                    <MenuItem value="unpaved">No pavimentado</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid xs={12}>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#c9d1d9', mt: 2, mb: 1, fontWeight: 300 }}>Servicios Disponibles</Typography>
-                  <Grid container spacing={1}>
-                    {['water', 'electricity', 'internet', 'phone', 'septic_tank', 'well_water'].map(utility => (
-                      <Grid xs={6} sm={4} md={3} key={utility}>
-                        <FormControlLabel
-                          control={<Checkbox
-                            checked={propertyData.utilities?.includes(utility)}
-                            onChange={() => {
-                              const currentUtilities = propertyData.utilities || [];
-                              if (currentUtilities.includes(utility)) {
-                                setPropertyData(prev => ({
-                                  ...prev,
-                                  utilities: currentUtilities.filter((u) => u !== utility)
-                                }));
-                              } else {
-                                setPropertyData(prev => ({
-                                  ...prev,
-                                  utilities: [...currentUtilities, utility]
-                                }));
-                              }
-                            }}
-                          />}
-                          label={utility.charAt(0).toUpperCase() + utility.slice(1).replace('_', ' ')}
-                          sx={{ '& .MuiFormControlLabel-label': { color: '#c9d1d9', fontSize: '0.9rem' } }}
-                        />
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <TextField
-                    select
-                    label="Terreno"
-                    value={propertyData.terrain}
-                    onChange={handleInputChange('terrain')}
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: '#c9d1d9',
-                        '& fieldset': { borderColor: '#30363d' }
-                      }
-                    }}
-                  >
-                    <MenuItem value="flat">Plano</MenuItem>
-                    <MenuItem value="hills">Colinas</MenuItem>
-                    <MenuItem value="mountains">Montañoso</MenuItem>
-                    <MenuItem value="mixed">Mixto</MenuItem>
-                  </TextField>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-
-          {activeStep === 3 && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h5" gutterBottom sx={{ color: '#e0e0e0', fontWeight: 400, mb: 3 }}>Revisar y Guardar</Typography>
-              
-              {/* Información Principal Card */}
-              <Card sx={{ mb: 3, backgroundColor: 'rgba(30, 41, 59, 0.6)', p: 2.5, borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#58a6ff' }}>Información Principal</Typography>
-                    <IconButton size="small" onClick={() => setActiveStep(0)} sx={{ color: '#8b949e' }} aria-label="Editar Información Principal">
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                  <Grid container spacing={1.5} sx={{ color: '#c9d1d9' }}>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Nombre:</strong> {propertyData.name || 'No especificado'}</Typography></Grid>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Tipo:</strong> {propertyData.propertyType ? propertyData.propertyType.charAt(0).toUpperCase() + propertyData.propertyType.slice(1) : 'No especificado'}</Typography></Grid>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Precio:</strong> {formatPrice(propertyData.price)}</Typography></Grid>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Tamaño:</strong> {propertyData.size || '0'} ha</Typography></Grid>
-                    <Grid xs={12} sx={{mt: 1}}><Typography variant="body2" sx={{wordBreak: 'break-word'}}><strong>Descripción:</strong> {propertyData.description || 'No especificada'}</Typography></Grid>
-                    <Grid xs={12} sm={6} sx={{mt: 1}}><Typography variant="body2"><strong>Acceso a Agua:</strong> {propertyData.hasWater ? 'Sí' : 'No'}</Typography></Grid>
-                    <Grid xs={12} sm={6} sx={{mt: 1}}><Typography variant="body2"><strong>Vistas Panorámicas:</strong> {propertyData.hasViews ? 'Sí' : 'No'}</Typography></Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-
-              {/* Ubicación Card */}
-              <Card sx={{ mb: 3, backgroundColor: 'rgba(30, 41, 59, 0.6)', p: 2.5, borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#58a6ff' }}>Ubicación</Typography>
-                    <IconButton size="small" onClick={() => setActiveStep(1)} sx={{ color: '#8b949e' }} aria-label="Editar Ubicación">
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                  <Grid container spacing={1.5} sx={{ color: '#c9d1d9' }}>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Latitud:</strong> {propertyData.latitude || 'No especificada'}</Typography></Grid>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Longitud:</strong> {propertyData.longitude || 'No especificada'}</Typography></Grid>
-                    <Grid xs={12} sx={{mt: 1}}><Typography variant="body2"><strong>Límites (GeoJSON):</strong> {propertyData.boundary_polygon ? 'Definidos' : 'No definidos'}</Typography></Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-
-              {/* Características Adicionales Card */}
-              <Card sx={{ backgroundColor: 'rgba(30, 41, 59, 0.6)', p: 2.5, borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ color: '#58a6ff' }}>Características Adicionales</Typography>
-                    <IconButton size="small" onClick={() => setActiveStep(2)} sx={{ color: '#8b949e' }} aria-label="Editar Características Adicionales">
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                  <Grid container spacing={1.5} sx={{ color: '#c9d1d9' }}>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Terreno:</strong> {propertyData.terrain ? propertyData.terrain.charAt(0).toUpperCase() + propertyData.terrain.slice(1) : 'No especificado'}</Typography></Grid>
-                    <Grid xs={12} sm={6}><Typography variant="body2"><strong>Acceso:</strong> {propertyData.access ? propertyData.access.charAt(0).toUpperCase() + propertyData.access.slice(1) : 'No especificado'}</Typography></Grid>
-                    <Grid xs={12} sx={{mt: 1}}><Typography variant="body2"><strong>Servicios:</strong> {propertyData.utilities && propertyData.utilities.length > 0 ? propertyData.utilities.map(u => u.charAt(0).toUpperCase() + u.slice(1).replace('_', ' ')).join(', ') : 'Ninguno especificado'}</Typography></Grid>
-                    <Grid xs={12} sm={6} sx={{mt: 1}}><Typography variant="body2"><strong>Estado Legal:</strong> {propertyData.legalStatus ? propertyData.legalStatus.charAt(0).toUpperCase() + propertyData.legalStatus.slice(1) : 'No especificado'}</Typography></Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-
-          {/* Navigation Buttons */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-            <Button 
-              disabled={activeStep === 0} 
-              onClick={handleBack}
-              sx={{ color: '#8b949e' }}
-            >
-              Atrás
-            </Button>
-            {activeStep < steps.length - 1 && (
-              <Button 
-                variant="contained" 
-                onClick={handleNext}
-                sx={{ 
-                  backgroundColor: '#3b82f6',
-                  '&:hover': { backgroundColor: '#2563eb' }
-                }}
-              >
-                Siguiente
-              </Button>
-            )}
-            {activeStep === steps.length - 1 && (
-              <Button 
-                variant="contained" 
-                onClick={handleSubmit} 
-                disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-                sx={{ 
-                  backgroundColor: '#10b981',
-                  '&:hover': { backgroundColor: '#059669' }
-                }}
-              >
-                {loading ? 'Guardando...' : (propertyId ? 'Actualizar' : 'Crear Propiedad')}
-              </Button>
-            )}
-          </Box>
-        </Paper>
+        <PropertyForm
+          property={property} // Pass property data for editing
+          onSave={handleSaveProperty}
+          onCancel={handleCancel}
+          isLoading={submitLoading}
+          error={submitError}
+        />
         
         <Snackbar 
           open={snackbar.open} 

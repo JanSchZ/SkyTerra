@@ -28,6 +28,9 @@ import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import TerrainIcon from '@mui/icons-material/Terrain';
 import SellIcon from '@mui/icons-material/Sell';
 import DescriptionIcon from '@mui/icons-material/Description';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import { propertyService } from '../../services/api';
 import MapView from '../map/MapView';
 import PropertyBoundaryDraw from '../map/PropertyBoundaryDraw';
@@ -76,6 +79,10 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     rentalTerms: '',
     documents: [],
     existingDocumentNames: [],
+    terrain: 'flat',
+    access: 'paved',
+    legalStatus: 'clear',
+    utilities: [],
     ...property,
   };
 
@@ -107,6 +114,10 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         tourToDelete: false,
         documents: [],
         existingDocumentNames: [],
+        terrain: property.terrain || 'flat',
+        access: property.access || 'paved',
+        legalStatus: property.legal_status || 'clear',
+        utilities: property.utilities || [],
       }));
       setTourPreviewName(property.tours && property.tours.length > 0 ? 'Tour existente' : '');
       setDocumentPreviews([]);
@@ -147,6 +158,15 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
     const { name, value, type, checked } = e.target;
     if (type === 'checkbox') {
       setFormData(prev => ({ ...prev, [name]: checked }));
+    } else if (name === 'utilities') {
+      // Special handling for utilities array
+      const utilityValue = e.target.value;
+      setFormData(prev => ({
+        ...prev,
+        utilities: prev.utilities.includes(utilityValue)
+          ? prev.utilities.filter(u => u !== utilityValue)
+          : [...prev.utilities, utilityValue]
+      }));
     } else if (name === 'price' || name === 'size' || name === 'latitude' || name === 'longitude') {
       if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -262,34 +282,12 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
       return;
     }
     setIsSubmitting(true);
-    const dataToSend = new FormData();
-    Object.keys(formData).forEach(key => {
-      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'tour360' || key === 'documents') {
-      } else if (formData[key] !== null && formData[key] !== undefined) {
-        dataToSend.append(key, formData[key]);
-      }
-    });
-    if (formData.boundary_polygon) {
-      dataToSend.append('boundary_polygon', JSON.stringify(formData.boundary_polygon.geojson || formData.boundary_polygon));
-    }
-    formData.images.forEach(file => dataToSend.append('new_images', file));
-    if (formData.imagesToDelete.length > 0) {
-        dataToSend.append('images_to_delete_ids', JSON.stringify(formData.imagesToDelete));
-    }
-    if (formData.tour360) {
-      dataToSend.append('new_tour_file', formData.tour360);
-    }
-    if (formData.tourToDelete && property?.tours?.[0]?.id) {
-      dataToSend.append('tour_to_delete_id', property.tours[0].id);
-    }
-    formData.documents.forEach(file => dataToSend.append('new_documents', file));
-
     try {
       let savedProperty;
       if (formData.id) {
-        savedProperty = await propertyService.updateProperty(formData.id, dataToSend);
+        savedProperty = await propertyService.updateProperty(formData.id, formData);
       } else {
-        savedProperty = await propertyService.createProperty(dataToSend);
+        savedProperty = await propertyService.createProperty(formData);
       }
       if (onSave) onSave(savedProperty);
     } catch (err) {
@@ -323,7 +321,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
             <Grid xs={12} md={8}>
               <TextField fullWidth label="Nombre de la propiedad" name="name" value={formData.name} onChange={handleChange} error={!!formErrors.name} helperText={formErrors.name} required />
             </Grid>
-            <Grid xs={12} md={4}>
+            <Grid xs={12} md={6}>
               <TextField fullWidth label="Tipo" name="propertyType" select SelectProps={{ native: true }} value={formData.propertyType} onChange={handleChange}>
                 <option value="farm">Parcela/Granja</option>
                 <option value="ranch">Rancho</option>
@@ -331,11 +329,97 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
                 <option value="lake">Terreno con Lago/Río</option>
               </TextField>
             </Grid>
-            <Grid xs={12} sm={6} md={4}>
-              <TextField fullWidth label="Precio (CLP)" name="price" type="number" value={formData.price} onChange={handleChange} error={!!formErrors.price} helperText={formErrors.price || 'En CLP'} required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
+            <Grid xs={12} md={6}>
+              <TextField fullWidth label="Terreno" name="terrain" select SelectProps={{ native: true }} value={formData.terrain} onChange={handleChange}>
+                <option value="flat">Plano</option>
+                <option value="hills">Colinas</option>
+                <option value="mountains">Montañoso</option>
+                <option value="mixed">Mixto</option>
+              </TextField>
+            </Grid>
+            <Grid xs={12} md={6}>
+              <TextField fullWidth label="Acceso" name="access" select SelectProps={{ native: true }} value={formData.access} onChange={handleChange}>
+                <option value="paved">Pavimentado</option>
+                <option value="unpaved">No pavimentado</option>
+              </TextField>
+            </Grid>
+            <Grid xs={12} md={6}>
+              <TextField fullWidth label="Estado Legal" name="legalStatus" select SelectProps={{ native: true }} value={formData.legalStatus} onChange={handleChange}>
+                <option value="clear">Saneado</option>
+                <option value="mortgaged">Con hipoteca</option>
+              </TextField>
+            </Grid>
+            <Grid xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 1 }}>Servicios Disponibles</Typography>
+              <Grid container spacing={1}>
+                {[ 'water', 'electricity', 'internet', 'phone', 'septic_tank', 'well_water'].map(utility => (
+                  <Grid item xs={6} sm={4} md={3} key={utility}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={formData.utilities.includes(utility)}
+                          onChange={() => handleChange({ target: { name: 'utilities', value: utility, type: 'checkbox' } })}
+                          name={utility}
+                        />
+                      }
+                      label={{
+                        'water': 'Agua Potable',
+                        'electricity': 'Electricidad',
+                        'internet': 'Internet',
+                        'phone': 'Teléfono',
+                        'septic_tank': 'Fosa Séptica',
+                        'well_water': 'Agua de Pozo',
+                      }[utility]}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
             </Grid>
             <Grid xs={12} sm={6} md={4}>
-              <TextField fullWidth label="Tamaño" name="size" type="number" value={formData.size} onChange={handleChange} error={!!formErrors.size} helperText={formErrors.size || 'En hectáreas'} required InputProps={{ endAdornment: <InputAdornment position="end">ha</InputAdornment> }} />
+              <Typography gutterBottom>Precio (CLP)</Typography>
+              <Slider
+                value={typeof formData.price === 'number' ? formData.price : 0}
+                onChange={(e, newValue) => setFormData(prev => ({ ...prev, price: newValue }))}
+                min={10000000} // 10M
+                max={1000000000} // 1B
+                step={5000000} // 5M
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => `${value.toLocaleString()}`}
+                sx={{ color: '#3b82f6' }}
+              />
+              <TextField
+                fullWidth
+                name="price"
+                type="number"
+                value={formData.price}
+                onChange={handleChange}
+                error={!!formErrors.price}
+                helperText={formErrors.price || 'En CLP'}
+                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              />
+            </Grid>
+            <Grid xs={12} sm={6} md={4}>
+              <Typography gutterBottom>Tamaño (Hectáreas)</Typography>
+              <Slider
+                value={typeof formData.size === 'number' ? formData.size : 0}
+                onChange={(e, newValue) => setFormData(prev => ({ ...prev, size: newValue }))}
+                min={0.1}
+                max={1000}
+                step={0.1}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => `${value} ha`}
+                sx={{ color: '#10b981' }}
+              />
+              <TextField
+                fullWidth
+                name="size"
+                type="number"
+                value={formData.size}
+                onChange={handleChange}
+                error={!!formErrors.size}
+                helperText={formErrors.size || 'En hectáreas'}
+                InputProps={{ endAdornment: <InputAdornment position="end">ha</InputAdornment> }}
+              />
             </Grid>
             <Grid xs={12} md={4}>
               <TextField fullWidth label="Modalidad" name="listingType" select SelectProps={{ native: true }} value={formData.listingType} onChange={handleChange}>
@@ -354,20 +438,8 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
                 <TextField fullWidth multiline minRows={3} label="Términos de Arriendo (Opcional)" name="rentalTerms" value={formData.rentalTerms} onChange={handleChange} />
               </Grid>
             )}
-            <Grid xs={12} sm={6}>
-              <TextField fullWidth label="Latitud (Opcional)" name="latitude" type="number" value={formData.latitude} onChange={handleChange} error={!!formErrors.latitude} helperText={formErrors.latitude || 'Ej: -33.4489'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
-            </Grid>
-            <Grid xs={12} sm={6}>
-              <TextField fullWidth label="Longitud (Opcional)" name="longitude" type="number" value={formData.longitude} onChange={handleChange} error={!!formErrors.longitude} helperText={formErrors.longitude || 'Ej: -70.6693'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
-            </Grid>
             <Grid xs={12}>
               <TextField fullWidth label="Descripción detallada" name="description" value={formData.description} onChange={handleChange} multiline rows={5} />
-            </Grid>
-            <Grid xs={12} sm={6}>
-              <TextField fullWidth label="Latitud (Opcional)" name="latitude" type="number" value={formData.latitude} onChange={handleChange} error={!!formErrors.latitude} helperText={formErrors.latitude || 'Ej: -33.4489'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
-            </Grid>
-            <Grid xs={12} sm={6}>
-              <TextField fullWidth label="Longitud (Opcional)" name="longitude" type="number" value={formData.longitude} onChange={handleChange} error={!!formErrors.longitude} helperText={formErrors.longitude || 'Ej: -70.6693'} InputProps={{ endAdornment: <IconButton size="small" onClick={() => setTabValue(1)} title="Definir en mapa"><GpsFixedIcon /></IconButton> }} />
             </Grid>
             {formData.boundary_polygon?.area && (
               <Grid xs={12}>
@@ -380,6 +452,9 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         </TabPanel>
 
         <TabPanel value={tabValue} index={1} sx={{ minHeight: 500, position: 'relative' }}>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+            Haz clic en el mapa para empezar a dibujar el polígono de tu propiedad. Haz doble clic para finalizar el dibujo.
+          </Typography>
           <Box sx={{ height: '100%', width: '100%', position: 'relative' }}>
             <MapView 
               ref={mapViewRef}
@@ -403,7 +478,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
-          <Typography variant="h6" gutterBottom>Imágenes de la Propiedad (máx. 5)</Typography>
+          <Typography variant="h6" gutterBottom>Imágenes de la Propiedad ({imagePreviews.length} de 5)</Typography>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {imagePreviews.map((preview, index) => (
               <Grid xs={6} sm={4} md={3} key={index}>
@@ -423,43 +498,63 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
             )}
           </Grid>
           <Divider sx={{ my: 3 }} />
-          <Typography variant="h6" gutterBottom>Tour Virtual 360°</Typography>
-          {tourPreviewName ? (
-            <Box sx={{display: 'flex', alignItems: 'center', gap: 2, mb:2}}>
-                <Chip label={tourPreviewName} onDelete={handleRemoveTour} />
-            </Box>
-           ) : null}
-          <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>
-            {formData.existingTourUrl ? 'Cambiar Archivo de Tour' : 'Subir Archivo de Tour (HTML/ZIP)'}
-            <input type="file" hidden accept=".html,.htm,.zip" onChange={handleTourUpload} />
-          </Button>
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
           <Typography variant="h6" gutterBottom>Tour Virtual 360°</Typography>
-            <VirtualTourEditor
-              initialTourData={formData.tour360}
-              onTourUpdate={handleTourUpdate}
-              map={mapboxMapInstance}
-              propertyId={property?.id}
-              onBoundariesUpdate={handleBoundariesUpdate}
+          <Box sx={{ mb: 2 }}>
+            <input
+              accept=".html,.htm,.zip,.ggpkg"
+              style={{ display: 'none' }}
+              id="tour-upload-button"
+              type="file"
+              onChange={handleTourUpload}
             />
+            <label htmlFor="tour-upload-button">
+              <Button variant="outlined" component="span" startIcon={<CloudUploadIcon />}>
+                {tourPreviewName ? 'Cambiar Archivo de Tour' : 'Subir Archivo de Tour'}
+              </Button>
+            </label>
+            {tourPreviewName && (
+              <Chip
+                label={tourPreviewName}
+                onDelete={handleRemoveTour}
+                sx={{ ml: 2 }}
+              />
+            )}
+          </Box>
+          <VirtualTourEditor
+            initialTourData={formData.tour360}
+            onTourUpdate={handleTourUpdate}
+            map={mapboxMapInstance}
+            propertyId={property?.id}
+            onBoundariesUpdate={handleBoundariesUpdate}
+          />
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
           <Typography variant="h6" gutterBottom>Documentos de Verificación (PDF, DOC, imágenes)</Typography>
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            {documentPreviews.map((doc, index) => (
-              <Grid xs={12} key={index}>
-                <Paper elevation={1} sx={{ p:2, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
-                    <DescriptionIcon color="action" />
-                    <Typography variant="body2" noWrap>{doc.name}</Typography>
-                  </Box>
-                  <IconButton onClick={() => handleRemoveDocument(index)} size="small"><DeleteIcon fontSize="small" /></IconButton>
-                </Paper>
-              </Grid>
-            ))}
+            {documentPreviews.map((doc, index) => {
+              const fileExtension = doc.name.split('.').pop().toLowerCase();
+              let IconComponent = InsertDriveFileIcon;
+              if (fileExtension === 'pdf') {
+                IconComponent = PictureAsPdfIcon;
+              } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(fileExtension)) {
+                IconComponent = ImageOutlinedIcon;
+              }
+              return (
+                <Grid xs={12} key={index}>
+                  <Paper elevation={1} sx={{ p:2, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
+                      <IconComponent color="action" />
+                      <Typography variant="body2" noWrap>{doc.name}</Typography>
+                    </Box>
+                    <IconButton onClick={() => handleRemoveDocument(index)} size="small"><DeleteIcon fontSize="small" /></IconButton>
+                  </Paper>
+                </Grid>
+              );
+            })}
             {documentPreviews.length < 10 && (
               <Grid xs={12}>
                 <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}>

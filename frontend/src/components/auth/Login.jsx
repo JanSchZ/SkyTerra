@@ -1,25 +1,43 @@
 import React, { useState } from 'react';
-import { Button, TextField, Container, Typography, Box } from '@mui/material';
+import axios from 'axios';
+import { Button, TextField, Container, Typography, Box, CircularProgress, Alert } from '@mui/material';
 import { Google as GoogleIcon, Twitter as TwitterIcon } from '@mui/icons-material';
+import config from '../../config/environment';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleEmailLogin = (e) => {
+  const handleEmailLogin = async (e) => {
     e.preventDefault();
-    // Lógica para iniciar sesión con email y contraseña
-    console.log('Email Login:', { email, password });
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post(`${config.api.baseURL}/auth/login/`, {
+        email,
+        password,
+      });
+      // Assuming the backend returns a token or user data
+      console.log('Login successful:', response.data);
+      // Here you would typically save the token and redirect the user
+      // e.g., localStorage.setItem('token', response.data.token);
+      // window.location.href = '/dashboard';
+    } catch (err) {
+      setError('Invalid credentials or server error. Please try again.');
+      console.error('Login failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = () => {
-    // Redirigir al backend para iniciar el flujo de OAuth2 con Google
-    window.location.href = 'http://localhost:8000/accounts/google/login/?process=login';
+    window.location.href = `${config.api.baseURL.replace('/api', '')}/accounts/google/login/?process=login`;
   };
 
   const handleTwitterLogin = () => {
-    // Redirigir al backend para iniciar el flujo de OAuth2 con Twitter
-    window.location.href = 'http://localhost:8000/accounts/twitter/login/?process=login';
+    window.location.href = `${config.api.baseURL.replace('/api', '')}/accounts/twitter/login/?process=login`;
   };
 
   return (
@@ -36,6 +54,7 @@ const Login = () => {
           Iniciar Sesión
         </Typography>
         <Box component="form" onSubmit={handleEmailLogin} sx={{ mt: 1 }}>
+          {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
           <TextField
             margin="normal"
             required
@@ -47,6 +66,7 @@ const Login = () => {
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
           />
           <TextField
             margin="normal"
@@ -59,14 +79,16 @@ const Login = () => {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
           />
           <Button
             type="submit"
             fullWidth
             variant="contained"
             sx={{ mt: 3, mb: 2 }}
+            disabled={loading}
           >
-            Iniciar Sesión
+            {loading ? <CircularProgress size={24} /> : 'Iniciar Sesión'}
           </Button>
           <Button
             fullWidth
@@ -74,6 +96,7 @@ const Login = () => {
             startIcon={<GoogleIcon />}
             onClick={handleGoogleLogin}
             sx={{ mb: 1 }}
+            disabled={loading}
           >
             Iniciar Sesión con Google
           </Button>
@@ -82,6 +105,7 @@ const Login = () => {
             variant="outlined"
             startIcon={<TwitterIcon />}
             onClick={handleTwitterLogin}
+            disabled={loading}
           >
             Iniciar Sesión con X
           </Button>

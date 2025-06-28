@@ -28,6 +28,7 @@ from .serializers import (
     TourSerializer, ImageSerializer, PropertyDocumentSerializer, PropertyVisitSerializer,
     PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer
 )
+from skyterra_backend.permissions import IsOwnerOrAdmin
 from .services import GeminiService, GeminiServiceError
 from .email_service import send_property_status_email
 
@@ -64,12 +65,14 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """
         Permite lectura (list, retrieve) a cualquiera.
-        Requiere autenticación para otras acciones (create, update, delete, my_properties).
+        Requiere ser propietario o admin para otras acciones (create, update, delete).
         """
         if self.action in ['list', 'retrieve']:
             permission_classes = [permissions.AllowAny]
-        else:
+        elif self.action == 'create':
             permission_classes = [permissions.IsAuthenticated]
+        else: # For update, partial_update, destroy, etc.
+            permission_classes = [IsOwnerOrAdmin]
         return [permission() for permission in permission_classes]
     
     def get_serializer_class(self):
@@ -86,7 +89,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
         
         # Annotations for N+1 optimization
         tour_exists = Tour.objects.filter(property=OuterRef('pk'))
-        queryset = queryset.annotate(
+        queryset = queryset.select_related('owner').prefetch_related('images').annotate(
             image_count_annotation=Count('images'),
             has_tour_annotation=Exists(tour_exists)
         )
@@ -185,21 +188,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         """Actualizar propiedad con validaciones adicionales"""
         try:
-            instance = self.get_object() # instance is retrieved first
-
-            # Permission check: User must be owner or staff
-            if instance.owner != self.request.user and not self.request.user.is_staff:
-                logger.error(f"Usuario {self.request.user.username} intentó editar propiedad {instance.id} sin permisos.")
-                # This should ideally be caught by permission_classes in the viewset or object-level permissions.
-                # Raising PermissionError here will lead to a 500 error if not handled by DRF's exception handler.
-                # A more DRF-idiomatic way is to rely on `self.check_object_permissions(self.request, instance)`
-                # or let the main `update` method's permission checks handle it.
-                # However, for this specific instruction, we ensure the logic is within perform_update.
-                # To be safe and explicit, we can return a Response for clarity, though this might duplicate view-level checks.
-                # For now, let's stick to the plan of modifying validated_data.
-                # The original code had `raise PermissionError`, which is fine if DRF handles it.
-                # The `update` method already has a permission check, so this one is an additional safeguard.
-            serializer.save()
+            instance = serializer.save()
             logger.info(f"Propiedad {instance.id} actualizada exitosamente. Nuevo estado: {instance.publication_status}")
             
             # Manejar documentos nuevos enviados en actualización
@@ -213,11 +202,6 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     )
                 logger.info(f"{len(new_docs)} documento(s) añadidos a la propiedad {instance.id} en actualización")
             
-        except PermissionError as pe: # Catch the specific error
-            # This is to make sure PermissionError is handled gracefully if not caught by DRF default handlers
-            # However, DRF's default exception handling should convert PermissionDenied to 403.
-            # Re-raising here to let DRF handle it.
-            raise pe
         except Exception as e:
             logger.error(f"Error al actualizar propiedad {instance.id}: {str(e)}", exc_info=True)
             # Re-raise to be handled by the main update method or DRF's exception handler
@@ -237,11 +221,6 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         """Override update para manejo personalizado de errores"""
         try:
-            # Validar permisos antes de llamar a super().update
-            instance = self.get_object()
-            if instance.owner != self.request.user and not self.request.user.is_staff:
-                logger.warning(f"Permiso denegado: Usuario {request.user} intentando actualizar propiedad {instance.id} de {instance.owner}")
-                return Response({"detail": "No tiene permisos para editar esta propiedad."}, status=status.HTTP_403_FORBIDDEN)
             return super().update(request, *args, **kwargs)
         except Exception as e:
             logger.error(f"Error en update: {str(e)}", exc_info=True)

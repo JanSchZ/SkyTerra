@@ -10,25 +10,32 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import ViewInArIcon from '@mui/icons-material/ViewInAr';
 import { useNavigate } from 'react-router-dom';
-import { favoritesService } from '../../services/api';
+import { favoritesService, compareService } from '../../services/api';
+import { AuthContext } from '../../App';
+import { formatPrice, formatRentPrice } from '../../utils/formatters';
 
 const PropertyCard = ({ property }) => {
   const navigate = useNavigate();
+  const { currentUser, isAuthenticated } = React.useContext(AuthContext);
   const [isFav, setIsFav] = React.useState(false);
 
   React.useEffect(() => {
     const fetchFavStatus = async () => {
-      if (!localStorage.getItem('auth_token')) return;
+      if (!isAuthenticated || !property.id) return;
       try {
         const favs = await favoritesService.list();
         setIsFav(!!favs.find((f) => f.property === property.id));
       } catch (err) { console.error('Error fetching favorites', err); }
     };
     fetchFavStatus();
-  }, [property.id]);
+  }, [isAuthenticated, property.id]);
+
+  const isOwnerOrAdmin = currentUser && (currentUser.is_staff || (property?.owner_details && currentUser.id === property.owner_details.id));
 
   const handleEdit = () => {
-    navigate(`/property/edit/${property.id}`); // Asumiendo que tendrás una ruta para editar
+    if (isOwnerOrAdmin) {
+      navigate(`/property/edit/${property.id}`); // Asumiendo que tendrás una ruta para editar
+    }
   };
 
   const handleViewDetails = () => {
@@ -39,15 +46,7 @@ const PropertyCard = ({ property }) => {
 
   const handleAddToCompare = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const headers = token ? { Authorization: `Token ${token}` } : {};
-      // post to compare endpoint
-      await fetch('/api/compare/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: JSON.stringify({ property_ids: [property.id] }),
-      });
-      // navigate to compare view with query param appended
+      await compareService.add(property.id);
       navigate(`/compare?ids=${property.id}`);
     } catch (err) { console.error('Error adding to compare', err); }
   };
@@ -74,8 +73,8 @@ const PropertyCard = ({ property }) => {
     : 'https://via.placeholder.com/300x200.png?text=Sin+Imagen'; // Placeholder
 
   const priceDisplay = property.listing_type === 'rent' || property.listing_type === 'both'
-    ? (property.rent_price ? `${Number(property.rent_price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' })} /mes` : 'Arriendo no disponible')
-    : (property.price ? Number(property.price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) : 'Precio no disponible');
+    ? (property.rent_price ? `${formatRentPrice(property.rent_price)}` : 'Arriendo no disponible')
+    : (property.price ? formatPrice(property.price) : 'Precio no disponible');
 
   const listingLabel = property.listing_type === 'rent' ? 'Arriendo' : (property.listing_type === 'both' ? 'Venta / Arriendo' : 'Venta');
 
@@ -126,9 +125,11 @@ const PropertyCard = ({ property }) => {
         <IconButton onClick={handleViewDetails} color="primary" title="Ver Detalles">
           <VisibilityIcon />
         </IconButton>
-        <IconButton onClick={handleEdit} color="secondary" title="Editar Propiedad">
-          <EditIcon />
-        </IconButton>
+        {isOwnerOrAdmin && (
+          <IconButton onClick={handleEdit} color="secondary" title="Editar Propiedad">
+            <EditIcon />
+          </IconButton>
+        )}
         <IconButton onClick={toggleFavorite} color="warning" title={isFav ? 'Quitar de Favoritos' : 'Guardar'}>
           {isFav ? <BookmarkIcon /> : <BookmarkBorderIcon />}
         </IconButton>

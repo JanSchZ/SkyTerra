@@ -1,4 +1,5 @@
 import axios from 'axios';
+import compareService from './api/compareService';
 
 // Configuración dinámica de la URL base
 const getBaseURL = () => {
@@ -453,12 +454,11 @@ export const propertyService = {
   // Crear nueva propiedad
   async createProperty(propertyData) {
     try {
-      const isFormData = typeof FormData !== 'undefined' && propertyData instanceof FormData;
-      const dataToSend = isFormData ? propertyData : this.preparePropertyData(propertyData);
-      console.log('Enviando datos de propiedad:', dataToSend);
+      const dataToSend = this.preparePropertyData(propertyData);
+      console.log('Enviando datos de propiedad para creación:', dataToSend);
 
       const response = await api.post('/properties/', dataToSend, {
-        headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       
       console.log('Propiedad creada exitosamente:', response.data);
@@ -508,13 +508,12 @@ export const propertyService = {
   // Actualizar datos y/o imágenes de una propiedad
   async updateProperty(id, propertyData) {
     try {
-      const isFormData = typeof FormData !== 'undefined' && propertyData instanceof FormData;
-      const dataToSend = isFormData ? propertyData : this.preparePropertyData(propertyData, true);
+      const dataToSend = this.preparePropertyData(propertyData, true);
 
       console.log(`Actualizando propiedad ${id} con datos:`, dataToSend);
 
       const response = await api.put(`/properties/${id}/`, dataToSend, {
-        headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data;
     } catch (error) {
@@ -562,77 +561,53 @@ export const propertyService = {
 
   // Método auxiliar para preparar datos de propiedad
   preparePropertyData(propertyData) {
-    const prepared = { ...propertyData };
-    
-    // Asegurar que boundary_polygon sea JSON string si es un objeto
-    if (prepared.boundary_polygon && typeof prepared.boundary_polygon === 'object') {
-      prepared.boundary_polygon = JSON.stringify(prepared.boundary_polygon);
+    const dataToSend = new FormData();
+
+    Object.keys(propertyData).forEach(key => {
+      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'tour360' || key === 'documents' || key === 'utilities') {
+        // Handle these special cases below
+      } else if (propertyData[key] !== null && propertyData[key] !== undefined) {
+        dataToSend.append(key, propertyData[key]);
+      }
+    });
+
+    // Handle images
+    propertyData.images.forEach(file => dataToSend.append('new_images', file));
+    if (propertyData.imagesToDelete.length > 0) {
+      dataToSend.append('images_to_delete_ids', JSON.stringify(propertyData.imagesToDelete));
     }
-    
-    // Convertir números a tipos correctos
-    if (prepared.price !== undefined && prepared.price !== null) {
-      prepared.price = parseFloat(prepared.price);
+
+    // Handle boundary_polygon
+    if (propertyData.boundary_polygon) {
+      dataToSend.append('boundary_polygon', JSON.stringify(propertyData.boundary_polygon.geojson || propertyData.boundary_polygon));
     }
-    
-    if (prepared.size !== undefined && prepared.size !== null) {
-      prepared.size = parseFloat(prepared.size);
+
+    // Handle tour360
+    if (propertyData.tour360) {
+      dataToSend.append('new_tour_file', propertyData.tour360);
     }
-    
-    if (prepared.latitude !== undefined && prepared.latitude !== null && prepared.latitude !== '') {
-      prepared.latitude = parseFloat(prepared.latitude);
-    } else {
-      prepared.latitude = null;
+    if (propertyData.tourToDelete && propertyData.existingTourId) {
+      dataToSend.append('tour_to_delete_id', propertyData.existingTourId);
     }
-    
-    if (prepared.longitude !== undefined && prepared.longitude !== null && prepared.longitude !== '') {
-      prepared.longitude = parseFloat(prepared.longitude);
-    } else {
-      prepared.longitude = null;
+
+    // Handle documents
+    propertyData.documents.forEach(file => dataToSend.append('new_documents', file));
+
+    // Handle new fields
+    if (propertyData.terrain) {
+      dataToSend.append('terrain', propertyData.terrain);
     }
-    
-    // Mapear campos del frontend al backend
-    if (prepared.propertyType) {
-      prepared.type = prepared.propertyType;
-      delete prepared.propertyType;
+    if (propertyData.access) {
+      dataToSend.append('access', propertyData.access);
     }
-    
-    if (prepared.hasWater !== undefined) {
-      prepared.has_water = prepared.hasWater;
-      delete prepared.hasWater;
+    if (propertyData.legalStatus) {
+      dataToSend.append('legal_status', propertyData.legalStatus); // Map frontend name to backend name
     }
-    
-    if (prepared.hasViews !== undefined) {
-      prepared.has_views = prepared.hasViews;
-      delete prepared.hasViews;
+    if (propertyData.utilities && propertyData.utilities.length > 0) {
+      dataToSend.append('utilities', JSON.stringify(propertyData.utilities));
     }
-    
-    if (prepared.listingType) {
-      prepared.listing_type = prepared.listingType;
-      delete prepared.listingType;
-    }
-    if (prepared.rentPrice !== undefined) {
-      if (prepared.rentPrice === '') prepared.rentPrice = null;
-      if (prepared.rentPrice !== null) prepared.rent_price = parseFloat(prepared.rentPrice);
-      delete prepared.rentPrice;
-    }
-    if (prepared.rentalTerms !== undefined) {
-      prepared.rental_terms = prepared.rentalTerms;
-      delete prepared.rentalTerms;
-    }
-    
-    // Limpiar campos que no son necesarios para el backend
-    delete prepared.images;
-    delete prepared.existingImageUrls;
-    delete prepared.imagesToDelete;
-    delete prepared.tour360;
-    delete prepared.existingTourUrl;
-    delete prepared.tourToDelete;
-    delete prepared.address;
-    delete prepared.city;
-    delete prepared.state;
-    delete prepared.country;
-    
-    return prepared;
+
+    return dataToSend;
   },
 
   getDashboardStats: async () => {
@@ -813,4 +788,5 @@ export default {
   image: imageService,
   savedSearch: savedSearchService,
   favorites: favoritesService,
+  compare: compareService,
 };
