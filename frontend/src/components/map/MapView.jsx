@@ -546,6 +546,33 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     return 'default';
   };
 
+  const startGrandFinale = useCallback(() => {
+    if (!mapRef.current || userInteractedRef.current) {
+      if (!userInteractedRef.current) setAutoFlyCompleted(true);
+      return;
+    }
+    
+    // console.log('🚁✨ Iniciando el gran final de la animación.');
+
+    // Vuelo final a una vista panorámica y elevada
+    mapRef.current.flyTo({
+      ...initialMapViewState, // Volver a la vista inicial, que es amplia
+      zoom: 4, // Un poco más cerca que el inicio para enmarcar bien
+      pitch: 50, // Ángulo más dramático
+      duration: 10000, // Vuelo lento y majestuoso
+      essential: true,
+    });
+
+    // Después del vuelo final, se completará la animación y se ocultará el overlay.
+    flightTimeoutIdRef.current = setTimeout(() => {
+      if (!userInteractedRef.current) {
+        setAutoFlyCompleted(true);
+        // console.log('🚁✨ Animación finalizada.');
+      }
+    }, 10000); // Coincidir con la duración del vuelo final
+
+  }, [initialMapViewState, setAutoFlyCompleted]);
+
   // Función para realizar vuelo automático inicial sobre propiedades reales
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
     // Skip animation for slow connections
@@ -611,7 +638,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           let currentStep = 0;
           const flyToNextSelectedProperty = () => {
             if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= selectedProperties.length) {
-              if (!userInteractedRef.current) setAutoFlyCompleted(true);
+              if (!userInteractedRef.current) startGrandFinale();
               // console.log('Secuencia de propiedades terminada o interrumpida (modo paseo lento).');
               return;
             }
@@ -643,7 +670,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
 
         const flyToNextGenericPoint = () => {
           if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= flightPath.length) {
-            if (!userInteractedRef.current) setAutoFlyCompleted(true);
+            if (!userInteractedRef.current) startGrandFinale();
             // console.log('Secuencia genérica terminada o interrumpida (modo paseo lento).');
             return;
           }
@@ -669,7 +696,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
       console.error('Error durante la animación de vuelo automático:', error);
       if (!userInteractedRef.current) setAutoFlyCompleted(true);
     }
-  }, [isMapLoaded, properties, countryFlightPaths, autoFlyCompleted, setAutoFlyCompleted, connectionType]);
+  }, [isMapLoaded, properties, countryFlightPaths, autoFlyCompleted, setAutoFlyCompleted, connectionType, startGrandFinale]);
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {

@@ -35,7 +35,7 @@ import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import LandingV2 from './components/ui/LandingV2';
 import CreatePublicationWizard from './components/property/CreatePublicationWizard';
-import AdminDocumentsReviewPage from './components/admin/AdminDocumentsReviewPage.jsx';
+
 import CompareView from './components/property/CompareView';
 import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
 import SavedSearchesPage from './components/ui/SavedSearchesPage';
@@ -127,12 +127,14 @@ function App() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await authService.getCurrentUser();
+        const currentUser = await authService.checkAuthStatus(); // Use the new method
         if (currentUser) {
           setUser(currentUser);
+        } else {
+          setUser(null); // Ensure user is null if not authenticated
         }
       } catch (error) {
-        console.error("Failed to load user from local storage:", error);
+        console.error("Failed to verify user session with backend:", error);
         setUser(null); // Ensure user is null on error
       } finally {
         setLoadingAuth(false);
@@ -543,7 +545,7 @@ function App() {
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="properties" element={<PropertyApprovalPage />} />
         <Route path="tickets" element={<AdminTicketsPage />} />
-        <Route path="documents" element={<AdminDocumentsReviewPage />} />
+        
         <Route path="users" element={<AdminUsersListPage />} />
         <Route path="coupons" element={<AdminCouponsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />

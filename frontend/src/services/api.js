@@ -54,7 +54,8 @@ export const api = axios.create({
   baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  withCredentials: true, // Importante para enviar cookies en solicitudes de origen cruzado
 });
 
 // Interceptor para añadir token en las solicitudes
@@ -110,12 +111,9 @@ api.interceptors.response.use(
         // y evitar problemas con el router dentro del interceptor, usamos un pequeño delay.
         // Idealmente, esto se manejaría con un sistema de pub/sub o un estado global
         // que indique que la sesión ha expirado y los componentes reaccionen a ello.
-        setTimeout(() => {
-          // Asegurarse de que solo redirigimos si no estamos ya en login
-          if (window.location.pathname !== '/login') {
-             window.location.href = '/login'; // Redirección completa para limpiar estado de la app
-          }
-        }, 100);
+        if (window.location.pathname !== '/login') {
+           window.location.href = '/login'; // Redirección completa para limpiar estado de la app
+        }
       } else if (isLoginAttempt) {
         console.error('[Login Failed]', 'Intento de login fallido con 401.', error.response.data);
       }
@@ -143,7 +141,20 @@ export const authService = {
       
       // Lanzar el error real en lugar de simular
       if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error de autenticación';
+        let errorMessage = 'Error de autenticación';
+        if (error.response.data.non_field_errors) {
+          errorMessage = error.response.data.non_field_errors[0];
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else {
+          // Si hay errores de campo específicos, combinarlos
+          const fieldErrors = Object.values(error.response.data).flat().join('; ');
+          if (fieldErrors) {
+            errorMessage = fieldErrors;
+          }
+        }
         throw new Error(errorMessage);
       } else if (error.message) {
         throw new Error(error.message);
@@ -223,7 +234,7 @@ export const authService = {
     } catch (error) {
       console.error('❌ Error durante el inicio de sesión con Google:', error);
       if (error.response && error.response.data) {
-        const errorMessage = error.response.data.error || 'Error de autenticación con Google';
+        const errorMessage = error.response.data.error || error.response.data.detail || error.response.data.non_field_errors?.[0] || 'Error de autenticación con Google';
         throw new Error(errorMessage);
       } else if (error.message) {
         throw new Error(error.message);
@@ -251,6 +262,7 @@ export const authService = {
       console.error('❌ Error durante el inicio de sesión con X:', error);
       const errorMessage = error.response?.data?.non_field_errors?.[0] || 
                            error.response?.data?.error || 
+                           error.response?.data?.detail ||
                            'Error de autenticación con X';
       throw new Error(errorMessage);
     }
@@ -301,14 +313,33 @@ export const authService = {
   },
 
   // Obtener usuario actual
-  getCurrentUser() {
+  async getCurrentUser() {
     const userStr = localStorage.getItem('user');
     if (!userStr) return null;
     
     try {
-      return JSON.parse(userStr);
-    } catch (e) {
+      const user = JSON.parse(userStr);
+      // Opcional: Podrías hacer una llamada ligera al backend aquí para validar el token
+      // Por ahora, solo devolvemos el usuario del localStorage
+      return user;
+    } catch {
       localStorage.removeItem('user');
+      return null;
+    }
+  },
+
+  // Verificar el estado de autenticación con el backend
+  async checkAuthStatus() {
+    try {
+      const response = await api.get('/auth/user/'); // Endpoint para obtener detalles del usuario actual
+      if (response.data) {
+        localStorage.setItem('user', JSON.stringify(response.data));
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      localStorage.removeItem('user'); // Limpiar si la sesión no es válida
       return null;
     }
   },
@@ -328,7 +359,27 @@ export const authService = {
       console.error('Error updating profile:', error);
       throw error;
     }
-  }
+  },
+
+  // Solicitar restablecimiento de contraseña
+  async requestPasswordReset(email) {
+    try {
+      console.log('🔄 Solicitando restablecimiento de contraseña para:', email);
+      const response = await api.post('/auth/password/reset/', { email });
+      console.log('✅ Solicitud de restablecimiento de contraseña exitosa:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error durante la solicitud de restablecimiento de contraseña:', error);
+      if (error.response && error.response.data) {
+        const errorMessage = error.response.data.email?.[0] || error.response.data.detail || 'Error al solicitar restablecimiento de contraseña.';
+        throw new Error(errorMessage);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Error de conexión con el servidor.');
+      }
+    }
+  },
 };
 
 // Servicio de propiedades
@@ -510,7 +561,7 @@ export const propertyService = {
   },
 
   // Método auxiliar para preparar datos de propiedad
-  preparePropertyData(propertyData, isUpdate = false) {
+  preparePropertyData(propertyData) {
     const prepared = { ...propertyData };
     
     // Asegurar que boundary_polygon sea JSON string si es un objeto

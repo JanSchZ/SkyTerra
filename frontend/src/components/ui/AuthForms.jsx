@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -61,14 +61,35 @@ const commonTextFieldStyles = {
 const REDIRECT_URI = window.location.href;
 
 // Componente de formulario de inicio de sesión
-export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
+export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onSwitchToForgotPassword, onClose, onGoogleLoginSuccess, onGoogleLoginError }) => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+
+  useEffect(() => {
+    if (error) {
+      if (typeof error === 'object' && error !== null) {
+        // Si el error es un objeto y tiene non_field_errors, usar ese mensaje
+        if (error.non_field_errors && Array.isArray(error.non_field_errors)) {
+          setFormErrors({ general: error.non_field_errors[0] });
+        } else {
+          // Si es un objeto con otros errores de campo, pasarlo directamente
+          setFormErrors(error);
+        }
+      } else {
+        // Si es un string, es un error general
+        setFormErrors({ general: error });
+      }
+    } else {
+      setFormErrors({});
+    }
+  }, [error]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (onLogin) onLogin({ login_identifier: loginIdentifier, password });
+    setFormErrors({}); // Limpiar errores anteriores
+    if (onLogin) onLogin({ username: loginIdentifier, password });
   };
 
   return (
@@ -80,9 +101,9 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
         Bienvenido de nuevo a SkyTerra.
       </Typography>
       
-      {error && (
+      {formErrors.general && (
         <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373' }}>
-          {typeof error === 'object' ? JSON.stringify(error) : error}
+          {formErrors.general}
         </Alert>
       )}
       
@@ -97,6 +118,8 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           margin="normal"
           autoFocus
           disabled={loading}
+          error={!!formErrors.username || !!formErrors.email}
+          helperText={formErrors.username || formErrors.email}
           sx={commonTextFieldStyles}
         />
         
@@ -109,6 +132,8 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           onChange={(e) => setPassword(e.target.value)}
           margin="normal"
           disabled={loading}
+          error={!!formErrors.password}
+          helperText={formErrors.password}
           sx={commonTextFieldStyles}
           InputProps={{
             endAdornment: (
@@ -121,6 +146,12 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onClose
           }}
         />
         
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%', mt: 1 }}>
+          <Button onClick={onSwitchToForgotPassword} sx={{ color: '#c9d1d9', fontWeight: 400, textTransform: 'none', p: 0.5, '&:hover': { textDecoration: 'underline' } }}>
+            ¿Olvidaste tu contraseña?
+          </Button>
+        </Box>
+
         <Button
           type="submit"
           variant="contained"
@@ -246,7 +277,8 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
         seller_type: sellerType,
         email: formData.email,
         username: autoUsername,
-        password: formData.password,
+        password1: formData.password,
+        password2: formData.confirmPassword,
         name: formData.name,
         rut: formData.rut,
         phone: formData.phone,
@@ -368,18 +400,89 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
   );
 };
 
+// Componente de formulario de recuperación de contraseña
+export const ForgotPasswordForm = ({ onForgotPassword, loading, error, success, onSwitchToLogin }) => {
+  const [email, setEmail] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (onForgotPassword) onForgotPassword({ email });
+  };
+
+  return (
+    <Box sx={{ width: '100%', p: 3 }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 300, color: '#c9d1d9', mb: 1, textAlign: 'center' }}>
+        Recuperar Contraseña
+      </Typography>
+      <Typography variant="body2" sx={{ color: '#8b949e', mb: 4, textAlign: 'center', fontWeight: 300 }}>
+        Ingresa tu correo electrónico para recibir instrucciones de recuperación.
+      </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2, backgroundColor: 'rgba(229,115,115,0.1)', color: '#e57373' }}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2, backgroundColor: 'rgba(144,238,144,0.1)', color: '#90ee90' }}>
+          Instrucciones enviadas a tu correo electrónico.
+        </Alert>
+      )}
+
+      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 0 }}>
+        <TextField
+          label="Correo Electrónico"
+          type="email"
+          fullWidth
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          margin="normal"
+          autoFocus
+          disabled={loading || success}
+          sx={commonTextFieldStyles}
+        />
+
+        <Button
+          type="submit"
+          variant="contained"
+          color="primary"
+          fullWidth
+          sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', textTransform: 'none', fontWeight: 500 }}
+          disabled={loading || success}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+        >
+          {loading ? 'Enviando...' : 'Enviar Instrucciones'}
+        </Button>
+
+        <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.15)' }} />
+        <Typography variant="body2" align="center" sx={{ color: '#8b949e', fontWeight: 300 }}>
+          ¿Recordaste tu contraseña?
+          <Button onClick={onSwitchToLogin} sx={{ color: '#c9d1d9', fontWeight: 400, textTransform: 'none', p: 0.5, '&:hover': { textDecoration: 'underline' } }}>
+            Iniciar sesión
+          </Button>
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
+
 // Main AuthPage component that acts as a modal-like container
 const AuthPage = ({ 
   formType, 
   onLogin, 
   onRegister, 
   onGoogleLoginSuccess, 
-  onGoogleLoginError 
+  onGoogleLoginError, 
+  onTwitterLoginSuccess, 
+  onTwitterLoginError, 
+  onAppleLoginSuccess 
 }) => {
-  // formType can be 'login' or 'register'
+  // formType can be 'login', 'register', or 'forgot_password'
   const [currentForm, setCurrentForm] = useState(formType || 'login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
   const handleLoginSubmit = async (credentials) => {
@@ -389,7 +492,16 @@ const AuthPage = ({
       if (onLogin) await onLogin(credentials);
       // Navigation should be handled by the App component after successful login
     } catch (err) {
-      setError(err.message || 'Error al iniciar sesión.');
+      console.error("Error en handleLoginSubmit:", err.response?.data || err.message);
+      // Asegurarse de que el error sea un objeto si viene del backend
+      if (err.response && err.response.data) {
+        // Si el backend devuelve un objeto de errores (ej. { username: ['error'], password: ['error'] })
+        // o un error general como { non_field_errors: ['mensaje'] }
+        setError(err.response.data);
+      } else {
+        // Si es un error general o un string
+        setError({ general: err.message || 'Error al iniciar sesión.' });
+      }
     }
     setIsLoading(false);
   };
@@ -404,6 +516,21 @@ const AuthPage = ({
       setError(err.message || 'Error al registrar.');
     }
     setIsLoading(false);
+  };
+
+  const handleForgotPasswordSubmit = async (data) => {
+    setIsLoading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      // Llama al endpoint de dj-rest-auth para resetear contraseña
+      await authService.requestPasswordReset(data.email);
+      setSuccess(true);
+    } catch (err) {
+      setError(err.message || 'Error al solicitar recuperación de contraseña.');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleClose = () => {
@@ -455,20 +582,29 @@ const AuthPage = ({
               onLogin={handleLoginSubmit} 
               loading={isLoading} 
               error={error}
-              onSwitchToRegister={() => { setCurrentForm('register'); setError(null); }}
+              onSwitchToRegister={() => { setCurrentForm('register'); setError(null); setSuccess(false); }}
+              onSwitchToForgotPassword={() => { setCurrentForm('forgot_password'); setError(null); setSuccess(false); }}
+              onClose={handleClose}
+              onGoogleLoginSuccess={onGoogleLoginSuccess}
+              onGoogleLoginError={onGoogleLoginError}
+            />
+          ) : currentForm === 'register' ? (
+            <RegisterForm 
+              onRegister={handleRegisterSubmit} 
+              loading={isLoading} 
+              error={error}
+              onSwitchToLogin={() => { setCurrentForm('login'); setError(null); setSuccess(false); }}
               onClose={handleClose}
               onGoogleLoginSuccess={onGoogleLoginSuccess}
               onGoogleLoginError={onGoogleLoginError}
             />
           ) : (
-            <RegisterForm 
-              onRegister={handleRegisterSubmit} 
-              loading={isLoading} 
+            <ForgotPasswordForm
+              onForgotPassword={handleForgotPasswordSubmit}
+              loading={isLoading}
               error={error}
-              onSwitchToLogin={() => { setCurrentForm('login'); setError(null); }}
-              onClose={handleClose}
-              onGoogleLoginSuccess={onGoogleLoginSuccess}
-              onGoogleLoginError={onGoogleLoginError}
+              success={success}
+              onSwitchToLogin={() => { setCurrentForm('login'); setError(null); setSuccess(false); }}
             />
           )}
         </Paper>

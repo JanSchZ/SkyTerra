@@ -6,7 +6,9 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import HomeWorkIcon from '@mui/icons-material/HomeWork';
 import SearchIcon from '@mui/icons-material/Search';
 import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import SellerPropertiesManager from './SellerPropertiesManager';
+import UserProfile from './UserProfile';
 
 /**
  * Seller/User Dashboard V2
@@ -17,7 +19,7 @@ export default function Dashboard({ user }) {
   const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [myProperties, setMyProperties] = useState(null);
-  const [loadingProps, setLoadingProps] = useState(true);
+  
   const [savedSearches, setSavedSearches] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [loadingFavs, setLoadingFavs] = useState(true);
@@ -31,7 +33,7 @@ export default function Dashboard({ user }) {
         console.error('Error cargando propiedades del usuario', err);
         setMyProperties([]);
       } finally {
-        setLoadingProps(false);
+        
       }
     };
     fetch();
@@ -114,6 +116,7 @@ export default function Dashboard({ user }) {
         <Tab icon={<HomeWorkIcon />} iconPosition="start" label="Mis Propiedades" />
         <Tab icon={<SearchIcon />} iconPosition="start" label="Búsquedas Guardadas" />
         <Tab icon={<FavoriteIcon />} iconPosition="start" label="Favoritos" />
+        <Tab icon={<AccountCircleIcon />} iconPosition="start" label="Mi Perfil" />
       </Tabs>
 
       {/* Tab Panels */}
@@ -221,6 +224,11 @@ export default function Dashboard({ user }) {
             </Grid>
           )}
         </Box>
+      )}
+
+      {/* User Profile Panel */}
+      {tab === 4 && (
+        <UserProfile user={user} />
       )}
     </Box>
   );

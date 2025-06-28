@@ -46,8 +46,7 @@
             *   **[COMPLETADO - 13 Jun 2025]** Se añadió pestaña "Documentos" en `PropertyForm.jsx` para permitir subida de PDFs, DOC y planos (hasta 10 archivos). UI con listado, remover y alerta informativa.
             *   **[COMPLETADO - 13 Jun 2025]** Backend: Modelo `PropertyDocument` implementado (relación 1-a-N), con campos `file`, `doc_type`, `description`, `uploaded_at`.
             *   **[COMPLETADO - 13 Jun 2025]** API: Se añadió `PropertyDocumentViewSet` (CRUD), ruta `/api/documents/`, serializer y registro en `urls.py`; `PropertySerializer` actualizado y manejo de `new_documents` en vistas.
-            *   **[EN PROGRESO - 13 Jun 2025]** Backend: Acciones `approve` / `reject` añadidas a `PropertyDocumentViewSet`; actualización de estado y transición automática de `publication_status`.
-            *   **[COMPLETADO - 13 Jun 2025]** Admin UX: Panel React `AdminDocumentsReviewPage.jsx` para revisión y aprobar/rechazar documentos; rutas y menú añadidos; backend filter `status` añadido.
+            *   **[COMPLETADO - 26 Jun 2025]** Backend: Acciones `approve` / `reject` añadidas a `PropertyDocumentViewSet`; actualización de estado y transición automática de `publication_status`. **Verificado: `send_property_status_email` ya se llama.**
             *   **[PENDIENTE]** Notificaciones: Email al propietario cuando su propiedad cambia de estado (pendiente → approved/rejected).
             *   **[PENDIENTE]** Frontend: Mostrar estado de verificación y lista de documentos subidos en `PropertyDetails.jsx` (sólo para owner y admin).
             *   **[DESCARTADO - 13 Jun 2025]** Filtros manuales eliminados del UI principal; la IA gestionará filtros internamente.
@@ -62,8 +61,8 @@
         *   **Seguridad:** `plusvalia_score` solo visible para usuarios `is_staff`.
         *   **Frontend:** **[COMPLETADO - 16 Jun 2025]** Mostrar métrica en vistas admin (AdminDetailedPropertiesPage) y panel de detalles de propiedad (solo staff).
         *   **Próximos pasos:** Ajustar pesos tras recopilar datos reales y conectar servicios externos en entorno prod.
-    4.  **[PENDIENTE]** 👤 **Creación de Cuenta Admin por Defecto:**
-        *   **Subtarea (Backend):** Implementar un script, `management command`, o proceso de inicialización para crear un superusuario con `username='admin'` y `password='SkyTerra3008%'` (la contraseña debe ser manejada de forma segura, idealmente establecida en el primer despliegue o mediante variables de entorno para el admin inicial).
+    4.  **[COMPLETADO - 26 Jun 2025]** 👤 **Creación de Cuenta Admin por Defecto:**
+        *   **Subtarea (Backend):** Implementar un script, `management command`, o proceso de inicialización para crear un superusuario con `username='admin'` y `password='SkyTerra3008%'` (la contraseña debe ser manejada de forma segura, idealmente establecida en el primer despliegue o mediante variables de entorno para el admin inicial). **Verificado: `create_default_admin.py` ya existe y funciona.**
 
 ---
 
@@ -74,7 +73,9 @@
         *   Backend: Modelo `Favorite`, serializer y `FavoriteViewSet` (`/api/favorites/`).
         *   Frontend: `PropertyCard` muestra botón bookmark para guardar/quitar; `favoritesService` en `api.js`.
         *   Pendiente: Vista dedicada "Favoritos" en dashboard.
-    2.  **[PENDIENTE]** 👤 **Página de Perfil de Usuario (Básica):**
+    2.  **[EN PROGRESO - 26 Jun 2025]** 👤 **Página de Perfil de Usuario (Básica):**
+        *   **Frontend:** Añadida pestaña "Mi Perfil" en `Dashboard.jsx` y componente `UserProfile.jsx` para edición de datos básicos.
+        *   **Backend:** Añadido endpoint `/api/auth/profile/` (`ProfileUpdateView`) para actualizar el perfil del usuario.
         *   Para compradores/arrendatarios: Ver favoritos, gestionar datos básicos de perfil.
         *   Para vendedores/propietarios: Ver y gestionar sus publicaciones (venta y arriendo), datos de perfil.
         *   Requiere lógica de autenticación y roles.
@@ -535,3 +536,75 @@ Completed a major overhaul of the Admin Dashboard based on user feedback to impr
 5.  **Code Structure:**
     *   Removed the "Documentos" link from `AdminLayout.jsx`.
     *   The `AdminDocumentsReviewPage.jsx` component is now unused and can be deleted.
+
+## Session Date: 2025-06-26 (Continuación)
+
+### Summary of Changes:
+
+Se abordaron problemas de autenticación, incluyendo mensajes de error detallados en el login y la configuración de inicio de sesión social.
+
+### Detailed Changes:
+
+1.  **[RESUELTO]** Eliminación de componente obsoleto:
+    *   Se eliminó `frontend/src/components/admin/AdminDocumentsReviewPage.jsx` y sus referencias en `frontend/src/App.jsx`.
+
+2.  **[VERIFICADO]** Bug de registro de usuarios:
+    *   Se confirmó que el bug de registro de usuarios (`SMTPAuthenticationError`) no es un problema de código de la aplicación, sino de configuración de credenciales de correo electrónico para el envío de emails de verificación.
+    *   Se verificó que el `management command` `create_default_admin.py` ya existe y funciona para crear un superusuario por defecto.
+
+3.  **[VERIFICADO]** Notificaciones por email al propietario:
+    *   Se confirmó que la funcionalidad de envío de emails al propietario cuando el estado de su propiedad cambia ya está implementada en `backend/properties/views.py` (`PropertyDocumentViewSet`) y `backend/properties/email_service.py`.
+
+4.  **[EN PROGRESO]** Página de Perfil de Usuario (Básica):
+    *   **Frontend:** Se añadió la pestaña "Mi Perfil" en `frontend/src/components/ui/Dashboard.jsx` y se creó el componente `frontend/src/components/ui/UserProfile.jsx` para la edición de datos básicos del usuario.
+    *   **Backend:** Se añadió el endpoint `/api/auth/profile/` (`ProfileUpdateView` en `backend/skyterra_backend/views.py`) para manejar la actualización del perfil.
+
+5.  **[EN PROGRESO]** Mejora de la autenticación y mensajes de error detallados:
+    *   **Backend:** Se implementó `CustomLoginSerializer` en `backend/skyterra_backend/serializers.py` para proporcionar mensajes de error más específicos ("Contraseña incorrecta", "Usuario o correo electrónico no registrado") durante el inicio de sesión.
+    *   **Frontend:** Se actualizó `frontend/src/components/ui/AuthForms.jsx` para interpretar y mostrar estos mensajes de error detallados.
+    *   **Frontend:** Se añadió la interfaz de usuario para la recuperación de contraseña (`ForgotPasswordForm` en `AuthForms.jsx`) y se integró con el endpoint de `dj-rest-auth`.
+
+6.  **[PENDIENTE - Requiere Configuración Externa]** Inicios de sesión con Google y X (Twitter):
+    *   **Problema identificado:** Los errores como `The given origin is not allowed for the given client ID.` y `FedCM get() rejects with NetworkError: Error retrieving a token.` indican problemas de configuración en las consolas de desarrolladores de Google y Twitter, no en el código de la aplicación.
+    *   **Acciones requeridas por el usuario:**
+        *   **Configuración de Correo Electrónico (para registro y recuperación de contraseña):**
+            *   Asegurarse de que las variables de entorno `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, y `ADMIN_EMAIL` estén configuradas correctamente en el archivo `.env`.
+            *   **Importante:** Si se usa Gmail con 2FA, `EMAIL_HOST_PASSWORD` debe ser una "Contraseña de aplicación" generada en la configuración de seguridad de Google.
+        *   **Configuración de Google OAuth:**
+            *   En Google Cloud Console (APIs y servicios -> Credenciales -> ID de cliente de OAuth 2.0 para la aplicación web):
+                *   Verificar que "Orígenes de JavaScript autorizados" incluya **todas las URLs exactas** del frontend (ej. `http://localhost:3000`, `http://localhost:5173`, `http://127.0.0.1:3000`, y URLs de producción).
+                *   Verificar que "URI de redirección autorizados" incluya las URLs de callback (ej. `http://localhost:3000/login`, `http://localhost:5173/login`).
+        *   **Configuración de Twitter (X) OAuth:**
+            *   En el Twitter Developer Portal (Proyecto -> Aplicación -> Configuración):
+                *   Verificar que los "Callback URLs" estén configurados correctamente.
+    *   **Cambios en el código:**
+        *   Se actualizó `CLIENT_URL` en `backend/skyterra_backend/settings.py` a `http://localhost:5173` para desarrollo local.
+        *   Se mejoró el manejo de errores en `authService.googleLogin` y `authService.xLogin` en `frontend/src/services/api.js` para propagar mensajes de error más detallados desde el backend.
+
+### Day 15: Overhauling User Dashboards & Theming
+- **New Feature: Role-Based Dashboards.**
+  - Implemented distinct, detailed dashboards for "Administrator" and "Seller" user roles.
+  - **Admin Dashboard:**
+    - Redesigned from the ground up to focus on SaaS and business KPIs.
+    - Features 3 distinct sections:
+      1.  **Business KPIs:** MRR, Churn Rate, LTV, and CAC cards.
+      2.  **Operations & Finance:** A production/marketing queue and a donut chart for MRR breakdown by plan.
+      3.  **Profitability Analysis:** Bar chart for LTV vs. CAC and a line chart for MRR evolution.
+    - Created modular components for each part of the dashboard (`SaaSKpiCard`, `ProductionQueue`, `MrrBreakdownChart`, etc.).
+  - **Seller Dashboard:**
+    - Designed a new dashboard for professional sellers to track their performance.
+    - Features 3 main sections:
+      1.  **Plan Status:** Shows the seller's current plan, feature status (e.g., "Completed", "In Post-Production"), and an upsell card.
+      2.  **Performance:** A detailed line chart for views/consultations over time and a set of KPI cards.
+      3.  **Property Management:** A clean data table listing the seller's properties with key stats and actions.
+    - Built using reusable components like `PlanStatus`, `PerformanceChart`, `PropertiesTable`, etc.
+- **Technical Implementation:**
+  - Used `Chart.js` for all new data visualizations.
+  - Leveraged Material-UI `Grid` and components to create the structured, responsive layouts.
+  - Implemented "Glassmorphism" style cards (`GlassCard`) for a modern, clean aesthetic on both dashboards.
+  - Updated application routing in `App.jsx` to direct `is_staff` users to `/admin` and all other authenticated users to the new `/dashboard` (Seller Dashboard).
+- **Project Structure:**
+  - Created new directories to organize dashboard components: `frontend/src/components/seller/` and `frontend/src/components/admin/dashboard/`.
+- **Next Steps:**
+  - Wire up dashboards to live backend data.
+  - Implement logic for different seller plans ("Dueño Particular" vs "Vendedor Profesional").

@@ -108,10 +108,22 @@ STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 
 # URL del cliente para redirecciones (ej. desde Stripe)
-CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:3000')
+CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
 
 # Configuración de CORS
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# Orígenes de confianza para peticiones POST (CSRF)
+# Es necesario para que el login desde el frontend funcione correctamente.
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+]
 
 ROOT_URLCONF = 'skyterra_backend.urls'
 
@@ -262,26 +274,27 @@ REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'jwt-access-token',
     'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
-    'USER_DETAILS_SERIALIZER': 'properties.serializers.UserSerializer', # Update with your user serializer
     'TOKEN_MODEL': None, # Disable default token (use JWT)
-    # Use allauth's registration serializer directly
-    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
-    'OLD_PASSWORD_FIELD_ENABLED': True,
     'LOGOUT_ON_PASSWORD_CHANGE': True,
+    'OLD_PASSWORD_FIELD_ENABLED': True,
+
+    # Serializers
+    'LOGIN_SERIALIZER': 'skyterra_backend.serializers.CustomLoginSerializer',
+    # Usa tu UserSerializer más detallado para el endpoint /user/
+    'USER_DETAILS_SERIALIZER': 'skyterra_backend.serializers.UserSerializer',
+    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
+    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_auth.serializers.PasswordChangeSerializer',
+    'PASSWORD_RESET_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetSerializer',
+    'TOKEN_SERIALIZER': 'dj_rest_auth.serializers.TokenSerializer',
+    'JWT_SERIALIZER': 'dj_rest_auth.serializers.JWTSerializer',
+    'VERIFY_EMAIL_SERIALIZER': 'dj_rest_auth.registration.serializers.VerifyEmailSerializer',
+
+    # Email and Password Reset
     'EMAIL_VERIFICATION': 'mandatory', # This should match ACCOUNT_EMAIL_VERIFICATION
     'PASSWORD_RESET_USE_SITES_DOMAIN': True,
     'PASSWORD_RESET_CONFIRM_URL': CLIENT_URL + '/password-reset-confirm/{uid}/{token}/',
     'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons
-    'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
-    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_auth.serializers.PasswordChangeSerializer',
-    'PASSWORD_RESET_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetSerializer',
-    'USER_DETAILS_SERIALIZER': 'dj_rest_auth.serializers.UserDetailsSerializer', # You might want to customize this
-    'TOKEN_SERIALIZER': 'dj_rest_auth.serializers.TokenSerializer',
-    'JWT_SERIALIZER': 'dj_rest_auth.serializers.JWTSerializer',
-    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
-    'VERIFY_EMAIL_SERIALIZER': 'dj_rest_auth.registration.serializers.VerifyEmailSerializer',
     'REST_AUTH_REGISTER_USES_ACCOUNT_EMAIL_VERIFICATION': True,
-    'OLD_PASSWORD_FIELD_ENABLED': True,
 }
 
 # Configuración de los campos de registro para dj-rest-auth
