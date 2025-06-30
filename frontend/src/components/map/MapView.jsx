@@ -405,10 +405,10 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
 
   const handleMarkerClick = async (property) => {
     // Si el usuario no está autenticado, mantenemos la lógica existente de modal rápido
-    if (!localStorage.getItem('auth_token')) {
-      setPreviewPropertyId(property.id);
-      setPreviewModalOpen(true);
-    }
+    // if (!localStorage.getItem('auth_token')) {
+    //   setPreviewPropertyId(property.id);
+    //   setPreviewModalOpen(true);
+    // }
 
     // Abrir panel lateral con información de la propiedad
     setSelectedProperty(property.id);

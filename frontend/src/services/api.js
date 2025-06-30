@@ -18,9 +18,8 @@ const getBaseURL = () => {
   
   // Para desarrollo local, usar localhost directamente
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    const backendUrl = 'http://localhost:8000/api';
-    console.log('💻 Configurando para localhost:', backendUrl);
-    return backendUrl;
+    console.log('💻 Usando proxy para /api');
+    return '/api';
   }
   
   // Detect if we're on a dedicated frontend sub-domain (e.g. app.skyterra.cl) and map to the

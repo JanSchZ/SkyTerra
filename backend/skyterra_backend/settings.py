@@ -116,6 +116,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:5173',
 ]
+
+# Permitir cualquier origen en modo DEBUG para simplificar el desarrollo con proxies
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOW_CREDENTIALS = True
 
 # Orígenes de confianza para peticiones POST (CSRF)
@@ -123,6 +128,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:5173',
+    'http://localhost:8000', # Añadido para el proxy de Vite
 ]
 
 ROOT_URLCONF = 'skyterra_backend.urls'

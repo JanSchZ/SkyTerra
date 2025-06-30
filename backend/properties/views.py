@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, filters, permissions, status, serializers
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -389,6 +390,7 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AISearchView(APIView):
+    authentication_classes = [TokenAuthentication] # No usar SessionAuthentication aquí
     permission_classes = [permissions.AllowAny]
     DEBUG_MODE = getattr(settings, 'DEBUG', False)
 
