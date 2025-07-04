@@ -94,7 +94,7 @@ const PREDEFINED_LOCATIONS = {
   'india': { center: [78.9629, 20.5937], zoom: 5, name: 'India' },
 };
 
-const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart, onSearchComplete, selectedCountry }) => {
+const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart, onSearchComplete }) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -158,61 +158,125 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
 
     // Inform parent that a search has started
     if (onSearchStart) {
-      onSearchStart();
+      onSearchStart(searchTerm);
     }
-    setLoading(true);
-    setError(null);
+
+    // QUICK HEURISTICS -------------------------------------------------
+    const greetingRegex = /^(hola|buenas|hello|hi|qué tal|que tal|hey)(\s+.*)?$/i;
+    if(greetingRegex.test(searchTermLowerCase.trim())){
+        const chatResponse = {
+          type:'chat',
+          search_mode:'chat',
+          assistant_message:'¡Hola! ¿En qué puedo ayudarte a buscar propiedades o ubicaciones?',
+          suggestedFilters:null,
+          recommendations:[],
+        };
+        setSearchResult(chatResponse);
+        if(onSearch) onSearch(chatResponse);
+        setShowResults(false);
+        if(onSearchComplete) onSearchComplete(chatResponse);
+        setLoading(false);
+        return;
+    }
+
+    // 1) If the query is very short (≤3 words) *and* doesn't mention property-related keywords,
+    //    we assume it is likely a place name and try geocoding first.
+    // 2) Otherwise we go straight to the AI service.
+
+    const wordCount = searchTermLowerCase.split(/\s+/).filter(Boolean).length;
+    const propertyKeywordsRegex = /(propiedad|propiedades|terreno|terrenos|granja|finca|campo|casa|parcela|parcel|lote|rancho|ranch|farm|forest|bosque)/;
+    const isLikelyLocationQuery = wordCount <= 3 && !propertyKeywordsRegex.test(searchTermLowerCase);
+
     try {
-      if (onQuerySubmit) {
-        await onQuerySubmit(query, selectedCountry);
-      } else {
-        // Fallback or direct API call if needed
-        const response = await api.post('/api/ai-search/', { query, country: selectedCountry });
-        if (response.data && typeof response.data === 'object') {
-          const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
-          const hasContentForPropertyList = (suggestedFilters && Object.values(suggestedFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== null && (Array.isArray(v) ? v.some(subVal => subVal !== null) : true )))) || (recommendations && recommendations.length > 0);
-
-          if (flyToLocation && onLocationSearch) {
+      // ---------------------------------------------------------------
+      // LOCATION SHORT-CIRCUIT
+      // ---------------------------------------------------------------
+      if (isLikelyLocationQuery) {
+        const predefinedLocation = PREDEFINED_LOCATIONS[searchTermLowerCase];
+        if (predefinedLocation) {
+          if (onLocationSearch) {
             onLocationSearch({
-              center: flyToLocation.center,
-              zoom: flyToLocation.zoom || 12,
-              locationName: flyToLocation.name || searchTerm, // Use original searchTerm
-              pitch: flyToLocation.pitch,
-              bearing: flyToLocation.bearing,
+              center: predefinedLocation.center,
+              zoom: predefinedLocation.zoom,
+              locationName: predefinedLocation.name
             });
-            setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` }); // Use original searchTerm
-            setShowResults(true); setLoading(false);
-            if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: flyToLocation.name || searchTerm, center: flyToLocation.center } });
-            return;
           }
-
-          const hasRecs = recommendations && recommendations.length > 0;
-          let resultType = hasRecs ? 'properties' : 'ai_response';
-
-          const processedResult = {
-            type: resultType,
-            search_mode: search_mode || (resultType === 'properties' ? 'property_recommendation' : 'location'),
-            assistant_message: assistant_message || (resultType === 'properties' ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
-            suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [], listingType: null }) : null,
-            interpretation: interpretation || assistant_message,
-            recommendations: hasRecs ? (recommendations || []) : [],
-            flyToLocation
-          };
-          setSearchResult(processedResult);
-          if (onSearch) {
-            onSearch(processedResult);
-          }
-          if (resultType === 'properties') {
-            setShowResults(false);
-          } else {
-            setShowResults(false); // hide for location/chat minimalism
-          }
-          if (onSearchComplete) onSearchComplete(processedResult);
-
-        } else {
-          const errorMsg = response.data?.error || response.data?.detail || 'Respuesta inesperada del servidor de IA.';
-          throw new Error(errorMsg);
+          setSearchResult({ type: 'location', locationName: predefinedLocation.name, coordinates: predefinedLocation.center, interpretation: `Volando a ${predefinedLocation.name}...` });
+          setShowResults(true); setLoading(false);
+          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: predefinedLocation.name, center: predefinedLocation.center } });
+          return;
         }
+
+        // If not predefined, use Mapbox geocoding. We'll only accept high-confidence results.
+        const geoResults = await searchLocation(searchTermLowerCase);
+        if (geoResults.length > 0 && (geoResults[0].relevance ?? 1) >= 0.8) {
+          const firstResult = geoResults[0];
+          const center = firstResult.center;
+          const placeName = firstResult.place_name || firstResult.text;
+          let zoom = 12;
+          if (firstResult.place_type?.includes('country')) zoom = 5;
+          else if (firstResult.place_type?.includes('region')) zoom = 8;
+          else if (firstResult.place_type?.includes('district')) zoom = 10;
+          else if (firstResult.place_type?.includes('place')) zoom = 11;
+
+          if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
+          setSearchResult({ type: 'location', locationName: placeName, coordinates: center, interpretation: `Volando a ${placeName}...`, allResults: geoResults.map(r => ({ name: r.place_name || r.text, center: r.center, type: r.place_type?.[0] || 'place' })) });
+          setShowResults(true); setLoading(false);
+          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: placeName, center } });
+          return;
+        }
+        // If geocoder didn't return confident result, fall through to AI search.
+      }
+
+      // ---------------------------------------------------------------
+      // AI SEARCH FALLBACK / PROPERTY QUERY
+      // ---------------------------------------------------------------
+
+      const response = await api.post('ai-search/', { query: searchTerm, conversation_history: [] });
+      if (response.data && typeof response.data === 'object') {
+        const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
+        const hasContentForPropertyList = (suggestedFilters && Object.values(suggestedFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== null && (Array.isArray(v) ? v.some(subVal => subVal !== null) : true )))) || (recommendations && recommendations.length > 0);
+
+        if (flyToLocation && onLocationSearch) {
+          onLocationSearch({
+            center: flyToLocation.center,
+            zoom: flyToLocation.zoom || 12,
+            locationName: flyToLocation.name || searchTerm, // Use original searchTerm
+            pitch: flyToLocation.pitch,
+            bearing: flyToLocation.bearing,
+          });
+          setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` }); // Use original searchTerm
+          setShowResults(true); setLoading(false);
+          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: flyToLocation.name || searchTerm, center: flyToLocation.center } });
+          return;
+        }
+
+        const hasRecs = recommendations && recommendations.length > 0;
+        let resultType = hasRecs ? 'properties' : 'ai_response';
+
+        const processedResult = {
+          type: resultType,
+          search_mode: search_mode || (resultType === 'properties' ? 'property_recommendation' : 'location'),
+          assistant_message: assistant_message || (resultType === 'properties' ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
+          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [], listingType: null }) : null,
+          interpretation: interpretation || assistant_message,
+          recommendations: hasRecs ? (recommendations || []) : [],
+          flyToLocation
+        };
+        setSearchResult(processedResult);
+        if (onSearch) {
+          onSearch(processedResult);
+        }
+        if (resultType === 'properties') {
+          setShowResults(false);
+        } else {
+          setShowResults(false); // hide for location/chat minimalism
+        }
+        if (onSearchComplete) onSearchComplete(processedResult);
+
+      } else {
+        const errorMsg = response.data?.error || response.data?.detail || 'Respuesta inesperada del servidor de IA.';
+        throw new Error(errorMsg);
       }
     } catch (err) {
       console.error('Error en la búsqueda AISearchBar:', err);

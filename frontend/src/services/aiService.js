@@ -1,3 +1,5 @@
+import { api } from './api';
+
 // This service simulates AI-powered operations.
 
 const highPriorityKeywords = ['error', 'no puedo', 'caído', 'urgente', 'falla', 'problema', 'bloqueado'];
@@ -27,3 +29,25 @@ export const assignTicketPriority = (title) => {
 
     return 'low';
 }; 
+
+export const aiService = {
+  async getModels() {
+    try {
+      const response = await api.get('/ai/models/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching AI models:', error);
+      throw error;
+    }
+  },
+
+  async getLogs() {
+    try {
+      const response = await api.get('/ai/logs/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching AI logs:', error);
+      throw error;
+    }
+  },
+};

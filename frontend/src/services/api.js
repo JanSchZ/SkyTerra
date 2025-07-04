@@ -610,12 +610,12 @@ export const propertyService = {
   },
 
   getDashboardStats: async () => {
-    const response = await api.get('/api/admin/dashboard/stats/');
+    const response = await api.get('/admin/dashboard/stats/');
     return response.data;
   },
 
   getPlanMetrics: async () => {
-    const response = await api.get('/api/admin/dashboard/plan-metrics/');
+    const response = await api.get('/admin/dashboard/plan-metrics/');
     return response.data;
   },
 };
