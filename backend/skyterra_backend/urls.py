@@ -79,6 +79,7 @@ urlpatterns = [
     path('api/admin/dashboard/plan-metrics/', AdminPlanMetricsView.as_view(), name='admin-dashboard-plan-metrics'),
     path('api/', include('properties.urls')),
     path('api/payments/', include('payments.urls')),
+    path('api/ai/', include('ai_management.urls')),
     path('api/', include(router.urls)),
 ]
 

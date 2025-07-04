@@ -703,17 +703,22 @@ function App() {
                             <Typography variant="caption">{user.groups[0]}</Typography>
                           </MenuItem>
                         )}
-                        <MenuItem onClick={() => { 
-                          const dest = user?.is_staff ? '/admin/dashboard' : '/dashboard';
-                          navigate(dest);
-                          closeUserMenu();
-                        }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>
-                          Dashboard
-                        </MenuItem>
-                        <MenuItem onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
-                        <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
-                        <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
-                        <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
+                        {user?.is_staff ? (
+                          [
+                            <MenuItem key="admin-dashboard" onClick={() => { navigate('/admin/dashboard'); closeUserMenu(); }} sx={{ color: 'white', pt: 1.5 }}>Admin Dashboard</MenuItem>,
+                            <MenuItem key="admin-users" onClick={() => { navigate('/admin/users'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Usuarios</MenuItem>,
+                            <MenuItem key="admin-properties" onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Propiedades</MenuItem>,
+                            <MenuItem key="admin-settings" onClick={() => { navigate('/admin/settings'); closeUserMenu(); }} sx={{ color: 'white' }}>Configuración</MenuItem>
+                          ]
+                        ) : (
+                          [
+                            <MenuItem key="user-dashboard" onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white', pt: 1.5 }}>Dashboard</MenuItem>,
+                            <MenuItem key="new-publication" onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>,
+                            <MenuItem key="my-searches" onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>,
+                            <MenuItem key="pricing" onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
+                          ]
+                        )}
+                        <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: '1px solid rgba(255,255,255,0.15)', mt: 1 }}>Logout</MenuItem>
                       </Menu>
                     </>
                   ) : (

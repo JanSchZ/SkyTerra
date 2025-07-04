@@ -10,6 +10,8 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import LeaderboardIcon from '@mui/icons-material/Leaderboard';
 import CalculateIcon from '@mui/icons-material/Calculate';
+import AIModelManager from './AIModelManager';
+import AIUsageChart from './AIUsageChart';
 
 const kpiData = [
     {
@@ -80,6 +82,14 @@ const AdminDashboardPage = () => {
                 {/* Fourth row */}
                 <Grid item xs={12}>
                     <ProductionQueue />
+                </Grid>
+
+                {/* AI Management Section */}
+                <Grid item xs={12}>
+                    <AIModelManager />
+                </Grid>
+                <Grid item xs={12}>
+                    <AIUsageChart />
                 </Grid>
             </Grid>
     </Box>

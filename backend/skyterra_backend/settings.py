@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'properties',   # Nuestra app principal
     'support_tickets', # Nueva app para tickets de soporte
     'payments', # App para cupones y pagos
+    'ai_management', # App para gestionar la IA
 ]
 
 SITE_ID = 1
