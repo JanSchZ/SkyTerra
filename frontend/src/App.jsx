@@ -51,6 +51,7 @@ import CheckoutPage from './components/checkout/CheckoutPage.jsx';
 import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
 import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
 import Login from './components/auth/Login';
+import CountrySelector from './components/ui/CountrySelector';
 import './App.css';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -103,12 +104,14 @@ const StaffRoute = ({ user, element }) => {
 };
 
 function App() {
+  const { mode } = useContext(ThemeModeContext);
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [aiAppliedFilters, setAiAppliedFilters] = useState(null);
   const [aiSearchLoading, setAiSearchLoading] = useState(false);
   const [aiSearchResult, setAiSearchResult] = useState(null);
   const [conversationHistory, setConversationHistory] = useState([]);
+  const [selectedCountry, setSelectedCountry] = useState('GLOBAL');
 
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -419,6 +422,46 @@ function App() {
     setSnackbarOpen(true);
   };
 
+  const handleSearch = async (query, country) => {
+    if (!query) return;
+
+    setIsSearching(true);
+    setSearchQuery(query);
+    setTour(null); // Clear previous tours
+    setShowLanding(false); // Hide landing page on search
+    if (isMobile) {
+      setIsPanelOpen(false); // Ocultar panel en móvil al buscar
+    }
+
+    try {
+      const response = await api.post('/api/ai-search/', { query, country: country || selectedCountry });
+      const data = response.data;
+
+      if (data.type === 'property_tour') {
+        // Si la respuesta es un tour de propiedad, iniciar el tour
+        const tourData = data.tour;
+        setTour(tourData);
+        setShowLanding(false);
+        if (mapRef.current) {
+          mapRef.current.startPropertyTour(tourData);
+        }
+      } else {
+        // Manejo normal de resultados de búsqueda
+        setAiSearchResult(data);
+        if (data.flyToLocation) {
+          handleLocationSearch(data.flyToLocation);
+        }
+      }
+    } catch (error) {
+      console.error("Error en la búsqueda:", error);
+      setSnackbarMessage('Error al realizar la búsqueda. Inténtalo de nuevo.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   if (loadingAuth) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
@@ -562,6 +605,12 @@ function App() {
     </Routes>
   );
 
+  const handleCountryChange = (newCountry) => {
+    setSelectedCountry(newCountry);
+    // TODO: Refetch properties or adjust view based on the selected country
+    console.log("Country changed to:", newCountry);
+  };
+
   return (
     <AuthContext.Provider value={{ user, handleLogin, handleRegister, handleLogout, handleGoogleLoginSuccess, handleGoogleLoginError, handleXLoginSuccess, handleXLoginError, handleAppleLoginSuccess }}>
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -703,22 +752,17 @@ function App() {
                             <Typography variant="caption">{user.groups[0]}</Typography>
                           </MenuItem>
                         )}
-                        {user?.is_staff ? (
-                          [
-                            <MenuItem key="admin-dashboard" onClick={() => { navigate('/admin/dashboard'); closeUserMenu(); }} sx={{ color: 'white', pt: 1.5 }}>Admin Dashboard</MenuItem>,
-                            <MenuItem key="admin-users" onClick={() => { navigate('/admin/users'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Usuarios</MenuItem>,
-                            <MenuItem key="admin-properties" onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Propiedades</MenuItem>,
-                            <MenuItem key="admin-settings" onClick={() => { navigate('/admin/settings'); closeUserMenu(); }} sx={{ color: 'white' }}>Configuración</MenuItem>
-                          ]
-                        ) : (
-                          [
-                            <MenuItem key="user-dashboard" onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white', pt: 1.5 }}>Dashboard</MenuItem>,
-                            <MenuItem key="new-publication" onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>,
-                            <MenuItem key="my-searches" onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>,
-                            <MenuItem key="pricing" onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
-                          ]
-                        )}
-                        <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: '1px solid rgba(255,255,255,0.15)', mt: 1 }}>Logout</MenuItem>
+                        <MenuItem onClick={() => { 
+                          const dest = user?.is_staff ? '/admin/dashboard' : '/dashboard';
+                          navigate(dest);
+                          closeUserMenu();
+                        }} sx={{ color: 'white', pt: user ? 1.5 : 0.5 }}>
+                          Dashboard
+                        </MenuItem>
+                        <MenuItem onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
+                        <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
+                        <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
+                        <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: user ? '1px solid rgba(255,255,255,0.15)' : 'none', mt: user ? 1 : 0 }}>Logout</MenuItem>
                       </Menu>
                     </>
                   ) : (

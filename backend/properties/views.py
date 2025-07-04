@@ -407,6 +407,7 @@ class AISearchView(APIView):
         try:
             # Accept both 'query' (new backend contract) and legacy 'current_query' from the frontend
             query = request.data.get('query') or request.data.get('current_query') or ''
+            country = request.data.get('country', 'GLOBAL')
 
             if not query:
                 return Response({'error': 'Query is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -416,7 +417,7 @@ class AISearchView(APIView):
 
             # Use the GeminiService to process the natural-language query and build the response
             gemini_service = GeminiService()
-            ai_response = gemini_service.search_properties_with_ai(query, conversation_history)
+            ai_response = gemini_service.search_properties_with_ai(query, conversation_history, country)
 
             # The AI helper already returns the expected JSON structure for the frontend
             return Response(ai_response, status=status.HTTP_200_OK)

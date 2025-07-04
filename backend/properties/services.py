@@ -28,10 +28,14 @@ class GeminiService:
         self.max_retries = 3
         self.retry_delay = 2  # segundos
 
-    def _get_property_context(self):
+    def _get_property_context(self, country='GLOBAL'):
         """Obtiene información de las propiedades disponibles en la base de datos."""
         try:
-            properties = Property.objects.all()[:20]  # Limitar a 20 propiedades para no sobrecargar el prompt
+            properties = Property.objects.all()
+            if country and country != 'GLOBAL':
+                properties = properties.filter(country=country)
+
+            properties = properties[:20]  # Limitar a 20 propiedades para no sobrecargar el prompt
             
             if not properties.exists():
                 return "No hay propiedades disponibles en la base de datos actualmente."
@@ -56,10 +60,12 @@ class GeminiService:
             logger.error(f"Error obteniendo contexto de propiedades: {e}")
             return "Error al obtener información de propiedades."
 
-    def _search_properties(self, filters):
+    def _search_properties(self, filters, country='GLOBAL'):
         """Busca propiedades en la base de datos basado en los filtros."""
         try:
             queryset = Property.objects.all()
+            if country and country != 'GLOBAL':
+                queryset = queryset.filter(country=country)
             
             # Filtrar por tipo de propiedad
             if filters.get('propertyTypes'):
@@ -121,10 +127,10 @@ class GeminiService:
             logger.error(f"Error buscando propiedades: {e}")
             return Property.objects.none()
 
-    def _create_enhanced_prompt(self, user_query, conversation_history=None):
+    def _create_enhanced_prompt(self, user_query, conversation_history=None, country='GLOBAL'):
         """Crea un prompt mejorado que incluye información de propiedades reales."""
         
-        property_context = self._get_property_context()
+        property_context = self._get_property_context(country)
         
         prompt = f"""
 Eres un asistente especializado en propiedades rurales para la plataforma SkyTerra. Tu trabajo es ayudar a los usuarios a encontrar propiedades que se ajusten a sus necesidades.
@@ -214,15 +220,15 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
         
         return prompt
 
-    def search_properties_with_ai(self, user_query, conversation_history=None):
+    def search_properties_with_ai(self, user_query, conversation_history=None, country='GLOBAL'):
         """Busca propiedades usando IA y datos reales de la base de datos."""
         
         for attempt in range(self.max_retries):
             try:
-                logger.info(f"[GeminiService] Intento {attempt + 1} - Buscando propiedades para: '{user_query}'")
+                logger.info(f"[GeminiService] Intento {attempt + 1} - Buscando propiedades para: '{user_query}' en país: {country}")
                 
                 # Crear prompt mejorado con contexto de propiedades reales
-                prompt = self._create_enhanced_prompt(user_query, conversation_history)
+                prompt = self._create_enhanced_prompt(user_query, conversation_history, country)
                 
                 # Preparar la solicitud a Gemini
                 headers = {
@@ -318,10 +324,10 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                                     # Si la IA no proporcionó recomendaciones válidas, construimos una lista basada en los filtros sugeridos (si existen)
                                     if ai_response.get('suggestedFilters'):
                                         search_filters = ai_response['suggestedFilters'].copy()
-                                        real_properties = self._search_properties(search_filters)
+                                        real_properties = self._search_properties(search_filters, country)
                                     else:
                                         # Como último recurso, hacemos una búsqueda básica utilizando el texto del usuario
-                                        real_properties = self._search_properties({'searchText': user_query})
+                                        real_properties = self._search_properties({'searchText': user_query}, country)
 
                                     generated_recommendations = []
                                     for prop in real_properties:
@@ -370,7 +376,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                             
                             # Crear respuesta de fallback con búsqueda básica
                             fallback_filters = self._extract_basic_filters(user_query)
-                            real_properties = self._search_properties(fallback_filters)
+                            real_properties = self._search_properties(fallback_filters, country)
                             
                             fallback_response = {
                                 'assistant_message': f"Procesé tu búsqueda y encontré {real_properties.count()} propiedades relacionadas.",
@@ -418,7 +424,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                 logger.error(f"[GeminiService] Error de conexión en intento {attempt + 1}: {e}")
                 if attempt == self.max_retries - 1:
                     # Último intento fallido, devolver búsqueda básica
-                    return self._create_fallback_response(user_query)
+                    return self._create_fallback_response(user_query, country)
                 
                 time.sleep(self.retry_delay)
                 continue
@@ -426,13 +432,13 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
             except Exception as e:
                 logger.error(f"[GeminiService] Error inesperado en intento {attempt + 1}: {e}")
                 if attempt == self.max_retries - 1:
-                    return self._create_fallback_response(user_query)
+                    return self._create_fallback_response(user_query, country)
                 
                 time.sleep(self.retry_delay)
                 continue
         
         # Si llegamos aquí, todos los intentos fallaron
-        return self._create_fallback_response(user_query)
+        return self._create_fallback_response(user_query, country)
 
     def _extract_basic_filters(self, user_query):
         """Extrae filtros básicos de la consulta del usuario sin usar IA."""
@@ -470,13 +476,13 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
         
         return filters
 
-    def _create_fallback_response(self, user_query):
+    def _create_fallback_response(self, user_query, country='GLOBAL'):
         """Crea una respuesta de fallback cuando Gemini no está disponible."""
-        logger.info(f"[GeminiService] Creando respuesta de fallback para: '{user_query}'")
+        logger.info(f"[GeminiService] Creando respuesta de fallback para: '{user_query}' en país {country}")
         
         # Usar filtros básicos para buscar propiedades
         basic_filters = self._extract_basic_filters(user_query)
-        properties = self._search_properties(basic_filters)
+        properties = self._search_properties(basic_filters, country)
         
         recommendations = []
         for prop in properties[:5]:
@@ -501,4 +507,4 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
             'recommendations': recommendations,
             'interpretation': f"Búsqueda procesada: {user_query}",
             'fallback': True
-        } 
+        }
