@@ -21,7 +21,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloseIcon from '@mui/icons-material/Close';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../services/api';
 import config from '../../config/environment';
 
@@ -100,6 +100,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
   const [error, setError] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const theme = useTheme();
 
   const chipSx = {
@@ -123,6 +124,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     setQuery(e.target.value);
     if (showResults) setShowResults(false);
     if (error) setError(null);
+    setIsInitialLoad(false);
   };
 
   const searchLocation = async (locationQuery) => {
@@ -160,6 +162,9 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     if (onSearchStart) {
       onSearchStart(searchTerm);
     }
+    
+    // Add smooth loading state transition
+    setIsInitialLoad(false);
 
     // QUICK HEURISTICS -------------------------------------------------
     const greetingRegex = /^(hola|buenas|hello|hi|qué tal|que tal|hey)(\s+.*)?$/i;
@@ -319,6 +324,27 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         onKeyPress={handleKeyPress}
         autoComplete="off"
         inputProps={{ autoComplete: 'off', name: 'ai-search-input' }}
+        InputProps={{
+          endAdornment: loading ? (
+            <InputAdornment position="end">
+              <CircularProgress size={20} sx={{ color: 'rgba(255,255,255,0.7)' }} />
+            </InputAdornment>
+          ) : (
+            <InputAdornment position="end">
+              <IconButton
+                onClick={handleSearch}
+                disabled={!query.trim()}
+                sx={{ 
+                  color: 'rgba(255,255,255,0.7)',
+                  '&:hover': { color: 'rgba(255,255,255,0.9)' },
+                  '&:disabled': { color: 'rgba(255,255,255,0.3)' }
+                }}
+              >
+                <SearchIcon />
+              </IconButton>
+            </InputAdornment>
+          )
+        }}
         sx={{
           '& .MuiOutlinedInput-root': {
             backgroundColor: 'rgba(255,255,255,0.18)',
@@ -327,14 +353,19 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             borderRadius: '12px',
             border: '1px solid rgba(255,255,255,0.25)',
             color: '#ffffff',
-            transition: 'box-shadow 0.35s ease',
+            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
             '& fieldset': { borderColor: 'transparent' },
             '&:hover fieldset': { borderColor: 'transparent' },
             '&.Mui-focused fieldset': { borderColor: 'transparent' },
             '&.Mui-focused': {
-              backgroundColor: 'rgba(255,255,255,0.18)',
-              boxShadow: '0 0 8px rgba(255,255,255,0.35)',
+              backgroundColor: 'rgba(255,255,255,0.22)',
+              boxShadow: '0 0 12px rgba(255,255,255,0.4)',
+              transform: 'translateY(-1px)',
             },
+            '&:hover': {
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              transform: 'translateY(-0.5px)',
+            }
           },
           input: { color: '#ffffff', '::placeholder': { color: 'rgba(255,255,255,0.75)' } },
         }}
@@ -349,23 +380,32 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
       )}
       
       {/* Show detailed results only for non-location types */}
-      {showResults && searchResult && searchResult.type !== 'location' && (
-        <Paper
-          elevation={0}
-          sx={{
-            position: 'absolute', 
-            width: '100%',
-            mt: 0.5,
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(14px)',
-            borderRadius: '16px',
-            border: '1px solid rgba(255,255,255,0.25)',
-            zIndex: 10,
-            maxHeight: 'calc(100vh - 200px)',
-            overflowY: 'auto',
-            boxShadow: theme.shadows[5]
-          }}
-        >
+      <AnimatePresence>
+        {showResults && searchResult && searchResult.type !== 'location' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            style={{ position: 'absolute', width: '100%', marginTop: '4px', zIndex: 10 }}
+          >
+            <Paper
+              elevation={0}
+              sx={{
+                backgroundColor: 'rgba(255,255,255,0.14)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255,255,255,0.3)',
+                maxHeight: 'calc(100vh - 200px)',
+                overflowY: 'auto',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+                '&::-webkit-scrollbar': { width: '6px' },
+                '&::-webkit-scrollbar-track': { background: 'rgba(255,255,255,0.1)', borderRadius: '3px' },
+                '&::-webkit-scrollbar-thumb': { background: 'rgba(255,255,255,0.3)', borderRadius: '3px' },
+                '&::-webkit-scrollbar-thumb:hover': { background: 'rgba(255,255,255,0.4)' }
+              }}
+            >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems:'center', pt: 1, pb:0.5, px: 2, borderBottom: '1px solid rgba(30, 41, 59, 0.2)' }}>
             <Typography variant="subtitle2" fontWeight="300" sx={{ color: '#c9d1d9' }}>
               {searchResult?.type === 'location' ? 'Ubicación Encontrada' :
@@ -495,9 +535,11 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                 </>
               );
             })()}
-          </Box>
-        </Paper>
-      )}
+            </Box>
+            </Paper>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Box>
   );
 };

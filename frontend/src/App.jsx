@@ -189,6 +189,10 @@ function App() {
   const handleSearchStart = () => {
     setAiSearchLoading(true);
     setAiSearchResult(null);
+    // Hide the intro overlay when search starts
+    if (mapRef.current?.hideIntroOverlay) {
+      mapRef.current.hideIntroOverlay();
+    }
   };
 
   const handleSearchComplete = (result) => {

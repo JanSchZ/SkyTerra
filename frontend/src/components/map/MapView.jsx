@@ -13,7 +13,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import config from '../../config/environment';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import PropertyPreviewModal from '../property/PropertyPreviewModal';
 import CloseIcon from '@mui/icons-material/Close';
 import PropertySidePreview from '../property/PropertySidePreview';
@@ -171,7 +171,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
     }
   }, [showOverlay, descriptiveTexts.length, disableIntroAnimation, userInteractedRef.current]);
 
-  // Ocultar overlay cuando la animación termine O el usuario interactúe
+  // Ocultar overlay cuando la animación termine O el usuario interactúe O cuando se active la búsqueda AI
   useEffect(() => {
     if (autoFlyCompleted || userInteractedRef.current) {
       const timer = setTimeout(() => {
@@ -180,6 +180,15 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
       return () => clearTimeout(timer);
     }
   }, [autoFlyCompleted, userInteractedRef.current, disableIntroAnimation]);
+
+  // Ocultar overlay inmediatamente cuando se detecta búsqueda AI
+  useEffect(() => {
+    if (appliedFilters && Object.keys(appliedFilters).length > 0) {
+      setShowOverlay(false);
+      setAutoFlyCompleted(true);
+      userInteractedRef.current = true;
+    }
+  }, [appliedFilters]);
 
   // Función para detener/omitir la animación de forma controlada
   const stopAndSkipAnimation = useCallback(() => {
@@ -1133,6 +1142,15 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
       };
 
       flyToNext();
+    },
+    hideIntroOverlay: () => {
+      setShowOverlay(false);
+      setAutoFlyCompleted(true);
+      userInteractedRef.current = true;
+      if (flightTimeoutIdRef.current) {
+        clearTimeout(flightTimeoutIdRef.current);
+        flightTimeoutIdRef.current = null;
+      }
     }
   }));
 
@@ -1372,24 +1390,26 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
         </Alert>
       </Snackbar>
 
-      {!disableIntroAnimation && showOverlay && (
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.05)',
-            backdropFilter: 'none',
-            WebkitBackdropFilter: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            pointerEvents: autoFlyCompleted ? 'none' : 'auto'
-          }}
-        >
+      <AnimatePresence>
+        {!disableIntroAnimation && showOverlay && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.05)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100,
+              pointerEvents: autoFlyCompleted ? 'none' : 'auto'
+            }}
+          >
           <Box
             sx={{
               textAlign: 'center',
@@ -1407,10 +1427,13 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           >
             <motion.div
               key={currentTextIndex}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.6 }}
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -15, scale: 0.95 }}
+              transition={{ 
+                duration: 0.5, 
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
             >
               <Typography
                 variant="h2"
@@ -1501,8 +1524,9 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               ))}
             </Box>
           </Box>
-        </Box>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <PropertyPreviewModal
         open={previewModalOpen}
