@@ -314,3 +314,9 @@ CSP_FRAME_ANCESTORS = ["'self'", "https://www.youtube.com"] # Ejemplo: permitir 
 
 # allauth settings for social authentication (Google, Apple, Twitter)
 SOCIALACCOUNT_ENABLED = True # Habilitar cuentas sociales
+
+# Cargar la clave de API de Google Gemini para búsquedas IA
+google_gemini_api = os.getenv('GOOGLE_GEMINI_API_KEY')
+if not google_gemini_api and DEBUG:
+    import logging; logging.warning('La variable de entorno GOOGLE_GEMINI_API_KEY no está configurada.')
+GOOGLE_GEMINI_API_KEY = google_gemini_api
