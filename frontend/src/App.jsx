@@ -46,7 +46,7 @@ import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
 import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
 import AdminAIPage from './components/admin/AdminAIPage.jsx';
-import IAManagementPage from './components/adminV2/IAManagementPage.jsx';
+import SamAdminPage from './components/admin/SamAdminPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
 import PricingPage from './components/pricing/PricingPage.jsx';
 import CheckoutPage from './components/checkout/CheckoutPage.jsx';
@@ -551,7 +551,7 @@ function App() {
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="properties" element={<PropertyApprovalPage />} />
         <Route path="tickets" element={<AdminTicketsPage />} />
-        <Route path="ai-management" element={<IAManagementPage />} />
+        <Route path="ai-management" element={<SamAdminPage />} />
         
         <Route path="users" element={<AdminUsersListPage />} />
         <Route path="coupons" element={<AdminCouponsPage />} />
@@ -716,7 +716,7 @@ function App() {
                             <MenuItem onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Aprobar Propiedades</MenuItem>
                             <MenuItem onClick={() => { navigate('/admin/tickets'); closeUserMenu(); }} sx={{ color: 'white' }}>Tickets de Soporte</MenuItem>
                             <MenuItem onClick={() => { navigate('/admin/users'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Usuarios</MenuItem>
-                            <MenuItem onClick={() => { navigate('/admin/ai-management'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar IA</MenuItem>
+                            <MenuItem onClick={() => { navigate('/admin/ai-management'); closeUserMenu(); }} sx={{ color: 'white' }}>Sam</MenuItem>
                           </>
                         ) : (
                           <>
