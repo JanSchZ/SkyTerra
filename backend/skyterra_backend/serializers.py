@@ -2,7 +2,9 @@ from django.contrib.auth.models import User
 from properties.models import Property
 from rest_framework import serializers
 from dj_rest_auth.serializers import LoginSerializer
+from dj_rest_auth.registration.serializers import RegisterSerializer
 from django.contrib.auth import authenticate
+from allauth.account.adapter import get_adapter
 
 class UserSerializer(serializers.ModelSerializer):
     property_count = serializers.SerializerMethodField()
@@ -58,3 +60,13 @@ class CustomLoginSerializer(LoginSerializer):
         
         attrs['user'] = user
         return attrs
+
+class CustomRegisterSerializer(RegisterSerializer):
+    # Override username and email to explicitly set required based on new allauth settings
+    # Assuming username is not required as per settings.ACCOUNT_USERNAME_REQUIRED = False
+    username = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, email):
+        email = get_adapter().clean_email(email)
+        return email

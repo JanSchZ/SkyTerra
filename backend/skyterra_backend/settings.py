@@ -53,17 +53,18 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',  # Requerido por allauth
+    'django.contrib.sites',
 
+    # Rest Framework
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',  # Para manejar CORS con el frontend
-    'django_filters',  # Añadimos django-filter
-    'storages',  # Soporte para AWS S3 y storage backends
-
-    # dj-rest-auth y allauth
     'dj_rest_auth',
     'dj_rest_auth.registration',
+    'corsheaders',
+    'django_filters',
+    'storages',
+
+    # allauth
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -79,6 +80,92 @@ INSTALLED_APPS = [
 
 SITE_ID = 1
 
+# URL del cliente para redirecciones (ej. desde Stripe)
+CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
+
+# Configuración de dj-rest-auth
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': 'jwt-access-token',
+    'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
+    'TOKEN_MODEL': None, # Disable default token (use JWT)
+    'LOGOUT_ON_PASSWORD_CHANGE': True,
+    'OLD_PASSWORD_FIELD_ENABLED': True,
+
+    # Serializers
+    'LOGIN_SERIALIZER': 'skyterra_backend.serializers.CustomLoginSerializer',
+    # Usa tu UserSerializer más detallado para el endpoint /user/
+    'USER_DETAILS_SERIALIZER': 'skyterra_backend.serializers.UserSerializer',
+    'REGISTER_SERIALIZER': 'skyterra_backend.serializers.CustomRegisterSerializer',
+    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_auth.serializers.PasswordChangeSerializer',
+    'PASSWORD_RESET_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetSerializer',
+    'TOKEN_SERIALIZER': 'dj_rest_auth.serializers.TokenSerializer',
+    'JWT_SERIALIZER': 'dj_rest_auth.serializers.JWTSerializer',
+    'VERIFY_EMAIL_SERIALIZER': 'dj_rest_auth.registration.serializers.VerifyEmailSerializer',
+
+    # Email and Password Reset
+    'EMAIL_VERIFICATION': 'mandatory', # This should match ACCOUNT_EMAIL_VERIFICATION
+    'PASSWORD_RESET_USE_SITES_DOMAIN': True,
+    'PASSWORD_RESET_CONFIRM_URL': CLIENT_URL + '/password-reset-confirm/{uid}/{token}/',
+    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons
+    'REST_AUTH_REGISTER_USES_ACCOUNT_EMAIL_VERIFICATION': True,
+}
+
+# allauth configuration
+# https://django-allauth.readthedocs.io/en/latest/configuration.html
+ACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomAccountAdapter'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
+ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SkyTerra] '
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'
+ACCOUNT_CHANGE_EMAIL = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_LOGIN_METHODS = ['email']
+ACCOUNT_SIGNUP_FIELDS = ['email', 'password'] # Now 'email' and 'password' are considered required by default for signup if not explicitly marked.
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_RATE_LIMITS = {'login_failed': '5/5m'} # Replaces deprecated login attempt settings
+ACCOUNT_FORMS = {
+    'signup': 'skyterra_backend.forms.CustomSignupForm',
+}
+
+# allauth social login
+SOCIALACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomSocialAccountAdapter'
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+            'key': ''
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'offline',
+        },
+        'VERIFIED_EMAIL': True
+    },
+    'apple': {
+        'APP': {
+            'client_id': os.getenv('APPLE_CLIENT_ID'),
+            'secret': os.getenv('APPLE_CLIENT_SECRET'),
+            'key': ''
+        },
+        'SCOPE': ['name', 'email'],
+    },
+    'twitter': {
+        'APP': {
+            'client_id': os.getenv('TWITTER_CLIENT_ID'),
+            'secret': os.getenv('TWITTER_CLIENT_SECRET'),
+            'key': ''
+        },
+    },
+}
+
 AUTHENTICATION_BACKENDS = [
     # allauth
     'allauth.account.auth_backends.AuthenticationBackend',
@@ -91,48 +178,14 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # Middleware de CORS
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'allauth.account.middleware.AccountMiddleware', # Middleware de allauth
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# Configuración de API Keys
-GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY', '')
-
-# Configuración de Stripe
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
-STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY')
-STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
-
-# URL del cliente para redirecciones (ej. desde Stripe)
-CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
-
-# Configuración de CORS
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-]
-
-# Permitir cualquier origen en modo DEBUG para simplificar el desarrollo con proxies
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-
-CORS_ALLOW_CREDENTIALS = True
-
-# Orígenes de confianza para peticiones POST (CSRF)
-# Es necesario para que el login desde el frontend funcione correctamente.
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:8000', # Añadido para el proxy de Vite
-]
-
-ROOT_URLCONF = 'skyterra_backend.urls'
+ROOT_URLCONF = "skyterra_backend.urls"
 
 TEMPLATES = [
     {
@@ -155,6 +208,7 @@ WSGI_APPLICATION = 'skyterra_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+
 # Usamos SQLite estándar para desarrollo
 DATABASES = {
     'default': {
@@ -162,6 +216,10 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # Password validation
@@ -248,120 +306,11 @@ ADMINS = [('Admin', os.getenv('ADMIN_EMAIL', 'admin@example.com'))] # For site a
 
 # ------------------------------------------------------------------
 # Security / Clickjacking – permitir incrustar tours (HTML) en iframe
-# ------------------------------------------------------------------
-# Necesitamos permitir que el frontend (que corre en un puerto/host distinto
-# durante el desarrollo) incruste los archivos HTML servidos desde /media/tours/
-# en un <iframe>.  Para ello configuramos X_FRAME_OPTIONS a 'ALLOWALL'.
-#
-# Si se desea un valor más restrictivo en producción (p.ej. 'SAMEORIGIN'), se
-# puede controlar con una variable de entorno X_FRAME_OPTIONS.
+X_FRAME_OPTIONS = 'SAMEORIGIN' # Solo permitir si es del mismo origen
+CSP_FRAME_ANCESTORS = ["'self'", "https://www.youtube.com"] # Ejemplo: permitir YouTube
+# Si quieres permitir todos los orígenes (menos seguro, pero puede ser necesario para iframes de terceros)
+# X_FRAME_OPTIONS = 'ALLOWALL' # ¡Usar con precaución!
+# CSP_FRAME_ANCESTORS = ["*"] # ¡Usar con precaución!
 
-X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'ALLOWALL')
-
-# Valor por defecto para claves primarias auto incrementales
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# REST Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        # 'rest_framework.permissions.IsAuthenticatedOrReadOnly', # Temporarily commented out
-        'rest_framework.permissions.AllowAny', # Temporarily added for debugging
-    ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
-}
-
-# Configuración de dj-rest-auth
-REST_AUTH = {
-    'USE_JWT': True,
-    'JWT_AUTH_COOKIE': 'jwt-access-token',
-    'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
-    'TOKEN_MODEL': None, # Disable default token (use JWT)
-    'LOGOUT_ON_PASSWORD_CHANGE': True,
-    'OLD_PASSWORD_FIELD_ENABLED': True,
-
-    # Serializers
-    'LOGIN_SERIALIZER': 'skyterra_backend.serializers.CustomLoginSerializer',
-    # Usa tu UserSerializer más detallado para el endpoint /user/
-    'USER_DETAILS_SERIALIZER': 'skyterra_backend.serializers.UserSerializer',
-    'REGISTER_SERIALIZER': 'dj_rest_auth.registration.serializers.RegisterSerializer',
-    'PASSWORD_CHANGE_SERIALIZER': 'dj_rest_auth.serializers.PasswordChangeSerializer',
-    'PASSWORD_RESET_SERIALIZER': 'dj_rest_auth.serializers.PasswordResetSerializer',
-    'TOKEN_SERIALIZER': 'dj_rest_auth.serializers.TokenSerializer',
-    'JWT_SERIALIZER': 'dj_rest_auth.serializers.JWTSerializer',
-    'VERIFY_EMAIL_SERIALIZER': 'dj_rest_auth.registration.serializers.VerifyEmailSerializer',
-
-    # Email and Password Reset
-    'EMAIL_VERIFICATION': 'mandatory', # This should match ACCOUNT_EMAIL_VERIFICATION
-    'PASSWORD_RESET_USE_SITES_DOMAIN': True,
-    'PASSWORD_RESET_CONFIRM_URL': CLIENT_URL + '/password-reset-confirm/{uid}/{token}/',
-    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons
-    'REST_AUTH_REGISTER_USES_ACCOUNT_EMAIL_VERIFICATION': True,
-}
-
-# Configuración de los campos de registro para dj-rest-auth
-# Esto es para alinearse con la nueva forma de allauth
-# Deprecated warning message suggests this
-ACCOUNT_SIGNUP_FIELDS = {
-    'email': {'required': True},
-    'password': {'required': True},
-}
-
-# allauth configuration
-# https://django-allauth.readthedocs.io/en/latest/configuration.html
-ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
-ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
-ACCOUNT_FORMS = {
-    'signup': 'skyterra_backend.forms.CustomSignupForm',
-}
-# New recommended settings for allauth:
-ACCOUNT_LOGIN_METHODS = ['email'] # Replaces ACCOUNT_AUTHENTICATION_METHOD
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'password'] # Define signup fields and mark email as required
-ACCOUNT_UNIQUE_EMAIL = True
-ACCOUNT_EMAIL_VERIFICATION = 'mandatory' # or 'optional', 'none'
-ACCOUNT_CONFIRM_EMAIL_ON_GET = True
-ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
-ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SkyTerra] '
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'
-ACCOUNT_CHANGE_EMAIL = True
-ACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomAccountAdapter'
-# allauth social login
-SOCIALACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomSocialAccountAdapter'
-ACCOUNT_RATE_LIMITS = {'login_failed': '5/5m'} # New recommended setting for rate limits
-SOCIALACCOUNT_PROVIDERS = {
-    'google': {
-        'APP': {
-            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
-            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
-            'key': ''
-        },
-        'SCOPE': [
-            'profile',
-            'email',
-        ],
-        'AUTH_PARAMS': {
-            'access_type': 'offline',
-        },
-        'VERIFIED_EMAIL': True
-    },
-    'apple': {
-        'APP': {
-            'client_id': os.getenv('APPLE_CLIENT_ID'),
-            'secret': os.getenv('APPLE_CLIENT_SECRET'),
-            'key': ''
-        },
-        'SCOPE': ['name', 'email'],
-    },
-    'twitter': {
-        'APP': {
-            'client_id': os.getenv('TWITTER_CLIENT_ID'),
-            'secret': os.getenv('TWITTER_CLIENT_SECRET'),
-            'key': ''
-        },
-    },
-}
+# allauth settings for social authentication (Google, Apple, Twitter)
+SOCIALACCOUNT_ENABLED = True # Habilitar cuentas sociales

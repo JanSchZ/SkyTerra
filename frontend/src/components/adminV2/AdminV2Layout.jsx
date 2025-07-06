@@ -138,4 +138,4 @@ function AdminV2Layout() {
   );
 }
 
-export default AdminV2Layout; 
+export default AdminV2Layout;

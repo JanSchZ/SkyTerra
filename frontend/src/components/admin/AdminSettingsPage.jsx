@@ -85,4 +85,4 @@ const AdminSettingsPage = () => {
     );
 };
 
-export default AdminSettingsPage; 
+export default AdminSettingsPage;

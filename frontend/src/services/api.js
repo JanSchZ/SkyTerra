@@ -620,6 +620,38 @@ export const propertyService = {
   },
 };
 
+// Servicio para la administración de Sam (IA)
+export const aiManagementService = {
+  // Obtener el estado y los logs de Sam
+  async getStatus() {
+    const response = await api.get('/sam/status/');
+    return response.data;
+  },
+
+  // Obtener los modelos de IA configurados
+  async getModels() {
+    const response = await api.get('/sam/models/');
+    return response.data;
+  },
+
+  // Crear un nuevo modelo de IA
+  async createModel(modelData) {
+    const response = await api.post('/sam/models/', modelData);
+    return response.data;
+  },
+
+  // Actualizar un modelo de IA
+  async updateModel(id, modelData) {
+    const response = await api.put(`/sam/models/${id}/`, modelData);
+    return response.data;
+  },
+
+  // Eliminar un modelo de IA
+  async deleteModel(id) {
+    await api.delete(`/sam/models/${id}/`);
+  },
+};
+
 // Servicio para tours 360°
 export const tourService = {
   // Obtener tours de una propiedad
@@ -788,4 +820,5 @@ export default {
   savedSearch: savedSearchService,
   favorites: favoritesService,
   compare: compareService,
+  aiManagement: aiManagementService,
 };

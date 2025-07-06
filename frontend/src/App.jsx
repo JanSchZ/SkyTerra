@@ -46,6 +46,7 @@ import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
 import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
 import AdminAIPage from './components/admin/AdminAIPage.jsx';
+import IAManagementPage from './components/adminV2/IAManagementPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
 import PricingPage from './components/pricing/PricingPage.jsx';
 import CheckoutPage from './components/checkout/CheckoutPage.jsx';
@@ -546,7 +547,7 @@ function App() {
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="properties" element={<PropertyApprovalPage />} />
         <Route path="tickets" element={<AdminTicketsPage />} />
-        <Route path="ai-management" element={<AdminAIPage />} />
+        <Route path="ai-management" element={<IAManagementPage />} />
         
         <Route path="users" element={<AdminUsersListPage />} />
         <Route path="coupons" element={<AdminCouponsPage />} />

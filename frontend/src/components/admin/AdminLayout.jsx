@@ -9,6 +9,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import SmartToyIcon from '@mui/icons-material/SmartToy'; // Importar el nuevo ícono
 
 const drawerWidth = 240;
 const collapsedDrawerWidth = 60;
@@ -19,6 +20,7 @@ const menuItems = [
     { text: 'Tickets', icon: <ConfirmationNumberIcon />, path: '/admin/tickets' },
     { text: 'Cupones', icon: <LocalOfferIcon />, path: '/admin/coupons' },
     { text: 'Usuarios', icon: <PeopleIcon />, path: '/admin/users' },
+    { text: 'Gestionar IA', icon: <SmartToyIcon />, path: '/admin/ai-management' }, // Añadir nueva opción de menú
     { text: 'Ajustes', icon: <SettingsIcon />, path: '/admin/settings' },
 ];
 
@@ -113,4 +115,4 @@ const AdminLayout = () => {
     );
 };
 
-export default AdminLayout; 
+export default AdminLayout;
