@@ -107,15 +107,24 @@ REST_AUTH = {
     'EMAIL_VERIFICATION': 'mandatory', # This should match ACCOUNT_EMAIL_VERIFICATION
     'PASSWORD_RESET_USE_SITES_DOMAIN': True,
     'PASSWORD_RESET_CONFIRM_URL': CLIENT_URL + '/password-reset-confirm/{uid}/{token}/',
-    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons
-    'REST_AUTH_REGISTER_USES_ACCOUNT_EMAIL_VERIFICATION': True,
+    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons    
+}
+
+# Configuración de Django Rest Framework para usar JWT por defecto
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
 }
 
 # allauth configuration
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomAccountAdapter'
-ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_EMAIL_REQUIRED = True  # Required when EMAIL_VERIFICATION is 'mandatory'
 ACCOUNT_CONFIRM_EMAIL_ON_GET = True
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
 ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SkyTerra] '
@@ -123,8 +132,9 @@ ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'
 ACCOUNT_CHANGE_EMAIL = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
-ACCOUNT_LOGIN_METHODS = ['email']
-ACCOUNT_SIGNUP_FIELDS = ['email', 'password'] # Now 'email' and 'password' are considered required by default for signup if not explicitly marked.
+ACCOUNT_LOGIN_METHODS = ['email']  # New recommended setting for login method
+# The ACCOUNT_SIGNUP_FIELDS setting is deprecated and has been removed.
+# Custom signup logic is handled by the form specified in ACCOUNT_FORMS.
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_RATE_LIMITS = {'login_failed': '5/5m'} # Replaces deprecated login attempt settings
 ACCOUNT_FORMS = {
@@ -178,7 +188,8 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    "django.middleware.common.CommonMiddleware",
+    'django.contrib.sites.middleware.CurrentSiteMiddleware',  # required for sites framework
+    'django.middleware.common.CommonMiddleware',
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

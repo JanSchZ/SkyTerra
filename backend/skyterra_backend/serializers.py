@@ -64,8 +64,8 @@ class CustomLoginSerializer(LoginSerializer):
 class CustomRegisterSerializer(RegisterSerializer):
     # Override username and email to explicitly set required based on new allauth settings
     # Assuming username is not required as per settings.ACCOUNT_USERNAME_REQUIRED = False
-    username = serializers.CharField(required=False, allow_blank=True)
-    email = serializers.EmailField(required=True)
+    # username = serializers.CharField(required=False, allow_blank=True) # Removed to let allauth manage
+    # email = serializers.EmailField(required=True) # Removed to let allauth manage
 
     def validate_email(self, email):
         email = get_adapter().clean_email(email)

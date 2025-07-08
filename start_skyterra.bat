@@ -16,9 +16,17 @@ IF NOT EXIST "%BACKEND_DIR%" (
     exit /b 1
 )
 
+cd /d "%BACKEND_DIR%"
+IF NOT EXIST ".venv\Scripts\activate" (
+    echo Error: El entorno virtual no se encontro en "%BACKEND_DIR%\.venv"
+    echo Por favor, ejecute 'python -m venv .venv' en la carpeta 'backend' y luego 'pip install -r requirements.txt'.
+    pause
+    exit /b 1
+)
+
 REM La opción "start" abre el comando en una nueva ventana y permite que el script continúe.
 REM Usa "cmd /k" para mantener la ventana abierta después de ejecutar el comando.
-start "SkyTerra Backend" cmd /k "cd /d "%BACKEND_DIR%" && .\.venv\Scripts\activate && python manage.py runserver"
+start "SkyTerra Backend" cmd /k ".\.venv\\Scripts\\python.exe manage.py runserver 127.0.0.1:8000"
 
 REM Dar un momento para que el backend inicie (opcional, ajusta según sea necesario)
 timeout /t 5 /nobreak
@@ -33,4 +41,4 @@ IF NOT EXIST "%FRONTEND_DIR%" (
 )
 start "SkyTerra Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm.cmd run dev"
 
-echo SkyTerra ha sido iniciado. Se abrieron dos ventanas separadas.  
+echo SkyTerra ha sido iniciado. Se abrieron dos ventanas separadas.

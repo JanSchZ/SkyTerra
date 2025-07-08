@@ -96,27 +96,27 @@ api.interceptors.response.use(
       message: error.message
     });
 
-    // Manejo global de error 401: limpiar localStorage y redirigir a login
+    // Manejo global de error 401: limpiar localStorage y redirigir a login solo si es necesario
     if (error.response && error.response.status === 401) {
       // Evitar bucles de redirección si ya estamos en /login o la petición es de login
       const isLoginAttempt = error.config?.url?.endsWith('/auth/login/');
+      const isAuthCheck = error.config?.url?.endsWith('/auth/user/');
       const isCurrentlyOnLoginPage = window.location.pathname === '/login';
+      const isCurrentlyOnLandingPage = window.location.pathname === '/';
 
-      if (!isLoginAttempt && !isCurrentlyOnLoginPage) {
+      if (!isLoginAttempt && !isCurrentlyOnLoginPage && !isCurrentlyOnLandingPage && !isAuthCheck) {
         console.warn('[401 Unauthorized]', 'Token inválido o expirado. Limpiando sesión y redirigiendo a login.');
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
         
-        // Para asegurar que la redirección ocurra después de que el estado se actualice
-        // y evitar problemas con el router dentro del interceptor, usamos un pequeño delay.
-        // Idealmente, esto se manejaría con un sistema de pub/sub o un estado global
-        // que indique que la sesión ha expirado y los componentes reaccionen a ello.
+        // Solo redirigir si estamos en una página que requiere autenticación
         if (window.location.pathname !== '/login') {
-           window.location.href = '/login'; // Redirección completa para limpiar estado de la app
+           window.location.href = '/login';
         }
       } else if (isLoginAttempt) {
         console.error('[Login Failed]', 'Intento de login fallido con 401.', error.response.data);
       }
+      // Si es una verificación de auth (/auth/user/) o estamos en landing/login, no hacer nada especial
     }
 
     return Promise.reject(error);
@@ -330,6 +330,13 @@ export const authService = {
 
   // Verificar el estado de autenticación con el backend
   async checkAuthStatus() {
+    // Primero verificar si hay un usuario en localStorage
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      // No hay usuario guardado, no hacer llamada al backend
+      return null;
+    }
+    
     try {
       const response = await api.get('/auth/user/'); // Endpoint para obtener detalles del usuario actual
       if (response.data) {
@@ -338,7 +345,10 @@ export const authService = {
       }
       return null;
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      // Si hay error 401, no mostrar como error en consola ya que es esperado cuando no hay sesión
+      if (error.response?.status !== 401) {
+        console.error('Error checking auth status:', error);
+      }
       localStorage.removeItem('user'); // Limpiar si la sesión no es válida
       return null;
     }
@@ -346,7 +356,8 @@ export const authService = {
 
   // Verificar si hay sesión activa
   isAuthenticated() {
-    return !!localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem('user');
+    return !!userStr;
   },
 
   // Actualizar perfil de usuario
@@ -379,6 +390,11 @@ export const authService = {
         throw new Error('Error de conexión con el servidor.');
       }
     }
+  },
+
+  // Método para obtener la URL base de la API
+  getBaseURL() {
+    return baseURL;
   },
 };
 

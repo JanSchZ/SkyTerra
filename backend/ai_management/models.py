@@ -1,94 +1,69 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 
 class AIModel(models.Model):
-    MODEL_CHOICES = [
-        ('gemini-2.0-flash', 'Gemini 2.0 Flash'),
-        ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
-        ('gemini-2.5-pro', 'Gemini 2.5 Pro'),
-    ]
-
-    name = models.CharField(max_length=50, choices=MODEL_CHOICES, unique=True)
-    api_name = models.CharField(max_length=100, help_text="API endpoint name for this model")
-    price_per_1k_tokens_input = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
-    price_per_1k_tokens_output = models.DecimalField(max_digits=10, decimal_places=6, default=0.0)
-    system_prompt = models.TextField(blank=True, help_text="Default system prompt for Sam")
-    is_active = models.BooleanField(default=True)
-    max_tokens = models.IntegerField(default=65536, help_text="Maximum output tokens")
-    supports_thinking = models.BooleanField(default=False, help_text="Model supports thinking capabilities")
+    name = models.CharField(max_length=100, unique=True, help_text='Nombre descriptivo para el modelo (ej. Gemini 2.5 Pro)')
+    api_name = models.CharField(max_length=100, unique=True, help_text='Nombre del modelo usado en la API de Google (ej. gemini-1.5-pro-latest)')
+    price_per_1k_tokens_input = models.DecimalField(max_digits=10, decimal_places=6, help_text='Costo por 1000 tokens de entrada (prompt)')
+    price_per_1k_tokens_output = models.DecimalField(max_digits=10, decimal_places=6, help_text='Costo por 1000 tokens de salida (respuesta)')
+    system_prompt = models.TextField(blank=True, help_text='Instrucción de sistema por defecto para este modelo.')
+    max_tokens = models.PositiveIntegerField(default=8192, help_text='Máximo de tokens que el modelo puede procesar en una sola llamada.')
+    supports_thinking = models.BooleanField(default=False, help_text='Indica si el modelo soporta la función de "pensamiento" o tool-calling.')
+    is_active = models.BooleanField(default=True, help_text='Si está activo, puede ser seleccionado en la configuración.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.get_name_display()
+        return self.name
 
 class SamConfiguration(models.Model):
-    """Global configuration for Sam AI assistant"""
-    is_enabled = models.BooleanField(default=True, help_text="Enable/disable Sam globally")
-    current_model = models.ForeignKey(AIModel, on_delete=models.SET_NULL, null=True, blank=True, help_text="Currently selected model for Sam")
-    custom_instructions = models.TextField(blank=True, help_text="Custom instructions for Sam behavior")
-    max_conversation_history = models.IntegerField(default=10, help_text="Maximum conversation history to maintain")
-    response_temperature = models.FloatField(default=0.7, help_text="Response creativity (0.0-1.0)")
+    is_enabled = models.BooleanField(default=True, help_text='Activa o desactiva globalmente el asistente Sam.')
+    current_model = models.ForeignKey(AIModel, on_delete=models.SET_NULL, null=True, blank=True, help_text='El modelo de IA que Sam usará para responder.')
+    custom_instructions = models.TextField(
+        blank=True,
+        default='Eres Sam, el asistente de IA de SkyTerra. Ayudas a los usuarios a encontrar propiedades y responder preguntas sobre bienes raíces.',
+        help_text='Instrucciones personalizadas para el asistente de IA.'
+    )
+    max_history_messages = models.PositiveSmallIntegerField(
+        default=10,
+        help_text='Número máximo de mensajes (usuario + asistente) a retener en el historial de la conversación. Un número par es recomendado.'
+    )
+    response_temperature = models.FloatField(
+        default=0.7,
+        help_text='Controla la aleatoriedad de la respuesta. Valores más altos (ej. 1.0) son más creativos, valores más bajos (ej. 0.2) son más deterministas.'
+    )
     updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-
-    class Meta:
-        verbose_name = "Sam Configuration"
-        verbose_name_plural = "Sam Configuration"
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sam_configs_updated'
+    )
 
     def __str__(self):
-        return f"Sam Configuration (Model: {self.current_model.get_name_display() if self.current_model else 'None'})"
-
-    def save(self, *args, **kwargs):
-        # Ensure only one configuration exists
-        if not self.pk and SamConfiguration.objects.exists():
-            raise ValueError("Only one Sam configuration can exist")
-        super().save(*args, **kwargs)
+        return "Configuración de Sam"
 
     @classmethod
     def get_config(cls):
-        """Get or create the Sam configuration"""
-        config, created = cls.objects.get_or_create(
-            pk=1,
-            defaults={
-                'is_enabled': True,
-                'custom_instructions': 'Eres Sam, el asistente de IA de SkyTerra. Ayudas a los usuarios a encontrar propiedades y responder preguntas sobre bienes raíces.',
-                'max_conversation_history': 10,
-                'response_temperature': 0.7,
-            }
-        )
-        
-        # Set default model to 2.0-flash if no model is configured
-        if created or not config.current_model:
-            try:
-                default_model = AIModel.objects.filter(name='gemini-2.0-flash', is_active=True).first()
-                if default_model:
-                    config.current_model = default_model
-                    config.save()
-            except Exception:
-                pass  # In case models table doesn't exist yet
-        
-        return config
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    class Meta:
+        verbose_name = "Configuración de Sam"
+        verbose_name_plural = "Configuraciones de Sam"
 
 class AIUsageLog(models.Model):
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    model_used = models.ForeignKey(AIModel, on_delete=models.CASCADE)
-    request_type = models.CharField(max_length=50, default='chat', help_text="Type of request (chat, search, etc.)")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    model_used = models.ForeignKey(AIModel, on_delete=models.PROTECT)
+    request_type = models.CharField(max_length=50, default='chat', help_text='Tipo de solicitud (ej. chat, search, summarization)')
     tokens_input = models.PositiveIntegerField()
     tokens_output = models.PositiveIntegerField()
     cost = models.DecimalField(max_digits=10, decimal_places=6)
-    response_time_ms = models.PositiveIntegerField(null=True, blank=True, help_text="Response time in milliseconds")
+    response_time_ms = models.PositiveIntegerField(help_text='Tiempo de respuesta en milisegundos.')
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
-    success = models.BooleanField(default=True, help_text="Whether the request was successful")
-    error_message = models.TextField(blank=True, help_text="Error message if request failed")
-
-    class Meta:
-        ordering = ['-timestamp']
-        indexes = [
-            models.Index(fields=['timestamp']),
-            models.Index(fields=['model_used']),
-            models.Index(fields=['user']),
-        ]
 
     def __str__(self):
-        return f"Usage of {self.model_used.get_name_display()} by {self.user.username if self.user else 'Anonymous'} at {self.timestamp}"
+        return f"Log de {self.model_used.name} a las {self.timestamp}"

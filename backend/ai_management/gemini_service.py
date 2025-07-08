@@ -139,7 +139,7 @@ Instrucciones específicas:
         
         # Add conversation history if provided
         if conversation_history:
-            for msg in conversation_history[-self.sam_config.max_conversation_history:]:
+            for msg in conversation_history[-self.sam_config.max_history_messages:]:
                 messages.append({"role": msg.get("role", "user"), "parts": [{"text": msg.get("content", "")}]})
         
         # Add current user message
@@ -175,7 +175,7 @@ Instrucciones específicas:
         # Make the request with retries
         for attempt in range(self.max_retries):
             try:
-                logger.info(f"[SamService] Enviando solicitud a {model.get_name_display()}, intento {attempt + 1}/{self.max_retries}")
+                logger.info(f"[SamService] Enviando solicitud a {model.name}, intento {attempt + 1}/{self.max_retries}")
                 
                 response = requests.post(url, json=request_data, headers=headers, params=params, timeout=30)
                 response_time_ms = int((time.time() - start_time) * 1000)
@@ -210,7 +210,7 @@ Instrucciones específicas:
                             
                             return {
                                 'response': generated_text,
-                                'model_used': model.get_name_display(),
+                                'model_used': model.name,
                                 'tokens_input': int(tokens_input),
                                 'tokens_output': int(tokens_output),
                                 'cost': cost,

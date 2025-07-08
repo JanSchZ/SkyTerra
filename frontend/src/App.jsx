@@ -129,15 +129,25 @@ function App() {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const currentUser = await authService.checkAuthStatus(); // Use the new method
+        // Primero verificar si hay indicios de sesión antes de hacer llamada al backend
+        const localUser = localStorage.getItem('user');
+        if (!localUser) {
+          // No hay usuario en localStorage, no hacer llamada al backend
+          setUser(null);
+          setLoadingAuth(false);
+          return;
+        }
+
+        // Solo si hay usuario en localStorage, verificar con el backend
+        const currentUser = await authService.checkAuthStatus();
         if (currentUser) {
           setUser(currentUser);
         } else {
-          setUser(null); // Ensure user is null if not authenticated
+          setUser(null);
         }
       } catch (error) {
         console.error("Failed to verify user session with backend:", error);
-        setUser(null); // Ensure user is null on error
+        setUser(null);
       } finally {
         setLoadingAuth(false);
       }
@@ -535,8 +545,14 @@ function App() {
           </motion.div>
         } 
       />
-      <Route path="/login" element={<AuthPage formType="login" onLogin={handleLogin} onRegister={handleRegister} onGoogleLoginSuccess={handleGoogleLoginSuccess} onGoogleLoginError={handleGoogleLoginError} onTwitterLoginSuccess={handleXLoginSuccess} onTwitterLoginError={handleXLoginError} onAppleLoginSuccess={handleAppleLoginSuccess} />} />
-      <Route path="/register" element={<AuthPage formType="register" onLogin={handleLogin} onRegister={handleRegister} onGoogleLoginSuccess={handleGoogleLoginSuccess} onGoogleLoginError={handleGoogleLoginError} onTwitterLoginSuccess={handleXLoginSuccess} onTwitterLoginError={handleXLoginError} onAppleLoginSuccess={handleAppleLoginSuccess} />} />
+      <Route path="/login" element={<AuthPage onLogin={handleLogin} />} />
+      <Route path="/auth" element={<AuthPage onLogin={handleLogin} />} />
+      <Route path="/landing" element={
+        <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+          <LandingV2 />
+        </motion.div>
+      } />
+      <Route path="/map" element={<ProtectedRoute user={user} element={<MapView />} />} />
       <Route path="/property/:id" element={<PropertyDetails user={user?.user || user} />} />
       <Route path="/tour/:tourId" element={<TourViewer />} />
       <Route path="/compare" element={<ProtectedRoute user={user} element={<CompareView />} />} />
@@ -570,9 +586,33 @@ function App() {
   );
 
   return (
-    <AuthContext.Provider value={{ user, handleLogin, handleRegister, handleLogout, handleGoogleLoginSuccess, handleGoogleLoginError, handleXLoginSuccess, handleXLoginError, handleAppleLoginSuccess }}>
-      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-        <div className="App">
+    <AuthContext.Provider 
+      value={{ 
+        currentUser: user, 
+        isAuthenticated: !!user, 
+        loading: loadingAuth,
+        handleLogin, 
+        handleRegister, 
+        handleLogout, 
+        handleGoogleLoginSuccess, 
+        handleGoogleLoginError, 
+        handleXLoginSuccess, 
+        handleXLoginError, 
+        handleAppleLoginSuccess 
+      }}
+    >
+      <AnimatePresence mode="wait">
+        <Box
+          className="App"
+          sx={{
+            position: 'relative',
+            minHeight: '100vh',
+            backgroundColor: '#0d1117',
+            color: '#e0e0e0',
+            fontFamily: 'Poppins, sans-serif',
+            overflowX: 'hidden',
+          }}
+        >
           {/* UI principal siempre visible (Header Minimalista, etc.) */}
           {/* Condición para no mostrar en property, tour, o dashboard */}
           {showTopBar && (
@@ -778,8 +818,8 @@ function App() {
              onFollowUpQuery={handleFollowUpQuery}
              currentQuery={aiSearchResult?.interpretation}
           />
-        </div>
-      </GoogleOAuthProvider>
+        </Box>
+      </AnimatePresence>
     </AuthContext.Provider>
   );
 }
