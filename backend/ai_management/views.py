@@ -20,6 +20,23 @@ class AIModelViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(active_models, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['post'])
+    def populate_defaults(self, request):
+        """Populate default AI models"""
+        try:
+            default_models_data = [
+                {"name": "Gemini 1.0 Pro", "api_name": "gemini-pro", "input_cost_per_1k_tokens": 0.0001, "output_cost_per_1k_tokens": 0.0002, "max_tokens": 32768, "is_active": True, "is_thinking_model": False},
+                {"name": "Gemini 1.5 Flash", "api_name": "gemini-1.5-flash-latest", "input_cost_per_1k_tokens": 0.00035, "output_cost_per_1k_tokens": 0.0005, "max_tokens": 1048576, "is_active": True, "is_thinking_model": True},
+                {"name": "Gemini 1.5 Pro", "api_name": "gemini-1.5-pro-latest", "input_cost_per_1k_tokens": 0.0035, "output_cost_per_1k_tokens": 0.007, "max_tokens": 1048576, "is_active": True, "is_thinking_model": True},
+            ]
+
+            for model_data in default_models_data:
+                AIModel.objects.update_or_create(api_name=model_data['api_name'], defaults=model_data)
+            
+            return Response({"message": "Default AI models populated successfully."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class AIUsageLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AIUsageLog.objects.all()
     serializer_class = AIUsageLogSerializer

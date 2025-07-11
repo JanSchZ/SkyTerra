@@ -55,8 +55,6 @@ import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
 import Login from './components/auth/Login';
 import './App.css';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
   mode: 'light',
