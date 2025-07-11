@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model # Import get_user_model
 from django.conf import settings # Alternative for AUTH_USER_MODEL
 from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite
 import json
+from payments.models import Subscription
 
 User = get_user_model()
 
@@ -151,8 +152,14 @@ class PropertySerializer(serializers.ModelSerializer):
         
     def get_plusvalia_score(self, obj):
         request = self.context.get('request')
-        if request and request.user and request.user.is_staff:
-            return obj.plusvalia_score
+        if request and request.user.is_authenticated:
+            # Check if the user has an active 'pro' subscription
+            try:
+                # Assuming 'active' status means 'Pro' subscription
+                if Subscription.objects.filter(user=request.user, status='active').exists():
+                    return obj.plusvalia_score
+            except Subscription.DoesNotExist:
+                pass # No subscription found
         return None
 
 class PropertyListSerializer(serializers.ModelSerializer):
@@ -170,8 +177,14 @@ class PropertyListSerializer(serializers.ModelSerializer):
 
     def get_plusvalia_score(self, obj):
         request = self.context.get('request')
-        if request and request.user and request.user.is_staff:
-            return obj.plusvalia_score
+        if request and request.user.is_authenticated:
+            # Check if the user has an active 'pro' subscription
+            try:
+                # Assuming 'active' status means 'Pro' subscription
+                if Subscription.objects.filter(user=request.user, status='active').exists():
+                    return obj.plusvalia_score
+            except Subscription.DoesNotExist:
+                pass # No subscription found
         return None
 
 class PropertyPreviewSerializer(serializers.ModelSerializer):
