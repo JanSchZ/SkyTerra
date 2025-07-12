@@ -38,6 +38,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { propertyService, tourService, imageService, authService, favoritesService } from '../../services/api';
+import config from '../../config/environment';
 import MapView from '../map/MapView';
 import axios from 'axios';
 import Pano2VRViewer from '../tours/Pano2VRViewer';
@@ -175,7 +176,7 @@ const PropertyDetails = () => {
         
         // Cargar imágenes reales
         try {
-          const actualImages = await imageService.getPropertyImages(id);
+          const actualImages = await imageService.getImages(id);
           setImages(actualImages.results || actualImages || []);
         } catch (imageError) {
           console.warn('No se pudieron cargar las imágenes para la propiedad:', imageError);

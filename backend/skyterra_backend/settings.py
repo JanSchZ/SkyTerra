@@ -317,7 +317,10 @@ ADMINS = [('Admin', os.getenv('ADMIN_EMAIL', 'admin@example.com'))] # For site a
 
 # ------------------------------------------------------------------
 # Security / Clickjacking – permitir incrustar tours (HTML) en iframe
-X_FRAME_OPTIONS = 'SAMEORIGIN' # Solo permitir si es del mismo origen
+if DEBUG:
+    X_FRAME_OPTIONS = 'ALLOWALL'  # Permitir iframes en desarrollo
+else:
+    X_FRAME_OPTIONS = 'SAMEORIGIN' # Solo permitir si es del mismo origen en producción
 CSP_FRAME_ANCESTORS = ["'self'", "https://www.youtube.com"] # Ejemplo: permitir YouTube
 # Si quieres permitir todos los orígenes (menos seguro, pero puede ser necesario para iframes de terceros)
 # X_FRAME_OPTIONS = 'ALLOWALL' # ¡Usar con precaución!
