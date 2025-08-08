@@ -92,6 +92,14 @@ This log tracks the systematic audit and improvement of the SkyTerra platform. E
     - **Cache strategy:** Redis como cache principal, configurado para AWS ElastiCache.
     - **Database:** settings preparados para AWS RDS con `DATABASE_URL`.
 
+### Issues Identificados (2025-08-07 22:45)
+
+- [x] **(Dev Server HTTPS Error - FIXED):** Django development server solo soporta HTTP pero frontend intentaba HTTPS:
+    - **Error:** "You're accessing the development server over HTTPS, but it only supports HTTP"
+    - **Causa:** Vite proxy config tenía `secure: true` forzando validación SSL en desarrollo
+    - **Fix aplicado:** `frontend/vite.config.js` → `secure: false` para permitir HTTP en desarrollo local
+    - **Estado:** Ambos servidores levantados (backend :8000, frontend :3000) con proxy HTTP correcto
+
 - [x] **(Payments) Bitcoin autocustodia con BTCPay Server (estándar abierto):**
     - Backend: nuevos modelos `BTCPayInvoice` y `BTCPayEvent` para auditoría e idempotencia.
     - Endpoints:

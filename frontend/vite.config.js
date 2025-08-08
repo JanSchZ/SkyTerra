@@ -13,7 +13,7 @@ export default defineConfig({
           ? `https://${process.env.CODESPACE_NAME}-8000.app.github.dev`
           : 'http://localhost:8000',
         changeOrigin: true,
-        secure: true,
+        secure: false, // Allow HTTP in development
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('proxy error', err);
