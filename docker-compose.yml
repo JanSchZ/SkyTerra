@@ -1,0 +1,60 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: skyterra
+      POSTGRES_PASSWORD: skyterra_dev_password
+      POSTGRES_DB: skyterra
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyterra"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis para caché (recomendado para producción)
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SkyTerra Backend (Django)
+  web:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://skyterra:skyterra_dev_password@db:5432/skyterra
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=False
+      - SECRET_KEY=your-secret-key-here-change-in-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/media:/app/media
+      - ./backend/logs:/app/logs
+
+volumes:
+  pgdata:
+  redisdata:

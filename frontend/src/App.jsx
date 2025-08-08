@@ -344,7 +344,7 @@ function App() {
   const handleGoogleLoginSuccess = async (response) => {
     console.log('Google login success response:', response);
     try {
-      const authData = await authService.googleLogin(response.credential);
+      const authData = await authService.googleLogin(response);
       const user = authData.user;
       setUser(user);
       setSnackbarMessage('¡Inicio de sesión con Google exitoso! Bienvenido.');

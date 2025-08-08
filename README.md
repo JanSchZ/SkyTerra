@@ -160,11 +160,17 @@ This script will start both services in the background and attempt to open the f
 
 If you prefer to start services manually or need more control:
 
+*   **Terminal 0 (Docker Postgres, optional):**
+    ```bash
+    docker compose up -d db
+    ```
 *   **Terminal 1 (Backend):**
     ```bash
     cd backend
     # Activate virtual environment (e.g., .venv\Scripts\activate or source .venv/bin/activate)
-    python manage.py runserver
+     # (optional) point to local Postgres
+     # set DATABASE_URL=postgres://skyterra:skyterra@localhost:5432/skyterra
+     python manage.py runserver 0.0.0.0:8000
     ```
 *   **Terminal 2 (Frontend):**
     ```bash
@@ -172,7 +178,7 @@ If you prefer to start services manually or need more control:
     npm run dev
     ```
 
-The backend will typically run on `http://127.0.0.1:8000/` and the frontend on `http://localhost:5173/` (or `http://localhost:3000/`).
+The backend will typically run on `http://127.0.0.1:8000/` and the frontend on `http://localhost:3000/` (or `http://localhost:5173/`). In local dev the frontend talks to the backend via the Vite dev proxy (`/api`) to avoid CORS/SSL issues.
 
 ## Testing
 

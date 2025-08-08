@@ -44,18 +44,10 @@ const CheckoutPage = () => {
     setPaymentLoading(true);
     setError('');
 
-    if (!plan || !plan.priceId) {
-      setError('Error: No se ha seleccionado un plan válido con un ID de precio.');
-      setPaymentLoading(false);
-      return;
-    }
-
     try {
-      const response = await api.post('/payments/create-checkout-session/', {
-        priceId: plan.priceId,
-        // Opcional: podrías pasar un ID de cupón de Stripe aquí si tu lógica de cupones lo soporta
-        // couponId: coupon ? coupon.stripe_id : null,
-      });
+      const payload = {};
+      if (plan && plan.priceId) payload.priceId = plan.priceId;
+      const response = await api.post('/payments/create-checkout-session/', payload);
 
       const session = response.data;
       const stripe = await stripePromise;
@@ -66,6 +58,23 @@ const CheckoutPage = () => {
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Error al procesar el pago.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleBitcoinPayment = async () => {
+    setPaymentLoading(true);
+    setError('');
+    try {
+      // Coinbase Commerce para Bitcoin (empresa establecida con compliance)
+      const usdAmount = 10; // TODO: mapear plan.price -> USD real si corresponde
+      const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
+      const response = await api.post('/payments/bitcoin/create-charge/', payload);
+      const { hostedUrl } = response.data;
+      window.location.href = hostedUrl;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Error al procesar pago con Bitcoin.');
     } finally {
       setPaymentLoading(false);
     }
@@ -131,6 +140,17 @@ const CheckoutPage = () => {
                         disabled={paymentLoading}
                     >
                         {paymentLoading ? <CircularProgress size={24} color="inherit" /> : `Ir a Pagar`}
+                    </Button>
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        color="secondary"
+                        size="large"
+                        sx={{ mt: 2, borderRadius: 2, fontWeight: 'bold' }}
+                        onClick={handleBitcoinPayment}
+                        disabled={paymentLoading}
+                    >
+                        {paymentLoading ? <CircularProgress size={24} color="inherit" /> : `Pagar con Bitcoin`}
                     </Button>
                     {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
                 </Paper>

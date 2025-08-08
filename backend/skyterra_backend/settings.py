@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import dj_database_url
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -40,8 +41,8 @@ if DEBUG:
     if '127.0.0.1' not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append('127.0.0.1')
     # Allow Codespaces URLs
-    ALLOWED_HOSTS.append('.app.github.dev')
-    ALLOWED_HOSTS.append('*')  # Allow all hosts in development
+    if '.app.github.dev' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('.app.github.dev')
 
 
 # Application definition
@@ -84,10 +85,17 @@ SITE_ID = 1
 CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
 
 # Configuración de dj-rest-auth
+# Ensure cookie security matches environment (secure in prod, not in dev)
+_jwt_cookie_secure_env = os.getenv('JWT_COOKIE_SECURE')
+_jwt_cookie_secure = (_jwt_cookie_secure_env == 'True') if _jwt_cookie_secure_env is not None else (not DEBUG)
+
 REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'jwt-access-token',
     'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
+    # Ensure cookies work cross-site in production
+    'JWT_AUTH_SAMESITE': 'None',
+    'JWT_AUTH_SECURE': _jwt_cookie_secure,
     'TOKEN_MODEL': None, # Disable default token (use JWT)
     'LOGOUT_ON_PASSWORD_CHANGE': True,
     'OLD_PASSWORD_FIELD_ENABLED': True,
@@ -128,7 +136,7 @@ ACCOUNT_EMAIL_REQUIRED = True  # Required when EMAIL_VERIFICATION is 'mandatory'
 ACCOUNT_CONFIRM_EMAIL_ON_GET = True
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
 ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SkyTerra] '
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 ACCOUNT_CHANGE_EMAIL = True
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
@@ -186,6 +194,7 @@ AUTHENTICATION_BACKENDS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.sites.middleware.CurrentSiteMiddleware',  # required for sites framework
@@ -194,6 +203,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'csp.middleware.CSPMiddleware',
 ]
 
 ROOT_URLCONF = "skyterra_backend.urls"
@@ -227,6 +237,11 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# If DATABASE_URL is provided, use it (PostgreSQL recommended for production)
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES['default'] = dj_database_url.config(default=DATABASE_URL, conn_max_age=600, ssl_require=os.getenv('DB_SSL_REQUIRE', 'True') == 'True')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -293,7 +308,7 @@ if USE_S3:
     # No STATIC_ROOT/MEDIA_ROOT needed when using S3
 else:
     # Local/staticfile approach (development or single-instance prod)
-    STATIC_URL = 'static/'
+    STATIC_URL = '/static/'
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
     MEDIA_URL = '/media/'
@@ -316,15 +331,57 @@ SERVER_EMAIL = os.getenv('SERVER_EMAIL', DEFAULT_FROM_EMAIL) # For server error 
 ADMINS = [('Admin', os.getenv('ADMIN_EMAIL', 'admin@example.com'))] # For site admins
 
 # ------------------------------------------------------------------
+# CORS / CSRF configuration (cookies with JWT across domains)
+CORS_ALLOW_CREDENTIALS = True
+
+_cors_allowed_origins = [o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+if _cors_allowed_origins:
+    CORS_ALLOWED_ORIGINS = _cors_allowed_origins
+    # In DEBUG, ensure common localhost ports are also allowed to prevent accidental CORS blocks
+    if DEBUG:
+        for dev_origin in ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173']:
+            if dev_origin not in CORS_ALLOWED_ORIGINS:
+                CORS_ALLOWED_ORIGINS.append(dev_origin)
+else:
+    # In development allow all for convenience
+    CORS_ALLOW_ALL_ORIGINS = DEBUG
+
+_csrf_trusted = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+if _csrf_trusted:
+    CSRF_TRUSTED_ORIGINS = _csrf_trusted
+elif DEBUG:
+    # Default trusted origins for local dev when env var is not set
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ]
+
+if not DEBUG:
+    # Secure cookies for cross-site usage (required for cookies with frontend on different domain)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = 'None'
+
+    # HTTPS hardening
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# ------------------------------------------------------------------
 # Security / Clickjacking – permitir incrustar tours (HTML) en iframe
 if DEBUG:
     X_FRAME_OPTIONS = 'ALLOWALL'  # Permitir iframes en desarrollo
 else:
     X_FRAME_OPTIONS = 'SAMEORIGIN' # Solo permitir si es del mismo origen en producción
-CSP_FRAME_ANCESTORS = ["'self'", "https://www.youtube.com"] # Ejemplo: permitir YouTube
-# Si quieres permitir todos los orígenes (menos seguro, pero puede ser necesario para iframes de terceros)
-# X_FRAME_OPTIONS = 'ALLOWALL' # ¡Usar con precaución!
-# CSP_FRAME_ANCESTORS = ["*"] # ¡Usar con precaución!
+# Simple CSP allow-list for frames
+client_url = os.getenv('CLIENT_URL', 'http://localhost:5173')
+CSP_FRAME_ANCESTORS = ("'self'", "https://www.youtube.com", client_url)
+SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
 
 # allauth settings for social authentication (Google, Apple, Twitter)
 SOCIALACCOUNT_ENABLED = True # Habilitar cuentas sociales
@@ -334,3 +391,53 @@ google_gemini_api = os.getenv('GOOGLE_GEMINI_API_KEY')
 if not google_gemini_api and DEBUG:
     import logging; logging.warning('La variable de entorno GOOGLE_GEMINI_API_KEY no está configurada.')
 GOOGLE_GEMINI_API_KEY = google_gemini_api
+
+# Stripe
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+
+# Coinbase Commerce (Bitcoin) – optional
+COINBASE_COMMERCE_API_KEY = os.getenv('COINBASE_COMMERCE_API_KEY', '')
+COINBASE_COMMERCE_WEBHOOK_SECRET = os.getenv('COINBASE_COMMERCE_WEBHOOK_SECRET', '')
+COINBASE_COMMERCE_DEFAULT_CURRENCY = os.getenv('COINBASE_COMMERCE_DEFAULT_CURRENCY', 'USD')
+
+# Bitcoin payments via Coinbase Commerce (empresa establecida con compliance)
+
+# ------------------------------------------------------------------
+# Security settings para producción (Django deployment checklist)
+if not DEBUG:
+    # HTTPS obligatorio en producción
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 año
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Cookies seguras
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # Protección contra ataques de frame
+    X_FRAME_OPTIONS = 'DENY'
+    
+    # Content type sniffing protection
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    
+    # XSS protection
+    SECURE_BROWSER_XSS_FILTER = True
+    
+    # Referrer policy
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# ------------------------------------------------------------------
+# Cache configuration (Redis para producción)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'TIMEOUT': 300,  # 5 minutos por defecto
+    }
+}

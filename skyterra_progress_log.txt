@@ -1,6 +1,6 @@
 # SkyTerra Progress Log
 
-## Audit Summary (2025-06-28)
+## Audit Summary (2025-08-07)
 
 This log tracks the systematic audit and improvement of the SkyTerra platform. Each entry represents a concrete task performed.
 
@@ -32,6 +32,91 @@ This log tracks the systematic audit and improvement of the SkyTerra platform. E
 - [x] **(Backend) Implemented Stripe Webhook and Subscription Management:**
     - **Problem:** No reliable mechanism to track user subscriptions or confirm payments from Stripe. Missing webhook endpoint.
     - **Fix:** Created `Subscription` model to store user subscription status. Implemented `StripeWebhookView` to securely handle Stripe events (e.g., `checkout.session.completed`, `customer.subscription.updated`). Updated `CreateCheckoutSessionView` to reuse existing Stripe customer IDs.
+
+### Completed Tasks – Production Ready (2025-08-07)
+
+- [x] **(Security/Infra) Backend hardening y producción-ready:**
+    - Agregado `corsheaders` al `MIDDLEWARE` y configuración CORS/CSRF por variables de entorno (`CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`).
+    - Cookies JWT seguras y `SameSite=None` en producción; `SECURE_SSL_REDIRECT`, HSTS y `SECURE_PROXY_SSL_HEADER` configurados.
+    - `ACCOUNT_DEFAULT_HTTP_PROTOCOL` dinámico (http en dev, https en prod).
+    - Soporte Postgres via `DATABASE_URL` con `dj-database-url` (mantiene SQLite en dev).
+    - CSP `frame-ancestors` incluyendo `CLIENT_URL` y YouTube; agregado middleware `django-csp`.
+    - Variables Stripe centralizadas en settings: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
+- [x] **(Payments) Checkout y Webhook robustos:**
+    - `CreateCheckoutSessionView`: eliminado `payment_method_types` para suscripciones (Stripe infiere según `price`); agregado fallback para auto-seleccionar un `price` recurrente activo si el frontend no envía `priceId`.
+    - Webhook: idempotencia con nuevo modelo `StripeEvent`; manejo de eventos `checkout.session.completed`, `invoice.payment_succeeded/failed`, `customer.subscription.updated/deleted`.
+    - Migración `payments.0003_add_stripe_event` aplicada.
+
+- [x] **(Frontend) Integración con Stripe en test:**
+    - `api.js`: soporte `VITE_API_BASE_URL` y CSRF headers; logs reducidos en producción.
+    - `CheckoutPage.jsx`: `priceId` ahora es opcional; el backend auto-selecciona un `price` mensual/anual si está omitido.
+    - `PricingPage.jsx`: `priceId` placeholders vaciados para usar el fallback durante pruebas.
+
+- [x] **(DevEnv) Dependencias y tooling:**
+    - `backend/requirements.txt`: agregado `dj-database-url` y `django-csp`.
+    - `env.example` actualizado con claves CORS/CSRF y `DATABASE_URL`.
+
+- [x] **(Payments) Bitcoin vía Coinbase Commerce - Compliance empresarial:**
+    - **Decisión estratégica:** Revertir de BTCPay Server autocustodiado a Coinbase Commerce.
+    - **Razón:** Coinbase es empresa pública cotizada con compliance KYC/AML establecido, vs implementación propia.
+    - Removidos modelos `BTCPayInvoice`/`BTCPayEvent` y endpoints relacionados.
+    - Frontend simplificado: solo `/api/payments/bitcoin/create-charge/` de Coinbase Commerce.
+    - Settings limpiado: removidas variables `BTCPAY_*`, foco en `COINBASE_COMMERCE_*`.
+
+- [x] **(Production Infrastructure) Configuración completa para AWS/Docker:**
+    - **Deployment:** `docker-compose.prod.yml` con Nginx reverse proxy, SSL termination.
+    - **Development:** `docker-compose.yml` actualizado con Postgres 15 + Redis + healthchecks.
+    - **Backend:** `Dockerfile` optimizado con Gunicorn, usuario no-root, dependencias mínimas.
+    - **Nginx:** configuración completa en `nginx/nginx.conf`:
+        - Rate limiting: 10req/s API general, 5req/min para auth/payments.
+        - SSL moderno (TLS 1.2/1.3), HSTS, headers de seguridad.
+        - Archivos estáticos optimizados con cache headers.
+        - Protección DDoS básica y configuración para Let's Encrypt.
+
+- [x] **(Security Standards) Django deployment checklist aplicado:**
+    - **HTTPS:** `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS=31536000` (1 año).
+    - **Cookies:** `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` en producción.
+    - **Headers:** `X_FRAME_OPTIONS=DENY`, `SECURE_CONTENT_TYPE_NOSNIFF=True`.
+    - **XSS:** `SECURE_BROWSER_XSS_FILTER=True`.
+    - **Cache:** Redis configurado con `django-redis` para performance.
+    - **AWS S3:** `django-storages` + `boto3` para archivos estáticos/media en producción.
+
+- [x] **(Environment & Dependencies) Production configuration:**
+    - **Requirements:** agregados `redis`, `django-redis`, `boto3`, `django-storages`.
+    - **Environment:** `env.production.example` con template completo:
+        - AWS (RDS PostgreSQL, ElastiCache Redis, S3).
+        - Stripe Live keys, Coinbase Commerce production.
+        - SES para email, Sentry para monitoring opcional.
+        - Security headers y variables de deployment.
+    - **Cache strategy:** Redis como cache principal, configurado para AWS ElastiCache.
+    - **Database:** settings preparados para AWS RDS con `DATABASE_URL`.
+
+- [x] **(Payments) Bitcoin autocustodia con BTCPay Server (estándar abierto):**
+    - Backend: nuevos modelos `BTCPayInvoice` y `BTCPayEvent` para auditoría e idempotencia.
+    - Endpoints:
+        - `POST /api/payments/btcpay/create-invoice/` crea factura BTCPay y devuelve `checkoutLink`.
+        - `POST /api/payments/btcpay/webhook/` (HMAC) actualiza estados: new/processing/paid/confirmed/complete/invalid/expired.
+    - Settings: variables `BTCPAY_HOST`, `BTCPAY_API_KEY`, `BTCPAY_STORE_ID`, `BTCPAY_WEBHOOK_SECRET`.
+    - Frontend: `CheckoutPage.jsx` ahora usa BTCPay por defecto para “Pagar con Bitcoin”.
+    - Coinbase queda opcional para fallback/compatibilidad; endpoints se mantienen.
+
+- [x] **(CORS/Proxy) Estabilización entorno local:**
+    - `api.js` y `environment.js`: forzar `'/api'` en localhost para evitar `ERR_SSL_PROTOCOL_ERROR` y CORS.
+
+- [x] **(DB) Camino a producción con PostgreSQL:**
+    - `settings.py` ya soporta `DATABASE_URL` (Postgres). Añadido `docker-compose.yml` con Postgres para dev.
+    - Documentación README actualizada para front en 3000 y proxy `/api`.
+
+### Next Steps – Deploy Readiness
+- Preparar BTCPay en producción (stack oficial) con dominio TLS y tienda configurada, crear API Key y webhook HMAC hacia `/api/payments/btcpay/webhook/`.
+- Configurar `DATABASE_URL` Postgres gestionado (RDS) y `USE_S3=True` si se activará S3 para estáticos/media.
+
+### Operational Notes
+
+- Backend comprobado con `python manage.py check` sin issues. Migraciones aplicadas.
+- Para pruebas locales: configurar `.env` de backend con claves Stripe TEST, ejecutar `stripe listen --forward-to localhost:8000/api/payments/webhook/` y copiar `whsec_...` en `STRIPE_WEBHOOK_SECRET`.
+- En producción: definir dominios reales en `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, usar Postgres, `DEBUG=False` y TLS.
 
 - [x] **(Backend) Audited and Secured `support_tickets` App:**
     - **Problem 1:** `TicketResponseViewSet` only allowed admins to view responses, preventing users from seeing replies to their own tickets.

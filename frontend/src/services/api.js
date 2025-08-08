@@ -6,19 +6,23 @@ const getBaseURL = () => {
   const hostname = window.location.hostname;
   const origin = window.location.origin;
   
-  console.log('🔍 Detectando entorno:', { hostname, origin, protocol: window.location.protocol, port: window.location.port });
+  if (import.meta.env.MODE === 'development') {
+    console.log('🔍 Detectando entorno:', { hostname, origin, protocol: window.location.protocol, port: window.location.port });
+  }
   
   // Si estamos en Codespaces, usar la URL del Codespace
   if (hostname.includes('github.dev') || hostname.includes('codespaces.io')) {
     // Para Codespaces, reemplazar el puerto del frontend (5173) por el del backend (8000)
     const backendUrl = origin.replace(/:\d+/, ':8000');
-    console.log('🚀 Configurando para Codespaces:', `${backendUrl}/api`);
+    if (import.meta.env.MODE === 'development') console.log('🚀 Configurando para Codespaces:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
   
   // Para desarrollo local, usar localhost directamente
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    console.log('💻 Usando proxy para /api');
+    const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
+    if (envBase) return envBase;
+    if (import.meta.env.MODE === 'development') console.log('💻 Usando proxy para /api');
     return '/api';
   }
   
@@ -28,7 +32,7 @@ const getBaseURL = () => {
   if (hostname.startsWith('app.')) {
     const backendHost = hostname.replace(/^app\./, 'api.');
     const backendUrl = `https://${backendHost}`;
-    console.log('🌐 Configurando para sub-dominio app.* -> api.*:', `${backendUrl}/api`);
+    if (import.meta.env.MODE === 'development') console.log('🌐 Configurando para sub-dominio app.* -> api.*:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
   
@@ -36,19 +40,24 @@ const getBaseURL = () => {
   if (hostname.startsWith('www.')) {
     const backendHost = hostname.replace(/^www\./, 'api.');
     const backendUrl = `https://${backendHost}`;
-    console.log('🌐 Configurando para sub-dominio www.* -> api.*:', `${backendUrl}/api`);
+    if (import.meta.env.MODE === 'development') console.log('🌐 Configurando para sub-dominio www.* -> api.*:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
   
   // Para producción u otros entornos donde backend y frontend comparten dominio raíz,
   // asumimos que el backend está disponible en la misma raíz bajo /api.
-  console.log('🌐 Configurando para producción (misma raíz):', '/api');
+  if (import.meta.env.MODE === 'development') console.log('🌐 Configurando para producción (misma raíz):', '/api');
   return '/api';
 };
 
 // Crear una instancia con configuración base
-const baseURL = getBaseURL();
-console.log('🔧 API configurada con baseURL:', baseURL);
+// En desarrollo local (localhost/127.0.0.1) forzamos usar el proxy '/api' aunque exista VITE_API_BASE_URL
+// para evitar errores CORS por apuntar directo a :8000.
+const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const shouldIgnoreEnvBaseOnDev = isLocalhost && envBase && /^https?:\/\//i.test(envBase);
+const baseURL = shouldIgnoreEnvBaseOnDev ? '/api' : (envBase || getBaseURL());
+if (import.meta.env.MODE === 'development') console.log('🔧 API configurada con baseURL:', baseURL);
 
 export const api = axios.create({
   baseURL: baseURL,
@@ -56,6 +65,8 @@ export const api = axios.create({
     'Content-Type': 'application/json'
   },
   withCredentials: true, // Importante para enviar cookies en solicitudes de origen cruzado
+  xsrfCookieName: 'csrftoken',
+  xsrfHeaderName: 'X-CSRFToken',
 });
 
 // Interceptor para añadir token en las solicitudes
@@ -221,10 +232,27 @@ export const authService = {
   },
 
   // Iniciar sesión con Google
-  async googleLogin(token) {
+  async googleLogin(googleResponse) {
     try {
-      console.log('🔄 Intentando iniciar sesión con Google con ID token');
-      const response = await api.post('/auth/google/', { access_token: token });
+      // googleResponse puede ser:
+      // - { code: '...' } cuando usamos flow="auth-code"
+      // - { credential: 'id_token' } para One Tap
+      // - string directamente (token)
+      let payload = {};
+      if (typeof googleResponse === 'string') {
+        // heurística: si parece JWT, enviarlo como id_token
+        if (googleResponse.startsWith('eyJ')) payload = { id_token: googleResponse };
+        else payload = { access_token: googleResponse };
+      } else if (googleResponse?.code) {
+        payload = { code: googleResponse.code };
+      } else if (googleResponse?.credential) {
+        payload = { id_token: googleResponse.credential };
+      } else {
+        throw new Error('Respuesta de Google inválida');
+      }
+
+      console.log('🔄 Intentando iniciar sesión con Google con payload:', Object.keys(payload));
+      const response = await api.post('/auth/google/', payload);
       console.log('✅ Inicio de sesión con Google exitoso:', response.data);
       
       // El token JWT se establece en una cookie HttpOnly.

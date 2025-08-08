@@ -1,30 +1,42 @@
+# Dockerfile para SkyTerra Backend (Django) - Producción Ready
 FROM python:3.11-slim
 
-# Prevent Python from writing pyc files and buffering stdout/stderr
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+# Configurar variables de entorno para Python
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Set work directory
+# Crear directorio de trabajo
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Instalar dependencias del sistema necesarias para PostgreSQL y build
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
     build-essential \
     libpq-dev \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY backend/requirements.txt ./requirements.txt
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+# Copiar e instalar dependencias de Python
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# Copy project
-COPY backend /app
+# Copiar código de la aplicación
+COPY . .
 
-# Collect static files (they will be uploaded to S3 or served via WhiteNoise)
-RUN python manage.py collectstatic --noinput
+# Crear directorio para logs
+RUN mkdir -p logs
 
-# Expose port
+# Crear directorio para archivos estáticos
+RUN mkdir -p staticfiles
+
+# Configurar usuario no-root para seguridad
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app
+USER app
+
+# Exponer puerto 8000
 EXPOSE 8000
 
-# Gunicorn entrypoint
-CMD ["gunicorn", "skyterra_backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"] 
+# Comando por defecto - usar Gunicorn en producción
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", "skyterra_backend.wsgi:application"]

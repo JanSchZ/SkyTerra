@@ -1,6 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ValidateCouponView, CreateCheckoutSessionView, CouponViewSet, StripeWebhookView
+from .views import (
+    ValidateCouponView,
+    CreateCheckoutSessionView,
+    CouponViewSet,
+    StripeWebhookView,
+    CreateBitcoinChargeView,
+    CoinbaseWebhookView,
+)
 
 app_name = 'payments'
 
@@ -12,4 +19,7 @@ urlpatterns = [
     path('validate-coupon/', ValidateCouponView.as_view(), name='validate-coupon'),
     path('create-checkout-session/', CreateCheckoutSessionView.as_view(), name='create-checkout-session'),
     path('webhook/', StripeWebhookView.as_view(), name='stripe-webhook'),
+    # Bitcoin (Coinbase Commerce)
+    path('bitcoin/create-charge/', CreateBitcoinChargeView.as_view(), name='bitcoin-create-charge'),
+    path('bitcoin/webhook/', CoinbaseWebhookView.as_view(), name='coinbase-webhook'),
 ] 

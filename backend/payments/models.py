@@ -67,3 +67,63 @@ class Coupon(models.Model):
         if self.discount_type == 'percentage' and (self.value < 0 or self.value > 100):
             raise ValidationError({'value': _('Percentage value must be between 0 and 100.')})
         super().clean()
+
+
+class StripeEvent(models.Model):
+    """Stores processed Stripe webhook events for idempotency and auditing."""
+    idempotency_key = models.CharField(max_length=255, unique=True)  # event.id from Stripe
+    type = models.CharField(max_length=100)
+    payload = models.JSONField()
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-received_at']
+
+    def __str__(self):
+        return f"{self.type} ({self.idempotency_key})"
+
+
+class BitcoinPayment(models.Model):
+    """
+    Records a Coinbase Commerce Bitcoin (or crypto) payment attempt and status.
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('failed', 'Failed'),
+        ('canceled', 'Canceled'),
+        ('delayed', 'Delayed'),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bitcoin_payments')
+    charge_id = models.CharField(max_length=255, unique=True)
+    hosted_url = models.URLField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
+    currency = models.CharField(max_length=10, default='USD')
+    plan_title = models.CharField(max_length=100, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.status} {self.amount} {self.currency}"
+
+
+class CoinbaseEvent(models.Model):
+    """Stores processed Coinbase Commerce webhook events for idempotency/audit."""
+    idempotency_key = models.CharField(max_length=255, unique=True)  # event.id
+    type = models.CharField(max_length=100)
+    payload = models.JSONField()
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-received_at']
+
+    def __str__(self):
+        return f"{self.type} ({self.idempotency_key})"
+
+
+# BTCPay Server models removidos - enfoque solo en Coinbase Commerce

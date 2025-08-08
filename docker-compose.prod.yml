@@ -1,0 +1,52 @@
+# Docker Compose para Producción - SkyTerra
+# Usar con: docker-compose -f docker-compose.prod.yml up -d
+version: '3.9'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - static_volume:/var/www/static
+      - media_volume:/var/www/media
+    depends_on:
+      - web
+
+  # SkyTerra Backend (Django)
+  web:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - COINBASE_COMMERCE_API_KEY=${COINBASE_COMMERCE_API_KEY}
+      - COINBASE_COMMERCE_WEBHOOK_SECRET=${COINBASE_COMMERCE_WEBHOOK_SECRET}
+      - CLIENT_URL=${CLIENT_URL}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./backend/logs:/app/logs
+    command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", "skyterra_backend.wsgi:application"]
+
+volumes:
+  static_volume:
+  media_volume:

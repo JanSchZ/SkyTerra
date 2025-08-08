@@ -50,6 +50,7 @@ def home_view(request):
 class GoogleLogin(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
     client_class = OAuth2Client
+    callback_url = settings.CLIENT_URL + '/login'
 
 class TwitterLogin(SocialLoginView):
     adapter_class = TwitterOAuthAdapter
@@ -57,7 +58,8 @@ class TwitterLogin(SocialLoginView):
 class AppleLogin(SocialLoginView):
     adapter_class = AppleOAuth2Adapter
     client_class = OAuth2Client
-    callback_url = 'http://localhost:5173/login' # O la URL de tu frontend que maneje el callback
+    # Use CLIENT_URL environment (fallback to localhost for dev)
+    callback_url = settings.CLIENT_URL + '/login'
 
 router = routers.DefaultRouter()
 router.register(r'admin/tickets', TicketViewSet, basename='admin-tickets')

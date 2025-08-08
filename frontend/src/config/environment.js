@@ -476,6 +476,16 @@ const skyTerraCustomStyle = {
   ]
 };
 
+// Helper to compute API baseURL in dev to avoid CORS/SSL mixups
+const computeApiBaseURL = () => {
+  const envBase = import.meta.env.VITE_API_BASE_URL || '';
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+  // In local dev always go through Vite proxy
+  if (isLocal) return '/api';
+  return envBase || '/api';
+};
+
 const config = {
   mapbox: {
     // Use environment variable first, fallback to the current token if not set
@@ -484,7 +494,7 @@ const config = {
     style: skyTerraCustomStyle, // Use our custom dark style
   },
   api: {
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+    baseURL: computeApiBaseURL(),
   },
   app: {
     name: import.meta.env.VITE_APP_NAME || 'SkyTerra',
