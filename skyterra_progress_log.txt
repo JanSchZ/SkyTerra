@@ -179,3 +179,57 @@ This log tracks the systematic audit and improvement of the SkyTerra platform. E
 3.  **Testing Strategy Enhancement:**
     - **Objective:** Increase test coverage and ensure application stability.
     - **Next Action:** Write a unit test for the new `IsOwnerOrAdmin` permission class to ensure it behaves as expected.
+
+### Production Rollout Plan (2025-08-09)
+
+- [ ] Domains and TLS
+  - Acquire/confirm domains: `app.skyterra.cl` (frontend), `api.skyterra.cl` (backend).
+  - CloudFront distribution for frontend (S3 origin) with TLS (ACM cert) and HTTP/2.
+  - Nginx reverse proxy for backend with Let’s Encrypt certificates; enable HSTS.
+
+- [ ] Backend Infrastructure
+  - Deploy containerized backend (Gunicorn) to EC2/Elastic Beanstalk/ECS.
+  - Configure environment variables: `ALLOWED_HOSTS`, `CLIENT_URL`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `DATABASE_URL` (RDS Postgres), `REDIS_URL` (ElastiCache), `USE_S3=True`.
+  - Enable logging/metrics: CloudWatch (app logs, access logs), health checks, autoscaling targets.
+
+- [ ] Database & Data Migration
+  - Provision RDS PostgreSQL (14/15), `db.t3.small` or higher, Multi-AZ optional.
+  - Create snapshot/backup strategy.
+  - Run `python manage.py migrate` and load baseline demo data if needed.
+  - Switch `DATABASE_URL` and set `DB_SSL_REQUIRE=True`.
+
+- [ ] Object Storage
+  - Create S3 buckets for `static` and `media` with lifecycle policies and least-privileged IAM.
+  - Configure `django-storages` (`USE_S3=True`) y `AWS_*` envs; invalidate CloudFront upon deploy.
+
+- [ ] Payments
+  - Stripe: set live keys, set webhook to `https://api.skyterra.cl/api/payments/webhook/`.
+  - Coinbase Commerce: set live API key + webhook `https://api.skyterra.cl/api/payments/bitcoin/webhook/`.
+  - Rotate and store secrets in AWS SSM Parameter Store.
+
+- [ ] Security Hardening
+  - Set `DEBUG=False` in prod, `SECURE_SSL_REDIRECT=True`, HSTS 1y, cookies `Secure` + `SameSite=None`.
+  - Set CSP and frame-ancestors to allow only required sources (YouTube + `CLIENT_URL`).
+  - Enable rate limiting on Nginx for auth/payments.
+
+- [ ] Observability
+  - Optional Sentry DSN; structured logging (JSON) for Gunicorn; CloudWatch dashboards.
+
+- [ ] CI/CD
+  - GitHub Actions to build Docker image, push to ECR, deploy to ECS/EB with migration step.
+  - Frontend build to S3 + CloudFront invalidation on tag push.
+
+- [ ] Local/Dev Parity
+  - `.env` templates actualizados:
+    - Frontend dev: `VITE_API_BASE_URL=http://127.0.0.1:8000/api`.
+    - Backend dev: `CORS_ALLOWED_ORIGINS` y `CSRF_TRUSTED_ORIGINS` incluyen `localhost` y `127.0.0.1` (3000/5173).
+    - Producción: dominios reales, Postgres RDS y S3 habilitado.
+
+### Today’s Fixes (2025-08-09)
+
+- [x] Frontend `api.js`: forzar uso de `VITE_API_BASE_URL` en todos los entornos para evitar mezcla proxy/SSL.
+- [x] `.env` frontend local: `VITE_API_BASE_URL=http://127.0.0.1:8000/api`.
+- [x] Backend CORS/CSRF en dev: `CORS_ALLOWED_ORIGINS` explícito + `CORS_ALLOW_CREDENTIALS=True`; añadido fallback seguro en DEBUG para incluir `localhost/127.0.0.1` en puertos 3000/5173. Deshabilitado `CORS_ALLOW_ALL_ORIGINS` en DEBUG para que el backend responda con el origen específico (requisito cuando se usan cookies), corrigiendo el error CORS visto en frontend.
+- [x] Evitado redirecciones HTTPS en local: añadido `IS_LOCAL_DEV` en `settings.py` para no forzar `SECURE_SSL_REDIRECT` en 127.0.0.1/localhost.
+- [x] Frontend `api.js` (dev): forzar uso del proxy `/api` cuando `hostname` es `localhost`/`127.0.0.1`, ignorando `VITE_API_BASE_URL` para evitar CORS/SSL mix.
+- [x] Verificación manual de endpoints: `GET /api/`, `GET /api/properties/` ok en 127.0.0.1.

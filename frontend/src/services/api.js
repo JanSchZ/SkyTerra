@@ -5,58 +5,49 @@ import compareService from './api/compareService';
 const getBaseURL = () => {
   const hostname = window.location.hostname;
   const origin = window.location.origin;
-  
+
   if (import.meta.env.MODE === 'development') {
     console.log('🔍 Detectando entorno:', { hostname, origin, protocol: window.location.protocol, port: window.location.port });
   }
-  
-  // Si estamos en Codespaces, usar la URL del Codespace
+
+  // 1) Desarrollo local: SIEMPRE usa el proxy de Vite para evitar CORS
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    if (import.meta.env.MODE === 'development') console.log('💻 Desarrollo local: usando proxy /api (ignora VITE_API_BASE_URL)');
+    return '/api';
+  }
+
+  // 2) Codespaces
   if (hostname.includes('github.dev') || hostname.includes('codespaces.io')) {
-    // Para Codespaces, reemplazar el puerto del frontend (5173) por el del backend (8000)
     const backendUrl = origin.replace(/:\d+/, ':8000');
     if (import.meta.env.MODE === 'development') console.log('🚀 Configurando para Codespaces:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
-  
-  // Para desarrollo local, usar localhost directamente
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
-    if (envBase) return envBase;
-    if (import.meta.env.MODE === 'development') console.log('💻 Usando proxy para /api');
-    return '/api';
-  }
-  
-  // Detect if we're on a dedicated frontend sub-domain (e.g. app.skyterra.cl) and map to the
-  // corresponding API sub-domain (e.g. api.skyterra.cl). This prevents requests from being
-  // sent to the same origin (which would 404 when the backend lives elsewhere).
+
+  // 3) app.* → api.*
   if (hostname.startsWith('app.')) {
     const backendHost = hostname.replace(/^app\./, 'api.');
     const backendUrl = `https://${backendHost}`;
     if (import.meta.env.MODE === 'development') console.log('🌐 Configurando para sub-dominio app.* -> api.*:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
-  
-  // Similar mapping for "www." → "api." (in case the frontend is served from www.domain)
+
+  // 4) www.* → api.*
   if (hostname.startsWith('www.')) {
     const backendHost = hostname.replace(/^www\./, 'api.');
     const backendUrl = `https://${backendHost}`;
     if (import.meta.env.MODE === 'development') console.log('🌐 Configurando para sub-dominio www.* -> api.*:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
-  
-  // Para producción u otros entornos donde backend y frontend comparten dominio raíz,
-  // asumimos que el backend está disponible en la misma raíz bajo /api.
-  if (import.meta.env.MODE === 'development') console.log('🌐 Configurando para producción (misma raíz):', '/api');
+
+  // 5) Producción misma raíz o fallback
+  const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (envBase) return envBase;
+  if (import.meta.env.MODE === 'development') console.log('🌐 Producción/Fallback: /api');
   return '/api';
 };
 
-// Crear una instancia con configuración base
-// En desarrollo local (localhost/127.0.0.1) forzamos usar el proxy '/api' aunque exista VITE_API_BASE_URL
-// para evitar errores CORS por apuntar directo a :8000.
-const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
-const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const shouldIgnoreEnvBaseOnDev = isLocalhost && envBase && /^https?:\/\//i.test(envBase);
-const baseURL = shouldIgnoreEnvBaseOnDev ? '/api' : (envBase || getBaseURL());
+// Crear una instancia con configuración base (regla: en local -> proxy /api)
+const baseURL = getBaseURL();
 if (import.meta.env.MODE === 'development') console.log('🔧 API configurada con baseURL:', baseURL);
 
 export const api = axios.create({

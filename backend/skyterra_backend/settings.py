@@ -31,6 +31,10 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-oz7k_zw9rjk8qc_01i9ataa7a0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
+# Detect explicit local development context even if DEBUG is accidentally False
+# This prevents forcing HTTPS on 127.0.0.1/localhost which breaks CORS/cookies in dev
+IS_LOCAL_DEV = DEBUG or any(h in {'localhost', '127.0.0.1'} for h in os.getenv('ALLOWED_HOSTS', '').split(','))
+
 # Comma-separated list of domains accepted in production, e.g. "skyterra.cl,api.skyterra.cl"
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',') if host.strip()]
 
@@ -82,7 +86,7 @@ INSTALLED_APPS = [
 SITE_ID = 1
 
 # URL del cliente para redirecciones (ej. desde Stripe)
-CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:5173')
+CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:3000')
 
 # Configuración de dj-rest-auth
 # Ensure cookie security matches environment (secure in prod, not in dev)
@@ -332,19 +336,33 @@ ADMINS = [('Admin', os.getenv('ADMIN_EMAIL', 'admin@example.com'))] # For site a
 
 # ------------------------------------------------------------------
 # CORS / CSRF configuration (cookies with JWT across domains)
+# Nota: cuando se usan credenciales (cookies) NO se puede usar '*'.
+# Por eso, siempre usamos una lista explícita de orígenes.
 CORS_ALLOW_CREDENTIALS = True
 
 _cors_allowed_origins = [o.strip() for o in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+DEV_DEFAULT_CORS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+
 if _cors_allowed_origins:
     CORS_ALLOWED_ORIGINS = _cors_allowed_origins
-    # In DEBUG, ensure common localhost ports are also allowed to prevent accidental CORS blocks
     if DEBUG:
-        for dev_origin in ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173']:
+        for dev_origin in DEV_DEFAULT_CORS:
             if dev_origin not in CORS_ALLOWED_ORIGINS:
                 CORS_ALLOWED_ORIGINS.append(dev_origin)
 else:
-    # In development allow all for convenience
-    CORS_ALLOW_ALL_ORIGINS = DEBUG
+    # Si no se proporcionó variable de entorno, definir explícitamente orígenes en desarrollo
+    CORS_ALLOWED_ORIGINS = DEV_DEFAULT_CORS if DEBUG else []
+
+# Importante: cuando se usan credenciales (cookies) el header 'Access-Control-Allow-Origin'
+# no puede ser '*'. En desarrollo usamos una lista explícita de orígenes permitidos
+# definida en CORS_ALLOWED_ORIGINS (arriba). No activar allow-all.
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = False
 
 _csrf_trusted = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
 if _csrf_trusted:
@@ -379,7 +397,7 @@ if DEBUG:
 else:
     X_FRAME_OPTIONS = 'SAMEORIGIN' # Solo permitir si es del mismo origen en producción
 # Simple CSP allow-list for frames
-client_url = os.getenv('CLIENT_URL', 'http://localhost:5173')
+client_url = os.getenv('CLIENT_URL', 'http://localhost:3000')
 CSP_FRAME_ANCESTORS = ("'self'", "https://www.youtube.com", client_url)
 SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
 
@@ -428,6 +446,11 @@ if not DEBUG:
     
     # Referrer policy
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# ------------------------------------------------------------------
+# Override: never force HTTPS redirects in local development
+if IS_LOCAL_DEV:
+    SECURE_SSL_REDIRECT = False
 
 # ------------------------------------------------------------------
 # Cache configuration (Redis para producción)
