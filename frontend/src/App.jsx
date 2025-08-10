@@ -127,6 +127,9 @@ function App() {
   useEffect(() => {
     const loadUser = async () => {
       try {
+        // Inicializa CSRF para que POST/PUT autenticados funcionen sin 403/401
+        try { await authService.ensureCsrfCookie(); } catch (_) {}
+
         // Primero verificar si hay indicios de sesión antes de hacer llamada al backend
         const localUser = localStorage.getItem('user');
         if (!localUser) {
@@ -543,7 +546,7 @@ function App() {
           </motion.div>
         } 
       />
-      <Route path="/login" element={<AuthPage onLogin={handleLogin} />} />
+      {/* Autenticación clásica dentro de un modal */}
       <Route path="/auth" element={<AuthPage onLogin={handleLogin} />} />
       <Route path="/landing" element={
         <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
@@ -576,6 +579,7 @@ function App() {
       <Route path="/payment-success" element={<ProtectedRoute user={user} element={<PaymentSuccess />} />} />
       <Route path="/payment-cancelled" element={<ProtectedRoute user={user} element={<PaymentCancelled />} />} />
 
+      {/* Página de Login dedicada */}
       <Route path="/login" element={<Login />} />
 
       {/* Fallback route */}

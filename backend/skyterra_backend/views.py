@@ -5,6 +5,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions
 from .serializers import UserDetailsSerializer
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 
 def get_southern_chile_properties(request):
     regions = ['Los Lagos', 'Aysén', 'Magallanes']  # Add more if needed based on the script
@@ -26,3 +28,12 @@ class ProfileUpdateView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400) 
+
+
+class CSRFTokenView(APIView):
+    """Simple endpoint to ensure the CSRF cookie is set for JWT cookie auth flows."""
+    permission_classes = [permissions.AllowAny]
+
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request, *args, **kwargs):
+        return Response({"detail": "CSRF cookie set"})

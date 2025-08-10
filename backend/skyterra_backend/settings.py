@@ -92,13 +92,16 @@ CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:3000')
 # Ensure cookie security matches environment (secure in prod, not in dev)
 _jwt_cookie_secure_env = os.getenv('JWT_COOKIE_SECURE')
 _jwt_cookie_secure = (_jwt_cookie_secure_env == 'True') if _jwt_cookie_secure_env is not None else (not DEBUG)
+# SameSite policy: In local dev behind Vite proxy the browser sees same-origin (localhost:3000),
+# but Chrome rejects SameSite=None without Secure over HTTP. Use Lax in dev, None in prod.
+_jwt_cookie_samesite = 'None' if (not DEBUG) else 'Lax'
 
 REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'jwt-access-token',
     'JWT_AUTH_REFRESH_COOKIE': 'jwt-refresh-token',
-    # Ensure cookies work cross-site in production
-    'JWT_AUTH_SAMESITE': 'None',
+    # Ensure cookies policy per environment (see _jwt_cookie_samesite above)
+    'JWT_AUTH_SAMESITE': _jwt_cookie_samesite,
     'JWT_AUTH_SECURE': _jwt_cookie_secure,
     'TOKEN_MODEL': None, # Disable default token (use JWT)
     'LOGOUT_ON_PASSWORD_CHANGE': True,

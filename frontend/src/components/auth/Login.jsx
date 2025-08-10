@@ -17,7 +17,8 @@ const Login = () => {
     setLoading(true);
     setError(null);
     try {
-      await auth.handleLogin({ login_identifier: email, password });
+      // El backend espera el campo `username` que puede ser email o usuario
+      await auth.handleLogin({ username: email, password });
       // El manejo de la navegación ya está en handleLogin en App.jsx
     } catch (err) {
       setError(err.message || 'Credenciales inválidas o error del servidor. Inténtalo de nuevo.');

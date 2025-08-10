@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from properties.models import Property
 from rest_framework import serializers
 from dj_rest_auth.serializers import LoginSerializer
+from rest_framework.response import Response
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from django.contrib.auth import authenticate
 from allauth.account.adapter import get_adapter
@@ -43,7 +44,8 @@ class CustomLoginSerializer(LoginSerializer):
     email = serializers.EmailField(required=False, allow_blank=True)
 
     def validate(self, attrs):
-        username_or_email = attrs.get('username')
+        # Acepta tanto 'login_identifier' como 'username' desde el frontend
+        username_or_email = attrs.get('username') or attrs.get('login_identifier')
         password = attrs.get('password')
 
         if not username_or_email:

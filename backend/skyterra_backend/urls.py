@@ -26,7 +26,7 @@ from allauth.socialaccount.providers.twitter.views import TwitterOAuthAdapter
 from allauth.socialaccount.providers.apple.views import AppleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from dj_rest_auth.registration.views import SocialLoginView
-from skyterra_backend.views import ProfileUpdateView
+from skyterra_backend.views import ProfileUpdateView, CSRFTokenView
 from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView, AdminPlanMetricsView  # Import stats view
 from rest_framework import routers
 from support_tickets.views import TicketViewSet, TicketResponseViewSet
@@ -70,6 +70,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/ai-search/', AISearchView.as_view(), name='project-ai-search'),
     path('api/auth/', include('dj_rest_auth.urls')),
+    path('api/auth/csrf/', CSRFTokenView.as_view(), name='set-csrf-cookie'),
     path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
     path('api/auth/profile/', ProfileUpdateView.as_view(), name='profile-update'),
     path('api/auth/google/', GoogleLogin.as_view(), name='google_login'),

@@ -160,7 +160,7 @@ export default function Dashboard({ user }) {
                 variant="contained"
                 sx={{ mt:2 }}
                 disabled={propertyLimitReached}
-                onClick={()=>navigate('/create-property')}
+                onClick={()=>navigate('/new-publication')}
               >
                 {propertyLimitReached ? 'Límite alcanzado' : 'Crear nueva publicación'}
               </Button>

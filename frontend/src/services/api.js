@@ -98,27 +98,23 @@ api.interceptors.response.use(
       message: error.message
     });
 
-    // Manejo global de error 401: limpiar localStorage y redirigir a login solo si es necesario
+    // Manejo global de 401 sin redirigir agresivamente
     if (error.response && error.response.status === 401) {
-      // Evitar bucles de redirección si ya estamos en /login o la petición es de login
-      const isLoginAttempt = error.config?.url?.endsWith('/auth/login/');
-      const isAuthCheck = error.config?.url?.endsWith('/auth/user/');
-      const isCurrentlyOnLoginPage = window.location.pathname === '/login';
-      const isCurrentlyOnLandingPage = window.location.pathname === '/';
+      const url = error.config?.url || '';
+      const isLoginAttempt = url.endsWith('/auth/login/');
+      const isAuthCheck = url.endsWith('/auth/user/');
 
-      if (!isLoginAttempt && !isCurrentlyOnLoginPage && !isCurrentlyOnLandingPage && !isAuthCheck) {
-        console.warn('[401 Unauthorized]', 'Token inválido o expirado. Limpiando sesión y redirigiendo a login.');
-        localStorage.removeItem('auth_token');
+      // Si la verificación explícita de sesión falla, limpiamos el usuario en caché.
+      if (isAuthCheck) {
         localStorage.removeItem('user');
-        
-        // Solo redirigir si estamos en una página que requiere autenticación
-        if (window.location.pathname !== '/login') {
-           window.location.href = '/login';
-        }
-      } else if (isLoginAttempt) {
+        // Notificar al resto de la app que la sesión ya no es válida
+        try { window.dispatchEvent(new CustomEvent('auth:invalid')); } catch (_) {}
+      }
+
+      // No redirigimos automáticamente. Dejamos que las rutas protegidas gestionen la navegación.
+      if (isLoginAttempt) {
         console.error('[Login Failed]', 'Intento de login fallido con 401.', error.response.data);
       }
-      // Si es una verificación de auth (/auth/user/) o estamos en landing/login, no hacer nada especial
     }
 
     return Promise.reject(error);
@@ -127,16 +123,37 @@ api.interceptors.response.use(
 
 // Servicio de autenticación
 export const authService = {
+  // Garantiza que exista la cookie CSRF para peticiones POST/PUT en modo JWT con cookies
+  async ensureCsrfCookie() {
+    try {
+      await api.get('/auth/csrf/');
+    } catch (e) {
+      // Silencioso: en desarrollo puede no ser crítico si ya existe
+      console.warn('No se pudo inicializar CSRF (posiblemente ya existe):', e?.response?.status || e?.message);
+    }
+  },
   // Iniciar sesión
   async login(credentials) {
     try {
-      console.log('Attempting login with:', { login_identifier: credentials.login_identifier });
+      await this.ensureCsrfCookie();
       const response = await api.post('/auth/login/', credentials);
-      console.log('Login successful, user data received:', response.data);
-      
-      // El token JWT se establece en una cookie HttpOnly por el backend.
-      // Solo guardamos los datos del usuario en localStorage.
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+
+      // Tras login, pide el usuario para confirmar que las cookies se guardaron
+      try {
+        const whoami = await api.get('/auth/user/');
+        if (whoami?.data) {
+          localStorage.setItem('user', JSON.stringify(whoami.data));
+          return { user: whoami.data };
+        }
+      } catch (e) {
+        console.warn('Login OK pero /auth/user/ falló. Manteniendo datos de respuesta directa.');
+      }
+
+      // Fallback: si el backend devolvió user en el body
+      if (response.data?.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        return response.data;
+      }
       return response.data;
     } catch (error) {
       console.error('Error during login:', error);
@@ -243,12 +260,17 @@ export const authService = {
       }
 
       console.log('🔄 Intentando iniciar sesión con Google con payload:', Object.keys(payload));
+      await this.ensureCsrfCookie();
       const response = await api.post('/auth/google/', payload);
-      console.log('✅ Inicio de sesión con Google exitoso:', response.data);
-      
-      // El token JWT se establece en una cookie HttpOnly.
-      // Solo guardamos los datos del usuario.
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Refrescar datos del usuario desde /auth/user/
+      try {
+        const whoami = await api.get('/auth/user/');
+        if (whoami?.data) {
+          localStorage.setItem('user', JSON.stringify(whoami.data));
+          return { user: whoami.data };
+        }
+      } catch (_) {}
+      if (response.data?.user) localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     } catch (error) {
       console.error('❌ Error durante el inicio de sesión con Google:', error);
@@ -267,15 +289,20 @@ export const authService = {
   async xLogin(authData) {
     try {
       console.log('🔄 Intentando iniciar sesión con X');
+      await this.ensureCsrfCookie();
       const response = await api.post('/auth/twitter/', { // El endpoint del backend sigue siendo 'twitter'
         access_token: authData.oauth_token,
         token_secret: authData.oauth_token_secret, 
       });
-      console.log('✅ Inicio de sesión con X exitoso:', response.data);
-      
-      const user = response.data.user || response.data;
-      localStorage.setItem('user', JSON.stringify(user));
-      
+      try {
+        const whoami = await api.get('/auth/user/');
+        if (whoami?.data) {
+          localStorage.setItem('user', JSON.stringify(whoami.data));
+          return { user: whoami.data };
+        }
+      } catch (_) {}
+      const fallbackUser = response.data.user || response.data;
+      localStorage.setItem('user', JSON.stringify(fallbackUser));
       return response.data;
     } catch (error) {
       console.error('❌ Error durante el inicio de sesión con X:', error);
@@ -292,15 +319,21 @@ export const authService = {
     try {
       console.log('🔄 Intentando iniciar sesión con Apple');
       // 'code' es el token de autorización de Apple
+      await this.ensureCsrfCookie();
       const response = await api.post('/auth/apple/', {
         code: authData.authorization.code,
         id_token: authData.authorization.id_token,
       });
-      console.log('✅ Inicio de sesión con Apple exitoso:', response.data);
-      
+      // Refrescar usuario desde /auth/user/
+      try {
+        const whoami = await api.get('/auth/user/');
+        if (whoami?.data) {
+          localStorage.setItem('user', JSON.stringify(whoami.data));
+        }
+      } catch (_) {}
       const user = response.data.user || response.data;
-      localStorage.setItem('user', JSON.stringify(user));
-      
+      if (user) localStorage.setItem('user', JSON.stringify(user));
+
       // Si Apple proporciona datos del usuario (solo la primera vez), podemos usarlos
       if (authData.user) {
         // Podrías enviar estos datos a una API para actualizar el perfil del usuario

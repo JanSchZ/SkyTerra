@@ -45,6 +45,12 @@ const CheckoutPage = () => {
     setError('');
 
     try {
+      // Asegurar CSRF antes de enviar POST autenticados
+      try {
+        const { authService } = await import('../../services/api');
+        if (authService?.ensureCsrfCookie) await authService.ensureCsrfCookie();
+      } catch (_) {}
+
       const payload = {};
       if (plan && plan.priceId) payload.priceId = plan.priceId;
       const response = await api.post('/payments/create-checkout-session/', payload);
@@ -67,6 +73,12 @@ const CheckoutPage = () => {
     setPaymentLoading(true);
     setError('');
     try {
+      // Asegurar CSRF antes de enviar POST autenticados
+      try {
+        const { authService } = await import('../../services/api');
+        if (authService?.ensureCsrfCookie) await authService.ensureCsrfCookie();
+      } catch (_) {}
+
       // Coinbase Commerce para Bitcoin (empresa establecida con compliance)
       const usdAmount = 10; // TODO: mapear plan.price -> USD real si corresponde
       const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
