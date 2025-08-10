@@ -96,6 +96,21 @@ _jwt_cookie_secure = (_jwt_cookie_secure_env == 'True') if _jwt_cookie_secure_en
 # but Chrome rejects SameSite=None without Secure over HTTP. Use Lax in dev, None in prod.
 _jwt_cookie_samesite = 'None' if (not DEBUG) else 'Lax'
 
+# Configuración adicional de cookies JWT para desarrollo local
+if DEBUG:
+    # En desarrollo, asegurar que las cookies JWT funcionen con el proxy de Vite
+    JWT_AUTH_COOKIE_DOMAIN = None  # No restringir dominio en desarrollo
+    JWT_AUTH_COOKIE_PATH = '/'
+    JWT_AUTH_COOKIE_HTTPONLY = True
+    JWT_AUTH_COOKIE_SECURE = False  # HTTP en desarrollo
+    JWT_AUTH_COOKIE_SAMESITE = 'Lax'  # Lax para desarrollo local
+    
+    # Configuración de sesión para desarrollo
+    SESSION_COOKIE_SECURE = False
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
 REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'jwt-access-token',

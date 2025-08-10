@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, Container, Typography, Paper, TextField, Button, Grid, IconButton, Divider, CircularProgress, Alert } from '@mui/material';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import { api } from '../../services/api';
+import { api, authService } from '../../services/api';
 import { loadStripe } from '@stripe/stripe-js';
 
 // Make sure to put your publishable key here
@@ -19,6 +19,32 @@ const CheckoutPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  // Verificar autenticación al cargar la página
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setAuthChecking(true);
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        } else {
+          setError('Debes iniciar sesión para realizar pagos.');
+          setTimeout(() => navigate('/login'), 2000);
+        }
+      } catch (err) {
+        console.error('Error checking authentication:', err);
+        setError('Error de autenticación. Redirigiendo al login...');
+        setTimeout(() => navigate('/login'), 2000);
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+
+    checkAuth();
+  }, [navigate]);
 
   const handleApplyCoupon = async () => {
     if (!couponCode) {
@@ -41,18 +67,24 @@ const CheckoutPage = () => {
   };
 
   const handlePayment = async () => {
+    if (!user) {
+      setError('Debes iniciar sesión para realizar pagos.');
+      return;
+    }
+
     setPaymentLoading(true);
     setError('');
 
     try {
       // Asegurar CSRF antes de enviar POST autenticados
-      try {
-        const { authService } = await import('../../services/api');
-        if (authService?.ensureCsrfCookie) await authService.ensureCsrfCookie();
-      } catch (_) {}
+      await authService.ensureCsrfCookie();
 
       const payload = {};
       if (plan && plan.priceId) payload.priceId = plan.priceId;
+      
+      console.log('🔐 [Payment] Usuario autenticado:', user.email);
+      console.log('🔐 [Payment] Enviando petición a Stripe...');
+      
       const response = await api.post('/payments/create-checkout-session/', payload);
 
       const session = response.data;
@@ -63,39 +95,70 @@ const CheckoutPage = () => {
         setError(error.message);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al procesar el pago.');
+      console.error('❌ [Payment Error]', err);
+      if (err.response?.status === 401) {
+        setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        setError(err.response?.data?.error || 'Error al procesar el pago.');
+      }
     } finally {
       setPaymentLoading(false);
     }
   };
 
   const handleBitcoinPayment = async () => {
+    if (!user) {
+      setError('Debes iniciar sesión para realizar pagos.');
+      return;
+    }
+
     setPaymentLoading(true);
     setError('');
     try {
       // Asegurar CSRF antes de enviar POST autenticados
-      try {
-        const { authService } = await import('../../services/api');
-        if (authService?.ensureCsrfCookie) await authService.ensureCsrfCookie();
-      } catch (_) {}
+      await authService.ensureCsrfCookie();
 
       // Coinbase Commerce para Bitcoin (empresa establecida con compliance)
       const usdAmount = 10; // TODO: mapear plan.price -> USD real si corresponde
       const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
+      
+      console.log('🔐 [Bitcoin Payment] Usuario autenticado:', user.email);
+      console.log('🔐 [Bitcoin Payment] Enviando petición a Coinbase...');
+      
       const response = await api.post('/payments/bitcoin/create-charge/', payload);
       const { hostedUrl } = response.data;
       window.location.href = hostedUrl;
     } catch (err) {
-      setError(err.response?.data?.error || 'Error al procesar pago con Bitcoin.');
+      console.error('❌ [Bitcoin Payment Error]', err);
+      if (err.response?.status === 401) {
+        setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        setError(err.response?.data?.error || 'Error al procesar pago con Bitcoin.');
+      }
     } finally {
       setPaymentLoading(false);
     }
   };
   
-  if (!plan) {
+  // Mostrar loading mientras se verifica la autenticación
+  if (authChecking) {
     return (
       <Container>
-        <Typography>No plan selected. Please go back and select a plan.</Typography>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+          <Typography variant="h6" sx={{ ml: 2 }}>Verificando autenticación...</Typography>
+        </Box>
+      </Container>
+    );
+  }
+
+  // Redirigir si no hay plan o usuario
+  if (!plan || !user) {
+    return (
+      <Container>
+        <Typography>No plan selected or user not authenticated. Please go back and select a plan.</Typography>
         <Button onClick={() => navigate('/pricing')}>Go to Pricing</Button>
       </Container>
     );

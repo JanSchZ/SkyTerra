@@ -63,14 +63,31 @@ export const api = axios.create({
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
-    // Ya no es necesario añadir el token manualmente, las cookies se envían automáticamente.
+    // Debug: verificar cookies JWT antes de cada request
+    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {});
+    
+    const hasJwtToken = cookies['jwt-access-token'];
+    const hasCsrfToken = cookies['csrftoken'];
+    
     console.log('🌐 [API Request]', {
       method: config.method?.toUpperCase(),
       url: config.url,
       baseURL: config.baseURL,
       fullURL: `${config.baseURL}${config.url}`,
-      headers: config.headers
+      headers: config.headers,
+      cookies: {
+        hasJwtToken: !!hasJwtToken,
+        hasCsrfToken: !!hasCsrfToken,
+        jwtTokenLength: hasJwtToken ? hasJwtToken.length : 0,
+        csrfTokenLength: hasCsrfToken ? hasCsrfToken.length : 0
+      },
+      withCredentials: config.withCredentials
     });
+    
     return config;
   },
   error => {
@@ -366,16 +383,29 @@ export const authService = {
 
   // Obtener usuario actual
   async getCurrentUser() {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
-    
     try {
-      const user = JSON.parse(userStr);
-      // Opcional: Podrías hacer una llamada ligera al backend aquí para validar el token
-      // Por ahora, solo devolvemos el usuario del localStorage
-      return user;
-    } catch {
-      localStorage.removeItem('user');
+      // Siempre verificar con el backend para asegurar que la sesión JWT sigue siendo válida
+      const response = await api.get('/auth/user/');
+      if (response.data) {
+        localStorage.setItem('user', JSON.stringify(response.data));
+        return response.data;
+      }
+      return null;
+    } catch (error) {
+      // Si hay error 401, la sesión no es válida
+      if (error.response?.status === 401) {
+        localStorage.removeItem('user');
+        return null;
+      }
+      // Para otros errores, intentar usar el usuario en caché como fallback
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          return JSON.parse(userStr);
+        } catch {
+          localStorage.removeItem('user');
+        }
+      }
       return null;
     }
   },
