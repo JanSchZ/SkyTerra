@@ -27,17 +27,21 @@ const CheckoutPage = () => {
     const checkAuth = async () => {
       try {
         setAuthChecking(true);
+        setError(''); // Limpiar errores previos
+        
         const currentUser = await authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
+          console.log('✅ [Checkout] Usuario autenticado:', currentUser.email);
         } else {
+          console.log('❌ [Checkout] No hay usuario autenticado');
           setError('Debes iniciar sesión para realizar pagos.');
-          setTimeout(() => navigate('/login'), 2000);
+          // No redirigir inmediatamente, dejar que el usuario vea el error
         }
       } catch (err) {
-        console.error('Error checking authentication:', err);
-        setError('Error de autenticación. Redirigiendo al login...');
-        setTimeout(() => navigate('/login'), 2000);
+        console.error('❌ [Checkout] Error checking authentication:', err);
+        setError('Error de autenticación. Por favor, inicia sesión nuevamente.');
+        // No redirigir inmediatamente, dejar que el usuario vea el error
       } finally {
         setAuthChecking(false);
       }
@@ -94,15 +98,15 @@ const CheckoutPage = () => {
       if (error) {
         setError(error.message);
       }
-    } catch (err) {
-      console.error('❌ [Payment Error]', err);
-      if (err.response?.status === 401) {
-        setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
-        setTimeout(() => navigate('/login'), 2000);
-      } else {
-        setError(err.response?.data?.error || 'Error al procesar el pago.');
-      }
-    } finally {
+         } catch (err) {
+       console.error('❌ [Payment Error]', err);
+       if (err.response?.status === 401) {
+         setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+         // No redirigir automáticamente, dejar que el usuario vea el error
+       } else {
+         setError(err.response?.data?.error || 'Error al procesar el pago.');
+       }
+     } finally {
       setPaymentLoading(false);
     }
   };
@@ -129,15 +133,15 @@ const CheckoutPage = () => {
       const response = await api.post('/payments/bitcoin/create-charge/', payload);
       const { hostedUrl } = response.data;
       window.location.href = hostedUrl;
-    } catch (err) {
-      console.error('❌ [Bitcoin Payment Error]', err);
-      if (err.response?.status === 401) {
-        setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
-        setTimeout(() => navigate('/login'), 2000);
-      } else {
-        setError(err.response?.data?.error || 'Error al procesar pago con Bitcoin.');
-      }
-    } finally {
+         } catch (err) {
+       console.error('❌ [Bitcoin Payment Error]', err);
+       if (err.response?.status === 401) {
+         setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+         // No redirigir automáticamente, dejar que el usuario vea el error
+       } else {
+         setError(err.response?.data?.error || 'Error al procesar pago con Bitcoin.');
+       }
+     } finally {
       setPaymentLoading(false);
     }
   };
@@ -154,12 +158,85 @@ const CheckoutPage = () => {
     );
   }
 
-  // Redirigir si no hay plan o usuario
+  // Mostrar error de autenticación con opción de reintentar
+  if (error && !user) {
+    return (
+      <Container>
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Typography variant="h5" gutterBottom color="error">
+            Error de Autenticación
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 3 }}>
+            {error}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                setError('');
+                setAuthChecking(true);
+                // Reintentar verificación de autenticación
+                authService.getCurrentUser().then(currentUser => {
+                  if (currentUser) {
+                    setUser(currentUser);
+                  }
+                  setAuthChecking(false);
+                }).catch(err => {
+                  console.error('❌ [Checkout] Reintento fallido:', err);
+                  setError('Error de autenticación. Por favor, inicia sesión nuevamente.');
+                  setAuthChecking(false);
+                });
+              }}
+              sx={{ borderRadius: 2, fontWeight: 'bold' }}
+            >
+              Reintentar
+            </Button>
+            <Button 
+              variant="outlined" 
+              onClick={() => navigate('/login')}
+              sx={{ borderRadius: 2, fontWeight: 'bold' }}
+            >
+              Ir al Login
+            </Button>
+          </Box>
+        </Box>
+      </Container>
+    );
+  }
+
+  // Mostrar error si no hay plan o usuario
   if (!plan || !user) {
     return (
       <Container>
-        <Typography>No plan selected or user not authenticated. Please go back and select a plan.</Typography>
-        <Button onClick={() => navigate('/pricing')}>Go to Pricing</Button>
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Typography variant="h5" gutterBottom color="error">
+            {!plan ? 'No se seleccionó ningún plan' : 'No estás autenticado'}
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 3 }}>
+            {!plan 
+              ? 'Por favor, regresa a la página de precios y selecciona un plan.'
+              : 'Debes iniciar sesión para continuar con el proceso de pago.'
+            }
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <Button 
+              variant="contained" 
+              onClick={() => navigate('/pricing')}
+              sx={{ borderRadius: 2, fontWeight: 'bold' }}
+            >
+              {!plan ? 'Ir a Precios' : 'Seleccionar Plan'}
+            </Button>
+            {!user && (
+              <Button 
+                variant="outlined" 
+                onClick={() => navigate('/login')}
+                sx={{ borderRadius: 2, fontWeight: 'bold' }}
+              >
+                Iniciar Sesión
+              </Button>
+            )}
+          </Box>
+        </Box>
       </Container>
     );
   }
@@ -167,10 +244,13 @@ const CheckoutPage = () => {
   return (
     <Box sx={{ backgroundColor: 'white', minHeight: '100vh', py: 6 }}>
       <Container maxWidth="md">
-        <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
             <IconButton onClick={() => navigate(-1)} aria-label="Volver">
                 <ArrowBackIosNewIcon />
             </IconButton>
+            <Typography variant="body2" color="text.secondary">
+              Volver
+            </Typography>
         </Box>
         <Typography variant="h3" component="h1" align="center" gutterBottom sx={{ fontWeight: 'bold' }}>
           Finalizar Compra

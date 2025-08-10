@@ -145,6 +145,7 @@ function App() {
           setUser(currentUser);
         } else {
           setUser(null);
+          localStorage.removeItem('user'); // Limpiar si la verificación falló
         }
       } catch (error) {
         console.error("Failed to verify user session with backend:", error);
@@ -153,7 +154,23 @@ function App() {
         setLoadingAuth(false);
       }
     };
+    
+    // Listener para cuando la sesión se invalida desde otros componentes
+    const handleAuthInvalid = () => {
+      console.log('🔄 [App] Sesión invalidada, limpiando estado del usuario');
+      setUser(null);
+      localStorage.removeItem('user');
+    };
+
     loadUser();
+    
+    // Agregar listener para eventos de autenticación inválida
+    window.addEventListener('auth:invalid', handleAuthInvalid);
+    
+    // Cleanup del listener
+    return () => {
+      window.removeEventListener('auth:invalid', handleAuthInvalid);
+    };
   }, []);
   
   const handleAISearch = (aiGeneratedFilters) => {
