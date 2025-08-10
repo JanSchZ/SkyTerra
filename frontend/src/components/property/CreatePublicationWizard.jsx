@@ -54,7 +54,7 @@ export default function CreatePublicationWizard() {
           price: Math.round(propertyData.price),
           size: parseFloat(propertyData.size),
           listing_type: 'sale',
-          boundary_polygon: JSON.stringify(propertyData.boundary_polygon)
+          boundary_polygon: propertyData.boundary_polygon
         });
         setSnackbar({ open: true, message: 'Propiedad creada con éxito', severity: 'success' });
         setSubmitting(false);
