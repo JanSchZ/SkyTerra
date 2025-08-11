@@ -319,8 +319,8 @@ const MapView = forwardRef(({
       // console.log("Parámetros finales para API:", params); // Debug log
       const data = await propertyService.getPaginatedProperties(pageToFetch, params);
       
-      // Debug: verificar qué datos recibimos
-      console.log('Datos recibidos del API:', { pageToFetch, data, dataType: typeof data });
+      // Debug solo en dev
+      if (import.meta.env.MODE === 'development') console.debug('Datos recibidos del API:', { pageToFetch, data, dataType: typeof data });
       
       // Verificar que data tenga la estructura esperada
       if (!data || !Array.isArray(data.results)) {
@@ -355,7 +355,7 @@ const MapView = forwardRef(({
       }
 
     } catch (err) {
-      console.error('Error al cargar propiedades:', err);
+        console.error('Error al cargar propiedades:', err?.message || err);
       setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
       if (pageToFetch === 1) {
         setProperties([]);

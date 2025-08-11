@@ -513,7 +513,7 @@ if (!config.mapbox.accessToken || typeof config.mapbox.accessToken !== 'string')
 
 // Log configuration in development (without sensitive data)
 if (config.development.isDev) {
-  console.log('🔧 App Configuration:', {
+  console.debug('🔧 App Configuration:', {
     app: config.app,
     api: config.api,
     mapbox: {

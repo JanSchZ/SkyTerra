@@ -13,8 +13,8 @@ const AIModelManager = () => {
     const fetchModels = async () => {
       try {
         const data = await aiService.getModels();
-        // Asegurarse de que 'data.models' es un array antes de hacer setModels
-        setModels(data.models || []); 
+        // API returns a plain list from /api/ai/models/
+        setModels(Array.isArray(data) ? data : (data.models || [])); 
       } catch (error) {
         console.error('Error fetching AI models:', error);
         setError('No se pudieron cargar los modelos de IA.');
@@ -25,8 +25,8 @@ const AIModelManager = () => {
     const fetchLogs = async () => {
       try {
         const data = await aiService.getLogs();
-        // Asegurarse de que 'data.logs' es un array antes de hacer setLogs
-        setLogs(data.logs || []);
+        // API returns a plain list from /api/ai/logs/
+        setLogs(Array.isArray(data) ? data : (data.logs || []));
       } catch (error) {
         console.error('Error fetching AI logs:', error);
         setError('No se pudieron cargar los logs de IA.');
@@ -38,9 +38,12 @@ const AIModelManager = () => {
     fetchLogs();
   }, []);
 
-  const handleUpdate = (modelId) => {
-    // Lógica para actualizar un modelo
-    console.log('Update model:', modelId);
+  const handleUpdate = async (modelId, modelPayload) => {
+    try {
+      await api.put(`/ai/models/${modelId}/`, modelPayload || models.find(m => m.id === modelId));
+    } catch (e) {
+      console.error('Error updating model:', e);
+    }
   };
 
   const handleInputChange = (e, modelId, field) => {

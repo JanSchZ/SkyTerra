@@ -208,12 +208,12 @@ const PropertyDetails = () => {
           navigator.geolocation.getCurrentPosition(
             (position) => {
               const { latitude, longitude } = position.coords;
-              console.log(`🌍 Ubicación detectada: ${latitude}, ${longitude}`);
-              console.log('🚁 Iniciando vuelo automático a la propiedad...');
+              if (import.meta.env.MODE === 'development') console.debug(`🌍 Ubicación detectada: ${latitude}, ${longitude}`);
+              if (import.meta.env.MODE === 'development') console.debug('🚁 Iniciando vuelo automático a la propiedad...');
               performAutoFlight(tours);
             },
             (error) => {
-              console.log('📍 No se pudo obtener ubicación, usando Chile como país por defecto');
+              if (import.meta.env.MODE === 'development') console.debug('📍 No se pudo obtener ubicación, usando Chile como país por defecto');
               performAutoFlight(tours);
             },
             {
@@ -223,7 +223,7 @@ const PropertyDetails = () => {
             }
           );
         } else {
-          console.log('🌐 Geolocalización no disponible, usando Chile como país por defecto');
+          if (import.meta.env.MODE === 'development') console.debug('🌐 Geolocalización no disponible, usando Chile como país por defecto');
           performAutoFlight(tours);
         }
       }, 2000); // Revertido a 2000ms
@@ -240,7 +240,7 @@ const PropertyDetails = () => {
       return;
     }
     
-    console.log('🚁 Iniciando vuelo directo a la propiedad...');
+    if (import.meta.env.MODE === 'development') console.debug('🚁 Iniciando vuelo directo a la propiedad...');
 
     // Primer tramo: vuelo cinematográfico directo al área de la propiedad
     mapRef.current.flyTo({
@@ -304,7 +304,7 @@ const PropertyDetails = () => {
 
   // Función para manejar la carga del mapa
   const handleMapLoad = () => {
-    console.log('🗺️ Mapa de PropertyDetails cargado');
+    if (import.meta.env.MODE === 'development') console.debug('🗺️ Mapa de PropertyDetails cargado');
     // El vuelo automático se iniciará desde el useEffect cuando la propiedad esté cargada
   };
 

@@ -26,7 +26,7 @@ IF NOT EXIST ".venv\Scripts\activate" (
 
 REM La opción "start" abre el comando en una nueva ventana y permite que el script continúe.
 REM Backend: fijamos variables de entorno para CORS/CSRF y puertos locales.
-start "SkyTerra Backend" cmd /k "set DEBUG=True && set CLIENT_URL=http://localhost:3000 && set CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173 && set CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 && set JWT_COOKIE_SECURE=False && .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000"
+start "SkyTerra Backend" cmd /k "set DEBUG=True && set CLIENT_URL=http://localhost:3000 && set CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173 && set CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173 && set JWT_COOKIE_SECURE=False && .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000"
 
 REM Dar un momento para que el backend inicie (opcional, ajusta según sea necesario)
 timeout /t 5 /nobreak

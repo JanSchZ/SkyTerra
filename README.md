@@ -180,6 +180,10 @@ If you prefer to start services manually or need more control:
 
 The backend will typically run on `http://127.0.0.1:8000/` and the frontend on `http://localhost:3000/` (or `http://localhost:5173/`). In local dev the frontend talks to the backend via the Vite dev proxy (`/api`) to avoid CORS/SSL issues.
 
+Notes:
+- In local development the frontend always proxies API calls to `/api` via Vite to avoid CORS/SSL issues. Only set `VITE_API_BASE_URL` for non-local deployments.
+- Sensitive logs and verbose console output are reduced in production builds.
+
 ## Testing
 
 ### Backend Tests

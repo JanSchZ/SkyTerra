@@ -17,7 +17,7 @@ export default function LandingV2() {
           filters={filters}
           appliedFilters={appliedFilters}
           disableIntroAnimation={false}
-          onLoad={() => console.log('Map loaded')}
+          onLoad={() => import.meta.env.MODE === 'development' && console.debug('Map loaded')}
         />
       </Box>
 

@@ -32,9 +32,9 @@ const CheckoutPage = () => {
         const currentUser = await authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
-          console.log('✅ [Checkout] Usuario autenticado:', currentUser.email);
+          if (import.meta.env.MODE === 'development') console.debug('✅ [Checkout] Usuario autenticado:', currentUser.email);
         } else {
-          console.log('❌ [Checkout] No hay usuario autenticado');
+          if (import.meta.env.MODE === 'development') console.debug('❌ [Checkout] No hay usuario autenticado');
           setError('Debes iniciar sesión para realizar pagos.');
           // No redirigir inmediatamente, dejar que el usuario vea el error
         }
@@ -86,8 +86,8 @@ const CheckoutPage = () => {
       const payload = {};
       if (plan && plan.priceId) payload.priceId = plan.priceId;
       
-      console.log('🔐 [Payment] Usuario autenticado:', user.email);
-      console.log('🔐 [Payment] Enviando petición a Stripe...');
+      if (import.meta.env.MODE === 'development') console.debug('🔐 [Payment] Usuario autenticado:', user.email);
+      if (import.meta.env.MODE === 'development') console.debug('🔐 [Payment] Enviando petición a Stripe...');
       
       const response = await api.post('/payments/create-checkout-session/', payload);
 
@@ -127,8 +127,8 @@ const CheckoutPage = () => {
       const usdAmount = 10; // TODO: mapear plan.price -> USD real si corresponde
       const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
       
-      console.log('🔐 [Bitcoin Payment] Usuario autenticado:', user.email);
-      console.log('🔐 [Bitcoin Payment] Enviando petición a Coinbase...');
+      if (import.meta.env.MODE === 'development') console.debug('🔐 [Bitcoin Payment] Usuario autenticado:', user.email);
+      if (import.meta.env.MODE === 'development') console.debug('🔐 [Bitcoin Payment] Enviando petición a Coinbase...');
       
       const response = await api.post('/payments/bitcoin/create-charge/', payload);
       const { hostedUrl } = response.data;

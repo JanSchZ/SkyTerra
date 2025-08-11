@@ -16,7 +16,9 @@ export const assignTicketPriority = (title) => {
     for (const keyword of highPriorityKeywords) {
         if (lowerCaseTitle.includes(keyword)) {
             // Simulate sending an immediate email for high priority tickets
-            console.log(`%c[AI Notification Service]%c Sending immediate email for high priority ticket: "${title}"`, 'color: #8A2BE2; font-weight: bold;', 'color: inherit;');
+            if (import.meta.env.MODE === 'development') {
+                console.log(`%c[AI Notification Service]%c Sending immediate email for high priority ticket: "${title}"`, 'color: #8A2BE2; font-weight: bold;', 'color: inherit;');
+            }
             return 'high';
         }
     }

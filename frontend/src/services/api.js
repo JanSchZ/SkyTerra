@@ -48,7 +48,7 @@ const getBaseURL = () => {
 
 // Crear una instancia con configuración base (regla: en local -> proxy /api)
 const baseURL = getBaseURL();
-if (import.meta.env.MODE === 'development') console.log('🔧 API configurada con baseURL:', baseURL);
+  if (import.meta.env.MODE === 'development') console.debug('🔧 API configurada con baseURL:', baseURL);
 
 export const api = axios.create({
   baseURL: baseURL,
@@ -73,7 +73,7 @@ api.interceptors.request.use(
     const hasJwtToken = cookies['jwt-access-token'];
     const hasCsrfToken = cookies['csrftoken'];
     
-    console.log('🌐 [API Request]', {
+    if (import.meta.env.MODE === 'development') console.debug('🌐 [API Request]', {
       method: config.method?.toUpperCase(),
       url: config.url,
       baseURL: config.baseURL,
@@ -91,7 +91,7 @@ api.interceptors.request.use(
     return config;
   },
   error => {
-    console.error('[API Request Error]', error);
+    console.error('[API Request Error]', error?.message || error);
     return Promise.reject(error);
   }
 );
@@ -99,7 +99,7 @@ api.interceptors.request.use(
 // Interceptor para manejo y logging de respuestas
 api.interceptors.response.use(
   response => {
-    console.log('[API Response]', {
+    if (import.meta.env.MODE === 'development') console.debug('[API Response]', {
       url: response.config.url,
       status: response.status,
       data: response.data
@@ -107,13 +107,7 @@ api.interceptors.response.use(
     return response;
   },
   error => {
-    console.error('[API Response Error]', {
-      url: error.config?.url,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
+    console.error('[API Response Error]', error?.message || error);
 
     // Manejo global de 401 sin redirigir agresivamente
     if (error.response && error.response.status === 401) {
@@ -130,7 +124,7 @@ api.interceptors.response.use(
 
       // No redirigimos automáticamente. Dejamos que las rutas protegidas gestionen la navegación.
       if (isLoginAttempt) {
-        console.error('[Login Failed]', 'Intento de login fallido con 401.', error.response.data);
+        console.warn('[Login Failed] 401');
       }
     }
 
@@ -787,13 +781,11 @@ export const tourService = {
   // Subir nuevo tour
   async uploadTour(tourData) {
     try {
-      const token = localStorage.getItem('auth_token');
-      const axiosConfig = {
-        headers: {
-          ...(token ? { Authorization: `Token ${token}` } : {})
-        }
-      };
-      const response = await axios.post(`${baseURL}/tours/`, tourData, axiosConfig);
+      // JWT via cookies; ensure CSRF then send multipart
+      await authService.ensureCsrfCookie?.();
+      const response = await api.post(`/tours/`, tourData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       return response.data;
     } catch (error) {
       console.error('Error uploading tour:', error);

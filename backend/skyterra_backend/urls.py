@@ -60,7 +60,7 @@ class AppleLogin(SocialLoginView):
     adapter_class = AppleOAuth2Adapter
     client_class = OAuth2Client
     # Use CLIENT_URL environment (fallback to localhost for dev)
-    callback_url = settings.CLIENT_URL + '/login'
+    callback_url = settings.CLIENT_URL.rstrip('/') + '/login'
 
 router = routers.DefaultRouter()
 router.register(r'admin/tickets', TicketViewSet, basename='admin-tickets')

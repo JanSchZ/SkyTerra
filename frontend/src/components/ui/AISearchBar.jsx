@@ -237,7 +237,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
       // AI SEARCH FALLBACK / PROPERTY QUERY
       // ---------------------------------------------------------------
 
-      const response = await api.post('ai-search/', { query: searchTerm, conversation_history: [] });
+      const response = await api.post('/ai-search/', { query: searchTerm, conversation_history: [] });
       if (response.data && typeof response.data === 'object') {
         const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
         const hasContentForPropertyList = (suggestedFilters && Object.values(suggestedFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== null && (Array.isArray(v) ? v.some(subVal => subVal !== null) : true )))) || (recommendations && recommendations.length > 0);

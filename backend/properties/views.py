@@ -135,8 +135,8 @@ class PropertyViewSet(viewsets.ModelViewSet):
         try:
             if not self.request.user.is_authenticated:
                 logger.error("Intento de crear propiedad sin autenticación")
-                # This should ideally be caught by permission_classes, but as a safeguard:
-                return Response({"detail": "Debe estar autenticado para crear propiedades."}, status=status.HTTP_401_UNAUTHORIZED)
+                from rest_framework.exceptions import NotAuthenticated
+                raise NotAuthenticated("Debe estar autenticado para crear propiedades.")
 
             logger.info(f"Creando propiedad para usuario: {self.request.user.username}")
             logger.info(f"Datos recibidos: {serializer.validated_data}")
@@ -206,7 +206,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
                 logger.info(f"{len(new_docs)} documento(s) añadidos a la propiedad {instance.id} en actualización")
             
         except Exception as e:
-            logger.error(f"Error al actualizar propiedad {instance.id}: {str(e)}", exc_info=True)
+            logger.error(f"Error al actualizar propiedad: {str(e)}", exc_info=True)
             # Re-raise to be handled by the main update method or DRF's exception handler
             raise
 
@@ -376,11 +376,10 @@ class ImageViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         queryset = Image.objects.all()
-        property_id = self.request.query_params.get('property_id')
-        
+        # Accept both 'property' and 'property_id' query params for compatibility
+        property_id = self.request.query_params.get('property') or self.request.query_params.get('property_id')
         if property_id:
             queryset = queryset.filter(property_id=property_id)
-            
         return queryset.order_by('order')
 
     def get_permissions(self):
@@ -429,7 +428,7 @@ class AISearchView(APIView):
             return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request, *args, **kwargs):
-        print("--- AISearchView GET method reached (use POST for AI search) ---")
+        logger.debug("AISearchView GET reached; advise to use POST for AI search")
         return Response({"message": "Use POST for AI search. Include 'current_query' and 'conversation_history'."}, status=status.HTTP_200_OK)
 
 class PropertyDocumentViewSet(viewsets.ModelViewSet):

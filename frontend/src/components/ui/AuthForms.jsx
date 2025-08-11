@@ -262,7 +262,7 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('🔄 Formulario de registro enviado:', {
+    if (import.meta.env.MODE === 'development') console.debug('🔄 Formulario de registro enviado:', {
       sellerType,
       ...formData,
       hasPassword: !!formData.password,
@@ -271,7 +271,7 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
     
     const errors = validateForm();
     if (Object.keys(errors).length === 0) {
-      console.log('✅ Validación exitosa, enviando datos...');
+      if (import.meta.env.MODE === 'development') console.debug('✅ Validación exitosa, enviando datos...');
       const autoUsername = formData.email ? formData.email.split('@')[0] : undefined;
       const userData = {
         seller_type: sellerType,
@@ -289,7 +289,7 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
       };
       if (onRegister) onRegister(userData);
     } else {
-      console.log('❌ Errores de validación:', errors);
+      if (import.meta.env.MODE === 'development') console.debug('❌ Errores de validación:', errors);
       setFormErrors(errors);
     }
   };

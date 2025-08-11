@@ -43,8 +43,8 @@ services:
       - DATABASE_URL=postgres://skyterra:skyterra_dev_password@db:5432/skyterra
       - REDIS_URL=redis://redis:6379/0
       - DEBUG=False
-      - SECRET_KEY=your-secret-key-here-change-in-production
-      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-env}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
     depends_on:
       db:
         condition: service_healthy

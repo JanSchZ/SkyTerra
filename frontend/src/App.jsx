@@ -350,7 +350,7 @@ function App() {
     setConversationHistory(newHistory);
     try {
       setAiSearchLoading(true);
-      const response = await api.post('ai-search/', { query: text, conversation_history: newHistory });
+      const response = await api.post('/ai-search/', { query: text, conversation_history: newHistory });
       if (response.data) {
         setAiSearchResult(response.data);
         if(response.data.assistant_message){
@@ -362,7 +362,7 @@ function App() {
   };
 
   const handleGoogleLoginSuccess = async (response) => {
-    console.log('Google login success response:', response);
+    if (import.meta.env.MODE === 'development') console.debug('Google login success response:', response);
     try {
       const authData = await authService.googleLogin(response);
       const user = authData.user;

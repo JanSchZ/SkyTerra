@@ -4,10 +4,12 @@ import django
 django.setup()
 from django.conf import settings
 
-print('DEBUG=', settings.DEBUG)
-print('SECURE_SSL_REDIRECT=', getattr(settings, 'SECURE_SSL_REDIRECT', None))
-print('ALLOWED_HOSTS=', settings.ALLOWED_HOSTS)
-print('CORS_ALLOWED_ORIGINS=', getattr(settings, 'CORS_ALLOWED_ORIGINS', None))
-print('CORS_ALLOW_CREDENTIALS=', getattr(settings, 'CORS_ALLOW_CREDENTIALS', None))
-print('CSRF_TRUSTED_ORIGINS=', getattr(settings, 'CSRF_TRUSTED_ORIGINS', None))
+import logging
+logger = logging.getLogger(__name__)
+logger.info('DEBUG=%s', settings.DEBUG)
+logger.info('SECURE_SSL_REDIRECT=%s', getattr(settings, 'SECURE_SSL_REDIRECT', None))
+logger.info('ALLOWED_HOSTS=%s', settings.ALLOWED_HOSTS)
+logger.info('CORS_ALLOWED_ORIGINS=%s', getattr(settings, 'CORS_ALLOWED_ORIGINS', None))
+logger.info('CORS_ALLOW_CREDENTIALS=%s', getattr(settings, 'CORS_ALLOW_CREDENTIALS', None))
+logger.info('CSRF_TRUSTED_ORIGINS=%s', getattr(settings, 'CSRF_TRUSTED_ORIGINS', None))
 
