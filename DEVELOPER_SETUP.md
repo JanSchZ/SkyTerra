@@ -88,18 +88,6 @@ start_skyterra.bat
 ```
 
 ---
-## 6. GitHub Codespaces
-1. Crea un Codespace → la carpeta raíz ya contiene los pasos de devcontainer (si no, agrega uno).
-2. Al abrirse, ejecuta:
-   ```bash
-   # Backend
-   cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && python manage.py migrate && python manage.py createsuperuser
-   # Frontend (en otra terminal)
-   cd frontend && npm install && npm install @emotion/react @emotion/styled @mui/x-data-grid && npm run dev -- --host 0.0.0.0
-   ```
-3. Codespaces expone puertos 8000 (backend) y 5173 (frontend). Marca el 5173 como "Public" para vista externa.
-
----
 ## 7. Problemas comunes
 | Síntoma | Solución |
 |---------|----------|

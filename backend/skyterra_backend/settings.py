@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'storages',
+    'drf_spectacular',
 
     # allauth
     'allauth',
@@ -148,6 +149,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # allauth configuration
@@ -413,7 +415,8 @@ if not DEBUG:
 if DEBUG:
     X_FRAME_OPTIONS = 'ALLOWALL'  # Permitir iframes en desarrollo
 else:
-    X_FRAME_OPTIONS = 'SAMEORIGIN' # Solo permitir si es del mismo origen en producción
+    # En producción permitir solo mismo origen; use CSP para whitelistar orígenes adicionales
+    X_FRAME_OPTIONS = 'SAMEORIGIN'
 # Simple CSP allow-list for frames
 client_url = os.getenv('CLIENT_URL', 'http://localhost:3000')
 CSP_FRAME_ANCESTORS = ("'self'", "https://www.youtube.com", client_url)
@@ -453,9 +456,6 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     
-    # Protección contra ataques de frame
-    X_FRAME_OPTIONS = 'DENY'
-    
     # Content type sniffing protection
     SECURE_CONTENT_TYPE_NOSNIFF = True
     
@@ -471,14 +471,70 @@ if IS_LOCAL_DEV:
     SECURE_SSL_REDIRECT = False
 
 # ------------------------------------------------------------------
-# Cache configuration (Redis para producción)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        },
-        'TIMEOUT': 300,  # 5 minutos por defecto
+# Cache configuration
+_redis_url = os.getenv('REDIS_URL')
+if _redis_url:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _redis_url,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'TIMEOUT': 300,  # 5 minutos por defecto
+        }
     }
+else:
+    # Fallback seguro para entornos locales sin Redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'skyterra-locmem-cache',
+            'TIMEOUT': 300,
+        }
+    }
+
+# ------------------------------------------------------------------
+# Logging configuration (básica a consola)
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '[{levelname}] {asctime} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'properties': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'ai_management': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
 }
+
+# ------------------------------------------------------------------
+# Admin notification emails
+ADMIN_NOTIFICATION_EMAILS = [e.strip() for e in os.getenv('ADMIN_NOTIFICATION_EMAILS', '').split(',') if e.strip()] or [DEFAULT_FROM_EMAIL]

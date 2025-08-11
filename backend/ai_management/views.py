@@ -25,9 +25,9 @@ class AIModelViewSet(viewsets.ModelViewSet):
         """Populate default AI models"""
         try:
             default_models_data = [
-                {"name": "Gemini 1.0 Pro", "api_name": "gemini-pro", "input_cost_per_1k_tokens": 0.0001, "output_cost_per_1k_tokens": 0.0002, "max_tokens": 32768, "is_active": True, "is_thinking_model": False},
-                {"name": "Gemini 1.5 Flash", "api_name": "gemini-1.5-flash-latest", "input_cost_per_1k_tokens": 0.00035, "output_cost_per_1k_tokens": 0.0005, "max_tokens": 1048576, "is_active": True, "is_thinking_model": True},
-                {"name": "Gemini 1.5 Pro", "api_name": "gemini-1.5-pro-latest", "input_cost_per_1k_tokens": 0.0035, "output_cost_per_1k_tokens": 0.007, "max_tokens": 1048576, "is_active": True, "is_thinking_model": True},
+                {"name": "Gemini 1.0 Pro", "api_name": "gemini-pro", "price_per_1k_tokens_input": 0.0001, "price_per_1k_tokens_output": 0.0002, "max_tokens": 32768, "is_active": True, "supports_thinking": False},
+                {"name": "Gemini 1.5 Flash", "api_name": "gemini-1.5-flash-latest", "price_per_1k_tokens_input": 0.00035, "price_per_1k_tokens_output": 0.0005, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
+                {"name": "Gemini 1.5 Pro", "api_name": "gemini-1.5-pro-latest", "price_per_1k_tokens_input": 0.0035, "price_per_1k_tokens_output": 0.007, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
             ]
 
             for model_data in default_models_data:

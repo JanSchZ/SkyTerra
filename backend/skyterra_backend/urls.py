@@ -30,6 +30,7 @@ from skyterra_backend.views import ProfileUpdateView, CSRFTokenView
 from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserListView, AdminDashboardStatsView, AdminPlanMetricsView  # Import stats view
 from rest_framework import routers
 from support_tickets.views import TicketViewSet, TicketResponseViewSet
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 def home_view(request):
     """Vista simple para la página de inicio"""
@@ -68,6 +69,10 @@ router.register(r'admin/ticket-responses', TicketResponseViewSet, basename='admi
 urlpatterns = [
     path('', home_view, name='home'),  # Ruta raíz
     path('admin/', admin.site.urls),
+    # API schema & docs
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     path('api/ai-search/', AISearchView.as_view(), name='project-ai-search'),
     path('api/auth/', include('dj_rest_auth.urls')),
     path('api/auth/csrf/', CSRFTokenView.as_view(), name='set-csrf-cookie'),

@@ -2,6 +2,7 @@ import logging
 from math import radians, cos, sin, asin, sqrt
 
 from django.conf import settings
+from django.utils import timezone
 
 from .plusvalia_factor_registry import get_factors, get_weights, register_factor
 
@@ -12,6 +13,14 @@ try:
 except Exception:
     GeminiService = None
     GeminiServiceError = Exception
+
+# Prefer SamService from ai_management for generic text evaluations
+try:
+    from ai_management.gemini_service import SamService as SkyTerraSamService
+    from ai_management.gemini_service import GeminiServiceError as SamServiceError
+except Exception:
+    SkyTerraSamService = None
+    SamServiceError = Exception
 
 try:
     from .external_market_service import ExternalMarketDataService
@@ -101,34 +110,35 @@ class PlusvaliaService:
     def _ai_score(cls, property):
         """Solicita a una IA un puntaje 0-100 basado en los detalles de la propiedad.
         Si falla, retorna 50 como valor neutral."""
-        # Deshabilitar IA si no se quiere llamar API en entornos sin clave
-        if not GeminiService:
-            return 50
+        # Intentar con SamService (preferido). Si no está disponible, usar 50 como neutral.
         try:
-            gemini = GeminiService()
-            prompt = (
-                "Eres un modelo que evalúa el potencial de plusvalía de propiedades rurales. "
-                "A continuación se describe una propiedad. Responde SOLO con un número entero entre 0 y 100 que refleje tu evaluación global.\n\n"
-                f"Nombre: {property.name}\n"
-                f"Tipo: {property.type}\n"
-                f"Precio: {property.price}\n"
-                f"Tamaño (ha): {property.size}\n"
-                f"Tiene agua: {property.has_water}\n"
-                f"Tiene vistas: {property.has_views}\n"
-                f"Descripción: {property.description[:500]}\n"
-                "\nPuntaje:"
-            )
-            response = gemini.search_properties_with_ai(prompt)  # Reutilizamos método existente pero esperamos JSON
-            # Intentar extraer número
-            import re, json as pyjson
-            score_match = re.search(r"\b(\d{1,3})\b", response if isinstance(response, str) else pyjson.dumps(response))
-            if score_match:
-                score = int(score_match.group(1))
-                return max(0, min(100, score))
-        except GeminiServiceError as ge:
-            logger.warning(f"GeminiServiceError evaluando IA plusvalía: {ge}")
+            if SkyTerraSamService:
+                sam = SkyTerraSamService()
+                prompt = (
+                    "Eres un modelo que evalúa el potencial de plusvalía de propiedades rurales. "
+                    "Responde SOLO con un número entero entre 0 y 100 (sin texto extra).\n\n"
+                    f"Nombre: {property.name}\n"
+                    f"Tipo: {property.type}\n"
+                    f"Precio: {property.price}\n"
+                    f"Tamaño (ha): {property.size}\n"
+                    f"Tiene agua: {property.has_water}\n"
+                    f"Tiene vistas: {property.has_views}\n"
+                    f"Descripción: {property.description[:500]}\n"
+                    "\nPuntaje (0-100):"
+                )
+                result = sam.generate_response(prompt, request_type="plusvalia_eval")
+                text = (result or {}).get('response', '') if isinstance(result, dict) else str(result)
+                import re
+                match = re.search(r"\b(\d{1,3})\b", text)
+                if match:
+                    score = int(match.group(1))
+                    return max(0, min(100, score))
+                # Si no se pudo extraer un número, devolver neutral
+                return 50
+        except SamServiceError as ge:
+            logger.warning(f"SamServiceError evaluando IA plusvalía: {ge}")
         except Exception as e:
-            logger.error(f"Error llamando a IA para plusvalía: {e}", exc_info=True)
+            logger.error(f"Error llamando a SamService para plusvalía: {e}", exc_info=True)
         return 50  # Valor neutral si falla
 
     # -------------------- Demanda interna ---------------------

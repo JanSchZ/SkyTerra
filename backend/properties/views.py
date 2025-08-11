@@ -12,6 +12,7 @@ import json
 import datetime
 import requests
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 import logging
 import traceback
@@ -41,9 +42,10 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size' # Allow client to override page_size
     max_page_size = 100 # Maximum page size
 
+@method_decorator(cache_page(60), name='list')
 class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
     """Vista read-only que expone detalles mínimos de propiedades para visitantes anónimos"""
-    queryset = Property.objects.filter(publication_status='approved').order_by('-created_at')
+    queryset = Property.objects.filter(publication_status='approved').prefetch_related('images').order_by('-created_at')
     serializer_class = PropertyPreviewSerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -162,7 +164,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     """
                     # Asegúrate que DEFAULT_FROM_EMAIL está configurado en settings.py
                     from_email = settings.DEFAULT_FROM_EMAIL
-                    recipient_list = ['skyedits.cl@gmail.com'] 
+                    recipient_list = getattr(settings, 'ADMIN_NOTIFICATION_EMAILS', ['admin@example.com']) 
                     
                     send_mail(subject, message_body, from_email, recipient_list, fail_silently=False)
                     logger.info(f"Email de notificación enviado a {recipient_list} para propiedad ID: {property_instance.id}")
@@ -574,7 +576,12 @@ class FavoriteViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Favorite.objects.filter(user=self.request.user).order_by('-created_at')
+        return (
+            Favorite.objects.filter(user=self.request.user)
+            .select_related('property')
+            .prefetch_related('property__images')
+            .order_by('-created_at')
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

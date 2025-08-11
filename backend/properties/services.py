@@ -1,12 +1,22 @@
-import requests
-from django.conf import settings
 import json
 import logging
+import re
 import time
 import random
+
+from django.conf import settings
 from django.db.models import Q
+
 from .models import Property
-import re
+
+# Prefer centralized SamService for AI interactions and usage logging
+try:
+    from ai_management.gemini_service import SamService as SkyTerraSamService
+    from ai_management.gemini_service import GeminiServiceError as SamServiceError
+except Exception:
+    SkyTerraSamService = None
+    class SamServiceError(Exception):
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +29,16 @@ class GeminiServiceError(Exception):
 
 class GeminiService:
     def __init__(self, api_key=None):
+        # Mantener compatibilidad, pero usar SamService si está disponible
         self.api_key = api_key or getattr(settings, 'GOOGLE_GEMINI_API_KEY', None)
         if not self.api_key:
             logger.error("[GeminiService] GOOGLE_GEMINI_API_KEY no está configurada.")
             raise GeminiServiceError("API key for Gemini service is not configured.", details="Verifique la configuración de GOOGLE_GEMINI_API_KEY en el archivo .env")
-        
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+
         self.max_retries = 3
         self.retry_delay = 2  # segundos
+        # No instanciar SamService aquí para evitar fallar temprano por falta de API key u otros
+        self._sam_class = SkyTerraSamService
 
     def _get_property_context(self):
         """Obtiene información de las propiedades disponibles en la base de datos."""
@@ -216,221 +228,169 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
 
     def search_properties_with_ai(self, user_query, conversation_history=None):
         """Busca propiedades usando IA y datos reales de la base de datos."""
-        
+
         for attempt in range(self.max_retries):
             try:
                 logger.info(f"[GeminiService] Intento {attempt + 1} - Buscando propiedades para: '{user_query}'")
-                
+
                 # Crear prompt mejorado con contexto de propiedades reales
                 prompt = self._create_enhanced_prompt(user_query, conversation_history)
-                
-                # Preparar la solicitud a Gemini
-                headers = {
-                    'Content-Type': 'application/json',
-                }
-                
-                data = {
-                    "contents": [{
-                        "parts": [{
-                            "text": prompt
-                        }]
-                    }],
-                    "generationConfig": {
-                        "temperature": 0.3,  # Menos creatividad, más precisión
-                        "topK": 40,
-                        "topP": 0.95,
-                        "maxOutputTokens": 2048,
-                    }
-                }
-                
-                # Realizar la solicitud
-                response = requests.post(
-                    f"{self.base_url}?key={self.api_key}",
-                    headers=headers,
-                    json=data,
-                    timeout=30
-                )
-                
-                logger.info(f"[GeminiService] Status Code: {response.status_code}")
-                
-                if response.status_code == 200:
-                    response_data = response.json()
-                    
-                    if 'candidates' in response_data and len(response_data['candidates']) > 0:
-                        content = response_data['candidates'][0]['content']['parts'][0]['text']
-                        logger.info(f"[GeminiService] Respuesta de Gemini: {content[:200]}...")
-                        
-                        try:
-                            # Limpiar posibles bloques de código Markdown (```json ... ```)
-                            clean_content = content.strip()
-                            if clean_content.startswith('```'):
-                                # Remove opening fence and optional language tag
-                                clean_content = re.sub(r'^```[a-zA-Z]*\s*', '', clean_content)
-                                # Remove trailing fence
-                                if clean_content.endswith('```'):
-                                    clean_content = clean_content[:-3]
-                                clean_content = clean_content.strip()
 
-                            # Intentar parsear como JSON
-                            ai_response = json.loads(clean_content)
-                            
-                            # Asegurar que los campos básicos estén presentes
-                            ai_response.setdefault('search_mode', 'property_recommendation') # Default si Gemini no lo incluye
-                            ai_response.setdefault('flyToLocation', None)
-                            ai_response.setdefault('suggestedFilters', None)
-                            ai_response.setdefault('recommendations', [])
-                            ai_response.setdefault('assistant_message', "Tu búsqueda ha sido procesada.")
-                            ai_response.setdefault('interpretation', user_query)
+                if not self._sam_class:
+                    raise GeminiServiceError("SamService no disponible en este entorno")
 
-                            # Si el modo es "property_recommendation", buscar propiedades reales
-                            if ai_response['search_mode'] == 'property_recommendation':
-                                # Primera prioridad: intentar enriquecer las recomendaciones sugeridas por la IA si tienen IDs válidos.
-                                enriched_recommendations = []
-                                valid_rec_ids = []
+                sam_instance = self._sam_class()
+                result = sam_instance.generate_response(prompt, request_type="ai_property_search")
+                content = (result or {}).get('response', '') if isinstance(result, dict) else str(result)
 
-                                for rec in ai_response.get('recommendations', []):
-                                    prop_id = rec.get('id')
-                                    if prop_id and isinstance(prop_id, int):
-                                        try:
-                                            prop = Property.objects.get(id=prop_id)
-                                            valid_rec_ids.append(prop_id)
-                                            enriched_recommendations.append({
-                                                'id': prop.id,
-                                                'name': prop.name,
-                                                'price': float(prop.price),
-                                                'size': prop.size,
-                                                'type': prop.get_type_display(),
-                                                'has_water': prop.has_water,
-                                                'has_views': prop.has_views,
-                                                'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
-                                                'latitude': prop.latitude,
-                                                'longitude': prop.longitude,
-                                                'reason': rec.get('reason') or "Recomendado por la IA"
-                                            })
-                                        except Property.DoesNotExist:
-                                            # ID no válido, continuar
-                                            continue
+                try:
+                    # Limpiar posibles bloques de código Markdown (```json ... ```)
+                    clean_content = content.strip()
+                    if clean_content.startswith('```'):
+                        # Remove opening fence and optional language tag
+                        clean_content = re.sub(r'^```[a-zA-Z]*\s*', '', clean_content)
+                        # Remove trailing fence
+                        if clean_content.endswith('```'):
+                            clean_content = clean_content[:-3]
+                        clean_content = clean_content.strip()
 
-                                # Si encontramos recomendaciones válidas a partir de la respuesta de la IA, las usamos tal cual
-                                if enriched_recommendations:
-                                    ai_response['recommendations'] = enriched_recommendations
-                                else:
-                                    # Si la IA no proporcionó recomendaciones válidas, construimos una lista basada en los filtros sugeridos (si existen)
-                                    if ai_response.get('suggestedFilters'):
-                                        search_filters = ai_response['suggestedFilters'].copy()
-                                        real_properties = self._search_properties(search_filters)
-                                    else:
-                                        # Como último recurso, hacemos una búsqueda básica utilizando el texto del usuario
-                                        real_properties = self._search_properties({'searchText': user_query})
+                    # Intentar parsear como JSON
+                    ai_response = json.loads(clean_content)
 
-                                    generated_recommendations = []
-                                    for prop in real_properties:
-                                        generated_recommendations.append({
-                                            'id': prop.id,
-                                            'name': prop.name,
-                                            'price': float(prop.price),
-                                            'size': prop.size,
-                                            'type': prop.get_type_display(),
-                                            'has_water': prop.has_water,
-                                            'has_views': prop.has_views,
-                                            'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
-                                            'latitude': prop.latitude,
-                                            'longitude': prop.longitude,
-                                            'reason': "Coincide con los filtros sugeridos."
-                                        })
+                    # Asegurar que los campos básicos estén presentes
+                    ai_response.setdefault('search_mode', 'property_recommendation')  # Default si Gemini no lo incluye
+                    ai_response.setdefault('flyToLocation', None)
+                    ai_response.setdefault('suggestedFilters', None)
+                    ai_response.setdefault('recommendations', [])
+                    ai_response.setdefault('assistant_message', "Tu búsqueda ha sido procesada.")
+                    ai_response.setdefault('interpretation', user_query)
 
-                                    ai_response['recommendations'] = generated_recommendations
+                    # Si el modo es "property_recommendation", buscar propiedades reales
+                    if ai_response['search_mode'] == 'property_recommendation':
+                        # Primera prioridad: intentar enriquecer las recomendaciones sugeridas por la IA si tienen IDs válidos.
+                        enriched_recommendations = []
+                        valid_rec_ids = []
 
-                                # Ajustar mensaje cuando utilizamos recomendaciones generadas y el mensaje existente es genérico
-                                generic_msgs = [
-                                    "Tu búsqueda ha sido procesada.",
-                                    "Búsqueda procesada",
-                                ]
-                                if (not enriched_recommendations) or (ai_response.get('assistant_message') in generic_msgs):
-                                    rec_count = len(ai_response['recommendations'])
-                                    if rec_count == 0:
-                                        ai_response['assistant_message'] = "No encontré propiedades que coincidan exactamente con tu búsqueda, pero aquí tienes algunas sugerencias generales."
-                                    else:
-                                        ai_response['assistant_message'] = f"Encontré {rec_count} propiedad{'es' if rec_count != 1 else ''} que podrían interesarte."
-
-                            elif ai_response['search_mode'] == 'location':
-                                # Para modo 'location', nos aseguramos que no haya recomendaciones de propiedades
-                                # y que flyToLocation esté presente (aunque el prompt ya lo pide)
-                                ai_response['recommendations'] = []
-                                ai_response['suggestedFilters'] = None # No se usan filtros de propiedad
-                                if not ai_response.get('flyToLocation'):
-                                    logger.warning("[GeminiService] search_mode es 'location' pero no se encontró flyToLocation en la respuesta de Gemini.")
-                                    # Podríamos intentar un geocoding aquí como fallback si fuera necesario
-                            
-                            return ai_response
-                            
-                        except json.JSONDecodeError as e:
-                            logger.error(f"[GeminiService] Error parseando JSON: {e}")
-                            logger.error(f"[GeminiService] Contenido recibido: {content}")
-                            
-                            # Crear respuesta de fallback con búsqueda básica
-                            fallback_filters = self._extract_basic_filters(user_query)
-                            real_properties = self._search_properties(fallback_filters)
-                            
-                            fallback_response = {
-                                'assistant_message': f"Procesé tu búsqueda y encontré {real_properties.count()} propiedades relacionadas.",
-                                'suggestedFilters': fallback_filters,
-                                'recommendations': [
-                                    {
+                        for rec in ai_response.get('recommendations', []):
+                            prop_id = rec.get('id')
+                            if prop_id and isinstance(prop_id, int):
+                                try:
+                                    prop = Property.objects.get(id=prop_id)
+                                    valid_rec_ids.append(prop_id)
+                                    enriched_recommendations.append({
                                         'id': prop.id,
                                         'name': prop.name,
                                         'price': float(prop.price),
                                         'size': prop.size,
-                                        'type': prop.get_type_display(), # Use display name for consistency
-                                        'latitude': prop.latitude, # Add latitude
-                                        'longitude': prop.longitude, # Add longitude
-                                        'has_water': prop.has_water, # Add has_water
-                                        'has_views': prop.has_views, # Add has_views
-                                        'reason': f"Relacionada con: {user_query}"
-                                    } for prop in real_properties[:5]
-                                ],
-                                'interpretation': f"Búsqueda procesada: {user_query}",
-                                'fallback': True # Ensure fallback flag is set for this path too
-                            }
-                            
-                            return fallback_response
-                    
-                    else:
-                        raise GeminiServiceError("No se recibieron candidatos en la respuesta de Gemini")
-                
-                elif response.status_code == 429:
+                                        'type': prop.get_type_display(),
+                                        'has_water': prop.has_water,
+                                        'has_views': prop.has_views,
+                                        'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
+                                        'latitude': prop.latitude,
+                                        'longitude': prop.longitude,
+                                        'reason': rec.get('reason') or "Recomendado por la IA"
+                                    })
+                                except Property.DoesNotExist:
+                                    # ID no válido, continuar
+                                    continue
+
+                        # Si encontramos recomendaciones válidas a partir de la respuesta de la IA, las usamos tal cual
+                        if enriched_recommendations:
+                            ai_response['recommendations'] = enriched_recommendations
+                        else:
+                            # Si la IA no proporcionó recomendaciones válidas, construimos una lista basada en los filtros sugeridos (si existen)
+                            if ai_response.get('suggestedFilters'):
+                                search_filters = ai_response['suggestedFilters'].copy()
+                                real_properties = self._search_properties(search_filters)
+                            else:
+                                # Como último recurso, hacemos una búsqueda básica utilizando el texto del usuario
+                                real_properties = self._search_properties({'searchText': user_query})
+
+                            generated_recommendations = []
+                            for prop in real_properties:
+                                generated_recommendations.append({
+                                    'id': prop.id,
+                                    'name': prop.name,
+                                    'price': float(prop.price),
+                                    'size': prop.size,
+                                    'type': prop.get_type_display(),
+                                    'has_water': prop.has_water,
+                                    'has_views': prop.has_views,
+                                    'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
+                                    'latitude': prop.latitude,
+                                    'longitude': prop.longitude,
+                                    'reason': "Coincide con los filtros sugeridos."
+                                })
+
+                            ai_response['recommendations'] = generated_recommendations
+
+                        # Ajustar mensaje cuando utilizamos recomendaciones generadas y el mensaje existente es genérico
+                        generic_msgs = [
+                            "Tu búsqueda ha sido procesada.",
+                            "Búsqueda procesada",
+                        ]
+                        if (not enriched_recommendations) or (ai_response.get('assistant_message') in generic_msgs):
+                            rec_count = len(ai_response['recommendations'])
+                            if rec_count == 0:
+                                ai_response['assistant_message'] = "No encontré propiedades que coincidan exactamente con tu búsqueda, pero aquí tienes algunas sugerencias generales."
+                            else:
+                                ai_response['assistant_message'] = f"Encontré {rec_count} propiedad{'es' if rec_count != 1 else ''} que podrían interesarte."
+
+                    elif ai_response['search_mode'] == 'location':
+                        # Para modo 'location', nos aseguramos que no haya recomendaciones de propiedades
+                        # y que flyToLocation esté presente (aunque el prompt ya lo pide)
+                        ai_response['recommendations'] = []
+                        ai_response['suggestedFilters'] = None  # No se usan filtros de propiedad
+                        if not ai_response.get('flyToLocation'):
+                            logger.warning("[GeminiService] search_mode es 'location' pero no se encontró flyToLocation en la respuesta de la IA.")
+
+                    return ai_response
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"[GeminiService] Error parseando JSON: {e}")
+                    logger.error(f"[GeminiService] Contenido recibido: {content}")
+
+                    # Crear respuesta de fallback con búsqueda básica
+                    fallback_filters = self._extract_basic_filters(user_query)
+                    real_properties = self._search_properties(fallback_filters)
+
+                    fallback_response = {
+                        'assistant_message': f"Procesé tu búsqueda y encontré {real_properties.count()} propiedades relacionadas.",
+                        'suggestedFilters': fallback_filters,
+                        'recommendations': [
+                            {
+                                'id': prop.id,
+                                'name': prop.name,
+                                'price': float(prop.price),
+                                'size': prop.size,
+                                'type': prop.get_type_display(),  # Use display name for consistency
+                                'latitude': prop.latitude,  # Add latitude
+                                'longitude': prop.longitude,  # Add longitude
+                                'has_water': prop.has_water,  # Add has_water
+                                'has_views': prop.has_views,  # Add has_views
+                                'reason': f"Relacionada con: {user_query}"
+                            } for prop in real_properties[:5]
+                        ],
+                        'interpretation': f"Búsqueda procesada: {user_query}",
+                        'fallback': True  # Ensure fallback flag is set for this path too
+                    }
+
+                    return fallback_response
+
+            except SamServiceError as e:
+                logger.error(f"[GeminiService] SamService error en intento {attempt + 1}: {e}")
+                if attempt < self.max_retries - 1:
                     wait_time = self.retry_delay * (2 ** attempt) + random.uniform(0, 1)
-                    logger.warning(f"[GeminiService] Rate limit alcanzado. Esperando {wait_time:.2f} segundos...")
                     time.sleep(wait_time)
                     continue
-                
-                else:
-                    error_msg = f"Error HTTP {response.status_code}"
-                    try:
-                        error_detail = response.json()
-                        error_msg += f": {error_detail}"
-                    except:
-                        error_msg += f": {response.text}"
-                    
-                    raise GeminiServiceError(error_msg, status_code=response.status_code)
-            
-            except requests.exceptions.RequestException as e:
-                logger.error(f"[GeminiService] Error de conexión en intento {attempt + 1}: {e}")
-                if attempt == self.max_retries - 1:
-                    # Último intento fallido, devolver búsqueda básica
-                    return self._create_fallback_response(user_query)
-                
-                time.sleep(self.retry_delay)
-                continue
-            
+                return self._create_fallback_response(user_query)
             except Exception as e:
                 logger.error(f"[GeminiService] Error inesperado en intento {attempt + 1}: {e}")
                 if attempt == self.max_retries - 1:
                     return self._create_fallback_response(user_query)
-                
                 time.sleep(self.retry_delay)
                 continue
-        
+
         # Si llegamos aquí, todos los intentos fallaron
         return self._create_fallback_response(user_query)
 

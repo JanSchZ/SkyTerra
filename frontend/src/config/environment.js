@@ -488,8 +488,8 @@ const computeApiBaseURL = () => {
 
 const config = {
   mapbox: {
-    // Use environment variable first, fallback to the current token if not set
-    accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || 'pk.eyJ1IjoiamFuc2NoeiIsImEiOiJjbWF0MHJkbTQwb2I2Mm5xOGRpdml5aGtwIn0.KzH4_qPWMU-GnVP4XSFp0Q',
+    // Do not hardcode tokens; must be provided via environment
+    accessToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN,
     // Mapbox style configuration - only dark mode
     style: skyTerraCustomStyle, // Use our custom dark style
   },
@@ -507,8 +507,8 @@ const config = {
 };
 
 // Validate critical configuration
-if (!config.mapbox.accessToken || config.mapbox.accessToken === 'your_mapbox_access_token_here') {
-  console.warn('⚠️  Mapbox access token not configured properly. Please set VITE_MAPBOX_ACCESS_TOKEN in your .env file.');
+if (!config.mapbox.accessToken || typeof config.mapbox.accessToken !== 'string') {
+  console.warn('⚠️  Mapbox access token not configured. Please set VITE_MAPBOX_ACCESS_TOKEN in your .env file.');
 }
 
 // Log configuration in development (without sensitive data)
