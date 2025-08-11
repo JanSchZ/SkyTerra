@@ -37,6 +37,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CircularPlusvalia from '../ui/CircularPlusvalia';
 import { propertyService, tourService, imageService, authService, favoritesService } from '../../services/api';
 import config from '../../config/environment';
 import MapView from '../map/MapView';
@@ -726,16 +727,10 @@ const PropertyDetails = () => {
                         <ListItemIcon sx={{ minWidth: '40px' }}>
                           <TrendingUpIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
                         </ListItemIcon>
-                        <ListItemText
-                          primary="Plusvalía (IA)"
-                          secondary={`${Number(property.plusvalia_score).toFixed(2)} / 100`}
-                          primaryTypographyProps={{
-                            fontSize: '0.9rem',
-                            fontWeight: 300,
-                            color: '#c9d1d9'
-                          }}
-                          secondaryTypographyProps={{ fontSize: '0.8rem', color: '#8b949e' }}
-                        />
+                        <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
+                          <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} />
+                          <Typography variant="caption" sx={{ color:'#8b949e' }}>Plusvalía</Typography>
+                        </Box>
                       </ListItem>
                     )}
                     {currentUser?.is_staff && property?.plusvalia_breakdown && (

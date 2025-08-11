@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, CardMedia, CardContent, CardActions, Typography, Button, IconButton, Box, Chip } from '@mui/material';
+import CircularPlusvalia from '../ui/CircularPlusvalia';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -113,13 +114,9 @@ const PropertyCard = ({ property }) => {
           </Box>
         )}
         {typeof property.plusvalia_score === 'number' && (
-          <Box sx={{ mt: 1 }}>
+          <Box sx={{ mt: 1, display:'flex', alignItems:'center', gap:1 }}>
+            <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} />
             <Typography variant="caption" sx={{ color:'text.secondary' }}>Plusvalía</Typography>
-            <Box sx={{ position:'relative', height:8, borderRadius:8, overflow:'hidden', background:'rgba(0,0,0,0.08)' }}>
-              <Box sx={{ position:'absolute', top:0, left:0, bottom:0, width:`${Math.min(100, Number(property.plusvalia_score)).toFixed(0)}%`,
-                        background: (Number(property.plusvalia_score) > 75 ? '#16a34a' : Number(property.plusvalia_score) > 40 ? '#f59e0b' : '#ef4444') }} />
-            </Box>
-            <Typography variant="caption">{Number(property.plusvalia_score).toFixed(0)}%</Typography>
           </Box>
         )}
          <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
