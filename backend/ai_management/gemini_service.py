@@ -48,7 +48,13 @@ class SamService:
             except Exception as e:
                 logger.error(f"Error getting fallback model: {e}")
                 raise GeminiServiceError("No se pudo obtener un modelo activo")
-        
+        # Ensure api_name defaults to Gemini 2.0 Flash if missing
+        if not getattr(self.sam_config.current_model, 'api_name', None):
+            self.sam_config.current_model.api_name = 'gemini-2.0-flash'
+            try:
+                self.sam_config.current_model.save(update_fields=['api_name'])
+            except Exception:
+                pass
         return self.sam_config.current_model
     
     def _get_system_prompt(self):

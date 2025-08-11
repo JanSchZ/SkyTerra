@@ -125,38 +125,39 @@ class PlusvaliaService:
     # IA evaluation ---------------------------------------------------------
     @classmethod
     def _ai_score(cls, property):
-        """Solicita a una IA un puntaje 0-100 basado en los detalles de la propiedad.
-        Si falla, retorna 50 como valor neutral."""
-        # Intentar con SamService (preferido). Si no está disponible, usar 50 como neutral.
+        """Solicita a Sam un puntaje 0-100. Si falla, lanza excepción.
+
+        Requisito del negocio: no ocultar errores; no devolver valores neutrales.
+        """
+        if not SkyTerraSamService:
+            raise SamServiceError("SamService no disponible")
         try:
-            if SkyTerraSamService:
-                sam = SkyTerraSamService()
-                prompt = (
-                    "Eres un modelo que evalúa el potencial de plusvalía de propiedades rurales. "
-                    "Responde SOLO con un número entero entre 0 y 100 (sin texto extra).\n\n"
-                    f"Nombre: {property.name}\n"
-                    f"Tipo: {property.type}\n"
-                    f"Precio: {property.price}\n"
-                    f"Tamaño (ha): {property.size}\n"
-                    f"Tiene agua: {property.has_water}\n"
-                    f"Tiene vistas: {property.has_views}\n"
-                    f"Descripción: {property.description[:500]}\n"
-                    "\nPuntaje (0-100):"
-                )
-                result = sam.generate_response(prompt, request_type="plusvalia_eval")
-                text = (result or {}).get('response', '') if isinstance(result, dict) else str(result)
-                import re
-                match = re.search(r"\b(\d{1,3})\b", text)
-                if match:
-                    score = int(match.group(1))
-                    return max(0, min(100, score))
-                # Si no se pudo extraer un número, devolver neutral
-                return 50
-        except SamServiceError as ge:
-            logger.warning(f"SamServiceError evaluando IA plusvalía: {ge}")
+            sam = SkyTerraSamService()
+            prompt = (
+                "Eres un modelo que evalúa el potencial de plusvalía de propiedades rurales. "
+                "Responde SOLO con un número entero entre 0 y 100 (sin texto extra).\n\n"
+                f"Nombre: {property.name}\n"
+                f"Tipo: {property.type}\n"
+                f"Precio: {property.price}\n"
+                f"Tamaño (ha): {property.size}\n"
+                f"Tiene agua: {property.has_water}\n"
+                f"Tiene vistas: {property.has_views}\n"
+                f"Descripción: {property.description[:500]}\n"
+                "\nPuntaje (0-100):"
+            )
+            result = sam.generate_response(prompt, request_type="plusvalia_eval")
+            text = (result or {}).get('response', '') if isinstance(result, dict) else str(result)
+            import re
+            match = re.search(r"\b(\d{1,3})\b", text)
+            if not match:
+                raise SamServiceError("Respuesta de Sam inválida para plusvalía")
+            score = int(match.group(1))
+            return max(0, min(100, score))
+        except SamServiceError:
+            raise
         except Exception as e:
             logger.error(f"Error llamando a SamService para plusvalía: {e}", exc_info=True)
-        return 50  # Valor neutral si falla
+            raise SamServiceError(str(e))
 
     # -------------------- Demanda interna ---------------------
     @classmethod
@@ -452,15 +453,29 @@ class PlusvaliaService:
             }
             base_score += contrib
 
+        # Integrar IA (15% del total final)
+        ai_weight = 0.15
+        blocks_weight_share = 1.0 - ai_weight
+        try:
+            ai_score = cls._ai_score(property)
+            ai_info = {"score": ai_score, "weight": ai_weight}
+        except SamServiceError as e:
+            # Propagar el error hacia arriba: no ocultar fallas de IA
+            raise
+
+        combined_score = (blocks_weight_share * base_score) + (ai_weight * ai_score)
+
         # Penalización ambiental leve
         env_risk = cls._environmental_risk_index(property)  # 0-1
         penalty = cls.AMBIENTAL_PENALTY_MAX * max(0.0, min(1.0, env_risk))
-        final_score = max(0.0, min(100.0, base_score - penalty))
+        final_score = max(0.0, min(100.0, combined_score - penalty))
 
         breakdown = {
             "version": "v2",
             "threshold": threshold,
-            "base_score": round(base_score, 2),
+            "base_score_blocks": round(base_score, 2),
+            "ai": ai_info,
+            "combined_before_penalty": round(combined_score, 2),
             "final_score": round(final_score, 2),
             "environmental_risk_index": round(env_risk, 3),
             "penalty": round(penalty, 2),

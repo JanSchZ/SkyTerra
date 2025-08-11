@@ -36,22 +36,19 @@ const StatusChip = ({ status }) => {
 };
 
 const PlusvaliaScore = ({ score }) => {
-    const getColor = (value) => {
-        if (value > 75) return 'success';
-        if (value > 40) return 'warning';
-        return 'error';
-    };
-
-    return (
-        <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ width: '70%', mr: 1 }}>
-                <LinearProgress variant="determinate" value={score} color={getColor(score)} />
-            </Box>
-            <Box sx={{ minWidth: 35 }}>
-                <Typography variant="body2" color="text.secondary">{`${Math.round(score)}%`}</Typography>
-            </Box>
+  const color = score > 75 ? '#16a34a' : score > 40 ? '#f59e0b' : '#ef4444';
+  return (
+    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ width: '70%', mr: 1, position:'relative', height:10, borderRadius:8, overflow:'hidden', background:'rgba(0,0,0,0.08)' }}>
+        <Box sx={{ position:'absolute', inset:0 }}>
+          <Box sx={{ position:'absolute', top:0, left:0, bottom:0, width:`${Math.min(100, Number(score)).toFixed(0)}%`, background: color }} />
         </Box>
-    );
+      </Box>
+      <Box sx={{ minWidth: 40 }}>
+        <Typography variant="body2" color="text.secondary">{`${Math.round(score)}%`}</Typography>
+      </Box>
+    </Box>
+  );
 };
 
 const AdminDetailedPropertiesPage = () => {

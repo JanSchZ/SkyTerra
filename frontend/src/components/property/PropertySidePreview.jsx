@@ -43,9 +43,16 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
             {/* Details */}
             <Typography variant="subtitle1" sx={{ fontWeight:600, mb:0.5 }}>{property.name}</Typography>
             <Typography variant="body2" sx={{ mb:0.5 }}>Precio: {getPriceDisplay ? getPriceDisplay(property) : 'N/D'}</Typography>
-            <Typography variant="body2" sx={{ mb:0.5 }}>Tamaño: {property.size} ha</Typography>
+            <Typography variant="body2" sx={{ mb:0.5 }}>Tamaño: {Number(property.size).toLocaleString('es-CL')} ha</Typography>
             {property.plusvalia_score !== undefined && (
-              <Typography variant="body2" sx={{ mb:0.5 }}>Plusvalía: {property.plusvalia_score}%</Typography>
+              <Box sx={{ mb:1 }}>
+                <Typography variant="caption" sx={{ display:'block', color:'rgba(255,255,255,0.8)', mb:0.5 }}>Plusvalía</Typography>
+                <Box sx={{ position:'relative', height:10, borderRadius:8, overflow:'hidden', background:'rgba(255,255,255,0.25)' }}>
+                  <Box sx={{ position:'absolute', top:0, left:0, bottom:0, width:`${Math.min(100, Number(property.plusvalia_score)).toFixed(0)}%`,
+                              background:'linear-gradient(90deg, #22c55e, #3b82f6)', boxShadow:'0 0 12px rgba(59,130,246,0.4)' }} />
+                </Box>
+                <Typography variant="caption" sx={{ color:'#fff' }}>{Number(property.plusvalia_score).toFixed(2)} / 100</Typography>
+              </Box>
             )}
             {property.bedrooms && (
               <Typography variant="body2" sx={{ mb:0.5 }}>Dormitorios: {property.bedrooms}</Typography>

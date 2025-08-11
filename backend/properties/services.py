@@ -455,7 +455,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
         
         return {
             'search_mode': 'property_recommendation', # Fallback implies property recommendation
-            'assistant_message': f"Encontré {len(recommendations)} propiedades relacionadas con tu búsqueda. (Servicio de IA con funcionalidad limitada)",
+            'assistant_message': f"Encontré {len(recommendations)} propiedades relacionadas con tu búsqueda.",
             'flyToLocation': None,
             'suggestedFilters': basic_filters,
             'recommendations': recommendations,

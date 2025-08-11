@@ -112,6 +112,16 @@ const PropertyCard = ({ property }) => {
             </Typography>
           </Box>
         )}
+        {typeof property.plusvalia_score === 'number' && (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" sx={{ color:'text.secondary' }}>Plusvalía</Typography>
+            <Box sx={{ position:'relative', height:8, borderRadius:8, overflow:'hidden', background:'rgba(0,0,0,0.08)' }}>
+              <Box sx={{ position:'absolute', top:0, left:0, bottom:0, width:`${Math.min(100, Number(property.plusvalia_score)).toFixed(0)}%`,
+                        background: (Number(property.plusvalia_score) > 75 ? '#16a34a' : Number(property.plusvalia_score) > 40 ? '#f59e0b' : '#ef4444') }} />
+            </Box>
+            <Typography variant="caption">{Number(property.plusvalia_score).toFixed(0)}%</Typography>
+          </Box>
+        )}
          <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
             {property.type && <Chip label={property.type === 'farm' ? 'Parcela/Granja' : property.type.charAt(0).toUpperCase() + property.type.slice(1)} size="small" variant="outlined" />}
             {property.has_water && <Chip label="Agua" size="small" color="info" variant="outlined" />}
