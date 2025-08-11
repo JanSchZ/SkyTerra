@@ -9,7 +9,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
 import * as turf from '@turf/turf';
 
-const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries }) => {
+const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, compact = false }) => {
   const drawRef = useRef(null);
   const [area, setArea] = useState(0);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
@@ -268,14 +268,14 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries }) =
     <Box
       sx={{
         position: 'absolute',
-        bottom: 32,
-        right: 16,
+        bottom: compact ? 12 : 32,
+        right: compact ? 12 : 16,
         backgroundColor: 'background.paper',
-        padding: 2,
+        padding: compact ? 1.25 : 2,
         borderRadius: 1,
         boxShadow: 3,
         zIndex: 5,
-        width: 250,
+        width: compact ? 220 : 250,
       }}
     >
       <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
@@ -294,7 +294,7 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries }) =
           color="primary"
           startIcon={<EditIcon />}
           onClick={handleStartDrawing}
-          size="small"
+          size={compact ? 'small' : 'small'}
         >
           {hasExistingBoundaries ? 'Modificar' : 'Dibujar'}
         </Button>
@@ -304,7 +304,7 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries }) =
           startIcon={<DeleteIcon />}
           onClick={handleDeleteAll}
           disabled={!hasExistingBoundaries}
-          size="small"
+          size={compact ? 'small' : 'small'}
         >
           Borrar
         </Button>
@@ -315,7 +315,7 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries }) =
           startIcon={<SaveIcon />}
           onClick={handleSave}
           disabled={!hasExistingBoundaries}
-          size="small"
+          size={compact ? 'small' : 'small'}
         >
           Guardar
         </Button>

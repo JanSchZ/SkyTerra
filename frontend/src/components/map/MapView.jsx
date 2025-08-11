@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef } from 'react';
 import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip } from '@mui/material';
 import { propertyService, tourService } from '../../services/api';
-import Map, { NavigationControl, Popup, Source, Layer, AttributionControl } from 'react-map-gl';
+import Map, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import EditIcon from '@mui/icons-material/Edit';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
@@ -45,7 +45,21 @@ const safePropertiesAccess = (properties, callback) => {
   return callback(validProperties);
 };
 
-const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBoundariesUpdate, initialViewState: propInitialViewState, initialGeoJsonBoundary, onLoad, disableIntroAnimation = false }, ref) => {
+const MapView = forwardRef(({ 
+  filters, 
+  appliedFilters, 
+  editable = false, 
+  onBoundariesUpdate, 
+  initialViewState: propInitialViewState, 
+  initialGeoJsonBoundary, 
+  onLoad, 
+  disableIntroAnimation = false,
+  embedded = false,
+  height: embeddedHeight,
+  onLocationSelect,
+  selectedPoint,
+  suppressData = false,
+}, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
   // Estados
@@ -361,7 +375,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   ]);
 
   useEffect(() => {
-    if (editable) {
+    if (editable || suppressData) {
       // Reset state when switching to editable mode
       setLoading(false); 
       setProperties([]);
@@ -1185,7 +1199,16 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
   }
 
   return (
-    <Box sx={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1 }}>
+    <Box sx={{ 
+      width: '100%', 
+      height: embedded ? (embeddedHeight || 420) : '100vh', 
+      position: embedded ? 'relative' : 'fixed', 
+      top: embedded ? 'auto' : 0, 
+      left: embedded ? 'auto' : 0, 
+      zIndex: 1,
+      borderRadius: embedded ? 2 : 0,
+      overflow: 'hidden'
+    }}>
       {loading && !error && (
         <Box sx={{
           position: 'absolute', 
@@ -1222,7 +1245,7 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             setViewState(evt.viewState);
             handleUserInteraction(evt); // Llamar aquí para detectar interacción
           }}
-          initialViewState={initialMapViewState}
+          initialViewState={propInitialViewState || initialMapViewState}
           onLoad={onMapLoad}
           mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
@@ -1230,7 +1253,15 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
           projection={{ name: 'globe' }}
           onMoveEnd={handleMapMoveEnd}
           onClick={(e) => {
-            onMapClick(e); 
+            if (editable) {
+              // Location pick for embedded/edit mode
+              const { lng, lat } = e.lngLat || {};
+              if (typeof lng === 'number' && typeof lat === 'number' && onLocationSelect) {
+                onLocationSelect({ longitude: lng, latitude: lat });
+              }
+            } else {
+              onMapClick(e);
+            }
             if (!e.features || e.features.length === 0) {
                 if (!userInteractedRef.current && !autoFlyCompleted) {
                     // console.log('Click genérico en mapa, deteniendo animación intro.');
@@ -1250,8 +1281,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             visualizePitch={true}
             style={{
                 position: 'absolute',
-                bottom: '30px',
-                right: '30px',
+                bottom: embedded ? '12px' : '30px',
+                right: embedded ? '12px' : '30px',
                 zIndex: 5,
                 backgroundColor: 'rgba(255,255,255,0.18)',
                 borderRadius: '12px',
@@ -1268,8 +1299,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
             compact={true} 
             style={{
                 position: 'absolute',
-                bottom: '10px',
-                left: '10px',
+                bottom: embedded ? '8px' : '10px',
+                left: embedded ? '8px' : '10px',
                 zIndex: 5,
                 backgroundColor: 'rgba(255,255,255,0.18)',
                 padding: '2px 5px',
@@ -1281,11 +1312,19 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
                 color: 'white',
              }}
           />
-          {isDrawingMode && mapRef.current && (
+          {editable && isDrawingMode && mapRef.current && (
             <PropertyBoundaryDraw 
               map={mapRef.current.getMap()} 
               onBoundariesUpdate={handleBoundariesUpdate}
               existingBoundaries={propertyBoundaries}
+              compact={embedded}
+            />
+          )}
+          {editable && (propertyBoundaries?.center || selectedPoint) && (
+            <Marker
+              longitude={(propertyBoundaries?.center || [selectedPoint.longitude, selectedPoint.latitude])[0]}
+              latitude={(propertyBoundaries?.center || [selectedPoint.longitude, selectedPoint.latitude])[1]}
+              color="#1E8578"
             />
           )}
           {!editable && propertiesGeoJSON && (
@@ -1303,8 +1342,8 @@ const MapView = forwardRef(({ filters, appliedFilters, editable = false, onBound
               elevation={3}
               sx={{
                 position: 'absolute',
-                bottom: '100px',
-                right: '30px',
+                bottom: embedded ? '68px' : '100px',
+                right: embedded ? '12px' : '30px',
                 zIndex: 5,
                 display: 'flex',
                 flexDirection: 'column',

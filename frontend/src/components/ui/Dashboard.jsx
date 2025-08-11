@@ -183,7 +183,7 @@ export default function Dashboard({ user }) {
 
       {/* Mis Propiedades Panel */}
       {tab === 1 && (
-        <SellerPropertiesManager onCreateNew={()=>navigate('/create-property')} onError={()=>{}} />
+        <SellerPropertiesManager onCreateNew={()=>navigate('/new-publication')} onError={()=>{}} />
       )}
 
       {/* Saved Searches Panel */}
