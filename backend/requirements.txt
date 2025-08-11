@@ -13,7 +13,8 @@ djangorestframework-simplejwt==5.2.2
 drf-spectacular==0.27.2
 
 # Database
-psycopg2-binary==2.9.7
+# Upgrade to a wheel that supports Python 3.12 on Windows
+psycopg2-binary==2.9.10
 dj-database-url==2.1.0
 
 # Cache
@@ -30,6 +31,10 @@ gunicorn==21.2.0
 
 # Environment management
 python-decouple==3.8
+python-dotenv==1.0.1
+
+# Filtering utilities used by 'django_filters' app
+django-filter==24.2
 
 # Payments
 stripe==6.4.0
