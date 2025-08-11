@@ -18,10 +18,10 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
           <Paper
             variant="glass"
             elevation={6}
-            sx={{ width: 340, p: 2, backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', backgroundColor:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', flexDirection:'column', color:'#ffffff' }}
+            sx={{ width: 320, p: 2, backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', backgroundColor:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', flexDirection:'column', color:'#ffffff' }}
           >
-            {/* Preview */}
-            <Box sx={{ position:'relative', width:'100%', height:180, mb:1.5, borderRadius:1, overflow:'hidden' }}>
+            {/* Preview - 1:1 aspect ratio */}
+            <Box sx={{ position:'relative', width:'100%', height:280, mb:1.5, borderRadius:1, overflow:'hidden' }}>
               {previewUrl ? (
                 <iframe
                   src={previewUrl}
@@ -36,33 +36,61 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                   <CardMedia component="img" image={property.images[0].url} alt={property.name} sx={{ width:'100%', height:'100%', objectFit:'cover' }} />
                 )
               )}
-              <IconButton size="small" onClick={onClose} sx={{ position:'absolute', top:6, right:6, backgroundColor:'rgba(0,0,0,0.55)', color:'#fff', '&:hover':{ backgroundColor:'rgba(0,0,0,0.75)' } }}>
-                <CloseIcon fontSize="small" />
+              <IconButton 
+                onClick={onClose} 
+                sx={{ 
+                  position:'absolute',
+                  top:2,
+                  right:2,
+                  width:28,
+                  height:28,
+                  padding:0,
+                  minWidth:0,
+                  backgroundColor:'transparent',
+                  color:'rgba(255,255,255,0.9)',
+                  '&:hover':{ backgroundColor:'rgba(255,255,255,0.06)' }
+                }}
+              >
+                <CloseIcon fontSize="small" sx={{ fontSize: 14 }} />
               </IconButton>
             </Box>
 
-            {/* Details */}
-            <Typography variant="subtitle1" sx={{ fontWeight:600, mb:0.5 }}>{property.name}</Typography>
-            <Typography variant="body2" sx={{ mb:0.5 }}>Precio: {getPriceDisplay ? getPriceDisplay(property) : 'N/D'}</Typography>
-            <Typography variant="body2" sx={{ mb:0.5 }}>Tamaño: {Number(property.size).toLocaleString('es-CL')} ha</Typography>
-            {property.plusvalia_score !== undefined && (
-              <Box sx={{ mb:1, display:'flex', alignItems:'center', gap:1 }}>
-                <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} />
-                <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.8)' }}>Plusvalía</Typography>
+            {/* Details in two-column layout */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            {/* Left column - Property details */}
+              <Box sx={{ flex: 1 }}>
+              { /* normalize price label to remove "/mes" */ }
+              { /* priceLabelClean computed below in render scope */ }
+              
+                <Box sx={{ display:'inline-block', mb:0.75, px:1, py:0.5, borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.10)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.18)' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight:700, fontSize: '0.9rem', color: '#ffffff' }}>{property.name}</Typography>
+                </Box>
+                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: '#ffffff' }}>
+                  Precio: {getPriceDisplay ? getPriceDisplay(property).replace(/\s*\/mes\s*$/, '') : 'N/D'}
+                </Typography>
+                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: '#ffffff' }}>Tamaño: {Number(property.size).toLocaleString('es-CL')} ha</Typography>
+                {property.bedrooms && (
+                  <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Dormitorios: {property.bedrooms}</Typography>
+                )}
+                {property.bathrooms && (
+                  <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Baños: {property.bathrooms}</Typography>
+                )}
+                {property.parking_spaces && (
+                  <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Estacionamientos: {property.parking_spaces}</Typography>
+                )}
               </Box>
-            )}
-            {property.bedrooms && (
-              <Typography variant="body2" sx={{ mb:0.5 }}>Dormitorios: {property.bedrooms}</Typography>
-            )}
-            {property.bathrooms && (
-              <Typography variant="body2" sx={{ mb:0.5 }}>Baños: {property.bathrooms}</Typography>
-            )}
-            {property.parking_spaces && (
-              <Typography variant="body2" sx={{ mb:0.5 }}>Estacionamientos: {property.parking_spaces}</Typography>
-            )}
-            <Box sx={{ mb:2 }} />
 
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              {/* Right column - Plusvalía score */}
+              {property.plusvalia_score !== undefined && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 0.5 }}>
+                  <CircularPlusvalia value={Number(property.plusvalia_score)} size={56} strokeWidth={6} />
+                  <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.8)', mt: 0.5, textAlign: 'center' }}>Plusvalía</Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Centered button */}
+            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
               <Button 
                 variant="contained" 
                 size="small"
