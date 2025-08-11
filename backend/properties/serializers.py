@@ -101,6 +101,7 @@ class PropertySerializer(serializers.ModelSerializer):
     owner_details = BasicUserSerializer(source='owner', read_only=True)
     documents = PropertyDocumentSerializer(many=True, read_only=True)
     plusvalia_score = serializers.SerializerMethodField()
+    plusvalia_breakdown = serializers.SerializerMethodField()
     # TODO: add documents serializer when backend model ready
 
     class Meta:
@@ -108,7 +109,7 @@ class PropertySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
-                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score',
+                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score', 'plusvalia_breakdown',
                  'terrain', 'access', 'legal_status', 'utilities']
         
     def validate_boundary_polygon(self, value):
@@ -151,15 +152,20 @@ class PropertySerializer(serializers.ModelSerializer):
         return value
         
     def get_plusvalia_score(self, obj):
+        # Beta/prelanzamiento: visible para todos
+        return obj.plusvalia_score
+
+    def get_plusvalia_breakdown(self, obj):
+        # Solo admins/staff ven el desglose detallado
         request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            # Check if the user has an active 'pro' subscription
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated and user.is_staff:
             try:
-                # Assuming 'active' status means 'Pro' subscription
-                if Subscription.objects.filter(user=request.user, status='active').exists():
-                    return obj.plusvalia_score
-            except Subscription.DoesNotExist:
-                pass # No subscription found
+                from .plusvalia_service import PlusvaliaService
+                _score, breakdown = PlusvaliaService.calculate_with_breakdown(obj)
+                return breakdown
+            except Exception:
+                return None
         return None
 
 class PropertyListSerializer(serializers.ModelSerializer):
@@ -176,16 +182,8 @@ class PropertyListSerializer(serializers.ModelSerializer):
                  'publication_status', 'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms', 'plusvalia_score']
 
     def get_plusvalia_score(self, obj):
-        request = self.context.get('request')
-        if request and request.user.is_authenticated:
-            # Check if the user has an active 'pro' subscription
-            try:
-                # Assuming 'active' status means 'Pro' subscription
-                if Subscription.objects.filter(user=request.user, status='active').exists():
-                    return obj.plusvalia_score
-            except Subscription.DoesNotExist:
-                pass # No subscription found
-        return None
+        # Beta/prelanzamiento: visible para todos
+        return obj.plusvalia_score
 
 class PropertyPreviewSerializer(serializers.ModelSerializer):
     """Serializer para mostrar información mínima de una propiedad a usuarios anónimos"""

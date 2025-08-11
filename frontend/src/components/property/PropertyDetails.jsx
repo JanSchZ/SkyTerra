@@ -721,7 +721,7 @@ const PropertyDetails = () => {
                       />
                     </ListItem>
 
-                    {property?.plusvalia_score !== null && currentUser?.is_staff && (
+                    {property?.plusvalia_score !== null && (
                       <ListItem sx={{ px: 0, py: 1 }}>
                         <ListItemIcon sx={{ minWidth: '40px' }}>
                           <TrendingUpIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
@@ -737,6 +737,37 @@ const PropertyDetails = () => {
                           secondaryTypographyProps={{ fontSize: '0.8rem', color: '#8b949e' }}
                         />
                       </ListItem>
+                    )}
+                    {currentUser?.is_staff && property?.plusvalia_breakdown && (
+                      <Box sx={{ mt: 2, p: 2, border: '1px solid rgba(30, 41, 59, 0.2)', borderRadius: '12px', backgroundColor: 'rgba(13,17,23,0.6)' }}>
+                        <Typography variant="subtitle2" sx={{ color: '#c9d1d9', mb: 1 }}>Desglose Plusvalía (solo admin)</Typography>
+                        <Typography variant="caption" sx={{ color: '#8b949e', display: 'block', mb: 1 }}>
+                          v{property.plusvalia_breakdown?.version?.replace('v','') || '2'} · threshold {property.plusvalia_breakdown?.threshold}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#8b949e', mb: 1 }}>
+                          Base: {property.plusvalia_breakdown?.base_score} · Penalización ambiental: {property.plusvalia_breakdown?.penalty}
+                        </Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto auto', gap: 1 }}>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>Bloque</Typography>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>Score</Typography>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>Conf</Typography>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>Peso</Typography>
+                          <Typography variant="caption" sx={{ color: '#8b949e' }}>Contrib</Typography>
+                          {['P','C','Z','F','L','D'].map(k => {
+                            const b = property.plusvalia_breakdown.blocks?.[k];
+                            if (!b) return null;
+                            return (
+                              <React.Fragment key={k}>
+                                <Typography variant="body2" sx={{ color: b.included ? '#c9d1d9' : '#6b7280' }}>{k}</Typography>
+                                <Typography variant="body2" sx={{ color: '#c9d1d9' }}>{b.score}</Typography>
+                                <Typography variant="body2" sx={{ color: '#c9d1d9' }}>{b.confidence}</Typography>
+                                <Typography variant="body2" sx={{ color: '#c9d1d9' }}>{b.normalized_weight}</Typography>
+                                <Typography variant="body2" sx={{ color: '#c9d1d9' }}>{b.contribution}</Typography>
+                              </React.Fragment>
+                            );
+                          })}
+                        </Box>
+                      </Box>
                     )}
                   </List>
                 </Box>
