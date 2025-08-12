@@ -308,12 +308,6 @@ const AISuggestionPanel = ({
                           onMouseLeave={() => onSuggestionHover && onSuggestionHover(null)} // Clear hover
                         >
                           <Box sx={{ position:'relative', height: 130, mb: 1 }}>
-                            {/* Plusvalía badge */}
-                            {typeof rec.plusvalia_score === 'number' && (
-                              <Box sx={{ position:'absolute', top: 8, right: 8, zIndex: 2 }}>
-                                <CircularPlusvalia value={Number(rec.plusvalia_score)} size={36} strokeWidth={5} />
-                              </Box>
-                            )}
                             {tourPreviews[rec.id] ? (
                               <iframe
                                 src={tourPreviews[rec.id]}
@@ -335,12 +329,15 @@ const AISuggestionPanel = ({
                             <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
                               Precio: {rec.price ? `$${Number(rec.price).toLocaleString()}` : 'No disponible'}
                             </Typography>
-                            <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
-                              Tamaño: {rec.size ? `${Math.round(Number(rec.size)).toLocaleString()} ha` : 'No disponible'}
-                            </Typography>
-                            <Typography variant="body2" color="white" sx={{ textTransform: 'capitalize', mb: 1 }}>
-                              Tipo: {rec.type || 'No especificado'}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="body2" color="white">
+                                Tamaño: {rec.size ? `${Math.round(Number(rec.size)).toLocaleString()} ha` : 'No disponible'}
+                              </Typography>
+                              {/* Plusvalía score */}
+                              {typeof rec.plusvalia_score === 'number' && (
+                                <CircularPlusvalia value={Number(rec.plusvalia_score)} size={32} strokeWidth={4} />
+                              )}
+                            </Box>
                             {rec.reason && rec.reason.toLowerCase().includes('filtros sugeridos') ? null : (
                               rec.reason ? (
                                 <Typography variant="caption" color="white" sx={{ fontStyle: 'italic' }}>

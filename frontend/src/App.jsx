@@ -353,9 +353,51 @@ function App() {
       setAiSearchLoading(true);
       const response = await api.post('/ai-search/', { query: text, conversation_history: newHistory });
       if (response.data) {
-        setAiSearchResult(response.data);
-        if(response.data.assistant_message){
-           const updatedHistory = [...newHistory,{ role:'assistant', content: response.data.assistant_message }];
+        const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
+        
+        // Process location navigation
+        if (flyToLocation) {
+          handleLocationSearch({
+            center: flyToLocation.center,
+            zoom: flyToLocation.zoom || 12,
+            locationName: flyToLocation.name || text,
+            pitch: flyToLocation.pitch,
+            bearing: flyToLocation.bearing,
+          });
+        } else if (recommendations && recommendations.length > 0) {
+          // If no direct flyToLocation, but we have recommendations, try to fly to the first one
+          const firstReco = recommendations[0];
+          if (firstReco && typeof firstReco.latitude === 'number' && typeof firstReco.longitude === 'number') {
+            handleLocationSearch({
+              center: [firstReco.longitude, firstReco.latitude],
+              zoom: 12,
+              pitch: 60,
+              bearing: 0
+            });
+          }
+        }
+
+        // Process recommendations and filters
+        const hasRecs = recommendations && recommendations.length > 0;
+        if (hasRecs && suggestedFilters) {
+          setAiAppliedFilters(suggestedFilters);
+        }
+
+        // Create processed result similar to AISearchBar
+        const processedResult = {
+          type: hasRecs ? 'properties' : 'ai_response',
+          search_mode: search_mode || (hasRecs ? 'property_recommendation' : 'location'),
+          assistant_message: assistant_message || (hasRecs ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
+          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [], listingType: null }) : null,
+          interpretation: interpretation || assistant_message,
+          recommendations: hasRecs ? (recommendations || []) : [],
+          flyToLocation
+        };
+
+        setAiSearchResult(processedResult);
+        
+        if(assistant_message){
+           const updatedHistory = [...newHistory,{ role:'assistant', content: assistant_message }];
            setConversationHistory(updatedHistory);
            try { window.__skyterraConversationHistory = updatedHistory; } catch (_) {}
         }
