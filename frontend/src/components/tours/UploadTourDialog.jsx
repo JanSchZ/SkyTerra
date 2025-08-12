@@ -73,12 +73,7 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
       return;
     }
     
-    // Validar tamaño de archivo (límite 100MB)
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (f.size > maxSize) {
-      setError('El archivo es demasiado grande. El tamaño máximo permitido es 100MB.');
-      return;
-    }
+    // Validación de tamaño removida - permitir archivos de cualquier tamaño
     
     setFile(f);
     setError('');
@@ -163,9 +158,13 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
       if (errorMessage.includes('not a valid zip')) {
         errorMessage = 'El archivo no es un ZIP válido. Por favor, verifica que el archivo no esté corrupto.';
       } else if (errorMessage.includes('file too large')) {
-        errorMessage = 'El archivo es demasiado grande. El tamaño máximo permitido es 100MB.';
+        errorMessage = 'El archivo es demasiado grande.';
       } else if (errorMessage.includes('permission')) {
         errorMessage = 'No tienes permisos para subir tours a esta propiedad.';
+      } else if (e.response?.status === 401) {
+        errorMessage = 'Error de autenticación. Por favor, inicia sesión nuevamente.';
+      } else if (e.response?.status === 403) {
+        errorMessage = 'No tienes permisos para subir tours.';
       }
       
       setError(errorMessage);

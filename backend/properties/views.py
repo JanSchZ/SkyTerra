@@ -331,7 +331,14 @@ class TourViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'get_stats']:
             permission_classes = [permissions.AllowAny]
+        elif self.action == 'create':
+            # Allow any authenticated user to create tours (including admins)
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ['destroy', 'update', 'partial_update']:
+            # Only staff/admin users can delete or modify tours
+            permission_classes = [permissions.IsAdminUser]
         else:
+            # For other actions, require authentication
             permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
 
@@ -350,12 +357,7 @@ class TourViewSet(viewsets.ModelViewSet):
                 'package_file': f"Tipo de archivo no permitido. Solo se permiten archivos: {', '.join(allowed_extensions)}"
             })
 
-        # Validar tamaño de archivo (100MB máximo)
-        max_size = 100 * 1024 * 1024  # 100MB
-        if package_file.size > max_size:
-            raise serializers.ValidationError({
-                'package_file': f"Archivo demasiado grande. Tamaño máximo permitido: {max_size // (1024 * 1024)}MB"
-            })
+        # Validación de tamaño removida - permitir archivos de cualquier tamaño
 
         tour_uuid = uuid.uuid4()
         tour_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))

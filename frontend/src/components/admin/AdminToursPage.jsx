@@ -30,7 +30,7 @@ import StorageIcon from '@mui/icons-material/Storage';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
-import { api, tourService } from '../../services/api';
+import { api, tourService, authService } from '../../services/api';
 import UploadTourDialog from '../tours/UploadTourDialog';
 
 // Componente para mostrar estadísticas de tours
@@ -137,6 +137,7 @@ const AdminToursPage = () => {
       const response = await api.get('/tours/');
       const toursData = Array.isArray(response.data) ? response.data : response.data.results || [];
       setTours(toursData);
+      setError(null); // Clear any previous errors when loading is successful
     } catch (err) {
       console.error('Error loading tours:', err);
       setError('Error al cargar tours: ' + (err.message || err.toString()));
@@ -205,14 +206,27 @@ const AdminToursPage = () => {
     if (!selectedTour) return;
     
     try {
+      console.log('Attempting to delete tour:', selectedTour.id);
+      
+      // Ensure CSRF token is available before making the delete request
+      await authService.ensureCsrfCookie();
+      
       await api.delete(`/tours/${selectedTour.id}/`);
       await loadTours();
       await loadStats();
       setDeleteDialogOpen(false);
       setSelectedTour(null);
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error deleting tour:', err);
-      setError('Error al eliminar el tour');
+      
+      if (err.response?.status === 401) {
+        setError('Error de autenticación. Por favor, inicia sesión nuevamente.');
+      } else if (err.response?.status === 403) {
+        setError('No tienes permisos para eliminar tours. Solo los administradores pueden eliminar tours.');
+      } else {
+        setError(`Error al eliminar el tour: ${err.response?.data?.detail || err.message || 'Error desconocido'}`);
+      }
     }
   };
 
