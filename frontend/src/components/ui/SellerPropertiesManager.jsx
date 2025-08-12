@@ -60,7 +60,7 @@ export default function SellerPropertiesManager({ onCreateNew, onError }) {
     { field: 'price', headerName: 'Precio', width: 130, valueGetter:(p)=> p.row.listing_type==='rent'? `$${Number(p.row.rent_price||0).toLocaleString()}`:`$${Number(p.row.price||0).toLocaleString()}` },
     { field: 'views_30d', headerName: 'Visitas 30d', width: 110, headerAlign:'center', align:'center' },
     { field: 'publication_status', headerName: 'Estado', width: 120, renderCell:(params)=> (
-        <Chip size="small" label={params.value==='published'?'Publicado':'Borrador'} color={params.value==='published'?'success':'default'} />
+        <Chip size="small" label={params.value==='published'?'Publicado':'Borrador'} />
       ) },
     { field: 'documents', headerName: 'Docs', width: 100, renderCell:(params)=> {
         const docs = params.value||[];
@@ -68,7 +68,7 @@ export default function SellerPropertiesManager({ onCreateNew, onError }) {
         let label='Sin'; let color='default';
         if(statuses.includes('pending')) { label='Pend'; color='warning'; }
         if(statuses.includes('rejected')) { label='Rech'; color='error'; }
-        if(statuses.length>0 && !statuses.includes('pending') && !statuses.includes('rejected')) { label='OK'; color='success'; }
+        if(statuses.length>0 && !statuses.includes('pending') && !statuses.includes('rejected')) { label='OK'; }
         return <Chip size="small" label={label} color={color}/>;
       } },
     { field: 'actions', headerName: 'Acciones', width: 180, sortable:false, renderCell:(params)=>{

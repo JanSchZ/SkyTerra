@@ -122,9 +122,9 @@ const PropertyCard = ({ property }) => {
          <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
             {property.type && <Chip label={property.type === 'farm' ? 'Parcela/Granja' : property.type.charAt(0).toUpperCase() + property.type.slice(1)} size="small" variant="outlined" />}
             {property.has_water && <Chip label="Agua" size="small" color="info" variant="outlined" />}
-            {property.has_views && <Chip label="Vistas" size="small" color="success" variant="outlined" />}
+            {property.has_views && <Chip label="Vistas" size="small" variant="outlined" />}
             {property.has_tour && (
-                <Chip icon={<ViewInArIcon />} label="Tour 360°" size="small" color="success" variant="outlined" />
+                <Chip icon={<ViewInArIcon />} label="Tour 360°" size="small" variant="outlined" />
             )}
         </Box>
       </CardContent>

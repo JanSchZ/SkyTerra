@@ -921,7 +921,7 @@ const PropertyDetails = () => {
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
           variant="filled"
-          sx={{ width: '100%', bgcolor: snackbar.severity === 'success' ? '#28a745' : snackbar.severity === 'error' ? '#dc3545' : '#ffc107' }}
+          sx={{ width: '100%', bgcolor: snackbar.severity === 'success' ? '#111111' : snackbar.severity === 'error' ? '#000000' : '#6B7280' }}
         >
           {snackbar.message}
         </Alert>

@@ -3,7 +3,7 @@ import { Paper, Typography, Box, CircularProgress } from '@mui/material';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { propertyService } from "../../../services/api";
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF19AF'];
+const COLORS = ['#111111', '#6B7280', '#9CA3AF', '#D1D5DB', '#4B5563', '#E5E7EB'];
 
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {

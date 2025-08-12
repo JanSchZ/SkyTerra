@@ -3,7 +3,7 @@ body, html {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Oxygen", sans-serif;
+  font-family: 'Helvetica', Arial, sans-serif;
   background-color: white;
 }
 
@@ -22,7 +22,7 @@ body, html {
   box-shadow: 0 10px 40px rgba(30, 58, 95, 0.15);
   border: 1px solid var(--border-light);
   background: var(--bg-primary);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Helvetica', Arial, sans-serif;
 }
 
 .property-popup .mapboxgl-popup-close-button {
@@ -72,7 +72,7 @@ body, html {
   box-shadow: 0 4px 12px rgba(30, 58, 95, 0.2);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Helvetica', Arial, sans-serif;
 }
 
 .property-marker-icon {
@@ -142,7 +142,7 @@ body, html {
   font-size: 0.875rem;
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Helvetica', Arial, sans-serif;
 }
 
 /* Estilos mejorados para animaciones */
@@ -346,14 +346,14 @@ body, html {
 /* Texto informativo mejorado */
 .read-the-docs {
   color: var(--text-secondary);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Helvetica', Arial, sans-serif;
   font-weight: 400;
 }
 
 /* Nuevos estilos para elementos específicos de SkyTerra */
 .skyterra-brand {
-  font-family: 'Poppins', sans-serif;
-  font-weight: 700;
+  font-family: 'Source Code Pro', monospace;
+  font-weight: 400;
   color: var(--navy-primary);
   letter-spacing: -0.02em;
 }
@@ -383,7 +383,7 @@ body, html {
 .price-tag {
   background: linear-gradient(135deg, var(--navy-primary) 0%, var(--navy-medium) 100%);
   color: var(--text-white);
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Helvetica', Arial, sans-serif;
   font-weight: 600;
   padding: 8px 16px;
   border-radius: 12px;

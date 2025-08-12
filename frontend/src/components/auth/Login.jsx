@@ -29,49 +29,38 @@ const Login = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
+    <Container component="main" maxWidth="xs" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
       <Box
         sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          minHeight: '100vh',
-          backgroundColor: '#0d1117',
-          padding: 3,
+          width: '100%',
+          p: 3,
+          borderRadius: 2,
+          bgcolor: '#FFFFFF',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+          border: '1px solid rgba(0,0,0,0.08)'
         }}
       >
-        <Typography component="h1" variant="h4" sx={{ color: '#c9d1d9', mb: 1 }}>
-          Iniciar Sesión
+        <Typography component="h1" variant="h4" sx={{ color: '#111111', mb: 1, fontWeight: 600 }}>
+          Bienvenido de nuevo
         </Typography>
-        <Typography variant="body2" sx={{ color: '#8b949e', mb: 4, textAlign: 'center' }}>
-          Bienvenido de nuevo a SkyTerra
+        <Typography variant="body2" sx={{ color: '#6B7280', mb: 3 }}>
+          Inicia sesión en tu cuenta
         </Typography>
-        
-        <Box component="form" onSubmit={handleEmailLogin} sx={{ mt: 1, width: '100%' }}>
+
+        <Box component="form" onSubmit={handleEmailLogin} sx={{ width: '100%' }}>
           {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
           <TextField
             margin="normal"
             required
             fullWidth
             id="email"
-            label="Correo Electrónico o Usuario"
+            label="Correo electrónico"
             name="email"
             autoComplete="email"
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
-            sx={{
-              '& .MuiInputLabel-root': { color: '#c9d1d9' },
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                color: '#e5e5e5',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                '&.Mui-focused fieldset': { borderColor: '#58a6ff' },
-              },
-            }}
           />
           <TextField
             margin="normal"
@@ -85,47 +74,45 @@ const Login = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
-            sx={{
-              '& .MuiInputLabel-root': { color: '#c9d1d9' },
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                color: '#e5e5e5',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                '&.Mui-focused fieldset': { borderColor: '#58a6ff' },
-              },
-            }}
           />
           <Button
             type="submit"
             fullWidth
             variant="contained"
-            sx={{ mt: 3, mb: 2 }}
+            sx={{ mt: 2, mb: 2, bgcolor: '#111111', '&:hover': { bgcolor: '#000000' } }}
             disabled={loading}
           >
-            {loading ? <CircularProgress size={24} /> : 'Iniciar Sesión'}
+            {loading ? <CircularProgress size={24} /> : 'Sign In'}
           </Button>
 
-          <GoogleLogin
-            onSuccess={auth.handleGoogleLoginSuccess}
-            onError={auth.handleGoogleLoginError}
-            useOneTap
-            theme="filled_black"
-            text="signin_with"
-            shape="rectangular"
-            width="364px"
-          />
+          <Box sx={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            '& .S9gUrf-YoZ4jf': {
+              width: '100% !important'
+            },
+            '& iframe[title="Sign in with Google"]': {
+              width: '100% !important'
+            }
+          }}>
+            <GoogleLogin
+              onSuccess={auth.handleGoogleLoginSuccess}
+              onError={auth.handleGoogleLoginError}
+              useOneTap
+              theme="filled_black"
+              text="signin_with"
+              shape="rectangular"
+            />
+          </Box>
 
           <Button
             fullWidth
             variant="text"
             onClick={() => navigate('/')}
-            sx={{ 
-              color: '#8b949e',
-              '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' }
-            }}
+            sx={{ color: '#6B7280' }}
           >
-            Volver al Inicio
+            Volver al inicio
           </Button>
         </Box>
       </Box>

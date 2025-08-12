@@ -1477,7 +1477,7 @@ const MapView = forwardRef(({
               <Typography
                 variant="h2"
                 sx={{
-                  fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontFamily: '"Helvetica", Arial, sans-serif',
                   fontWeight: 700,
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                   color: 'rgba(255, 255, 255, 0.95)',
@@ -1491,7 +1491,7 @@ const MapView = forwardRef(({
               <Typography
                 variant="h5"
                 sx={{
-                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontFamily: '"Helvetica", Arial, sans-serif',
                   fontWeight: 300,
                   fontSize: { xs: '1.1rem', md: '1.4rem' },
                   color: 'rgba(255, 255, 255, 0.85)',
@@ -1505,7 +1505,7 @@ const MapView = forwardRef(({
               <Typography
                 variant="body1"
                 sx={{
-                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontFamily: '"Helvetica", Arial, sans-serif',
                   fontWeight: 300,
                   fontSize: { xs: '0.95rem', md: '1.1rem' },
                   color: 'rgba(255, 255, 255, 0.75)',
@@ -1526,7 +1526,7 @@ const MapView = forwardRef(({
                 sx={{
                   backgroundColor: 'rgba(255, 255, 255, 0.25)',
                   color: '#ffffff',
-                  fontFamily: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif',
+                  fontFamily: '"Helvetica", Arial, sans-serif',
                   fontWeight: 500,
                   fontSize: '1.1rem',
                   px: 4,

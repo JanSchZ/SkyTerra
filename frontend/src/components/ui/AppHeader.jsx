@@ -32,7 +32,7 @@ const AppHeader = () => {
                 color: 'white', 
                 textDecoration: 'none',
                 fontWeight: 'bold',
-                fontFamily: "'Source Code Pro', monospace",
+                fontFamily: "'Helvetica', Arial, sans-serif",
                 textShadow: '0 2px 10px rgba(0,0,0,0.4)'
               }}
             >

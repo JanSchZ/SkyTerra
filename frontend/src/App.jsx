@@ -455,7 +455,7 @@ function App() {
 
   if (loadingAuth) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
+      <Box sx={(theme)=>({ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: theme.palette.background.default })}>
         <CircularProgress />
       </Box>
     );
@@ -623,14 +623,14 @@ function App() {
       <AnimatePresence mode="wait">
         <Box
           className="App"
-          sx={{
+          sx={(theme)=>({
             position: 'relative',
             minHeight: '100vh',
-            backgroundColor: '#0d1117',
-            color: '#e0e0e0',
-            fontFamily: 'Poppins, sans-serif',
+            backgroundColor: theme.palette.background.default,
+            color: theme.palette.text.primary,
+            fontFamily: '"Helvetica", Arial, sans-serif',
             overflowX: 'hidden',
-          }}
+          })}
         >
           {/* UI principal siempre visible (Header Minimalista, etc.) */}
           {/* Condición para no mostrar en property, tour, o dashboard */}
@@ -660,11 +660,11 @@ function App() {
                   variant={isMobile ? "h6" : "h5"}
                   component="div" 
                   onClick={() => navigate('/')}
-                  sx={{
-                    color: '#e0e0e0',
-                    fontFamily: 'Poppins, sans-serif',
-                    fontWeight: 300,
-                    letterSpacing: '0.05em',
+                  sx={(theme)=>({
+                    color: theme.palette.common.white,
+                    fontFamily: '"Source Code Pro", monospace',
+                    fontWeight: 400,
+                    letterSpacing: '0.01em',
                     cursor: 'pointer',
                     userSelect: 'none',
                     paddingRight: 2,
@@ -673,7 +673,7 @@ function App() {
                     '&:hover': {
                       color: '#ffffff',
                     }
-                  }}
+                  })}
                 >
                   SKYTERRA
                 </Typography>

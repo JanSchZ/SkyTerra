@@ -90,7 +90,7 @@ function PropertyManagementPage() {
     { field: 'name', headerName: 'Nombre', flex: 1 },
     { field: 'owner', headerName: 'Propietario', width: 150 },
     { field: 'publication_status', headerName: 'Estado', width: 130, renderCell: ({ value }) => {
-        const colorMap = { pending: 'warning', approved: 'success', rejected: 'error' };
+        const colorMap = { pending: 'warning', approved: 'default', rejected: 'error' };
         const labelMap = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada' };
         return <Chip label={labelMap[value] || value} color={colorMap[value] || 'default'} size="small" />;
       } },
@@ -107,7 +107,7 @@ function PropertyManagementPage() {
       renderCell: (params) => (
         <Stack direction="row" spacing={1}>
           {params.row.publication_status !== 'approved' && (
-            <Button color="success" variant="contained" size="small" onClick={() => handleStatusChange(params.id, 'approved')}>Aprobar</Button>
+            <Button variant="contained" size="small" onClick={() => handleStatusChange(params.id, 'approved')}>Aprobar</Button>
           )}
           {params.row.publication_status !== 'rejected' && (
             <Button color="warning" variant="outlined" size="small" onClick={() => handleStatusChange(params.id, 'rejected')}>Rechazar</Button>

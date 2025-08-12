@@ -9,8 +9,8 @@ export const liquidGlassTheme = (mode = 'light') => {
     mode,
     primary: {
       main: colors.accent,
-      light: alpha(colors.accent, 0.7),
-      dark: alpha(colors.accent, 0.4),
+      light: alpha('#000000', 0.7),
+      dark: alpha('#000000', 0.4),
       contrastText: '#ffffff'
     },
     background: {
@@ -18,25 +18,31 @@ export const liquidGlassTheme = (mode = 'light') => {
       paper: 'rgba(22,27,34,0.8)'
     },
     text: {
-      primary: colors.textPrimary,
-      secondary: colors.textSecondary
+      primary: '#E5E7EB',
+      secondary: '#9CA3AF'
     },
     divider: 'rgba(255,255,255,0.12)'
   } : {
     mode,
     primary: {
       main: colors.accent,
-      light: alpha(colors.accent,0.7),
-      dark: alpha(colors.accent,0.5),
+      light: alpha('#111111',0.7),
+      dark: alpha('#000000',0.5),
       contrastText: '#ffffff',
+    },
+    success: {
+      main: '#111111',
+      light: alpha('#111111', 0.8),
+      dark: '#000000',
+      contrastText: '#FFFFFF',
     },
     background: {
       default: colors.lightBg,
       paper: colors.lightPaper,
     },
     text: {
-      primary: '#212121',
-      secondary: '#555555',
+      primary: colors.textPrimary,
+      secondary: colors.textSecondary,
     },
     divider: 'rgba(0,0,0,0.12)',
   };
@@ -44,14 +50,14 @@ export const liquidGlassTheme = (mode = 'light') => {
   return createTheme({
     palette,
     typography: {
-      fontFamily: '"Clear Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      fontFamily: '"Helvetica", Arial, sans-serif',
       fontSize: 14,
-      h1: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
-      h2: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 300 },
-      h3: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 700 },
-      h4: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 600 },
-      h5: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 500 },
-      h6: { fontFamily: '"Source Code Pro", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif', fontWeight: 500 },
+      h1: { fontFamily: '"Source Code Pro", monospace', fontWeight: 300 },
+      h2: { fontFamily: '"Source Code Pro", monospace', fontWeight: 300 },
+      h3: { fontFamily: '"Source Code Pro", monospace', fontWeight: 700 },
+      h4: { fontFamily: '"Source Code Pro", monospace', fontWeight: 600 },
+      h5: { fontFamily: '"Source Code Pro", monospace', fontWeight: 500 },
+      h6: { fontFamily: '"Source Code Pro", monospace', fontWeight: 500 },
       subtitle1: { fontWeight: 600 },
       subtitle2: { fontWeight: 600, color: palette.text.secondary },
       caption: { color: palette.text.secondary }
@@ -103,6 +109,16 @@ export const liquidGlassTheme = (mode = 'light') => {
           root: {
             borderRadius: 8,
             textTransform: 'none',
+          },
+          containedPrimary: {
+            backgroundColor: '#111111',
+            color: '#FFFFFF',
+            '&:hover': { backgroundColor: '#000000' }
+          },
+          outlinedPrimary: {
+            borderColor: '#111111',
+            color: '#111111',
+            '&:hover': { borderColor: '#000000', backgroundColor: 'rgba(0,0,0,0.04)' }
           }
         }
       },

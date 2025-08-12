@@ -79,8 +79,15 @@ const MrrEvolutionChart = () => {
           {
             label: 'MRR',
             data: [8000, 8500, 9500, 10000, 11000, 11500, 12450],
-            borderColor: 'rgb(53, 162, 235)',
-            backgroundColor: 'rgba(53, 162, 235, 0.4)',
+            borderColor: '#111111',
+            backgroundColor: (ctx) => {
+              const { chart } = ctx;
+              const { ctx: c } = chart;
+              const gradient = c.createLinearGradient(0, 0, 0, chart.height);
+              gradient.addColorStop(0, 'rgba(0,0,0,0.25)');
+              gradient.addColorStop(1, 'rgba(0,0,0,0.0)');
+              return gradient;
+            },
             fill: true,
             tension: 0.4,
           },

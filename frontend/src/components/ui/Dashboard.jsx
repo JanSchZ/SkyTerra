@@ -73,7 +73,7 @@ export default function Dashboard({ user }) {
     if (statuses.includes('pending')) {
       return <Chip label="Pendientes" size="small" color="warning" />;
     }
-    return <Chip label="Aprobados" size="small" color="success" />;
+    return <Chip label="Aprobados" size="small" />;
   };
 
   // Helper for property card (shared between lists)

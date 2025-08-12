@@ -15,7 +15,7 @@ const SaaSKpiCard = ({ kpi }) => {
         labels: Array(kpi.trend?.data.length || 0).fill(''),
         datasets: [{
             data: kpi.trend?.data,
-            borderColor: kpi.trend?.borderColor,
+            borderColor: kpi.trend?.borderColor || '#111111',
             borderWidth: 2,
             tension: 0.4,
         }]
@@ -26,11 +26,11 @@ const SaaSKpiCard = ({ kpi }) => {
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Typography variant="subtitle1" color="text.primary">{kpi.title}</Typography>
-                    {kpi.icon}
+                    {/* No icon to keep a neutral look */}
                 </Box>
                 <Typography variant="h4" sx={{ fontWeight: 'bold', my: 1 }} color="text.primary">{kpi.value}</Typography>
                 {kpi.trend && <Box sx={{height: '50px'}}><Line options={lineOptions} data={lineData} /></Box>}
-                {kpi.note && <Typography variant="caption" sx={{color: kpi.note.color}}>{kpi.note.text}</Typography>}
+                {kpi.note && <Typography variant="caption" sx={{color: '#6B7280'}}>{kpi.note.text}</Typography>}
             </CardContent>
         </Card>
     );

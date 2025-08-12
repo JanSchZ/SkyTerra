@@ -76,12 +76,12 @@ const ProfitabilityChart = () => {
           {
             label: 'LTV',
             data: [2800, 3200, 3100, 3400],
-            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            backgroundColor: 'rgba(0,0,0,0.7)',
           },
           {
             label: 'CAC',
             data: [450, 500, 480, 420],
-            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+            backgroundColor: 'rgba(0,0,0,0.35)',
           },
         ],
     };

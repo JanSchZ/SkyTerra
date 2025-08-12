@@ -16,7 +16,7 @@ const StatusChip = ({ status }) => {
     approved: {
         icon: <CheckCircleOutlineIcon />,
         label: 'Aprobado',
-        color: 'success',
+       color: 'default',
       },
       pending: {
         icon: <HourglassEmptyIcon />,

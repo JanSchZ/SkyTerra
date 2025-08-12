@@ -66,7 +66,7 @@ const PricingCard = ({ title, price, price_period, features, isFeatured = false,
           <List sx={{ flexGrow: 1 }}>
             {features.map((feature, index) => (
               <ListItem key={index} disableGutters sx={{ py: 0.5 }}>
-                <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5, color: 'success.light' }}>
+                <ListItemIcon sx={{ minWidth: 'auto', mr: 1.5, color: 'text.secondary' }}>
                   <CheckCircleOutlineIcon fontSize="small" />
                 </ListItemIcon>
                 <ListItemText primary={feature} sx={{ '& .MuiListItemText-primary': { fontSize: '0.95rem' } }} />
