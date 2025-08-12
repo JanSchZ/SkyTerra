@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip } from '@mui/material';
 import { propertyService, tourService } from '../../services/api';
 import Map, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
@@ -99,14 +99,18 @@ const MapView = forwardRef(({
   const [showOverlay, setShowOverlay] = useState(!disableIntroAnimation);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [isRotating, setIsRotating] = useState(false); // Estado para la rotación del globo
   const [connectionType, setConnectionType] = useState('4g');
   const mapRef = useRef(null);
+  const rotationFrameId = useRef(null); // Ref para el ID de la animación de rotación
+  const rotationPrevTimeRef = useRef(null); // timestamp del frame previo
   const flightTimeoutIdRef = useRef(null);
   const userInteractedRef = useRef(false);
   const lastLoadViewportRef = useRef(null);
   const debounceTimeoutRef = useRef(null);
   const lastFetchedPage1FiltersRef = useRef(null);
   const recommendationsTourTimeoutRef = useRef(null);
+  const idleRotationTimeoutRef = useRef(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewPropertyId, setPreviewPropertyId] = useState(null);
   const [tourCache, setTourCache] = useState({}); // propertyId -> tourUrl
@@ -151,39 +155,103 @@ const MapView = forwardRef(({
   // Para evitar múltiples ejecuciones del efecto de autoflight
   const autoFlightAttemptedRef = useRef(false);
 
+  // Render helper: interpreta **texto** como énfasis en negrita
+  const renderEmphasis = useCallback((text) => {
+    if (text == null) return null;
+    const parts = String(text).split(/\*\*/);
+    return parts.map((part, index) => (
+      index % 2 === 1
+        ? <Box key={`em-${index}`} component="span" sx={{ fontWeight: 700 }}>{part}</Box>
+        : <React.Fragment key={`txt-${index}`}>{part}</React.Fragment>
+    ));
+  }, []);
+
+  // Índice para palabras dinámicas dentro de un mismo slide (e.g., Compra/Vende/Invierte)
+  const [dynamicWordIndex, setDynamicWordIndex] = useState(0);
+
   // Textos descriptivos rotativos
   const descriptiveTexts = [
     {
-      title: "SkyTerra",
-      subtitle: "Propiedades elevadas a otra perspectiva",
-      description: "Compra y vende terrenos con tours aéreos inmersivos impulsados por IA"
+      // Título dinámico: Compra/Vende/Invierte + " informado."
+      dynamicWords: ["Compra", "Vende", "Invierte"],
+      titleAfter: " **informado**.",
+      subtitle: "Decide con **datos**."
     },
     {
-      title: "Tecnología Inmersiva",
-      subtitle: "Tours 360° y mapas interactivos",
-      description: "Navega propiedades con la última tecnología de visualización"
+      title: "Tierras, con la precisión del **futuro**.",
+      subtitle: "Mapa inmersivo + **IA** para decidir mejor."
     },
     {
-      title: "Chile y el Mundo", 
-      subtitle: "Propiedades en ubicaciones excepcionales",
-      description: "Desde la Patagonia hasta los Andes, encuentra tu lugar ideal"
+      title: "Hacemos **visible** el valor **oculto**.",
+      subtitle: "Destaca las **ventajas** de tu propiedad."
     },
     {
-      title: "Experiencia Única",
-      subtitle: "Búsqueda inteligente con IA",
-      description: "Encuentra propiedades usando lenguaje natural y filtros avanzados"
+      title: "Del terreno a los **datos**.",
+      subtitle: "**Tours 360°**, estándares pro y datos accionables."
+    },
+    {
+      title: "Explora sin **carretera**.",
+      subtitle: "**Evalúa 10** terrenos en una tarde."
+    },
+    // (removed: "Invierte con certeza" per request)
+    {
+      title: "Vende como **experto**.",
+      subtitle: "Un **ecosistema**, de la captura al cierre."
+    },
+    {
+      title: "Conoce a **Sam**.",
+      subtitle: "Tu asistente **IA** para buscar terrenos en lenguaje natural."
     }
   ];
 
-  // Rotar texto cada 6 segundos
+  // Rotación de palabras dinámicas (una sola pasada) y avance automático al siguiente slide
+  const dynamicTimersRef = useRef([]);
+  useEffect(() => {
+    // Limpiar timers previos
+    dynamicTimersRef.current.forEach(clearTimeout);
+    dynamicTimersRef.current = [];
+
+    setDynamicWordIndex(0);
+    const slide = descriptiveTexts[currentTextIndex];
+    if (
+      slide && slide.dynamicWords && slide.dynamicWords.length > 0 && showOverlay && !disableIntroAnimation
+    ) {
+      const stepMs = 1800; // ritmo de lectura con ligera reducción para suavizar ciclo
+      // Programar cambios de palabra
+      slide.dynamicWords.forEach((_, i) => {
+        const t = setTimeout(() => {
+          setDynamicWordIndex(i);
+        }, i * stepMs);
+        dynamicTimersRef.current.push(t);
+      });
+      // Avanzar al siguiente slide tras mostrar la última palabra
+      const totalMs = slide.dynamicWords.length * stepMs + 150;
+      const advance = setTimeout(() => {
+        setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
+      }, totalMs);
+      dynamicTimersRef.current.push(advance);
+    }
+
+    return () => {
+      dynamicTimersRef.current.forEach(clearTimeout);
+      dynamicTimersRef.current = [];
+    };
+  }, [currentTextIndex, showOverlay, disableIntroAnimation]);
+
+  // Rotar texto (slides normales) cada ~7.5s para mejor lectura
   useEffect(() => {
     if (showOverlay && !disableIntroAnimation && !userInteractedRef.current) {
+      const slide = descriptiveTexts[currentTextIndex];
+      // Si el slide actual usa palabras dinámicas, su propio efecto se encarga del avance
+      if (slide && slide.dynamicWords && slide.dynamicWords.length > 0) {
+        return undefined;
+      }
       const interval = setInterval(() => {
         setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
-      }, 6000);
+      }, 8200);
       return () => clearInterval(interval);
     }
-  }, [showOverlay, descriptiveTexts.length, disableIntroAnimation, userInteractedRef.current]);
+  }, [showOverlay, descriptiveTexts.length, disableIntroAnimation, userInteractedRef.current, currentTextIndex]);
 
   // Ocultar overlay cuando la animación termine O el usuario interactúe O cuando se active la búsqueda AI
   useEffect(() => {
@@ -215,12 +283,13 @@ const MapView = forwardRef(({
     userInteractedRef.current = true; 
     setAutoFlyCompleted(true); 
     setShowOverlay(false); // Ocultar overlay inmediatamente
+    setIsRotating(false); // Detener la rotación del globo
 
     // Ya NO llamamos a map.stop() ni a map.easeTo() aquí.
     // La interacción del usuario (si ocurre) o la finalización natural del segmento actual de flyTo
     // se encargarán de detener el movimiento.
 
-  }, [setAutoFlyCompleted, setShowOverlay]);
+  }, [setAutoFlyCompleted, setShowOverlay, setIsRotating]);
 
   const mapStyle = config.mapbox.style;
   
@@ -575,26 +644,53 @@ const MapView = forwardRef(({
       return;
     }
     
-    // console.log('🚁✨ Iniciando el gran final de la animación.');
+    // console.log('🚁✨ Iniciando el gran final de la animación: zoom-out.');
 
-    // Vuelo final a una vista panorámica y elevada
-    mapRef.current.flyTo({
-      ...initialMapViewState, // Volver a la vista inicial, que es amplia
-      zoom: 4, // Un poco más cerca que el inicio para enmarcar bien
-      pitch: 50, // Ángulo más dramático
-      duration: 10000, // Vuelo lento y majestuoso
+    const map = mapRef.current.getMap();
+    const currentCenter = map.getCenter();
+    const targetCenter = [currentCenter.lng, 0]; // conservar longitud, centrar en ecuador
+
+    // Vuelo final a una vista global, centrando por longitud actual
+    map.flyTo({
+      center: targetCenter,
+      zoom: 2.0,
+      pitch: 0,
+      bearing: 0, // dejar el mapa derecho (norte arriba)
+      duration: 6500,
       essential: true,
     });
 
-    // Después del vuelo final, se completará la animación y se ocultará el overlay.
-    flightTimeoutIdRef.current = setTimeout(() => {
+    // Cuando termine el vuelo final, ocultar overlay e iniciar rotación
+    const onEnd = () => {
       if (!userInteractedRef.current) {
         setAutoFlyCompleted(true);
-        // console.log('🚁✨ Animación finalizada.');
+        setShowOverlay(false);
+        try {
+          // Asegurar que los controles de interacción estén habilitados
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.boxZoom.enable();
+          map.dragRotate.enable();
+          map.keyboard.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
+        } catch {}
+        setIsRotating(true);
       }
-    }, 10000); // Coincidir con la duración del vuelo final
+      map.off('moveend', onEnd);
+    };
+    map.once('moveend', onEnd);
 
-  }, [initialMapViewState, setAutoFlyCompleted]);
+    // Fallback: si por alguna razón no llegara a dispararse moveend (no debería), iniciar igual
+    setTimeout(() => {
+      if (!isRotating && !userInteractedRef.current) {
+        setAutoFlyCompleted(true);
+        setShowOverlay(false);
+        setIsRotating(true);
+      }
+    }, 6800);
+
+  }, [initialMapViewState, setAutoFlyCompleted, setIsRotating]);
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
@@ -867,6 +963,82 @@ const MapView = forwardRef(({
     }
   }, [onLoad]);
 
+  // Listeners globales para pausar/reanudar rotación con interacción real del usuario
+  useEffect(() => {
+    if (!isMapLoaded || !mapRef.current) return;
+    const map = mapRef.current.getMap();
+
+    const onMoveStart = (e) => {
+      if (e && e.originalEvent) {
+        setIsRotating(false);
+        if (idleRotationTimeoutRef.current) {
+          clearTimeout(idleRotationTimeoutRef.current);
+          idleRotationTimeoutRef.current = null;
+        }
+      }
+    };
+
+    const onMoveEnd = (e) => {
+      if (e && e.originalEvent) {
+        // reprogramar rotación si quedamos alejados
+        if (idleRotationTimeoutRef.current) clearTimeout(idleRotationTimeoutRef.current);
+        idleRotationTimeoutRef.current = setTimeout(() => {
+          const zoom = map.getZoom();
+          if (zoom <= 3.2 && !activeTourUrlRef.current) {
+            map.setPitch(0);
+            map.setBearing(0);
+            setIsRotating(true);
+          }
+        }, 7000);
+      }
+    };
+
+    map.on('movestart', onMoveStart);
+    map.on('moveend', onMoveEnd);
+
+    return () => {
+      map.off('movestart', onMoveStart);
+      map.off('moveend', onMoveEnd);
+    };
+  }, [isMapLoaded]);
+
+  // Rotación suave del globo a velocidad constante
+  useEffect(() => {
+    const ROTATION_DEG_PER_SEC = 40; // velocidad alta para que se note claramente
+
+    const step = (timestamp) => {
+      if (!mapRef.current || !isRotating || userInteractedRef.current) {
+        if (rotationFrameId.current) cancelAnimationFrame(rotationFrameId.current);
+        rotationFrameId.current = null;
+        rotationPrevTimeRef.current = null;
+        return;
+      }
+
+      const map = mapRef.current.getMap();
+      if (!rotationPrevTimeRef.current) rotationPrevTimeRef.current = timestamp;
+      const deltaSec = Math.min(0.05, (timestamp - rotationPrevTimeRef.current) / 1000);
+      rotationPrevTimeRef.current = timestamp;
+
+      // Rotar linealmente; permitir que el usuario interrumpa libremente (movestart listener pausa)
+      map.setBearing(map.getBearing() + ROTATION_DEG_PER_SEC * deltaSec);
+      rotationFrameId.current = requestAnimationFrame(step);
+    };
+
+    if (isRotating) {
+      rotationFrameId.current = requestAnimationFrame(step);
+    } else if (rotationFrameId.current) {
+      cancelAnimationFrame(rotationFrameId.current);
+      rotationFrameId.current = null;
+      rotationPrevTimeRef.current = null;
+    }
+
+    return () => {
+      if (rotationFrameId.current) cancelAnimationFrame(rotationFrameId.current);
+      rotationFrameId.current = null;
+      rotationPrevTimeRef.current = null;
+    };
+  }, [isRotating]);
+
   // Prefetch tours when zoom is moderate
   const prefetchToursInViewport = useCallback(async () => {
     if (!mapRef.current) return;
@@ -912,6 +1084,19 @@ const MapView = forwardRef(({
     debounceTimeoutRef.current = setTimeout(() => {
       if (!mapRef.current) return;
       const map = mapRef.current.getMap();
+      // Reprogramar rotación por inactividad tras cualquier movimiento
+      if (!activeTourUrlRef.current) {
+        setIsRotating(false);
+        if (idleRotationTimeoutRef.current) clearTimeout(idleRotationTimeoutRef.current);
+        idleRotationTimeoutRef.current = setTimeout(() => {
+          const zoom = map.getZoom();
+          if (zoom <= 3.2) {
+            map.setPitch(0);
+            map.setBearing(0);
+            setIsRotating(true);
+          }
+        }, 7000);
+      }
       // -------------- Seamless zoom-to-tour logic -----------------
       const currentZoom = map.getZoom();
       if (currentZoom >= 14.5) {
@@ -1083,13 +1268,35 @@ const MapView = forwardRef(({
     }
   }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted]);
 
+  const scheduleIdleRotation = useCallback(() => {
+    if (idleRotationTimeoutRef.current) {
+      clearTimeout(idleRotationTimeoutRef.current);
+      idleRotationTimeoutRef.current = null;
+    }
+    idleRotationTimeoutRef.current = setTimeout(() => {
+      if (!mapRef.current) return;
+      const map = mapRef.current.getMap();
+      const zoom = map.getZoom();
+      if (zoom <= 3.2 && !activeTourUrlRef.current) {
+        map.setPitch(0);
+        map.setBearing(0);
+        setIsRotating(true);
+      }
+    }, 7000);
+  }, []);
+
   const handleUserInteraction = useCallback((event) => {
     // Detectar si es una interacción genuina del usuario
     if (event.originalEvent && !userInteractedRef.current && !autoFlyCompleted) {
         // console.log('Interacción de movimiento en mapa, deteniendo animación intro.');
         stopAndSkipAnimation();
     }
-  }, [stopAndSkipAnimation, autoFlyCompleted]);
+    if (event.originalEvent) {
+      // Pausar rotación y reprogramar tras 7s de inactividad
+      setIsRotating(false);
+      scheduleIdleRotation();
+    }
+  }, [stopAndSkipAnimation, autoFlyCompleted, scheduleIdleRotation]);
 
   const onMapMouseMove = useCallback(event => {
     if (!mapRef.current) return;
@@ -1295,9 +1502,9 @@ const MapView = forwardRef(({
           interactiveLayerIds={!editable ? [unclusteredPointLayer.id] : []} 
           onMouseMove={onMapMouseMove} 
           onMouseLeave={onMapMouseLeave} 
-          preserveDrawingBuffer={true}
+           preserveDrawingBuffer={false}
         >
-          <NavigationControl 
+           <NavigationControl 
             position="bottom-right"
             showCompass={true}
             showZoom={true}
@@ -1476,9 +1683,10 @@ const MapView = forwardRef(({
             sx={{
               textAlign: 'center',
               color: 'white',
-              maxWidth: '600px',
-              px: 4,
-              py: 3,
+              width: { xs: '92vw', sm: '84vw', md: 620 },
+              maxWidth: 620,
+              px: { xs: 3, md: 3.25 },
+              py: { xs: 2.75, md: 3 },
               backgroundColor: 'rgba(255, 255, 255, 0.18)',
               borderRadius: '24px',
               backdropFilter: 'blur(14px)',
@@ -1486,6 +1694,9 @@ const MapView = forwardRef(({
               border: '1px solid rgba(255, 255, 255, 0.25)',
               boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             }}
+            component={motion.div}
+            layout
+            transition={{ layout: { duration: 0.45, ease: [0.25, 0.1, 0.25, 1] } }}
           >
             <motion.div
               key={currentTextIndex}
@@ -1499,16 +1710,46 @@ const MapView = forwardRef(({
             >
               <Typography
                 variant="h2"
+                component="div"
                 sx={{
                   fontFamily: '"Helvetica", Arial, sans-serif',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                   color: 'rgba(255, 255, 255, 0.95)',
                   mb: 2,
                   letterSpacing: '-0.02em'
                 }}
               >
-                {descriptiveTexts[currentTextIndex].title}
+                {descriptiveTexts[currentTextIndex] && descriptiveTexts[currentTextIndex].dynamicWords ? (
+                  <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline' }}>
+                    {/* Contenedor con ancho fijo (palabra más larga) centrado */}
+                    <Box component="span" sx={{ position: 'relative', display: 'inline-block', textAlign: 'center' }}>
+                      <Box aria-hidden component="span" sx={{ visibility: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
+                        {renderEmphasis('Invierte')}
+                      </Box>
+                      <Box component="span" sx={{ position: 'absolute', left: '50%', top: 0, transform: 'translateX(-50%)' }}>
+                        <AnimatePresence mode="wait">
+                          <motion.span
+                            key={dynamicWordIndex}
+                            initial={{ y: 14, opacity: 0, position: 'absolute' }}
+                            animate={{ y: 0, opacity: 1, position: 'relative' }}
+                            exit={{ y: -14, opacity: 0, position: 'absolute' }}
+                            transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
+                            style={{ whiteSpace: 'nowrap' }}
+                          >
+                            {renderEmphasis(descriptiveTexts[currentTextIndex].dynamicWords[dynamicWordIndex])}
+                          </motion.span>
+                        </AnimatePresence>
+                      </Box>
+                    </Box>
+                    {/* Espacio y parte fija */}
+                    <Box component="span" sx={{ ml: 1 }}>
+                      {renderEmphasis(descriptiveTexts[currentTextIndex].titleAfter || '')}
+                    </Box>
+                  </Box>
+                ) : (
+                  renderEmphasis(descriptiveTexts[currentTextIndex].title)
+                )}
               </Typography>
               
               <Typography
@@ -1522,23 +1763,25 @@ const MapView = forwardRef(({
                   letterSpacing: '-0.01em'
                 }}
               >
-                {descriptiveTexts[currentTextIndex].subtitle}
+                {renderEmphasis(descriptiveTexts[currentTextIndex].subtitle)}
               </Typography>
               
-              <Typography
-                variant="body1"
-                sx={{
-                  fontFamily: '"Helvetica", Arial, sans-serif',
-                  fontWeight: 300,
-                  fontSize: { xs: '0.95rem', md: '1.1rem' },
-                  color: 'rgba(255, 255, 255, 0.75)',
-                  lineHeight: 1.6,
-                  maxWidth: '400px',
-                  mx: 'auto'
-                }}
-              >
-                {descriptiveTexts[currentTextIndex].description}
-              </Typography>
+              {descriptiveTexts[currentTextIndex].description && (
+                <Typography
+                  variant="body1"
+                  sx={{
+                    fontFamily: '"Helvetica", Arial, sans-serif',
+                    fontWeight: 300,
+                    fontSize: { xs: '0.95rem', md: '1.1rem' },
+                    color: 'rgba(255, 255, 255, 0.75)',
+                    lineHeight: 1.6,
+                    maxWidth: '400px',
+                    mx: 'auto'
+                  }}
+                >
+                  {descriptiveTexts[currentTextIndex].description}
+                </Typography>
+              )}
             </motion.div>
 
             <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -1567,7 +1810,7 @@ const MapView = forwardRef(({
                 }}
                 startIcon={<TravelExploreIcon />}
               >
-                Explorar Ahora
+                Explorar
               </Button>
             </Box>
 
