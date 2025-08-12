@@ -44,6 +44,7 @@ import AdminDashboardPage from './components/admin/AdminDashboardPage.jsx';
 import AdminTicketsPage from './components/admin/AdminTicketsPage.jsx';
 import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
+import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage.jsx';
 import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
 import AdminAIPage from './components/admin/AdminAIPage.jsx';
 import SamAdminPage from './components/admin/SamAdminPage.jsx';
@@ -628,7 +629,7 @@ function App() {
       <Route path="/admin" element={<StaffRoute user={user} element={<AdminLayout />} />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
-        <Route path="properties" element={<PropertyApprovalPage />} />
+        <Route path="properties" element={<AdminDetailedPropertiesPage />} />
         <Route path="tickets" element={<AdminTicketsPage />} />
         <Route path="ai-management" element={<SamAdminPage />} />
         

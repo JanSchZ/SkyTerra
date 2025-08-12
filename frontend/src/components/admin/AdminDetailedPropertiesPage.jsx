@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Chip, Avatar, IconButton, Menu, MenuItem, LinearProgress, Dialog, DialogTitle, DialogContent, Button, TextField, List, ListItem, ListItemText, ListItemAvatar, Paper, InputBase, CircularProgress, Alert } from '@mui/material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { styled } from '@mui/material/styles';
-import { propertyService } from '../../services/api';
+import { propertyService, authService } from '../../services/api';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -138,6 +138,8 @@ const AdminDetailedPropertiesPage = () => {
 
     // Efecto para cargar propiedades inicialmente
     useEffect(() => {
+        // Como las propiedades funcionan (según logs), cargamos directamente
+        // StaffRoute ya valida que solo admins puedan acceder
         loadProperties('', paginationModel.page, paginationModel.pageSize);
     }, [paginationModel.page, paginationModel.pageSize, loadProperties]);
 
@@ -170,11 +172,11 @@ const AdminDetailedPropertiesPage = () => {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <Avatar 
-                        src={params.row.images && params.row.images[0] ? params.row.images[0].image : null} 
+                        src={params.row?.images?.[0]?.image || null} 
                         sx={{ mr: 2 }} 
                         variant="rounded" 
                     />
-                    <Typography variant="body2">{params.value}</Typography>
+                    <Typography variant="body2">{params.value || ''}</Typography>
                 </Box>
             )
         },
@@ -183,19 +185,19 @@ const AdminDetailedPropertiesPage = () => {
             headerName: 'Ubicación', 
             minWidth: 200, 
             flex: 1,
-            valueGetter: (params) => params.row.location_name || 'No especificada'
+            valueGetter: (params) => params?.row?.location_name || 'No especificada'
         },
         {
             field: 'publication_status',
             headerName: 'Estado',
             minWidth: 150,
-            renderCell: (params) => <StatusChip status={params.value} />,
+            renderCell: (params) => <StatusChip status={params?.value || 'pending'} />,
         },
         {
             field: 'plusvalia_score',
             headerName: 'Plusvalía Score',
             minWidth: 180,
-            renderCell: (params) => <PlusvaliaScore score={params.value} />
+            renderCell: (params) => <PlusvaliaScore score={params?.value || 0} />
         },
         { 
             field: 'price', 
@@ -203,7 +205,7 @@ const AdminDetailedPropertiesPage = () => {
             minWidth: 180,
             type: 'number',
             valueFormatter: (params) => {
-                if (params.value == null) {
+                if (params?.value == null) {
                     return 'N/A';
                 }
                 return `$${params.value.toLocaleString('es-CL')}`;
@@ -214,14 +216,14 @@ const AdminDetailedPropertiesPage = () => {
             headerName: 'Tamaño (ha)', 
             minWidth: 120,
             type: 'number',
-            valueFormatter: (params) => `${params.value} ha`,
+            valueFormatter: (params) => `${params?.value || 'N/A'} ha`,
         },
         { 
             field: 'created_at', 
             headerName: 'Fecha Creación', 
             minWidth: 180, 
             type: 'date', 
-            valueGetter: (params) => new Date(params.value)
+            valueGetter: (params) => params?.value ? new Date(params.value) : new Date()
         },
         {
             field: 'actions',
@@ -231,7 +233,7 @@ const AdminDetailedPropertiesPage = () => {
             cellClassName: 'actions',
             getActions: ({ row }) => {
                 return [
-                    <IconButton onClick={(e) => handleOpenMenu(e, row)}>
+                    <IconButton key="menu" onClick={(e) => handleOpenMenu(e, row)}>
                         <MoreVertIcon />
                     </IconButton>
                 ];

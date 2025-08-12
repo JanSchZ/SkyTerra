@@ -436,6 +436,18 @@ export const authService = {
     return !!userStr;
   },
 
+  // Obtener usuario del localStorage sin llamada al backend (función helper simple)
+  getStoredUser() {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return null;
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.warn('Error parsing stored user:', error);
+      return null;
+    }
+  },
+
   // Actualizar perfil de usuario
   async updateProfile(userData) {
     try {
