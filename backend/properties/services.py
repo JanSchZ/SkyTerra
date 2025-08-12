@@ -283,6 +283,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                                         'price': float(prop.price),
                                         'size': prop.size,
                                         'type': prop.get_type_display(),
+                                        'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                                         'has_water': prop.has_water,
                                         'has_views': prop.has_views,
                                         'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
@@ -314,6 +315,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                                     'price': float(prop.price),
                                     'size': prop.size,
                                     'type': prop.get_type_display(),
+                                    'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                                     'has_water': prop.has_water,
                                     'has_views': prop.has_views,
                                     'description': prop.description[:100] + "..." if len(prop.description) > 100 else prop.description,
@@ -324,17 +326,35 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
 
                             ai_response['recommendations'] = generated_recommendations
 
-                        # Ajustar mensaje cuando utilizamos recomendaciones generadas y el mensaje existente es genérico
-                        generic_msgs = [
-                            "Tu búsqueda ha sido procesada.",
-                            "Búsqueda procesada",
+                        # Si el usuario viene de un contexto conversacional (pregunta abierta) invita a clarificar antes de listar muchas
+                        user_last = (conversation_history or [])[-1]['content'].lower() if conversation_history else ''
+                        followup_phrases = [
+                            'qué opinas', 'que opinas', 'te parece', 'cómo lo ves', 'como lo ves',
+                            'qué te parece', 'que te parece', 'mis gustos', 'qué recomiendas', 'me conviene'
                         ]
-                        if (not enriched_recommendations) or (ai_response.get('assistant_message') in generic_msgs):
-                            rec_count = len(ai_response['recommendations'])
-                            if rec_count == 0:
-                                ai_response['assistant_message'] = "No encontré propiedades que coincidan exactamente con tu búsqueda, pero aquí tienes algunas sugerencias generales."
-                            else:
-                                ai_response['assistant_message'] = f"Encontré {rec_count} propiedad{'es' if rec_count != 1 else ''} que podrían interesarte."
+                        if any(p in user_last for p in followup_phrases):
+                            ai_response['assistant_message'] = "Entiendo. Antes de sugerir más, ¿qué te importa más: precio, agua, vistas, tamaño o ubicación?"
+                            # Fomentar conversación: no repetir mensajes de conteo y reducir resultados
+                            ai_response['recommendations'] = ai_response['recommendations'][:2]
+                        # Si el usuario hace una pregunta directa (por qué, cómo, etc.), evitar respuestas de conteo
+                        question_cues = ['por qué', 'porque', 'por que', 'cómo', 'como', 'qué', 'que']
+                        if any(q in user_last for q in question_cues):
+                            ai_response['assistant_message'] = ai_response.get('assistant_message') or 'Puedo explicarte en detalle.'
+                            # Evitar listas largas y centrarse en explicación
+                            ai_response['recommendations'] = ai_response['recommendations'][:1]
+                        else:
+                            # Ajustar mensaje cuando el generado sea muy genérico
+                            generic_msgs = [
+                                "Tu búsqueda ha sido procesada.",
+                                "Búsqueda procesada",
+                            ]
+                            if (not enriched_recommendations) or (ai_response.get('assistant_message') in generic_msgs):
+                                rec_count = len(ai_response['recommendations'])
+                                if rec_count == 0:
+                                    ai_response['assistant_message'] = "No encontré coincidencias exactas. ¿Prefieres que priorice precio bajo, ubicación o características como agua/vistas?"
+                                else:
+                                    # Mensaje más conversacional, sin números
+                                    ai_response['assistant_message'] = "Tengo algunas opciones que podrían encajar. Si me indicas presupuesto y zona preferida, afino aún más."
 
                     elif ai_response['search_mode'] == 'location':
                         # Para modo 'location', nos aseguramos que no haya recomendaciones de propiedades
@@ -364,6 +384,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                                 'price': float(prop.price),
                                 'size': prop.size,
                                 'type': prop.get_type_display(),  # Use display name for consistency
+                                'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                                 'latitude': prop.latitude,  # Add latitude
                                 'longitude': prop.longitude,  # Add longitude
                                 'has_water': prop.has_water,  # Add has_water
@@ -446,6 +467,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                 'price': float(prop.price),
                 'size': prop.size,
                 'type': prop.get_type_display(), # Use display name for consistency
+                'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                 'latitude': prop.latitude, # Add latitude
                 'longitude': prop.longitude, # Add longitude
                 'has_water': prop.has_water,
@@ -462,3 +484,48 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
             'interpretation': f"Búsqueda procesada: {user_query}",
             'fallback': True
         } 
+
+
+# ------------------------------
+# Enriquecimiento por IA: Categorizar y resumir propiedades
+# ------------------------------
+
+def categorize_property_with_ai(property_instance):
+    """Usa Sam para inferir una categoría y un resumen breve para una propiedad.
+    Devuelve un dict con posibles claves: ai_category, ai_summary.
+    """
+    try:
+        if SkyTerraSamService is None:
+            raise SamServiceError("SamService no disponible")
+        sam = SkyTerraSamService()
+        prompt = (
+            "Clasifica esta propiedad rural en UNA categoría corta y genera un resumen de 1-2 líneas. "
+            "Responde SOLO en JSON con claves ai_category y ai_summary.\n\n"
+            f"Nombre: {property_instance.name}\n"
+            f"Tipo declarado: {property_instance.get_type_display()}\n"
+            f"Precio: {float(property_instance.price)}\n"
+            f"Tamaño (ha): {property_instance.size}\n"
+            f"Agua: {'sí' if property_instance.has_water else 'no'}\n"
+            f"Vistas: {'sí' if property_instance.has_views else 'no'}\n"
+            f"Coordenadas: {property_instance.latitude}, {property_instance.longitude}\n"
+            f"Descripción: {property_instance.description[:600]}\n\n"
+            "Ejemplo exacto de salida: {\"ai_category\": \"forest\", \"ai_summary\": \"Campo con bosque nativo cercano a ríos...\"}"
+        )
+        result = sam.generate_response(prompt, request_type="ai_property_classification")
+        text = (result or {}).get('response', '') if isinstance(result, dict) else str(result)
+        # Limpia posibles fences
+        cleaned = text.strip()
+        if cleaned.startswith('```'):
+            import re
+            cleaned = re.sub(r'^```[a-zA-Z]*\s*', '', cleaned)
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+        data = json.loads(cleaned)
+        return {
+            'ai_category': data.get('ai_category'),
+            'ai_summary': data.get('ai_summary'),
+        }
+    except Exception as e:
+        logger.error(f"[AI Categorization] Error clasificando propiedad {property_instance.id}: {e}")
+        return {}

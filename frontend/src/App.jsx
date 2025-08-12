@@ -347,6 +347,7 @@ function App() {
     }
 
     const newHistory = [...conversationHistory, { role: 'user', content: text }];
+    try { window.__skyterraConversationHistory = newHistory; } catch (_) {}
     setConversationHistory(newHistory);
     try {
       setAiSearchLoading(true);
@@ -354,7 +355,9 @@ function App() {
       if (response.data) {
         setAiSearchResult(response.data);
         if(response.data.assistant_message){
-           setConversationHistory([...newHistory,{ role:'assistant', content: response.data.assistant_message }]);
+           const updatedHistory = [...newHistory,{ role:'assistant', content: response.data.assistant_message }];
+           setConversationHistory(updatedHistory);
+           try { window.__skyterraConversationHistory = updatedHistory; } catch (_) {}
         }
       }
     } catch (err) { console.error(err); }
@@ -824,19 +827,21 @@ function App() {
             {mainContent}
           </AnimatePresence>
 
-          {/* Render AI suggestion panel on left */}
-          <AISuggestionPanel 
-             isLoading={aiSearchLoading}
-             assistantMessage={aiSearchResult?.assistant_message}
-             recommendations={aiSearchResult?.recommendations}
-             searchMode={aiSearchResult?.search_mode}
-             flyToLocation={aiSearchResult?.flyToLocation}
-             onSuggestionClick={handleSuggestionClick}
-             onSuggestionHover={null}
-             onClearAISearch={() => { setAiSearchResult(null); setAiAppliedFilters(null);} }
-             onFollowUpQuery={handleFollowUpQuery}
-             currentQuery={aiSearchResult?.interpretation}
-          />
+          {/* Render AI suggestion panel only on main map route */}
+          {location.pathname === '/' && (
+            <AISuggestionPanel 
+               isLoading={aiSearchLoading}
+               assistantMessage={aiSearchResult?.assistant_message}
+               recommendations={aiSearchResult?.recommendations}
+               searchMode={aiSearchResult?.search_mode}
+               flyToLocation={aiSearchResult?.flyToLocation}
+               onSuggestionClick={handleSuggestionClick}
+               onSuggestionHover={null}
+               onClearAISearch={() => { setAiSearchResult(null); setAiAppliedFilters(null);} }
+               onFollowUpQuery={handleFollowUpQuery}
+               currentQuery={aiSearchResult?.interpretation}
+            />
+          )}
         </Box>
       </AnimatePresence>
     </AuthContext.Provider>

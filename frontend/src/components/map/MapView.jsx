@@ -617,32 +617,53 @@ const MapView = forwardRef(({
     try {
       if (Array.isArray(properties) && properties.length > 0 && !userInteractedRef.current) {
         const selectedProperties = [];
-        const latRanges = [
+        // Priorizar Chile: primero escogeremos propiedades dentro de Chile
+        const CHILE_LAT_MIN = -56, CHILE_LAT_MAX = -17;
+        const CHILE_LON_MIN = -75, CHILE_LON_MAX = -66;
+        const chileProps = properties.filter(p => typeof p.latitude === 'number' && typeof p.longitude === 'number' && p.latitude >= CHILE_LAT_MIN && p.latitude <= CHILE_LAT_MAX && p.longitude >= CHILE_LON_MIN && p.longitude <= CHILE_LON_MAX);
+
+        const chileLatRanges = [
           { min: -35, max: -30, name: "Centro" },
           { min: -40, max: -35, name: "Centro-Sur" },
           { min: -45, max: -40, name: "Sur" },
           { min: -50, max: -45, name: "Aysén" },
           { min: -55, max: -50, name: "Magallanes" }
         ];
-
+        // Elegir la primera propiedad SIEMPRE en Chile si existe
+        let firstChileCandidate = null;
+        for (const range of chileLatRanges) {
+          const inRange = chileProps.filter(p => p.latitude >= range.min && p.latitude < range.max);
+          if (inRange.length > 0) { firstChileCandidate = inRange[Math.floor(Math.random()*inRange.length)]; break; }
+        }
+        if (firstChileCandidate) {
+          selectedProperties.push({
+            center: [firstChileCandidate.longitude, firstChileCandidate.latitude],
+            zoom: 10,
+            pitch: 45,
+            bearing: 0,
+            name: firstChileCandidate.name
+          });
+        }
+        // Luego, agregar más propiedades dentro de Chile para no marear
+        const latRanges = chileLatRanges;
         for (const range of latRanges) {
-          const propertiesInRange = properties.filter(prop => 
-            prop.latitude >= range.min && prop.latitude < range.max
-          );
+          const propertiesInRange = chileProps.filter(prop => prop.latitude >= range.min && prop.latitude < range.max);
           if (propertiesInRange.length > 0) {
             const randomProperty = propertiesInRange[Math.floor(Math.random() * propertiesInRange.length)];
-            selectedProperties.push({
-              center: [randomProperty.longitude, randomProperty.latitude],
-              zoom: Math.random() > 0.5 ? 8 : 10,
-              pitch: 30 + Math.random() * 30,
-              bearing: Math.random() * 360,
-              name: randomProperty.name
-            });
+            if (!firstChileCandidate || randomProperty.id !== firstChileCandidate.id) {
+              selectedProperties.push({
+                center: [randomProperty.longitude, randomProperty.latitude],
+                zoom: Math.random() > 0.5 ? 8 : 10,
+                pitch: 30 + Math.random() * 30,
+                bearing: Math.random() * 360,
+                name: randomProperty.name
+              });
+            }
           }
         }
 
-        if (selectedProperties.length < 3 && Array.isArray(properties) && properties.length > 0) {
-          const shuffled = [...properties].sort(() => 0.5 - Math.random());
+        if (selectedProperties.length < 3 && Array.isArray(chileProps) && chileProps.length > 0) {
+          const shuffled = [...chileProps].sort(() => 0.5 - Math.random());
           for (let i = 0; i < Math.min(3, shuffled.length); i++) {
             const prop = shuffled[i];
             if (!selectedProperties.find(p => p.name === prop.name)) { // Evitar duplicados si ya se añadieron por rango
@@ -687,8 +708,8 @@ const MapView = forwardRef(({
       }
 
       if (!flightPerformed && !userInteractedRef.current) {
-        // console.log('No hay propiedades para el vuelo cinematográfico o fue interrumpido, usando vuelo genérico por país.');
-        const flightPath = countryFlightPaths[userCountry] || countryFlightPaths['default'];
+        // Si no hay propiedades chilenas en memoria, usa recorrido de Chile por defecto
+        const flightPath = countryFlightPaths['chile'];
         let currentStep = 0;
 
         const flyToNextGenericPoint = () => {
@@ -744,13 +765,13 @@ const MapView = forwardRef(({
             performAutoFlight(userCountry);
           },
           () => {
-            // console.warn('No se pudo obtener la ubicación del usuario, usando vuelo por defecto.');
-            performAutoFlight('default'); 
+            // No se pudo obtener ubicación: por defecto usamos tour de Chile
+            performAutoFlight('chile'); 
           }
         );
       } else {
-        // console.warn('Geolocalización no soportada, usando vuelo por defecto.');
-        performAutoFlight('default');
+        // Geolocalización no soportada: por defecto Chile
+        performAutoFlight('chile');
       }
     } 
   }, [isMapLoaded, loading, properties, editable, autoFlyCompleted, getCountryFromCoords, performAutoFlight, disableIntroAnimation]);

@@ -96,6 +96,9 @@ class Property(models.Model):
     rent_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     rental_terms = models.TextField(blank=True)
     plusvalia_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Métrica que refleja el potencial de plusvalía (0-100). Visible para suscriptores Pro.")
+    # Campos enriquecidos por IA (clasificación y resumen). No se usan para filtrar en la UI.
+    ai_category = models.CharField(max_length=100, null=True, blank=True, help_text="Categoría inferida por IA (ej. Farm, Ranch, Forest, Lake) o etiquetas internas.")
+    ai_summary = models.TextField(null=True, blank=True, help_text="Resumen corto generado por IA para mejorar búsquedas y recomendaciones.")
     terrain = models.CharField(max_length=50, choices=TERRAIN_CHOICES, default='flat', blank=True)
     access = models.CharField(max_length=50, choices=ACCESS_CHOICES, default='paved', blank=True)
     legal_status = models.CharField(max_length=50, choices=LEGAL_STATUS_CHOICES, default='clear', blank=True)

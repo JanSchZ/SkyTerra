@@ -109,8 +109,8 @@ class PropertySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
-                 'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score', 'plusvalia_breakdown',
-                 'terrain', 'access', 'legal_status', 'utilities']
+                  'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score', 'plusvalia_breakdown',
+                 'terrain', 'access', 'legal_status', 'utilities', 'ai_category', 'ai_summary']
         
     def validate_boundary_polygon(self, value):
         """Validar que boundary_polygon sea un GeoJSON válido"""

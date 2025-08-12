@@ -31,7 +31,7 @@ from .serializers import (
     PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer
 )
 from skyterra_backend.permissions import IsOwnerOrAdmin
-from .services import GeminiService, GeminiServiceError
+from .services import GeminiService, GeminiServiceError, categorize_property_with_ai
 from .email_service import send_property_status_email
 
 # Create your views here.
@@ -172,6 +172,21 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     logger.error(f"Error al enviar email de notificación para propiedad ID: {property_instance.id}: {str(email_error)}", exc_info=True)
                     # No relanzar el error para no impedir la creación de la propiedad, solo loggearlo.
             
+            # Enriquecer con IA (mejora de clasificación/summary)
+            try:
+                ai_data = categorize_property_with_ai(property_instance)
+                updates = {}
+                if ai_data.get('ai_category') and not property_instance.ai_category:
+                    updates['ai_category'] = ai_data['ai_category']
+                if ai_data.get('ai_summary') and not property_instance.ai_summary:
+                    updates['ai_summary'] = ai_data['ai_summary']
+                if updates:
+                    for k,v in updates.items():
+                        setattr(property_instance, k, v)
+                    property_instance.save(update_fields=list(updates.keys()))
+            except Exception as _:
+                logger.warning(f"No se pudo enriquecer por IA la propiedad {property_instance.id} en creación")
+
             # Procesar documentos subidos (campo 'new_documents')
             new_docs = self.request.FILES.getlist('new_documents')
             if new_docs:
@@ -193,6 +208,20 @@ class PropertyViewSet(viewsets.ModelViewSet):
         try:
             instance = serializer.save()
             logger.info(f"Propiedad {instance.id} actualizada exitosamente. Nuevo estado: {instance.publication_status}")
+            # Intentar refrescar clasificación/resumen por IA cuando cambien campos relevantes
+            try:
+                ai_data = categorize_property_with_ai(instance)
+                updates = {}
+                if ai_data.get('ai_category'):
+                    updates['ai_category'] = ai_data['ai_category']
+                if ai_data.get('ai_summary'):
+                    updates['ai_summary'] = ai_data['ai_summary']
+                if updates:
+                    for k,v in updates.items():
+                        setattr(instance, k, v)
+                    instance.save(update_fields=list(updates.keys()))
+            except Exception as _:
+                logger.warning(f"No se pudo refrescar enriquecimiento IA para propiedad {instance.id}")
             
             # Manejar documentos nuevos enviados en actualización
             new_docs = self.request.FILES.getlist('new_documents')
@@ -277,6 +306,18 @@ class PropertyViewSet(viewsets.ModelViewSet):
                 {'error': 'Error interno al actualizar el estado.', 'details': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=True, methods=['post'], url_path='ai-categorize', permission_classes=[permissions.IsAdminUser])
+    def ai_categorize(self, request, pk=None):
+        """Permite forzar categorización/resumen por IA para una propiedad."""
+        prop = self.get_object()
+        data = categorize_property_with_ai(prop)
+        if not data:
+            return Response({'detail': 'No se pudo obtener clasificación IA'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        for k,v in data.items():
+            setattr(prop, k, v)
+        prop.save(update_fields=list(data.keys()))
+        return Response({'detail': 'Propiedad enriquecida', **data}, status=status.HTTP_200_OK)
 
 class TourViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar tours virtuales"""

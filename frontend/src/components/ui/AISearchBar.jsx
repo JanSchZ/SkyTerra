@@ -455,30 +455,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                   
                   {isPropertiesSearch && (
                     <>
-                      {hasSuggestedFilters && (
-                        <Box mb={2.5}>
-                          <Typography variant="overline" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}>
-                            Filtros Sugeridos
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
-                            {suggestedFilters.propertyTypes?.map(type => (
-                              <Chip key={type} label={type.charAt(0).toUpperCase() + type.slice(1)} size="small" sx={chipSx}/>
-                            ))}
-                            {suggestedFilters.priceRange?.[0] !== null && suggestedFilters.priceRange?.[1] !== null && (
-                              <Chip label={`$${suggestedFilters.priceRange[0]?.toLocaleString()} - $${suggestedFilters.priceRange[1]?.toLocaleString()}`} size="small" sx={chipSx}/>
-                            )}
-                            {suggestedFilters.features?.map(feature => (
-                              <Chip key={feature} label={feature} size="small" sx={chipSx}/>
-                            ))}
-                            {suggestedFilters.locations?.map(loc => (
-                              <Chip key={loc} label={`${loc}`} icon={<TravelExploreIcon />} size="small" sx={chipSx}/>
-                            ))}
-                            {suggestedFilters.listingType && (
-                              <Chip label={suggestedFilters.listingType === 'rent' ? 'Arriendo' : (suggestedFilters.listingType === 'both' ? 'Venta/Arriendo' : 'Venta')} size="small" sx={chipSx} />
-                            )}
-                          </Box>
-                        </Box>
-                      )}
+                      {/* Ocultamos filtros visibles: gestionados internamente por Sam */}
                       
                       {hasRecommendations && (
                           <Box mb={2.5}>
@@ -506,7 +483,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                           </Box>
                       )}
 
-                      {(hasSuggestedFilters || hasRecommendations) && (
+                      {hasRecommendations && (
                           <Button 
                               variant="contained" 
                               size="small" 
@@ -527,7 +504,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
                                 }
                               }}
                           >
-                              Aplicar Filtros y Ver Propiedades
+                              Ver Propiedades Recomendadas
                           </Button>
                       )}
                     </>

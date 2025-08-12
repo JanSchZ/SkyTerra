@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, List, ListItem, ListItemText, Card, CardContent, Divider, Chip, IconButton } from '@mui/material';
+import { Box, Typography, Paper, List, ListItem, ListItemText, Card, CardContent, Divider, Chip, IconButton, Tooltip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tourService } from '../../services/api';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import { TextField } from '@mui/material';
+import CircularPlusvalia from './CircularPlusvalia';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const AISuggestionPanel = ({
   assistantMessage,
@@ -18,10 +21,13 @@ const AISuggestionPanel = ({
   currentQuery // The user's query that led to these results
 }) => {
   const [tourPreviews, setTourPreviews] = useState({});
-  const MAX_DISPLAY = 3;
+  // Show up to 5 recommendations so counts like 4 are fully displayed
+  const MAX_DISPLAY = 5;
   const [collapsed, setCollapsed] = useState(false);
   const [followUp, setFollowUp] = useState("");
   const [displayedAssistant, setDisplayedAssistant] = useState('');
+  const [lastRecommendations, setLastRecommendations] = useState([]);
+  const [chatExpanded, setChatExpanded] = useState(false);
 
   useEffect(() => {
     const fetchPreviews = async () => {
@@ -53,6 +59,13 @@ const AISuggestionPanel = ({
     fetchPreviews();
   }, [recommendations]);
 
+  // Mantener últimas recomendaciones visibles mientras Sam piensa
+  useEffect(() => {
+    if (Array.isArray(recommendations) && recommendations.length > 0) {
+      setLastRecommendations(recommendations);
+    }
+  }, [recommendations]);
+
   useEffect(() => {
     if (assistantMessage && assistantMessage !== displayedAssistant) {
       let i = 0;
@@ -71,6 +84,7 @@ const AISuggestionPanel = ({
   const hasFlyTo = flyToLocation && searchMode === 'location';
   const hasContentToDisplay = hasRecommendations || hasFlyTo || (assistantMessage && assistantMessage !== 'Búsqueda procesada') || isLoading;
   const shouldShow = hasContentToDisplay || currentQuery;
+  const activeRecommendations = hasRecommendations ? recommendations : lastRecommendations;
 
   return (
     <>
@@ -112,22 +126,22 @@ const AISuggestionPanel = ({
               border: `1px solid rgba(255,255,255,0.3)`,
               borderRadius: '20px',
               boxShadow: '0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1)',
-              // Custom scrollbar for a better look
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'rgba(255,255,255,0.3) transparent',
+              // Ocultar barra de scroll visual, permitir scroll con rueda
+              scrollbarWidth: 'none',
+              scrollbarColor: 'transparent transparent',
               '&::-webkit-scrollbar': {
-                width: '6px',
+                width: 0,
               },
               '&::-webkit-scrollbar-track': {
-                background: 'rgba(255,255,255,0.1)',
+                background: 'transparent',
                 borderRadius: '3px',
               },
               '&::-webkit-scrollbar-thumb': {
-                background: 'rgba(255,255,255,0.3)',
+                background: 'transparent',
                 borderRadius: '3px',
               },
               '&::-webkit-scrollbar-thumb:hover': {
-                background: 'rgba(255,255,255,0.4)',
+                background: 'transparent',
               }
             })}
           >
@@ -162,39 +176,19 @@ const AISuggestionPanel = ({
               >
                 {isLoading ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <motion.div
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      <Typography variant="body2" sx={{ color: 'white', fontStyle: 'italic' }}>
-                        Sam está escribiendo
-                      </Typography>
-                    </motion.div>
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        {[0, 1, 2].map((i) => (
-                          <motion.div
-                            key={i}
-                            animate={{ opacity: [0.3, 1, 0.3] }}
-                            transition={{ 
-                              duration: 1.2, 
-                              repeat: Infinity, 
-                              delay: i * 0.2,
-                              ease: "easeInOut"
-                            }}
-                            style={{
-                              width: 4,
-                              height: 4,
-                              borderRadius: '50%',
-                              backgroundColor: 'rgba(255,255,255,0.7)'
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </motion.div>
+                    <Typography variant="body2" sx={{ color: 'white', fontStyle: 'italic' }}>
+                      Pensando
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.6 }}>
+                      {[0, 1, 2].map((i) => (
+                        <motion.div
+                          key={i}
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: "easeInOut" }}
+                          style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.85)' }}
+                        />
+                      ))}
+                    </Box>
                   </Box>
                 ) : (
                   <>
@@ -215,7 +209,12 @@ const AISuggestionPanel = ({
             </AnimatePresence>
 
             {/* Chat / follow-up input on top */}
-            <Box sx={{ my: 2, display:'flex', gap:1 }}>
+            <Box sx={{ my: 1.5, display:'flex', gap:1, alignItems:'center' }}>
+              <Tooltip title={chatExpanded ? 'Ocultar chat' : 'Mostrar chat'} placement="top">
+                <IconButton size="small" onClick={()=>setChatExpanded(v=>!v)} sx={{ color:'rgba(255,255,255,0.85)' }}>
+                  {chatExpanded ? <ExpandLessIcon fontSize="small"/> : <ExpandMoreIcon fontSize="small"/>}
+                </IconButton>
+              </Tooltip>
               <TextField 
                 size="small" 
                 fullWidth 
@@ -257,19 +256,30 @@ const AISuggestionPanel = ({
               />
             </Box>
 
+            {/* Chat history (compact) */}
+            {chatExpanded && (
+              <Box sx={{ mb: 1.5, px: 1, py: 1, borderRadius: '10px', backgroundColor:'rgba(0,0,0,0.25)', border:'1px solid rgba(255,255,255,0.15)', maxHeight: 150, overflowY:'auto' }}>
+                 {(Array.isArray(window.__skyterraConversationHistory) ? window.__skyterraConversationHistory : []).slice(-8).map((msg, idx)=> (
+                    <Typography key={idx} variant="caption" sx={{ display:'block', color:'rgba(255,255,255,0.85)' }}>
+                      <strong>{msg.role === 'user' ? 'Tú' : 'Sam'}:</strong> {msg.content}
+                    </Typography>
+                 ))}
+              </Box>
+            )}
+
             <AnimatePresence>
-              {!isLoading && hasRecommendations && (
+              {(activeRecommendations && activeRecommendations.length > 0) && (
                 <motion.div
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.2, duration: 0.5 } }}
+                  animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.4 } }}
                   exit={{ opacity: 0 }}
                 >
                   <Divider sx={{ mb: 1.5, borderColor: 'rgba(255,255,255,0.08)' }} />
                   <Typography variant="subtitle1" sx={{ mb: 1, fontWeight:'bold', color: 'white' }}>
-                    Top {Math.min(recommendations.length, MAX_DISPLAY)} Sugerencia{Math.min(recommendations.length, MAX_DISPLAY) > 1 ? 's' : ''}:
+                    Sugerencias de Sam
                   </Typography>
                   <List dense disablePadding sx={{ overflowY: 'auto', maxHeight: { xs: '50vh', sm: '55vh' }, pr:0.5, '&::-webkit-scrollbar':{ width:0}, scrollbarWidth:'none' }}>
-                    {recommendations.slice(0, MAX_DISPLAY).map((rec, index) => (
+                    {activeRecommendations.slice(0, MAX_DISPLAY).map((rec, index) => (
                       <motion.div
                         key={rec.id || index}
                         initial={{ opacity: 0, y: 15, scale: 0.95 }}
@@ -297,7 +307,13 @@ const AISuggestionPanel = ({
                           onMouseEnter={() => onSuggestionHover && onSuggestionHover(rec)}
                           onMouseLeave={() => onSuggestionHover && onSuggestionHover(null)} // Clear hover
                         >
-                          <Box sx={{ height: 100, mb: 1 }}>
+                          <Box sx={{ position:'relative', height: 130, mb: 1 }}>
+                            {/* Plusvalía badge */}
+                            {typeof rec.plusvalia_score === 'number' && (
+                              <Box sx={{ position:'absolute', top: 8, right: 8, zIndex: 2 }}>
+                                <CircularPlusvalia value={Number(rec.plusvalia_score)} size={36} strokeWidth={5} />
+                              </Box>
+                            )}
                             {tourPreviews[rec.id] ? (
                               <iframe
                                 src={tourPreviews[rec.id]}
@@ -320,15 +336,17 @@ const AISuggestionPanel = ({
                               Precio: {rec.price ? `$${Number(rec.price).toLocaleString()}` : 'No disponible'}
                             </Typography>
                             <Typography variant="body2" color="white" sx={{ mb: 0.5 }}>
-                              Tamaño: {rec.size ? `${rec.size} ha` : 'No disponible'}
+                              Tamaño: {rec.size ? `${Math.round(Number(rec.size)).toLocaleString()} ha` : 'No disponible'}
                             </Typography>
                             <Typography variant="body2" color="white" sx={{ textTransform: 'capitalize', mb: 1 }}>
                               Tipo: {rec.type || 'No especificado'}
                             </Typography>
-                            {rec.reason && (
-                              <Typography variant="caption" color="white" sx={{ fontStyle: 'italic' }}>
-                                {rec.reason}
-                              </Typography>
+                            {rec.reason && rec.reason.toLowerCase().includes('filtros sugeridos') ? null : (
+                              rec.reason ? (
+                                <Typography variant="caption" color="white" sx={{ fontStyle: 'italic' }}>
+                                  {rec.reason}
+                                </Typography>
+                              ) : null
                             )}
                           </CardContent>
                         </Card>
@@ -353,11 +371,15 @@ const AISuggestionPanel = ({
               zIndex: 1250,
             }}
           >
-            <IconButton 
-              size="small" 
+            <Paper
               onClick={() => setCollapsed(false)}
-              sx={{ 
-                backgroundColor: 'rgba(255,255,255,0.2)', 
+              elevation={6}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: '12px',
+                cursor: 'pointer',
+                backgroundColor: 'rgba(255,255,255,0.2)',
                 backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(255,255,255,0.3)',
                 color: 'white',
@@ -366,8 +388,8 @@ const AISuggestionPanel = ({
                 }
               }}
             >
-              <ArrowForwardIosIcon fontSize="small" />
-            </IconButton>
+              <Typography variant="body2" sx={{ fontWeight: 600, letterSpacing: 0.3 }}>Sam</Typography>
+            </Paper>
           </motion.div>
         )}
     </>
