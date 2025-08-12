@@ -329,7 +329,7 @@ class TourViewSet(viewsets.ModelViewSet):
     filterset_fields = ['property', 'type']
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'get_stats']:
             permission_classes = [permissions.AllowAny]
         else:
             permission_classes = [permissions.IsAuthenticated]
@@ -346,46 +346,111 @@ class TourViewSet(viewsets.ModelViewSet):
         # Validar extensión
         allowed_extensions = ['.zip', '.ggpkg']
         if not any(package_file.name.lower().endswith(ext) for ext in allowed_extensions):
-            raise serializers.ValidationError(f"Tipo de archivo no permitido. Permitidos: {', '.join(allowed_extensions)}")
+            raise serializers.ValidationError({
+                'package_file': f"Tipo de archivo no permitido. Solo se permiten archivos: {', '.join(allowed_extensions)}"
+            })
+
+        # Validar tamaño de archivo (100MB máximo)
+        max_size = 100 * 1024 * 1024  # 100MB
+        if package_file.size > max_size:
+            raise serializers.ValidationError({
+                'package_file': f"Archivo demasiado grande. Tamaño máximo permitido: {max_size // (1024 * 1024)}MB"
+            })
 
         tour_uuid = uuid.uuid4()
         tour_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
-        os.makedirs(tour_dir, exist_ok=True)
-
-        package_path = os.path.join(tour_dir, package_file.name)
-        with open(package_path, 'wb+') as destination:
-            for chunk in package_file.chunks():
-                destination.write(chunk)
-
+        
         try:
-            if not zipfile.is_zipfile(package_path):
-                raise serializers.ValidationError("El archivo no es un paquete ZIP (.zip o .ggpkg) válido.")
-
-            with zipfile.ZipFile(package_path, 'r') as zip_ref:
-                # Chequeo de seguridad básico contra path traversal
-                for member in zip_ref.infolist():
-                    if member.filename.startswith('/') or '..' in member.filename:
-                        raise serializers.ValidationError(f"El paquete contiene una ruta de archivo insegura: {member.filename}")
-                
-                zip_ref.extractall(tour_dir)
+            os.makedirs(tour_dir, exist_ok=True)
             
+            package_path = os.path.join(tour_dir, package_file.name)
+            
+            # Guardar archivo con validación de escritura
+            try:
+                with open(package_path, 'wb+') as destination:
+                    for chunk in package_file.chunks():
+                        destination.write(chunk)
+            except (OSError, IOError) as e:
+                raise serializers.ValidationError({
+                    'package_file': f"Error escribiendo archivo: {str(e)}"
+                })
+
+            # Validar que es un ZIP válido
+            try:
+                if not zipfile.is_zipfile(package_path):
+                    raise serializers.ValidationError({
+                        'package_file': "El archivo no es un ZIP válido. Verifica que el archivo no esté corrupto."
+                    })
+            except Exception as e:
+                raise serializers.ValidationError({
+                    'package_file': f"Error validando archivo ZIP: {str(e)}"
+                })
+
+            # Extraer contenido del ZIP con validación de seguridad
+            try:
+                with zipfile.ZipFile(package_path, 'r') as zip_ref:
+                    # Validar contenido del ZIP
+                    total_size = 0
+                    file_count = 0
+                    
+                    for member in zip_ref.infolist():
+                        # Chequeo de seguridad contra path traversal
+                        if member.filename.startswith('/') or '..' in member.filename:
+                            raise serializers.ValidationError({
+                                'package_file': f"El archivo contiene rutas inseguras: {member.filename}"
+                            })
+                        
+                        # Verificar tamaño total descomprimido (prevenir zip bombs)
+                        total_size += member.file_size
+                        file_count += 1
+                        
+                        if total_size > 500 * 1024 * 1024:  # 500MB descomprimido máximo
+                            raise serializers.ValidationError({
+                                'package_file': "El contenido descomprimido es demasiado grande (máximo 500MB)"
+                            })
+                        
+                        if file_count > 1000:  # Máximo 1000 archivos
+                            raise serializers.ValidationError({
+                                'package_file': "El archivo contiene demasiados archivos (máximo 1000)"
+                            })
+                    
+                    zip_ref.extractall(tour_dir)
+                    
+            except zipfile.BadZipFile:
+                raise serializers.ValidationError({
+                    'package_file': "Archivo ZIP corrupto o inválido"
+                })
+            except Exception as e:
+                if "inseguras" in str(e) or "demasiado" in str(e):
+                    raise  # Re-lanzar nuestros errores personalizados
+                raise serializers.ValidationError({
+                    'package_file': f"Error extrayendo archivo: {str(e)}"
+                })
+            
+            # Eliminar archivo ZIP original
             os.remove(package_path)
 
-            # Buscar todos los archivos .html o .htm y elegir el que esté más cerca de la raíz
+            # Buscar archivos HTML
             html_files = []
-            for root_dir, _dirs, files in os.walk(tour_dir):
-                for fname in files:
-                    if fname.lower().endswith(('.html', '.htm')):
-                        rel_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir)
-                        rel_path_posix = rel_path.replace('\\', '/')  # Normalizar separadores
-                        # Guardar también la "profundidad" para priorizar los más cercanos a la raíz
-                        depth = rel_path_posix.count('/')
-                        html_files.append((depth, rel_path_posix))
+            try:
+                for root_dir, _dirs, files in os.walk(tour_dir):
+                    for fname in files:
+                        if fname.lower().endswith(('.html', '.htm')):
+                            rel_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir)
+                            rel_path_posix = rel_path.replace('\\', '/')  # Normalizar separadores
+                            depth = rel_path_posix.count('/')
+                            html_files.append((depth, rel_path_posix))
+            except Exception as e:
+                raise serializers.ValidationError({
+                    'package_file': f"Error explorando contenido del tour: {str(e)}"
+                })
 
             if not html_files:
-                raise serializers.ValidationError("No se encontró ningún archivo HTML dentro del paquete para usarlo como entrada.")
+                raise serializers.ValidationError({
+                    'package_file': "No se encontró ningún archivo HTML en el tour. Un tour válido debe contener al menos un archivo .html o .htm"
+                })
 
-            # Elegir el archivo con menor profundidad (más cercano a la raíz). En caso de empate, el primero.
+            # Elegir el archivo HTML principal (más cercano a la raíz)
             html_entry = sorted(html_files, key=lambda t: t[0])[0][1]
 
             tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/{html_entry}"
@@ -396,16 +461,68 @@ class TourViewSet(viewsets.ModelViewSet):
                 type='package',
                 tour_id=tour_uuid
             )
-            logger.info(f"Paquete de tour {instance.id} creado y descomprimido en {tour_dir}")
+            
+            logger.info(f"Tour {instance.id} procesado exitosamente: {len(html_files)} archivos HTML encontrados, usando {html_entry}")
 
-            # Asegurar un solo tour por propiedad: eliminar cualquier otro (anteriores)
-            Tour.objects.filter(property=instance.property).exclude(id=instance.id).delete()
+            # Asegurar un solo tour por propiedad: eliminar anteriores
+            deleted_count = Tour.objects.filter(property=instance.property).exclude(id=instance.id).count()
+            if deleted_count > 0:
+                Tour.objects.filter(property=instance.property).exclude(id=instance.id).delete()
+                logger.info(f"Eliminados {deleted_count} tours anteriores de la propiedad {instance.property.id}")
 
-        except Exception as e:
+        except serializers.ValidationError:
+            # Limpiar en caso de error de validación
             if os.path.exists(tour_dir):
                 shutil.rmtree(tour_dir)
-            logger.error(f"Error procesando paquete de tour: {e}", exc_info=True)
-            raise serializers.ValidationError(str(e))
+            raise
+        except Exception as e:
+            # Limpiar en caso de cualquier otro error
+            if os.path.exists(tour_dir):
+                shutil.rmtree(tour_dir)
+            logger.error(f"Error inesperado procesando tour: {e}", exc_info=True)
+            raise serializers.ValidationError({
+                'package_file': f"Error interno procesando el tour: {str(e)}"
+            })
+
+    @action(detail=False, methods=['get'], url_path='stats', permission_classes=[permissions.AllowAny])
+    def get_stats(self, request):
+        """Endpoint para obtener estadísticas de tours"""
+        try:
+            total_tours = Tour.objects.count()
+            active_tours = Tour.objects.filter(url__isnull=False).exclude(url='').count()
+            error_tours = Tour.objects.filter(url__isnull=True).count() + Tour.objects.filter(url='').count()
+            
+            # Calcular almacenamiento usado (estimación)
+            import os
+            tours_dir = os.path.join(settings.MEDIA_ROOT, 'tours')
+            storage_used = 0
+            
+            if os.path.exists(tours_dir):
+                for root, dirs, files in os.walk(tours_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        try:
+                            storage_used += os.path.getsize(file_path)
+                        except (OSError, IOError):
+                            pass
+            
+            # Convertir a MB
+            storage_used_mb = storage_used / (1024 * 1024)
+            
+            return Response({
+                'total_tours': total_tours,
+                'active_tours': active_tours,
+                'error_tours': error_tours,
+                'storage_used': f"{storage_used_mb:.1f} MB",
+                'storage_used_bytes': storage_used
+            })
+            
+        except Exception as e:
+            logger.error(f"Error obteniendo estadísticas de tours: {e}", exc_info=True)
+            return Response(
+                {'error': 'Error obteniendo estadísticas'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class ImageViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar imágenes de propiedades"""

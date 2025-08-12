@@ -11,6 +11,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import TourIcon from '@mui/icons-material/Tour';
 import DescriptionIcon from '@mui/icons-material/Description';
 import FolderIcon from '@mui/icons-material/Folder';
+import UploadTourDialog from '../tours/UploadTourDialog';
 
 const SearchContainer = styled(Paper)(({ theme }) => ({
   display: 'flex',
@@ -327,16 +328,16 @@ const AdminDetailedPropertiesPage = () => {
 
         {selectedProperty && (
             <>
-                <Dialog open={tourModalOpen} onClose={() => setTourModalOpen(false)} maxWidth="sm" fullWidth>
-                    <DialogTitle>Gestionar Tour para: {selectedProperty.name}</DialogTitle>
-                    <DialogContent>
-                        <Typography sx={{mb: 2}}>Sube un archivo ZIP para el tour virtual.</Typography>
-                        <Button variant="contained" component="label">
-                            Subir Archivo
-                            <input type="file" hidden accept=".zip"/>
-                                        </Button>
-                    </DialogContent>
-                </Dialog>
+                <UploadTourDialog
+                    open={tourModalOpen}
+                    onClose={() => setTourModalOpen(false)}
+                    propertyId={selectedProperty?.id}
+                    onUploaded={() => {
+                        setTourModalOpen(false);
+                        // Refresh the property data to show new tour
+                        loadProperties(searchTerm, paginationModel.page, paginationModel.pageSize);
+                    }}
+                />
 
                 <Dialog open={docsModalOpen} onClose={() => setDocsModalOpen(false)} maxWidth="md" fullWidth>
                     <DialogTitle>Documentos de: {selectedProperty.name}</DialogTitle>

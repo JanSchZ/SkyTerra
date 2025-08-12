@@ -34,6 +34,7 @@ class TourSerializer(serializers.ModelSerializer):
     # Build an absolute URL so that the frontend can always load the tour correctly, even when
     # it runs on a different sub-domain (e.g. app.skyterra.cl vs api.skyterra.cl).
     url = serializers.SerializerMethodField()
+    property = serializers.SerializerMethodField()
 
     def get_url(self, obj):
         """Return an absolute URL for the tour.
@@ -54,6 +55,26 @@ class TourSerializer(serializers.ModelSerializer):
 
         # As a fallback (should not normally happen), just return the stored value
         return obj.url
+
+    def get_property(self, obj):
+        """Return property details including name and first image."""
+        if not obj.property:
+            return None
+        
+        property_data = {
+            'id': obj.property.id,
+            'name': obj.property.name,
+            'type': obj.property.type,
+        }
+        
+        # Get first image if available
+        first_image = obj.property.images.first()
+        if first_image:
+            property_data['images'] = [{'image': first_image.image.url if first_image.image else None}]
+        else:
+            property_data['images'] = []
+        
+        return property_data
 
     class Meta:
         model = Tour

@@ -127,6 +127,9 @@ const AdminToursPage = () => {
     pageSize: 25,
   });
 
+  // Logging básico para debugging si es necesario
+  // console.log('AdminToursPage renderizando...', { tours, loading, error });
+
   // Cargar tours
   const loadTours = async () => {
     try {
@@ -136,7 +139,7 @@ const AdminToursPage = () => {
       setTours(toursData);
     } catch (err) {
       console.error('Error loading tours:', err);
-      setError('Error al cargar tours');
+      setError('Error al cargar tours: ' + (err.message || err.toString()));
     } finally {
       setLoading(false);
     }
@@ -146,27 +149,47 @@ const AdminToursPage = () => {
   const loadStats = async () => {
     try {
       setStatsLoading(true);
+      // Intentar endpoint de estadísticas primero
+      try {
+        const response = await api.get('/tours/stats/');
+        setStats({
+          totalTours: response.data.total_tours,
+          activeTours: response.data.active_tours,
+          errorTours: response.data.error_tours,
+          storageUsed: response.data.storage_used,
+        });
+        return; // Si funciona, salir aquí
+      } catch (statsErr) {
+        // console.warn('Endpoint stats falló, usando fallback:', statsErr);
+      }
+      
+      // Fallback manual si el endpoint falla
       const response = await api.get('/tours/');
       const toursData = Array.isArray(response.data) ? response.data : response.data.results || [];
       
       const totalTours = toursData.length;
       const activeTours = toursData.filter(t => t.url && t.url.trim() !== '').length;
-      const errorTours = toursData.filter(t => !t.url && !t.package_path).length;
+      const errorTours = toursData.filter(t => !t.url || t.url.trim() === '').length;
       
-      // Calcular almacenamiento usado (estimado)
-      const totalSize = toursData.reduce((acc, tour) => {
-        // Estimación basada en tours activos
-        return acc + (tour.url ? 50 : 0); // 50MB promedio por tour
-      }, 0);
+      // Calcular almacenamiento usado (estimación)
+      const storageUsed = `${(activeTours * 25).toFixed(1)} MB (estimado)`;
       
       setStats({
         totalTours,
         activeTours,
         errorTours,
-        storageUsed: `${totalSize.toFixed(1)} MB`,
+        storageUsed,
       });
+
+      
     } catch (err) {
       console.error('Error loading stats:', err);
+      setStats({
+        totalTours: 0,
+        activeTours: 0,
+        errorTours: 0,
+        storageUsed: 'Error',
+      });
     } finally {
       setStatsLoading(false);
     }
@@ -219,32 +242,53 @@ const AdminToursPage = () => {
       field: 'property_name',
       headerName: 'Propiedad',
       width: 200,
-      valueGetter: (params) => params.row.property?.name || 'Sin nombre',
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar
-            src={params.row.property?.images?.[0]?.image}
-            sx={{ mr: 1, width: 32, height: 32 }}
-            variant="rounded"
-          />
-          <Typography variant="body2">
-            {params.value}
-          </Typography>
-        </Box>
-      ),
+      valueGetter: (params) => {
+        try {
+          return params?.row?.property?.name || 'Sin nombre';
+        } catch (error) {
+          console.warn('Error getting property name:', error);
+          return 'Sin nombre';
+        }
+      },
+      renderCell: (params) => {
+        try {
+          const propertyName = params?.value || 'Sin nombre';
+          const imageUrl = params?.row?.property?.images?.[0]?.image;
+          
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Avatar
+                src={imageUrl}
+                sx={{ mr: 1, width: 32, height: 32 }}
+                variant="rounded"
+              />
+              <Typography variant="body2">
+                {propertyName}
+              </Typography>
+            </Box>
+          );
+        } catch (error) {
+          console.warn('Error rendering property cell:', error);
+          return (
+            <Typography variant="body2">
+              Error al cargar
+            </Typography>
+          );
+        }
+      },
     },
     {
       field: 'name',
       headerName: 'Nombre del Tour',
       width: 200,
-      valueGetter: (params) => params.row.name || 'Sin nombre',
+      valueGetter: (params) => params?.row?.name || 'Sin nombre',
     },
     {
       field: 'type',
       headerName: 'Tipo',
       width: 120,
       renderCell: (params) => (
-        <Chip label={params.value || 'package'} size="small" variant="outlined" />
+        <Chip label={params?.value || 'package'} size="small" variant="outlined" />
       ),
     },
     {
@@ -258,8 +302,13 @@ const AdminToursPage = () => {
       headerName: 'Fecha de Subida',
       width: 180,
       valueFormatter: (params) => {
-        if (!params.value) return 'N/A';
-        return new Date(params.value).toLocaleString('es-CL');
+        if (!params?.value) return 'N/A';
+        try {
+          return new Date(params.value).toLocaleString('es-CL');
+        } catch (error) {
+          console.warn('Error formatting date:', error);
+          return 'N/A';
+        }
       },
     },
     {
@@ -267,7 +316,7 @@ const AdminToursPage = () => {
       headerName: 'URL',
       width: 120,
       renderCell: (params) => (
-        params.value ? (
+        params?.value ? (
           <Tooltip title={params.value}>
             <IconButton
               size="small"
@@ -295,7 +344,7 @@ const AdminToursPage = () => {
           <IconButton
             size="small"
             onClick={() => {
-              setSelectedTour(params.row);
+              setSelectedTour(params?.row);
               setEditDialogOpen(true);
             }}
           >
@@ -305,7 +354,7 @@ const AdminToursPage = () => {
             size="small"
             color="error"
             onClick={() => {
-              setSelectedTour(params.row);
+              setSelectedTour(params?.row);
               setDeleteDialogOpen(true);
             }}
           >
@@ -315,6 +364,42 @@ const AdminToursPage = () => {
       ),
     },
   ];
+
+  // Early return para debugging
+  if (loading && tours.length === 0) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6">Cargando página de tours...</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Si esta pantalla persiste, revisa la consola del navegador
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (error && tours.length === 0) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <Typography variant="h6">Error cargando página de tours</Typography>
+          <Typography variant="body2">{error}</Typography>
+        </Alert>
+        <Button 
+          variant="contained" 
+          onClick={() => {
+            setError(null);
+            loadTours();
+            loadStats();
+          }}
+        >
+          Reintentar
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>

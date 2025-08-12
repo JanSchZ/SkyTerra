@@ -46,6 +46,7 @@ import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
 import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage.jsx';
 import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
+import AdminToursPage from './components/admin/AdminToursPage.jsx';
 import AdminAIPage from './components/admin/AdminAIPage.jsx';
 import SamAdminPage from './components/admin/SamAdminPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
@@ -630,6 +631,7 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="properties" element={<AdminDetailedPropertiesPage />} />
+        <Route path="tours" element={<AdminToursPage />} />
         <Route path="tickets" element={<AdminTicketsPage />} />
         <Route path="ai-management" element={<SamAdminPage />} />
         
