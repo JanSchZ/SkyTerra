@@ -644,52 +644,57 @@ const MapView = forwardRef(({
       return;
     }
     
-    // console.log('🚁✨ Iniciando el gran final de la animación: zoom-out.');
-
     const map = mapRef.current.getMap();
-    const currentCenter = map.getCenter();
-    const targetCenter = [currentCenter.lng, 0]; // conservar longitud, centrar en ecuador
-
+    
     // Vuelo final a una vista global, centrando por longitud actual
     map.flyTo({
-      center: targetCenter,
+      center: [map.getCenter().lng, 0],
       zoom: 2.0,
       pitch: 0,
-      bearing: 0, // dejar el mapa derecho (norte arriba)
+      bearing: 0,
       duration: 6500,
       essential: true,
     });
 
-    // Cuando termine el vuelo final, ocultar overlay e iniciar rotación
-    const onEnd = () => {
-      if (!userInteractedRef.current) {
+    // En lugar de depender de eventos como 'moveend' o 'idle', que pueden ser inconsistentes
+    // después de animaciones complejas, usamos un temporizador como fuente de verdad.
+    // Se ejecuta un poco después de que la animación 'flyTo' debería haber terminado.
+    const finaleTimeoutId = setTimeout(() => {
+        // Si el usuario interactuó en el último momento, no hacemos nada.
+        if (userInteractedRef.current || !mapRef.current) return;
+
+        const m = mapRef.current.getMap();
+        
+        // 1. Detener cualquier animación residual para 'liberar' el mapa.
+        try { m.stop(); } catch (e) { console.error("Error al detener el mapa en el final:", e); }
+        
+        // 2. Limpiar temporizadores de la secuencia de vuelo anterior.
+        if (flightTimeoutIdRef.current) {
+            clearTimeout(flightTimeoutIdRef.current);
+            flightTimeoutIdRef.current = null;
+        }
+
+        // 3. Actualizar el estado de la aplicación.
         setAutoFlyCompleted(true);
         setShowOverlay(false);
+
+        // 4. Habilitar explícitamente TODOS los controles de interacción del usuario.
         try {
-          // Asegurar que los controles de interacción estén habilitados
-          map.dragPan.enable();
-          map.scrollZoom.enable();
-          map.boxZoom.enable();
-          map.dragRotate.enable();
-          map.keyboard.enable();
-          map.doubleClickZoom.enable();
-          map.touchZoomRotate.enable();
-        } catch {}
-        setIsRotating(true);
-      }
-      map.off('moveend', onEnd);
-    };
-    map.once('moveend', onEnd);
+            m.dragPan.enable();
+            m.scrollZoom.enable();
+            m.boxZoom.enable();
+            m.dragRotate.enable();
+            m.keyboard.enable();
+            m.doubleClickZoom.enable();
+            m.touchZoomRotate.enable();
+        } catch (e) {
+            console.error("Error al habilitar los controles del mapa:", e);
+        }
 
-    // Fallback: si por alguna razón no llegara a dispararse moveend (no debería), iniciar igual
-    setTimeout(() => {
-      if (!isRotating && !userInteractedRef.current) {
-        setAutoFlyCompleted(true);
-        setShowOverlay(false);
+        // 5. Iniciar la rotación del globo.
         setIsRotating(true);
-      }
-    }, 6800);
 
+    }, 6600); // 100ms después de la duración del flyTo
   }, [initialMapViewState, setAutoFlyCompleted, setIsRotating]);
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
@@ -1722,20 +1727,22 @@ const MapView = forwardRef(({
               >
                 {descriptiveTexts[currentTextIndex] && descriptiveTexts[currentTextIndex].dynamicWords ? (
                   <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline' }}>
-                    {/* Contenedor con ancho fijo (palabra más larga) centrado */}
+                    {/* Slot de ancho fijo basado en la palabra más larga */}
                     <Box component="span" sx={{ position: 'relative', display: 'inline-block', textAlign: 'center' }}>
+                      {/* Elemento invisible que define el ancho del slot (palabra más larga) */}
                       <Box aria-hidden component="span" sx={{ visibility: 'hidden', whiteSpace: 'nowrap', display: 'block' }}>
                         {renderEmphasis('Invierte')}
                       </Box>
-                      <Box component="span" sx={{ position: 'absolute', left: '50%', top: 0, transform: 'translateX(-50%)' }}>
+                      {/* Capa absoluta centrada */}
+                      <Box component="span" sx={{ position: 'absolute', top: 0, left: 0, right: 0, textAlign: 'center' }}>
                         <AnimatePresence mode="wait">
                           <motion.span
                             key={dynamicWordIndex}
-                            initial={{ y: 14, opacity: 0, position: 'absolute' }}
-                            animate={{ y: 0, opacity: 1, position: 'relative' }}
-                            exit={{ y: -14, opacity: 0, position: 'absolute' }}
-                            transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
-                            style={{ whiteSpace: 'nowrap' }}
+                            initial={{ y: 18, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: -18, opacity: 0 }}
+                            transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+                            style={{ whiteSpace: 'nowrap', display: 'inline-block' }}
                           >
                             {renderEmphasis(descriptiveTexts[currentTextIndex].dynamicWords[dynamicWordIndex])}
                           </motion.span>
@@ -1743,7 +1750,7 @@ const MapView = forwardRef(({
                       </Box>
                     </Box>
                     {/* Espacio y parte fija */}
-                    <Box component="span" sx={{ ml: 1 }}>
+                    <Box component="span" sx={{ ml: { xs: 2.25, md: 3 } }}>
                       {renderEmphasis(descriptiveTexts[currentTextIndex].titleAfter || '')}
                     </Box>
                   </Box>
