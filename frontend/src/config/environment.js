@@ -2,9 +2,17 @@
 // This file centralizes all environment variables and provides fallbacks
 
 // Estilo personalizado SkyTerra con bordes grises
+// Helper: fecha (UTC) para tiles diarios de NASA (usamos "ayer" para mayor disponibilidad)
+// (Desactivado por ahora) tiles de nubes NASA
+// const oneDayMs = 24 * 60 * 60 * 1000;
+// const d = new Date(Date.now() - oneDayMs);
+// const YYYY = d.getUTCFullYear();
+// const MM = String(d.getUTCMonth() + 1).padStart(2, '0');
+// const DD = String(d.getUTCDate()).padStart(2, '0');
+// const GIBS_DATE = `${YYYY}-${MM}-${DD}`;
 const skyTerraCustomStyle = {
   version: 8,
-  name: "SkyTerra Custom - Gray Borders",
+  name: "SkyTerra Custom - Daylight Earth",
   metadata: {
     "mapbox:autocomposite": true,
     "mapbox:uiParadigm": "layers",
@@ -23,9 +31,10 @@ const skyTerraCustomStyle = {
       id: "directional",
       type: "directional",
       properties: {
-        direction: [120, 60], // Ajustar dirección para mejor iluminación del globo
-        color: "hsl(30, 70%, 80%)", // Luz un poco más cálida
-        intensity: 0.6, // Aumentar intensidad ligeramente
+        // Iluminación más diurna
+        direction: [90, 40],
+        color: "hsl(40, 90%, 95%)",
+        intensity: 0.9,
         "cast-shadows": true
       }
     },
@@ -33,33 +42,30 @@ const skyTerraCustomStyle = {
       id: "ambient",
       type: "ambient",
       properties: {
-        color: "hsl(30, 50%, 90%)", // Luz ambiental más clara
-        intensity: 0.8 // Aumentar intensidad
+        color: "hsl(40, 70%, 98%)",
+        intensity: 0.6
       }
     }
   ],
   terrain: {
     source: "mapbox-dem",
-    exaggeration: 1.5
+    exaggeration: 1.35
   },
-  fog: { // Ajustes para reducir neblina y mejorar visibilidad
-    "vertical-range": [0.5, 5], // Rango vertical más ajustado para la niebla baja
-    "color": "hsl(210, 30%, 5%)", // Color de niebla base muy oscuro, casi negro azulado
-    "high-color": "hsl(210, 40%, 15%)", // Color de niebla en altura, un poco más claro
-    "horizon-blend": 0.02, // Reducir significativamente la mezcla con el horizonte para menos "blancura"
-    "space-color": "hsl(210, 60%, 3%)", // Espacio muy oscuro
-    "star-intensity": // Estrellas más sutiles o visibles según el zoom
-      [
-        "interpolate",
-        ["exponential", 1.2],
-        ["zoom"],
-        0, // Zoom muy bajo
-        0.6, // Intensidad de estrellas moderada
-        3, // Zoom medio
-        0.2, // Intensidad de estrellas baja
-        5, // Zoom alto
-        0.05 // Casi sin estrellas
-      ]
+  fog: { // Atmósfera densa y laminar, pegada a la superficie como la real
+    "vertical-range": [0.0, 1.9],
+    // Tinte azul más denso pero localizado
+    "color": "rgba(135, 180, 255, 0.35)",
+    "high-color": "rgba(160, 200, 255, 0.25)",
+    // Borde más definido y concentrado
+    "horizon-blend": 0.01,
+    // Espacio negro profundo
+    "space-color": "#000005",
+    "star-intensity": [
+      "interpolate", ["exponential", 1.2], ["zoom"],
+      0, 0.6,
+      3, 0.5,
+      5, 0.35
+    ]
   },
   sources: {
     "mapbox-dem": {
@@ -88,22 +94,42 @@ const skyTerraCustomStyle = {
       type: "raster",
       source: "mapbox-satellite",
       paint: {
+        // Ajustes para una vista diurna natural con menos saturación
         "raster-opacity": 1,
-        "raster-saturation": -0.1, // Ligeramente menos saturado
-        "raster-contrast": -0.1 // Ligeramente menos contraste para un look más suave
+        "raster-saturation": -0.25, // Mucho menos saturado para colores naturales
+        "raster-contrast": 0.05, // Menos contraste para suavizar
+        "raster-brightness-min": 0.08,
+        "raster-brightness-max": 0.92
       }
     },
-    // Water bodies
+    // Clouds overlay removed for stability; can be re-enabled once tiles are confirmed
+    // Terrain hillshade to add subtle relief and perceived detail over satellite
+    {
+      id: "terrain-hillshade",
+      type: "hillshade",
+      source: "mapbox-dem",
+      paint: {
+        "hillshade-exaggeration": 0.15, // Más sutil
+        "hillshade-shadow-color": "hsla(210, 15%, 8%, 0.45)", // Menos saturado
+        "hillshade-highlight-color": "hsla(0, 0%, 100%, 0.18)", // Más sutil
+        "hillshade-accent-color": "hsla(210, 20%, 12%, 0.35)" // Menos intenso
+      }
+    },
+    // Water bodies (more natural, Google Earth-like)
     {
       id: "water",
       type: "fill",
       source: "composite",
       "source-layer": "water",
       paint: {
-        "fill-color": "hsl(200, 45%, 65%)", // Agua un poco más oscura y menos saturada
-        "fill-opacity": 0.6
+        // Tinte más natural y menos saturado
+        "fill-color": "hsl(210, 25%, 22%)", // Menos saturado
+        "fill-opacity": 0.15, // Más transparente
+        "fill-outline-color": "hsl(210, 20%, 18%)" // Menos saturado
       }
     },
+    // Light vegetation tint to increase perceived detail without overpowering satellite
+    // landcover layers removed (source layer not present in streets v8 at low zoom)
     // Country boundaries in gray - MÁS VISIBLES DESDE LEJOS
     {
       id: "admin-country-boundaries",
@@ -122,7 +148,8 @@ const skyTerraCustomStyle = {
         "line-cap": "round"
       },
       paint: {
-        "line-color": "#a0a0a0", // Un gris más claro para mejor visibilidad sobre satélite oscuro
+        // Mejorar contraste de fronteras sin resultar agresivo
+        "line-color": "#bdbdbd",
         "line-width": [
           "interpolate",
           ["linear"],
@@ -141,7 +168,7 @@ const skyTerraCustomStyle = {
           ["linear"],
           ["zoom"],
           0,
-          0.7, // Buena opacidad desde lejos
+          0.8, // Más visibles desde lejos
           3,
           0.8,
           5,
@@ -168,7 +195,7 @@ const skyTerraCustomStyle = {
         "line-cap": "round"
       },
       paint: {
-        "line-color": "#707070", // Un gris medio
+        "line-color": "#909090",
         "line-width": [
           "interpolate",
           ["linear"],
@@ -185,9 +212,9 @@ const skyTerraCustomStyle = {
           ["linear"],
           ["zoom"],
           2,
-          0.5,
+          0.6,
           5,
-          0.6
+          0.7
         ]
       }
     },
@@ -207,7 +234,7 @@ const skyTerraCustomStyle = {
         "line-join": "round"
       },
       paint: {
-        "line-color": "#888888",
+        "line-color": "#9a9a9a",
         "line-width": [
           "interpolate",
           ["linear"],
@@ -220,7 +247,7 @@ const skyTerraCustomStyle = {
           1.8
         ],
         "line-dasharray": [1.5, 1.5],
-        "line-opacity": 0.75
+        "line-opacity": 0.8
       }
     },
     // Roads (simplificado, solo autopistas principales y visibles más tarde)
@@ -269,9 +296,9 @@ const skyTerraCustomStyle = {
         "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 95%)",
-        "text-halo-color": "hsla(210, 30%, 10%, 0.6)",
-        "text-halo-width": 1
+        "text-color": "hsl(0, 0%, 98%)",
+        "text-halo-color": "hsla(210, 30%, 6%, 0.7)",
+        "text-halo-width": 1.2
       }
     },
     // Ciudades principales (alta jerarquía)
@@ -301,9 +328,9 @@ const skyTerraCustomStyle = {
         "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 94%)",
-        "text-halo-color": "hsla(210, 30%, 10%, 0.6)",
-        "text-halo-width": 1
+        "text-color": "hsl(0, 0%, 96%)",
+        "text-halo-color": "hsla(210, 30%, 6%, 0.65)",
+        "text-halo-width": 1.05
       }
     },
     // Ciudades secundarias (mediana jerarquía)
@@ -333,9 +360,9 @@ const skyTerraCustomStyle = {
         "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 88%)",
-        "text-halo-color": "hsla(210, 30%, 10%, 0.5)",
-        "text-halo-width": 0.9
+        "text-color": "hsl(0, 0%, 92%)",
+        "text-halo-color": "hsla(210, 30%, 8%, 0.55)",
+        "text-halo-width": 1
       }
     },
     // Pueblos / comunas
@@ -396,9 +423,9 @@ const skyTerraCustomStyle = {
         "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 75%)",
-        "text-halo-color": "hsla(210, 30%, 10%, 0.4)",
-        "text-halo-width": 0.8
+        "text-color": "hsl(0, 0%, 85%)",
+        "text-halo-color": "hsla(210, 30%, 8%, 0.5)",
+        "text-halo-width": 0.9
       }
     },
     // POIs principales (aeropuertos, hospitales, universidades, parques nacionales)
@@ -420,9 +447,9 @@ const skyTerraCustomStyle = {
         "text-offset": [0, 1.1]
       },
       paint: {
-        "text-color": "#e0e0e0",
-        "text-halo-color": "hsla(210, 30%, 10%, 0.55)",
-        "text-halo-width": 1
+        "text-color": "#efefef",
+        "text-halo-color": "hsla(210, 30%, 8%, 0.6)",
+        "text-halo-width": 1.1
       }
     },
     {
@@ -443,9 +470,9 @@ const skyTerraCustomStyle = {
         "text-offset": [0, 1]
       },
       paint: {
-        "text-color": "#cccccc",
-        "text-halo-color": "hsla(210, 30%, 10%, 0.5)",
-        "text-halo-width": 0.8
+        "text-color": "#d9d9d9",
+        "text-halo-color": "hsla(210, 30%, 8%, 0.55)",
+        "text-halo-width": 0.9
       }
     },
     // Nueva capa para carreteras secundarias y primarias

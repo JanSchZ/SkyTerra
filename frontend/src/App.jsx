@@ -796,7 +796,7 @@ function App() {
                       variant="outlined"
                       onClick={() => navigate('/login')}
                       sx={(theme)=>({
-                        borderColor: 'rgba(120, 120, 120, 0.7)', color: theme.palette.primary.main, fontWeight: 300,
+                        borderColor: 'rgba(120, 120, 120, 0.7)', color: '#ffffff', fontWeight: 300,
                         padding: '6px 12px', fontSize: '0.8rem',
                         backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(6px)',
                         '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }

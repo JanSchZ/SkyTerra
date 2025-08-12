@@ -840,6 +840,8 @@ const MapView = forwardRef(({
          console.warn("⚠️ Fuente 'mapbox-dem' no encontrada en el estilo al cargar.")
       }
       
+      // No dynamic tile mutation; tiles are preconfigured to yesterday's date in config
+
       map.on('error', (e) => {
         console.error('❌ Mapbox GL Error:', e.error ? e.error.message : e);
         if (e.error && e.error.message && !e.error.message.includes('terrain')) {
