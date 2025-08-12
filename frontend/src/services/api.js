@@ -60,6 +60,12 @@ export const api = axios.create({
   xsrfHeaderName: 'X-CSRFToken',
 });
 
+// Inicializar Authorization header si hay token guardado en localStorage
+const storedToken = localStorage.getItem('auth_token');
+if (storedToken) {
+  api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+}
+
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
@@ -114,12 +120,24 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
       const isLoginAttempt = url.endsWith('/auth/login/');
       const isAuthCheck = url.endsWith('/auth/user/');
+      const isAIEndpoint = url.includes('/api/ai/');
+      const isPropertiesEndpoint = url.includes('/api/properties/');
 
       // Si la verificación explícita de sesión falla, limpiamos el usuario en caché.
       if (isAuthCheck) {
+        console.warn('[Auth Check Failed] 401 - Invalidating session');
         localStorage.removeItem('user');
         // Notificar al resto de la app que la sesión ya no es válida
         try { window.dispatchEvent(new CustomEvent('auth:invalid')); } catch (_) {}
+      } else if (isAIEndpoint) {
+        // Errores 401 en endpoints de AI no invalidan la sesión completa
+        console.warn('[AI Endpoint] 401 - Posible problema de configuración o permisos específicos de AI, manteniendo sesión');
+      } else if (isPropertiesEndpoint) {
+        // Para endpoints de propiedades, verificar si es realmente un problema de autenticación
+        console.warn('[Properties Endpoint] 401 - Error de permisos, pero manteniendo sesión de admin si existe');
+      } else {
+        // Para otros endpoints, registrar pero no invalidar automáticamente
+        console.warn(`[Other Endpoint] 401 en ${url} - No invalidando sesión automáticamente`);
       }
 
       // No redirigimos automáticamente. Dejamos que las rutas protegidas gestionen la navegación.
@@ -158,6 +176,13 @@ export const authService = {
         }
       } catch (e) {
         console.warn('Login OK pero /auth/user/ falló. Manteniendo datos de respuesta directa.');
+      }
+
+      // Si el backend devuelve un token (JWT) en el body, configúralo para futuras peticiones
+      const possibleToken = response.data?.access || response.data?.token || response.data?.auth_token || response.data?.access_token;
+      if (possibleToken) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${possibleToken}`;
+        try { localStorage.setItem('auth_token', possibleToken); } catch (_) {}
       }
 
       // Fallback: si el backend devolvió user en el body
@@ -371,7 +396,8 @@ export const authService = {
     } finally {
       // Limpia el estado del frontend independientemente del resultado del backend.
       localStorage.removeItem('user');
-      // No necesitamos quitar 'auth_token' porque ya no lo usamos.
+      try { localStorage.removeItem('auth_token'); } catch (_) {}
+      try { delete api.defaults.headers.common['Authorization']; } catch (_) {}
     }
   },
 
@@ -434,6 +460,27 @@ export const authService = {
   isAuthenticated() {
     const userStr = localStorage.getItem('user');
     return !!userStr;
+  },
+
+  // Obtener usuario del localStorage sin llamada al backend
+  getStoredUser() {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (!userStr) return null;
+      
+      const user = JSON.parse(userStr);
+      // Verificar que tenga campos básicos
+      if (!user || !user.id) {
+        console.warn('Usuario inválido en localStorage, limpiando');
+        localStorage.removeItem('user');
+        return null;
+      }
+      return user;
+    } catch (error) {
+      console.error('Error parsing stored user:', error);
+      localStorage.removeItem('user');
+      return null;
+    }
   },
 
   // Actualizar perfil de usuario

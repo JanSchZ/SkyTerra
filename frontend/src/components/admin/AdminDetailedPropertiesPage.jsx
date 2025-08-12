@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Chip, Avatar, IconButton, Menu, MenuItem, LinearProgress, Dialog, DialogTitle, DialogContent, Button, TextField, List, ListItem, ListItemText, ListItemAvatar, Paper, InputBase, CircularProgress, Alert } from '@mui/material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { styled } from '@mui/material/styles';
-import { propertyService } from '../../services/api';
+import { propertyService, authService } from '../../services/api';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -120,14 +120,26 @@ const AdminDetailedPropertiesPage = () => {
                 filters.search = search;
             }
             
+            console.log('Loading properties with filters:', filters, 'page:', page + 1);
             const response = await propertyService.getPaginatedProperties(page + 1, filters);
+            console.log('Properties response:', response);
             
             setProperties(response.results || []);
             setTotalCount(response.count || 0);
             setError(null);
         } catch (err) {
             console.error('Error loading properties:', err);
-            setError('Error al cargar las propiedades. Verifique su conexión.');
+            let errorMessage = 'Error al cargar las propiedades.';
+            
+            if (err.response?.status === 401) {
+                errorMessage = 'No tiene permisos para acceder a esta información. Verifique su sesión de administrador.';
+            } else if (err.response?.status === 403) {
+                errorMessage = 'Acceso denegado. Se requieren permisos de administrador.';
+            } else if (err.message) {
+                errorMessage += ' ' + err.message;
+            }
+            
+            setError(errorMessage);
             setProperties([]);
             setTotalCount(0);
         } finally {
@@ -138,6 +150,24 @@ const AdminDetailedPropertiesPage = () => {
 
     // Efecto para cargar propiedades inicialmente
     useEffect(() => {
+        // Verificar autenticación antes de cargar (sin llamada al backend)
+        const user = authService.getStoredUser();
+        console.log('Admin user check:', user);
+        
+        if (!user || !user.id) {
+            console.warn('No valid user found in localStorage');
+            setLoading(false);
+            // No establecemos error, dejamos que StaffRoute maneje la redirección
+            return;
+        }
+        
+        if (!user.is_staff) {
+            setError('Se requieren permisos de administrador para acceder a esta página.');
+            setLoading(false);
+            return;
+        }
+        
+        console.log('Loading properties for admin user:', user.username || user.email);
         loadProperties('', paginationModel.page, paginationModel.pageSize);
     }, [paginationModel.page, paginationModel.pageSize, loadProperties]);
 
@@ -170,11 +200,11 @@ const AdminDetailedPropertiesPage = () => {
             renderCell: (params) => (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <Avatar 
-                        src={params.row.images && params.row.images[0] ? params.row.images[0].image : null} 
+                        src={params.row?.images?.[0]?.image || null} 
                         sx={{ mr: 2 }} 
                         variant="rounded" 
                     />
-                    <Typography variant="body2">{params.value}</Typography>
+                    <Typography variant="body2">{params.value || ''}</Typography>
                 </Box>
             )
         },
@@ -183,7 +213,7 @@ const AdminDetailedPropertiesPage = () => {
             headerName: 'Ubicación', 
             minWidth: 200, 
             flex: 1,
-            valueGetter: (params) => params.row.location_name || 'No especificada'
+            valueGetter: (params) => params?.row?.location_name || 'No especificada'
         },
         {
             field: 'publication_status',
@@ -250,8 +280,16 @@ const AdminDetailedPropertiesPage = () => {
     if (error) {
         return (
             <Box sx={{ p: 3 }}>
+                <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
+                    Gestión de Propiedades
+                </Typography>
                 <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
-                <Button variant="outlined" onClick={() => loadProperties('', paginationModel.page, paginationModel.pageSize)}>
+                <Button 
+                    variant="outlined" 
+                    onClick={() => loadProperties('', paginationModel.page, paginationModel.pageSize)}
+                    disabled={loading || searchLoading}
+                >
+                    {loading || searchLoading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
                     Reintentar
                 </Button>
             </Box>
@@ -286,7 +324,7 @@ const AdminDetailedPropertiesPage = () => {
           p: 1
         }}>
             <DataGrid
-                rows={properties}
+                rows={properties || []}
                 columns={columns}
                 paginationModel={paginationModel}
                 onPaginationModelChange={handlePaginationModelChange}
@@ -298,7 +336,27 @@ const AdminDetailedPropertiesPage = () => {
                 disableSelectionOnClick
                 components={{
                     Toolbar: GridToolbar,
+                    NoRowsOverlay: () => (
+                        <Box sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            height: '100%',
+                            gap: 2 
+                        }}>
+                            <Typography variant="h6" color="text.secondary">
+                                {searchTerm ? 'No se encontraron propiedades que coincidan con la búsqueda' : 'No hay propiedades disponibles'}
+                            </Typography>
+                            {searchTerm && (
+                                <Typography variant="body2" color="text.secondary">
+                                    Pruebe con otros términos de búsqueda
+                                </Typography>
+                            )}
+                        </Box>
+                    ),
                 }}
+                getRowId={(row) => row.id || Math.random()}
                 sx={{
                     border: 'none',
                     '& .MuiDataGrid-cell': {
