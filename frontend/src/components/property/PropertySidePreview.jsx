@@ -1,10 +1,61 @@
 import React from 'react';
-import { Box, Typography, Button, IconButton, CardMedia, Paper } from '@mui/material';
+import { Box, Typography, Button, IconButton, CardMedia, Paper, Snackbar, Alert } from '@mui/material';
 import CircularPlusvalia from '../ui/CircularPlusvalia';
 import CloseIcon from '@mui/icons-material/Close';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
 import { motion, AnimatePresence } from 'framer-motion';
+import { favoritesService } from '../../services/api';
+import { AuthContext } from '../../App';
 
 const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPriceDisplay }) => {
+  const { isAuthenticated } = React.useContext(AuthContext) || { isAuthenticated: false };
+  const [isSaved, setIsSaved] = React.useState(false);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'info' });
+
+  React.useEffect(() => {
+    let mounted = true;
+    const checkFav = async () => {
+      try {
+        if (!property?.id) { setIsSaved(false); return; }
+        if (!isAuthenticated) { setIsSaved(false); return; }
+        const favs = await favoritesService.list();
+        if (!mounted) return;
+        setIsSaved(!!favs.find((f) => (f.property === property.id) || (f.property_details && f.property_details.id === property.id)));
+      } catch (_) { setIsSaved(false); }
+    };
+    checkFav();
+    return () => { mounted = false; };
+  }, [isAuthenticated, property?.id]);
+
+  const toggleSave = async () => {
+    if (!property?.id) return;
+    if (!isAuthenticated) {
+      setSnackbar({ open: true, message: 'Inicia sesión para guardar propiedades.', severity: 'warning' });
+      return;
+    }
+    const next = !isSaved;
+    setIsSaved(next); // Optimistic update
+    try {
+      if (next) {
+        await favoritesService.add(property.id);
+      } else {
+        const favs = await favoritesService.list();
+        const fav = favs.find((f) => f.property === property.id || (f.property_details && f.property_details.id === property.id));
+        if (fav) await favoritesService.remove(fav.id);
+      }
+    } catch (e) {
+      // If unauthorized, keep visual state as pressed; otherwise revert
+      const status = e?.response?.status;
+      if (status === 401) {
+        setIsSaved(!next);
+        setSnackbar({ open: true, message: 'Inicia sesión para guardar propiedades.', severity: 'warning' });
+      } else if (status && status !== 401) {
+        setIsSaved(!next);
+      }
+    }
+  };
+
   return (
     <AnimatePresence>
       {open && property && (
@@ -36,6 +87,33 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                   <CardMedia component="img" image={property.images[0].url} alt={property.name} sx={{ width:'100%', height:'100%', objectFit:'cover' }} />
                 )
               )}
+              {/* Bookmark toggle */}
+              <IconButton 
+                onClick={toggleSave}
+                sx={{ 
+                  position:'absolute',
+                  top:8,
+                  left:10,
+                  padding:0,
+                  minWidth:0,
+                  backgroundColor:'transparent',
+                  border:'none',
+                  color: isSaved ? '#000' : 'rgba(255,255,255,0.85)',
+                  '&:hover':{ color: isSaved ? '#000' : 'rgba(255,255,255,0.95)' },
+                  width: 44,
+                  height: 44,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                aria-label={isSaved ? 'Quitar de guardados' : 'Guardar'}
+              >
+                {isSaved ? (
+                  <BookmarkIcon sx={{ color:'#000', fontSize: 28 }} />
+                ) : (
+                  <BookmarkBorderIcon sx={{ fontSize: 28 }} />
+                )}
+              </IconButton>
               <IconButton 
                 onClick={onClose} 
                 sx={{ 
@@ -105,6 +183,16 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
               </Button>
             </Box>
           </Paper>
+          <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3000}
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          >
+            <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled" sx={{ width: '100%' }}>
+              {snackbar.message}
+            </Alert>
+          </Snackbar>
         </motion.div>
       )}
     </AnimatePresence>

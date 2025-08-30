@@ -56,6 +56,7 @@ import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
 import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
 import Login from './components/auth/Login';
 import './App.css';
+import SavedAndRecent from './components/ui/SavedAndRecent';
 
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
@@ -111,6 +112,7 @@ function App() {
   const [aiSearchLoading, setAiSearchLoading] = useState(false);
   const [aiSearchResult, setAiSearchResult] = useState(null);
   const [conversationHistory, setConversationHistory] = useState([]);
+  // Removed top-bar save search dialog/button per request
 
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -241,11 +243,21 @@ function App() {
     }
   };
 
-  const handleSuggestionClick = (rec) => {
-    if (rec.latitude && rec.longitude) {
-      handleLocationSearch({ center:[rec.longitude, rec.latitude], zoom:14, pitch:60, bearing:0 });
+  const handleSuggestionClick = async (rec) => {
+    try {
+      // Intentar abrir directamente el tour 360° sobre el mapa si existe
+      const opened = await mapRef.current?.openPropertyTour?.(rec, { duration: 3000, zoom: 14.5 });
+      if (!opened) {
+        // Fallback a la vista de detalles si no hay tour válido
+        if (rec.latitude && rec.longitude) {
+          handleLocationSearch({ center:[rec.longitude, rec.latitude], zoom:14, pitch:60, bearing:0 });
+        }
+        navigate(`/property/${rec.id}`);
+      }
+    } catch (e) {
+      console.error('Error handling suggestion click:', e);
+      navigate(`/property/${rec.id}`);
     }
-    navigate(`/property/${rec.id}`);
   };
 
   const handleLogin = async (credentials) => {
@@ -621,6 +633,7 @@ function App() {
       <Route path="/property/:id" element={<PropertyDetails user={user?.user || user} />} />
       <Route path="/tour/:tourId" element={<TourViewer />} />
       <Route path="/compare" element={<ProtectedRoute user={user} element={<CompareView />} />} />
+      <Route path="/saved" element={<ProtectedRoute user={user} element={<SavedAndRecent />} />} />
       <Route path="/new-publication" element={<ProtectedRoute user={user} element={<CreatePublicationWizard />} />} />
       <Route path="/my-searches" element={<ProtectedRoute user={user} element={<SavedSearchesPage />} />} />
       <Route path="/dashboard" element={<ProtectedRoute user={user} element={<SellerDashboardPage />} />} />
@@ -737,7 +750,7 @@ function App() {
                   </Box>
                 </Box>
 
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                   {user ? (
                     <>
                       <IconButton
@@ -828,6 +841,7 @@ function App() {
                         ) : (
                           <>
                             <MenuItem onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white' }}>Dashboard</MenuItem>
+                            <MenuItem onClick={() => { navigate('/saved'); closeUserMenu(); }} sx={{ color: 'white' }}>Guardados y recientes</MenuItem>
                             <MenuItem onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
                             <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
                             <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
@@ -857,9 +871,9 @@ function App() {
           )}
 
           {/* Snackbar para notificaciones */}
-          <Snackbar 
-            open={snackbarOpen} 
-            autoHideDuration={6000} 
+          <Snackbar
+            open={snackbarOpen}
+            autoHideDuration={3000}
             onClose={handleCloseSnackbar}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           >
@@ -887,6 +901,7 @@ function App() {
                currentQuery={aiSearchResult?.interpretation}
             />
           )}
+          {/* SaveSearchDialog removed per request */}
         </Box>
       </AnimatePresence>
     </AuthContext.Provider>

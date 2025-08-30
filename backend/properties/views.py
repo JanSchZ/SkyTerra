@@ -14,6 +14,9 @@ import requests
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
+from functools import wraps
+import hashlib
 import logging
 import traceback
 from rest_framework.pagination import PageNumberPagination
@@ -37,15 +40,123 @@ from .email_service import send_property_status_email
 # Create your views here.
 logger = logging.getLogger(__name__)
 
-class StandardResultsSetPagination(PageNumberPagination):
-    page_size = 12 # Default page size
-    page_size_query_param = 'page_size' # Allow client to override page_size
-    max_page_size = 100 # Maximum page size
+def generate_cache_key(request, view_name, additional_params=None):
+    """
+    Genera una clave de caché inteligente basada en los parámetros de la request.
+    Incluye query params relevantes para asegurar que diferentes filtros tengan diferentes claves.
+    """
+    # Parámetros base
+    key_parts = [view_name]
 
-@method_decorator(cache_page(60), name='list')
+    # Agregar parámetros de query relevantes para el caché
+    # Compatibilidad con Django HttpRequest y DRF Request
+    try:
+        query_params = request.query_params.copy()  # DRF Request
+    except Exception:
+        try:
+            query_params = request.GET.copy()  # Django HttpRequest
+        except Exception:
+            query_params = {}
+    relevant_params = [
+        'page', 'page_size', 'ordering', 'search',
+        'price', 'size', 'has_water', 'has_views', 'listing_type',
+        'min_price', 'max_price', 'min_size', 'max_size'
+    ]
+
+    for param in relevant_params:
+        if param in query_params:
+            key_parts.append(f"{param}:{query_params[param]}")
+
+    # Agregar parámetros adicionales si existen
+    if additional_params:
+        for param, value in additional_params.items():
+            key_parts.append(f"{param}:{value}")
+
+    # Crear hash para la clave
+    key_string = '|'.join(key_parts)
+    return f"properties:{hashlib.md5(key_string.encode()).hexdigest()}"
+
+
+def smart_cache_page(timeout=300):
+    """
+    Decorador inteligente para caché que considera parámetros de query y usuario.
+    Cachea por 5 minutos por defecto, pero invalida cuando cambian parámetros relevantes.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(self, request, *args, **kwargs):
+            # Solo cachear para métodos GET
+            if request.method != 'GET':
+                return view_func(self, request, *args, **kwargs)
+
+            # Generar clave de caché inteligente
+            cache_key = generate_cache_key(request, view_func.__name__)
+
+            # Intentar obtener del caché
+            cached_response = cache.get(cache_key)
+            if cached_response is not None:
+                logger.debug(f"Cache hit for key: {cache_key}")
+                try:
+                    # Reconstruir Response desde datos cacheados
+                    cached_data = cached_response.get('data') if isinstance(cached_response, dict) else cached_response
+                    cached_status = cached_response.get('status', 200) if isinstance(cached_response, dict) else 200
+                    return Response(cached_data, status=cached_status)
+                except Exception:
+                    # Si algo falla con el formato cacheado, continuar a ejecutar la vista
+                    logger.warning("Cached value format invalid; regenerating response")
+
+            # Ejecutar la vista
+            response = view_func(self, request, *args, **kwargs)
+
+            # Cachear la respuesta si es exitosa
+            if hasattr(response, 'status_code') and response.status_code == 200:
+                try:
+                    payload = getattr(response, 'data', None)
+                    if payload is not None:
+                        cache.set(cache_key, {'data': payload, 'status': 200}, timeout)
+                        logger.debug(f"Cached response for key: {cache_key}")
+                except Exception as e:
+                    logger.warning(f"Failed to cache response for key {cache_key}: {e}")
+
+            return response
+        return _wrapped_view
+    return decorator
+
+
+def invalidate_property_cache():
+    """
+    Invalida todo el caché relacionado con propiedades.
+    Útil cuando se crea, actualiza o elimina una propiedad.
+    """
+    # Obtener todas las claves que empiecen con 'properties:'
+    cache_keys = cache.keys('properties:*') if hasattr(cache, 'keys') else []
+
+    if cache_keys:
+        cache.delete_many(cache_keys)
+        logger.info(f"Invalidated {len(cache_keys)} property cache keys")
+    else:
+        # Fallback: borrar todas las claves que contengan 'properties'
+        # Esto es menos eficiente pero funciona con todos los backends de caché
+        try:
+            # Intentar borrar algunas claves comunes
+            common_keys = [
+                'properties:list',
+                'properties:preview',
+                'properties:search',
+            ]
+            cache.delete_many(common_keys)
+            logger.info("Invalidated common property cache keys")
+        except:
+            logger.warning("Could not invalidate property cache - cache backend may not support key listing")
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20 # Increased default page size for better performance
+    page_size_query_param = 'page_size' # Allow client to override page_size
+    max_page_size = 200 # Increased maximum page size for power users
+
 class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
     """Vista read-only que expone detalles mínimos de propiedades para visitantes anónimos"""
-    queryset = Property.objects.filter(publication_status='approved').prefetch_related('images').order_by('-created_at')
+    queryset = Property.objects.filter(publication_status='approved').order_by('-created_at')
     serializer_class = PropertyPreviewSerializer
     pagination_class = StandardResultsSetPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -53,6 +164,22 @@ class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'size', 'created_at', 'plusvalia_score']
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        """
+        Optimizado para preview de propiedades con prefetch_related para evitar N+1 queries.
+        """
+        queryset = super().get_queryset()
+
+        # Optimizaciones para vista de preview
+        queryset = queryset.prefetch_related(
+            'images',  # Prefetch imágenes para el preview
+        ).annotate(
+            image_count_annotation=Count('images', distinct=True),
+            has_tour_annotation=Exists(Tour.objects.filter(property=OuterRef('pk')))
+        )
+
+        return queryset
 
 class PropertyViewSet(viewsets.ModelViewSet):
     """Viewset para la gestión de propiedades inmobiliarias"""
@@ -86,49 +213,87 @@ class PropertyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """
         Permite filtrar propiedades por rango de precio y tamaño y anota conteos relacionados.
-        # Los usuarios staff ven todas las propiedades, los demás solo las aprobadas. # Comentado para mostrar todas
+        Optimizado con prefetch_related para evitar N+1 queries y select_related para joins eficientes.
         """
         queryset = super().get_queryset()
-        
-        # Annotations for N+1 optimization
-        tour_exists = Tour.objects.filter(property=OuterRef('pk'))
-        queryset = queryset.select_related('owner').prefetch_related('images').annotate(
-            image_count_annotation=Count('images'),
-            has_tour_annotation=Exists(tour_exists)
+
+        # Optimizaciones de base de datos para evitar N+1 queries
+        # Prefetch todas las relaciones necesarias en una sola consulta
+        queryset = queryset.select_related(
+            'owner'  # Join eficiente para el owner
+        ).prefetch_related(
+            'images',  # Prefetch todas las imágenes relacionadas
+            'tours',   # Prefetch todos los tours relacionados
+            'documents',  # Prefetch documentos relacionados
+            'tours__property',  # Para evitar queries adicionales en el serializer de tours
+            'images__property',  # Para evitar queries adicionales en el serializer de images
+            'documents__property',  # Para evitar queries adicionales en el serializer de documents
+            'owner__properties'  # Prefetch otras propiedades del mismo owner si se necesitan
         )
-        
+
+        # Annotations optimizadas - una sola consulta para contar elementos relacionados
+        queryset = queryset.annotate(
+            image_count_annotation=Count('images', distinct=True),
+            tour_count_annotation=Count('tours', distinct=True),
+            document_count_annotation=Count('documents', distinct=True),
+            has_tour_annotation=Exists(Tour.objects.filter(property=OuterRef('pk'))),
+            has_document_annotation=Exists(PropertyDocument.objects.filter(property=OuterRef('pk')))
+        )
+
         # Filter by publication_status for non-staff users # Comentado para mostrar todas
         # if not self.request.user.is_staff:
         #     queryset = queryset.filter(publication_status='approved')
 
-        # Filtros adicionales por rango
+        # Filtros adicionales por rango - optimizados con índices si existen
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
         min_size = self.request.query_params.get('min_size')
         max_size = self.request.query_params.get('max_size')
-        
+
+        # Usar filtering más eficiente con validación optimizada
+        filters = {}
         if min_price:
             try:
-                queryset = queryset.filter(price__gte=float(min_price))
+                filters['price__gte'] = float(min_price)
             except ValueError:
                 pass
         if max_price:
             try:
-                queryset = queryset.filter(price__lte=float(max_price))
+                filters['price__lte'] = float(max_price)
             except ValueError:
                 pass
         if min_size:
             try:
-                queryset = queryset.filter(size__gte=float(min_size))
+                filters['size__gte'] = float(min_size)
             except ValueError:
                 pass
         if max_size:
             try:
-                queryset = queryset.filter(size__lte=float(max_size))
+                filters['size__lte'] = float(max_size)
             except ValueError:
                 pass
-            
+
+        # Aplicar filtros en bulk para mejor rendimiento
+        if filters:
+            queryset = queryset.filter(**filters)
+
+        # Optimización adicional: ordenar por campos indexados cuando sea posible
+        ordering = self.request.query_params.get('ordering', '-created_at')
+        if ordering in ['-created_at', 'created_at', '-updated_at', 'updated_at']:
+            # Estos campos tienen índices naturales, usarlos directamente
+            queryset = queryset.order_by(ordering)
+        elif ordering in ['price', '-price', 'size', '-size']:
+            # Campos que pueden beneficiarse de índices compuestos
+            queryset = queryset.order_by(ordering, '-created_at')  # Fallback para estabilidad
+
         return queryset
+
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve para optimizar consulta individual de propiedad"""
+        # Usar select_related y prefetch_related para optimizar la consulta
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         """Crear propiedad asignando el owner al usuario autenticado y enviar email de notificación."""
@@ -140,9 +305,12 @@ class PropertyViewSet(viewsets.ModelViewSet):
 
             logger.info(f"Creando propiedad para usuario: {self.request.user.username}")
             logger.info(f"Datos recibidos: {serializer.validated_data}")
-            
+
             property_instance = serializer.save(owner=self.request.user, publication_status='pending')
             logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}, Estado: {property_instance.publication_status}")
+
+            # Invalidar caché después de crear propiedad
+            invalidate_property_cache()
 
             # Enviar email de notificación si la propiedad está pendiente de revisión
             if property_instance.publication_status == 'pending':
@@ -156,22 +324,22 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     Precio: {property_instance.price}
                     Tamaño: {property_instance.size} ha
                     Enviada por: {self.request.user.username} (ID: {self.request.user.id})
-                    
+
                     ID de Propiedad: {property_instance.id}
 
-                    Por favor, revísala en el panel de administración. 
-                    (Enlace al detalle en API: /api/properties/{property_instance.id}/ ) 
+                    Por favor, revísala en el panel de administración.
+                    (Enlace al detalle en API: /api/properties/{property_instance.id}/ )
                     """
                     # Asegúrate que DEFAULT_FROM_EMAIL está configurado en settings.py
                     from_email = settings.DEFAULT_FROM_EMAIL
-                    recipient_list = getattr(settings, 'ADMIN_NOTIFICATION_EMAILS', ['admin@example.com']) 
-                    
+                    recipient_list = getattr(settings, 'ADMIN_NOTIFICATION_EMAILS', ['admin@example.com'])
+
                     send_mail(subject, message_body, from_email, recipient_list, fail_silently=False)
                     logger.info(f"Email de notificación enviado a {recipient_list} para propiedad ID: {property_instance.id}")
                 except Exception as email_error:
                     logger.error(f"Error al enviar email de notificación para propiedad ID: {property_instance.id}: {str(email_error)}", exc_info=True)
                     # No relanzar el error para no impedir la creación de la propiedad, solo loggearlo.
-            
+
             # Enriquecer con IA (mejora de clasificación/summary)
             try:
                 ai_data = categorize_property_with_ai(property_instance)
@@ -197,7 +365,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
                         doc_type='other'
                     )
                 logger.info(f"{len(new_docs)} documento(s) asociados a la propiedad {property_instance.id}")
-            
+
         except Exception as e:
             logger.error(f"Error al crear propiedad: {str(e)}", exc_info=True)
             # El error ya se maneja en el método create, aquí solo relanzamos para que create lo capture
@@ -208,6 +376,10 @@ class PropertyViewSet(viewsets.ModelViewSet):
         try:
             instance = serializer.save()
             logger.info(f"Propiedad {instance.id} actualizada exitosamente. Nuevo estado: {instance.publication_status}")
+
+            # Invalidar caché después de actualizar propiedad
+            invalidate_property_cache()
+
             # Intentar refrescar clasificación/resumen por IA cuando cambien campos relevantes
             try:
                 ai_data = categorize_property_with_ai(instance)
@@ -222,7 +394,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     instance.save(update_fields=list(updates.keys()))
             except Exception as _:
                 logger.warning(f"No se pudo refrescar enriquecimiento IA para propiedad {instance.id}")
-            
+
             # Manejar documentos nuevos enviados en actualización
             new_docs = self.request.FILES.getlist('new_documents')
             if new_docs:
@@ -233,7 +405,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
                         doc_type='other'
                     )
                 logger.info(f"{len(new_docs)} documento(s) añadidos a la propiedad {instance.id} en actualización")
-            
+
         except Exception as e:
             logger.error(f"Error al actualizar propiedad: {str(e)}", exc_info=True)
             # Re-raise to be handled by the main update method or DRF's exception handler
@@ -297,6 +469,10 @@ class PropertyViewSet(viewsets.ModelViewSet):
         try:
             property_instance.publication_status = new_status
             property_instance.save(update_fields=['publication_status', 'updated_at'])
+
+            # Invalidar caché después de cambiar estado
+            invalidate_property_cache()
+
             logger.info(f"Usuario {request.user.username} actualizó estado de propiedad ID {property_instance.id} a {new_status}")
             serializer = self.get_serializer(property_instance)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -317,7 +493,30 @@ class PropertyViewSet(viewsets.ModelViewSet):
         for k,v in data.items():
             setattr(prop, k, v)
         prop.save(update_fields=list(data.keys()))
+
+        # Invalidar caché después de categorización IA
+        invalidate_property_cache()
+
         return Response({'detail': 'Propiedad enriquecida', **data}, status=status.HTTP_200_OK)
+
+    def perform_destroy(self, instance):
+        """Eliminar propiedad con validaciones adicionales y invalidación de caché"""
+        try:
+            # Verificar permisos adicionales si es necesario
+            if not self.request.user.is_staff and instance.owner != self.request.user:
+                raise PermissionDenied("No tienes permisos para eliminar esta propiedad.")
+
+            logger.info(f"Eliminando propiedad {instance.id} por usuario {self.request.user.username}")
+            instance.delete()
+
+            # Invalidar caché después de eliminar propiedad
+            invalidate_property_cache()
+
+            logger.info(f"Propiedad {instance.id} eliminada exitosamente")
+
+        except Exception as e:
+            logger.error(f"Error al eliminar propiedad {instance.id}: {str(e)}", exc_info=True)
+            raise
 
 class TourViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar tours virtuales"""

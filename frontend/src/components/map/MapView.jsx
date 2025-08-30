@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip } from '@mui/material';
-import { propertyService, tourService } from '../../services/api';
+import { propertyService, tourService, usePropertyService } from '../../services/api';
 import Map, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import EditIcon from '@mui/icons-material/Edit';
@@ -45,14 +45,14 @@ const safePropertiesAccess = (properties, callback) => {
   return callback(validProperties);
 };
 
-const MapView = forwardRef(({ 
-  filters, 
-  appliedFilters, 
-  editable = false, 
-  onBoundariesUpdate, 
-  initialViewState: propInitialViewState, 
-  initialGeoJsonBoundary, 
-  onLoad, 
+const MapView = forwardRef(({
+  filters,
+  appliedFilters,
+  editable = false,
+  onBoundariesUpdate,
+  initialViewState: propInitialViewState,
+  initialGeoJsonBoundary,
+  onLoad,
   disableIntroAnimation = false,
   embedded = false,
   height: embeddedHeight,
@@ -62,9 +62,13 @@ const MapView = forwardRef(({
 }, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
+
+  // Hook optimizado para gestión de propiedades
+  const { getPropertiesCached, prefetchNextPage } = usePropertyService();
+
   // Estados
   const [properties, setProperties] = useState([]);
-  const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([])); 
+  const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([]));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTourUrl, _setActiveTourUrl] = useState(null);
@@ -301,12 +305,12 @@ const MapView = forwardRef(({
   const serializedFilters = JSON.stringify(filters);
   const serializedAppliedFilters = JSON.stringify(appliedFilters);
 
-  // Memoized fetchProperties function
+  // Memoized fetchProperties function optimizada con caché
   const fetchProperties = useCallback(async (pageToFetch = 1, currentFilters, aiFilters) => {
     if (pageToFetch === 1) {
       setLoading(true);
       // When filters change (pageToFetch === 1), we should reset properties
-      setProperties([]); 
+      setProperties([]);
       setPropertiesGeoJSON(propertiesToGeoJSON([]));
     } else {
       setLoadingMore(true);
@@ -357,7 +361,7 @@ const MapView = forwardRef(({
         params.listing_type = params.listingType;
         delete params.listingType;
       }
-      
+
       // If AI filters exist, they take precedence over manual filters
       if (aiFilters && Object.keys(aiFilters).length > 0) {
         params = {};
@@ -384,19 +388,21 @@ const MapView = forwardRef(({
           params.listing_type = aiFilters.listingType;
         }
       }
-      
+
       // console.log("Parámetros finales para API:", params); // Debug log
-      const data = await propertyService.getPaginatedProperties(pageToFetch, params);
-      
+
+      // Usar el servicio optimizado con caché
+      const data = await getPropertiesCached(params, pageToFetch, 20);
+
       // Debug solo en dev
-      if (import.meta.env.MODE === 'development') console.debug('Datos recibidos del API:', { pageToFetch, data, dataType: typeof data });
-      
+      if (import.meta.env.MODE === 'development') console.debug('Datos recibidos del API optimizado:', { pageToFetch, data, dataType: typeof data });
+
       // Verificar que data tenga la estructura esperada
       if (!data || !Array.isArray(data.results)) {
         console.error('Datos inválidos recibidos del API:', data);
         throw new Error('Formato de datos inválido recibido del servidor');
       }
-      
+
       setProperties(prev => {
         const prevArray = Array.isArray(prev) ? prev : [];
         return pageToFetch === 1 ? data.results : [...prevArray, ...data.results];
@@ -411,6 +417,11 @@ const MapView = forwardRef(({
       setTotalProperties(data.count);
       setCurrentPage(pageToFetch);
       setHasNextPage(data.next !== null);
+
+      // Prefetch próxima página si hay más datos
+      if (data.next && pageToFetch === 1) {
+        prefetchNextPage(params, pageToFetch, 20);
+      }
 
       if (mapRef.current && pageToFetch === 1) { // After initial load or filter change
         const map = mapRef.current.getMap();
@@ -428,7 +439,7 @@ const MapView = forwardRef(({
       setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
       if (pageToFetch === 1) {
         setProperties([]);
-        setPropertiesGeoJSON(propertiesToGeoJSON([])); 
+        setPropertiesGeoJSON(propertiesToGeoJSON([]));
       }
     } finally {
       if (pageToFetch === 1) {
@@ -437,11 +448,7 @@ const MapView = forwardRef(({
         setLoadingMore(false);
       }
     }
-  }, [ // Dependencies for fetchProperties
-    setLoading, setLoadingMore, setError, setProperties, 
-    setPropertiesGeoJSON, setTotalProperties, setCurrentPage, setHasNextPage
-    // `filters`, `appliedFilters` (via currentFilters, aiFilters params) and `editable` are handled by the calling useEffect
-  ]);
+  }, [getPropertiesCached, prefetchNextPage]);
 
   useEffect(() => {
     if (editable || suppressData) {
@@ -507,6 +514,25 @@ const MapView = forwardRef(({
     setSidePanelProperty(property);
     setSidePanelOpen(true);
 
+    // Register recent view locally
+    try {
+      const recentRaw = localStorage.getItem('recently_viewed_properties');
+      const recentArr = recentRaw ? JSON.parse(recentRaw) : [];
+      const entry = {
+        id: property.id,
+        name: property.name,
+        price: property.price,
+        size: property.size,
+        type: property.type,
+        images: property.images || [],
+        main_image: property.main_image || null,
+        previewTourUrl: null,
+      };
+      const filtered = recentArr.filter((x) => x.id !== entry.id);
+      const next = [entry, ...filtered].slice(0, 20);
+      localStorage.setItem('recently_viewed_properties', JSON.stringify(next));
+    } catch (_) {}
+
     // Prefetch del tour para mostrar preview
     if (!tourPreviews[property.id]) {
       try {
@@ -517,6 +543,14 @@ const MapView = forwardRef(({
           if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
           setTourPreviews(prev => ({ ...prev, [property.id]: url }));
           setTourCache(prev => ({ ...prev, [property.id]: url }));
+
+          // Update recent entry with preview URL
+          try {
+            const raw = localStorage.getItem('recently_viewed_properties');
+            const arr = raw ? JSON.parse(raw) : [];
+            const updated = arr.map((it) => it.id === property.id ? { ...it, previewTourUrl: url } : it);
+            localStorage.setItem('recently_viewed_properties', JSON.stringify(updated));
+          } catch (_) {}
         }
       } catch (err) {
         console.error('Error prefetching tour for side panel:', err);
@@ -524,7 +558,7 @@ const MapView = forwardRef(({
     }
   };
 
-  // Ejecuta animación de zoom y abre tour virtual
+  // Ejecuta animación de zoom suave y abre tour virtual automáticamente
   const handleGoToTour = async () => {
     if (!sidePanelProperty || !mapRef.current) return;
 
@@ -555,22 +589,27 @@ const MapView = forwardRef(({
     if (map && !isNaN(lat) && !isNaN(lon)) {
       map.flyTo({
         center: [lon, lat],
-        zoom: 16,
+        zoom: 14.5, // Zoom menos agresivo y más natural
         pitch: 0,
         bearing: 0,
-        duration: 2500,
+        duration: 3500, // Duración más larga para suavidad
+        easing: (t) => {
+          // Curva de easing más suave: ease-out con deceleración gradual
+          // Esta curva acelera al inicio y desacelera suavemente al final
+          return 1 - Math.pow(1 - t, 3);
+        },
         essential: true,
       });
     }
 
-    // Tras terminar la animación, abrir el tour
+    // Tras terminar la animación, abrir el tour automáticamente
     setTimeout(() => {
       if (url) {
         setActiveTourUrl(url);
         setActiveTourPropertyId(property.id);
       }
       setNavigatingToTour(false);
-    }, 2600);
+    }, 3600); // Ajustado para coincidir con la duración extendida
   };
 
   const handleMarkerHover = (property) => {
@@ -1349,6 +1388,47 @@ const MapView = forwardRef(({
       }
     },
     getMapInstance: () => mapRef.current,
+    openPropertyTour: async (prop, options = {}) => {
+      try {
+        const propertyId = (prop && prop.id) ? prop.id : prop;
+        if (!propertyId) return false;
+
+        let url = tourCache[propertyId] || tourPreviews[propertyId];
+        if (!url) {
+          const tours = await tourService.getPropertyTours(propertyId);
+          const first = Array.isArray(tours) ? tours.find(t => t && t.url) : null;
+          if (first && first.url) {
+            url = first.url;
+            if (!url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+            if (!url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+            setTourCache(prev => ({ ...prev, [propertyId]: url }));
+          }
+        }
+
+        if (!url) return false;
+
+        const map = mapRef.current;
+        const duration = options.duration || 3000;
+        const zoom = options.zoom || 14.5;
+        const lat = parseFloat(prop?.latitude);
+        const lon = parseFloat(prop?.longitude);
+
+        if (map && !isNaN(lat) && !isNaN(lon)) {
+          map.flyTo({ center: [lon, lat], zoom, pitch: 0, bearing: 0, duration, essential: true });
+          setTimeout(() => {
+            _setActiveTourUrl(url);
+            _setActiveTourPropertyId(propertyId);
+          }, duration + 100);
+        } else {
+          _setActiveTourUrl(url);
+          _setActiveTourPropertyId(propertyId);
+        }
+        return true;
+      } catch (e) {
+        console.error('Error opening property tour:', e);
+        return false;
+      }
+    },
     showRecommendationsTour: (recs, options = {}) => {
       if (!Array.isArray(recs) || recs.length === 0 || !mapRef.current) return;
 

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import React from 'react';
 import compareService from './api/compareService';
 
 // Configuración dinámica de la URL base
@@ -502,20 +503,78 @@ export const propertyService = {
     }
   },
 
-  // NUEVA FUNCIÓN PARA OBTENER PROPIEDADES PAGINADAS
-  async getPaginatedProperties(page = 1, filters = {}) {
+  // NUEVA FUNCIÓN PARA OBTENER PROPIEDADES PAGINADAS CON OPTIMIZACIONES
+  async getPaginatedProperties(page = 1, filters = {}, pageSize = 20) {
     try {
-      const params = { ...filters, page };
-      console.log('Fetching paginated properties with params:', params);
-      const response = await api.get('/properties/', { params });
+      // Optimizaciones de parámetros para mejor rendimiento
+      const params = {
+        ...filters,
+        page,
+        page_size: pageSize,
+      };
+
+      // Agregar timestamp para evitar caché del navegador en desarrollo
+      if (import.meta.env.MODE === 'development') {
+        params._t = Date.now();
+      }
+
+      console.log('Fetching paginated properties with optimized params:', params);
+      const response = await api.get('/properties/', {
+        params,
+        // Optimizaciones de red
+        timeout: 10000, // 10 segundos timeout
+        headers: {
+          'Cache-Control': 'max-age=300' // Cache del navegador por 5 minutos
+        }
+      });
+
       // La respuesta de DRF con PageNumberPagination incluye:
       // response.data.count
       // response.data.next (URL or null)
       // response.data.previous (URL or null)
       // response.data.results (array of items)
-      return response.data; 
+      return response.data;
     } catch (error) {
       console.error('Error fetching paginated properties:', error);
+      throw error;
+    }
+  },
+
+  // Nueva función para obtener propiedades con prefetch inteligente
+  async getPropertiesOptimized(filters = {}, options = {}) {
+    try {
+      const {
+        page = 1,
+        pageSize = 20,
+        prefetchImages = true,
+        prefetchTours = false,
+        useCache = true
+      } = options;
+
+      const params = {
+        ...filters,
+        page,
+        page_size: pageSize,
+      };
+
+      // Agregar parámetros de optimización
+      if (prefetchImages) params.include_images = 'true';
+      if (prefetchTours) params.include_tours = 'true';
+      if (useCache) params.use_cache = 'true';
+
+      console.log('Fetching optimized properties:', params);
+
+      const response = await api.get('/properties/', {
+        params,
+        timeout: 15000, // Mayor timeout para consultas optimizadas
+        headers: useCache ? {
+          'Cache-Control': 'max-age=600' // 10 minutos de cache del navegador
+        } : {}
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching optimized properties:', error);
       throw error;
     }
   },
@@ -904,6 +963,104 @@ export const favoritesService = {
   },
 };
 
+// Hook personalizado para gestión optimizada de propiedades
+export const usePropertyService = () => {
+  const [cache, setCache] = React.useState(new Map());
+  const [loadingStates, setLoadingStates] = React.useState(new Map());
+
+  // Función para obtener clave de caché
+  const getCacheKey = (filters, page, pageSize) => {
+    return JSON.stringify({ filters, page, pageSize });
+  };
+
+  // Función para verificar si los datos están en caché y son válidos
+  const getCachedData = (key) => {
+    const cached = cache.get(key);
+    if (cached) {
+      const now = Date.now();
+      const cacheAge = now - cached.timestamp;
+      // Cache válido por 5 minutos
+      if (cacheAge < 300000) {
+        return cached.data;
+      } else {
+        // Remover datos expirados
+        cache.delete(key);
+      }
+    }
+    return null;
+  };
+
+  // Función para cachear datos
+  const setCachedData = (key, data) => {
+    setCache(prev => new Map(prev).set(key, {
+      data,
+      timestamp: Date.now()
+    }));
+  };
+
+  // Función optimizada para obtener propiedades con caché
+  const getPropertiesCached = React.useCallback(async (filters = {}, page = 1, pageSize = 20) => {
+    const cacheKey = getCacheKey(filters, page, pageSize);
+    const loadingKey = `loading_${cacheKey}`;
+
+    // Verificar si ya está cargando
+    if (loadingStates.get(loadingKey)) {
+      // Si ya está cargando, esperar un poco y reintentar
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return getCachedData(cacheKey);
+    }
+
+    // Verificar caché
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      console.log('Using cached property data');
+      return cachedData;
+    }
+
+    // Marcar como cargando
+    setLoadingStates(prev => new Map(prev).set(loadingKey, true));
+
+    try {
+      const data = await propertyService.getPaginatedProperties(page, filters, pageSize);
+      setCachedData(cacheKey, data);
+
+      return data;
+    } finally {
+      // Remover estado de carga
+      setLoadingStates(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(loadingKey);
+        return newMap;
+      });
+    }
+  }, [cache, loadingStates]);
+
+  // Función para invalidar caché
+  const invalidateCache = React.useCallback(() => {
+    setCache(new Map());
+  }, []);
+
+  // Función para prefetch de próxima página
+  const prefetchNextPage = React.useCallback(async (filters, currentPage, pageSize) => {
+    const nextPage = currentPage + 1;
+    const cacheKey = getCacheKey(filters, nextPage, pageSize);
+
+    if (!getCachedData(cacheKey)) {
+      // Prefetch en background sin bloquear
+      propertyService.getPaginatedProperties(nextPage, filters, pageSize)
+        .then(data => setCachedData(cacheKey, data))
+        .catch(err => console.warn('Prefetch failed:', err));
+    }
+  }, [cache]);
+
+  return {
+    getPropertiesCached,
+    invalidateCache,
+    prefetchNextPage,
+    cacheSize: cache.size
+  };
+};
+
 const makeAbsoluteUrl = (partialUrl) => {
   if (!partialUrl) return partialUrl;
   if (partialUrl.startsWith('http://') || partialUrl.startsWith('https://')) return partialUrl;
@@ -923,4 +1080,5 @@ export default {
   favorites: favoritesService,
   compare: compareService,
   aiManagement: aiManagementService,
+  usePropertyService
 };

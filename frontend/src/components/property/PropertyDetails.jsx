@@ -165,6 +165,23 @@ const PropertyDetails = () => {
         // Cargar propiedad
         const propertyData = await propertyService.getProperty(id);
         setProperty(propertyData);
+        try {
+          const recentRaw = localStorage.getItem('recently_viewed_properties');
+          const recentArr = recentRaw ? JSON.parse(recentRaw) : [];
+          const newEntry = {
+            id: propertyData.id,
+            name: propertyData.name,
+            price: propertyData.price,
+            size: propertyData.size,
+            type: propertyData.type,
+            images: propertyData.images,
+            main_image: propertyData.images && propertyData.images[0] ? propertyData.images[0].url : null,
+            previewTourUrl: null,
+          };
+          const filtered = recentArr.filter((x) => x.id !== newEntry.id);
+          const next = [newEntry, ...filtered].slice(0, 20);
+          localStorage.setItem('recently_viewed_properties', JSON.stringify(next));
+        } catch(_) {}
         
         // Cargar tours reales
         try {
