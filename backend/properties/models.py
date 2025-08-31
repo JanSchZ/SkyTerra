@@ -38,12 +38,6 @@ def validate_boundary_polygon(value):
         raise ValidationError(f"Error validando boundary_polygon: {str(e)}")
 
 class Property(models.Model):
-    PROPERTY_TYPES = [
-        ('farm', 'Farm'),
-        ('ranch', 'Ranch'),
-        ('forest', 'Forest'),
-        ('lake', 'Lake'),
-    ]
     PUBLICATION_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -72,7 +66,8 @@ class Property(models.Model):
     
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='properties', null=True, blank=True)
     name = models.CharField(max_length=255)
-    type = models.CharField(max_length=50, choices=PROPERTY_TYPES, default='farm')
+    # Eliminamos choices para permitir categorías libres/no forzadas por UI
+    type = models.CharField(max_length=50, null=True, blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     size = models.FloatField(help_text="Tamaño en hectáreas")
     latitude = models.FloatField(null=True, blank=True)
@@ -297,3 +292,35 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f'Favorite property {self.property_id} by {self.user.username}'
+
+# -----------------------------
+# Órdenes de Grabación (workflow)
+# -----------------------------
+
+class RecordingOrder(models.Model):
+    STATUS_CHOICES = [
+        ('created', 'Orden creada'),
+        ('recording', 'En grabación'),
+        ('postproduction', 'Postproducción'),
+        ('done', 'Finalizado'),
+        ('canceled', 'Cancelado'),
+    ]
+
+    property = models.ForeignKey(Property, related_name='recording_orders', on_delete=models.CASCADE)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='recording_orders', on_delete=models.CASCADE)
+    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, related_name='assigned_recordings', on_delete=models.SET_NULL, limit_choices_to={'is_staff': True})
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created', db_index=True)
+    scheduled_date = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"RecordingOrder {self.id} for {self.property.name} - {self.get_status_display()}"

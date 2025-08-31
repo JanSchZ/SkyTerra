@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { liquidGlassTheme } from '../../theme/liquidGlassTheme';
 import { motion, AnimatePresence } from 'framer-motion';
 import MapView from '../map/MapView';
-import { propertyService } from '../../services/api';
+import { propertyService, tourService } from '../../services/api';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
@@ -157,12 +157,29 @@ export default function CreatePublicationWizard() {
         boundary_polygon: propertyData.boundary_polygon,
         images: propertyData.images,
         documents: propertyData.documents,
-        tour360: propertyData.tour360,
+        // Tour se sube por endpoint de tours, no aquí
+        tour360: null,
         listing_type: propertyData.listingType,
         rent_price: propertyData.listingType !== 'sale' ? Number(propertyData.rentPrice) : undefined,
       };
-      await propertyService.createProperty(payload);
+      const created = await propertyService.createProperty(payload);
       setSnackbar({ open: true, message: 'Propiedad creada con éxito', severity: 'success' });
+      // Subir Tour 360 si fue seleccionado, antes de navegar
+      if (propertyData.tour360 && created && created.id) {
+        try {
+          const form = new FormData();
+          form.append('property', created.id);
+          form.append('package_file', propertyData.tour360);
+          if (tourName) form.append('name', tourName);
+          await tourService.uploadTour(form);
+        } catch (tourErr) {
+          console.error('Error al subir el tour:', tourErr);
+          setSnackbar({ open: true, message: 'Propiedad creada, pero falló la subida del tour', severity: 'warning' });
+          setTimeout(() => navigate('/dashboard'), 1500);
+          return;
+        }
+      }
+
       setTimeout(() => navigate('/dashboard'), 1200);
     } catch (e) {
       const msg = e?.message || 'Error al crear la propiedad';
@@ -311,8 +328,8 @@ export default function CreatePublicationWizard() {
             <Grid item xs={12} md={6}>
               <Typography variant="h6" sx={{ mb: 1 }}>Tour 360°</Typography>
               <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}> 
-                {tourName || 'Subir paquete/HTML'}
-                <input hidden type="file" accept=".html,.htm,.zip,.ggpkg" onChange={handleTourUpload} />
+                {tourName || 'Subir paquete .zip (Pano2VR)'}
+                <input hidden type="file" accept=".zip" onChange={handleTourUpload} />
               </Button>
               {tourName && (
                 <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>{tourName}</Typography>

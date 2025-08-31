@@ -53,7 +53,7 @@ class GeminiService:
                 property_info = {
                     'id': prop.id,
                     'name': prop.name,
-                    'type': prop.get_type_display(),
+                    'type': prop.type,
                     'price': float(prop.price),
                     'size': prop.size,
                     'has_water': prop.has_water,
@@ -69,64 +69,20 @@ class GeminiService:
             return "Error al obtener información de propiedades."
 
     def _search_properties(self, filters):
-        """Busca propiedades en la base de datos basado en los filtros."""
+        """Busca propiedades en base a texto libre (sin filtros rígidos)."""
         try:
             queryset = Property.objects.all()
-            
-            # Filtrar por tipo de propiedad
-            if filters.get('propertyTypes'):
-                type_mapping = {
-                    'granja': 'farm',
-                    'farm': 'farm',
-                    'rancho': 'ranch', 
-                    'ranch': 'ranch',
-                    'bosque': 'forest',
-                    'forest': 'forest',
-                    'lago': 'lake',
-                    'lake': 'lake'
-                }
-                
-                property_types = []
-                for prop_type in filters['propertyTypes']:
-                    mapped_type = type_mapping.get(prop_type.lower())
-                    if mapped_type:
-                        property_types.append(mapped_type)
-                
-                if property_types:
-                    queryset = queryset.filter(type__in=property_types)
-            
-            # Filtrar por rango de precio
-            if filters.get('priceRange') and len(filters['priceRange']) == 2:
-                min_price, max_price = filters['priceRange']
-                if min_price is not None:
-                    queryset = queryset.filter(price__gte=min_price)
-                if max_price is not None:
-                    queryset = queryset.filter(price__lte=max_price)
-            
-            # Filtrar por características
-            if filters.get('features'):
-                for feature in filters['features']:
-                    if feature.lower() in ['agua', 'water', 'haswater']:
-                        queryset = queryset.filter(has_water=True)
-                    elif feature.lower() in ['vistas', 'views', 'hasviews']:
-                        queryset = queryset.filter(has_views=True)
-            
-            # Filtrar por tamaño si se especifica
-            if filters.get('sizeRange') and len(filters['sizeRange']) == 2:
-                min_size, max_size = filters['sizeRange']
-                if min_size is not None:
-                    queryset = queryset.filter(size__gte=min_size)
-                if max_size is not None:
-                    queryset = queryset.filter(size__lte=max_size)
-            
-            # Búsqueda por texto en nombre y descripción
-            if filters.get('searchText'):
-                search_text = filters['searchText']
-                queryset = queryset.filter(
-                    Q(name__icontains=search_text) | 
-                    Q(description__icontains=search_text)
-                )
-            
+
+            # Búsqueda por texto en nombre y descripción (si se entrega)
+            search_text = None
+            if isinstance(filters, str):
+                search_text = filters
+            elif isinstance(filters, dict):
+                search_text = filters.get('searchText')
+
+            if search_text:
+                queryset = queryset.filter(Q(name__icontains=search_text) | Q(description__icontains=search_text))
+
             return queryset[:10]  # Limitar a 10 resultados
             
         except Exception as e:
@@ -147,20 +103,17 @@ PROPIEDADES DISPONIBLES EN LA PLATAFORMA:
 INSTRUCCIONES:
 1. Analiza la consulta del usuario: "{user_query}"
 2. Determina el tipo de consulta:
-    - Si la consulta es principalmente una ubicación (ej: "Villarrica", "terrenos en Santiago"), enfócate en devolver datos para `flyToLocation` (coordenadas, zoom apropiado) y establece `search_mode: "location"`.
-    - Si la consulta describe características de una propiedad (ej: "casa con vista al lago y bosque nativo"), enfócate en generar `suggestedFilters` y hasta 5 `recommendations` a partir del contexto de propiedades proporcionado. Establece `search_mode: "property_recommendation"`.
-3. Para `search_mode: "property_recommendation"`:
-    - Identifica qué tipo de propiedad busca, rango de precio, características deseadas, etc.
-    - Busca en las propiedades disponibles las que mejor coincidan.
-    - Proporciona recomendaciones específicas basadas en las propiedades reales.
-    - Sugiere filtros apropiados para refinar la búsqueda.
+    - Si la consulta es principalmente una ubicación (ej: "Villarrica", "terrenos en Santiago"), devuelve `flyToLocation` (coordenadas, zoom) y usa `search_mode: "location"`.
+    - Si la consulta describe características con intención de ver propiedades (ej: "terrenos con agua cerca de Osorno"), genera hasta 5 `recommendations` basadas en el contexto real. Usa `search_mode: "property_recommendation"`.
+    - Si la consulta es informativa o conversacional y NO hay intención explícita de ver propiedades, responde conversacionalmente y usa `search_mode: "chat"`.
+3. No menciones ni generes filtros ni tipos predefinidos. No hables de "filtros".
 4. Para `search_mode: "location"`:
     - Intenta identificar coordenadas (longitud, latitud) y un nivel de zoom adecuado para la ubicación mencionada. `pitch` y `bearing` son opcionales pero buenos si se pueden inferir.
-    - No generes `suggestedFilters` ni `recommendations` si el modo es "location".
+    - No generes `recommendations` si el modo es "location".
 
 FORMATO DE RESPUESTA (JSON):
 {{
-    "search_mode": "location" | "property_recommendation",
+    "search_mode": "location" | "property_recommendation" | "chat",
     "assistant_message": "Respuesta amigable al usuario explicando tu acción o hallazgos.",
     "flyToLocation": {{ // Poblar solo si search_mode es 'location'. Asegúrate que center sea [longitud, latitud]
         "center": [-71.5, -33.0], // [longitud, latitud]
@@ -168,19 +121,14 @@ FORMATO DE RESPUESTA (JSON):
         "pitch": 0,  // Opcional, default 0
         "bearing": 0 // Opcional, default 0
     }},
-    "suggestedFilters": {{ // Poblar solo si search_mode es 'property_recommendation'
-        "propertyTypes": ["farm", "ranch", "forest", "lake"],
-        "priceRange": [null, null], // [min_precio, max_precio] - usa null si no se especifica
-        "features": [], // ej: ["hasWater", "hasViews"]
-        "sizeRange": [null, null] // [min_hectareas, max_hectareas] - usa null si no se especifica
-    }},
+    "suggestedFilters": null,
     "recommendations": [ // Poblar solo si search_mode es 'property_recommendation', máximo 5
         {{
             "id": 1, // ID de la propiedad real del contexto
             "name": "Nombre de la propiedad",
             "price": 120000,
             "size": 43.5,
-            "type": "farm", // Tipo de la propiedad real
+            "type": "categoria",
             "reason": "Por qué recomiendas esta propiedad, basado en la consulta y los datos de la propiedad."
         }}
     ],
@@ -265,6 +213,46 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                     ai_response.setdefault('assistant_message', "Tu búsqueda ha sido procesada.")
                     ai_response.setdefault('interpretation', user_query)
 
+                    # Heurísticas: consultas conversacionales o informativas (sin intención explícita de listar propiedades)
+                    user_text_lc = (user_query or '').lower().strip()
+                    conv_cues = [
+                        'hola', 'buenas', 'hello', 'hi', 'qué tal', 'que tal', 'hey',
+                        'quién eres', 'quien eres', 'qué puedes hacer', 'que puedes hacer',
+                        'ayuda', 'help', 'como funcionas', 'cómo funcionas', 'que haces', 'qué haces'
+                    ]
+                    property_cues = [
+                        'propiedad', 'propiedades', 'terreno', 'terrenos', 'granja', 'finca', 'campo',
+                        'casa', 'parcela', 'lote', 'rancho', 'ranch', 'farm', 'forest', 'bosque'
+                    ]
+                    intent_cues = ['muéstrame', 'muestrame', 'mostrar', 'enséñame', 'ensename', 'ver', 'buscar', 'encuéntrame', 'encontrar', 'recomienda', 'recomiéndame', 'sugiéreme', 'sugerir']
+                    price_cues = ['precio', 'precios', 'rango', 'presupuesto', 'barato', 'caro', 'cuánto', 'cuanto', 'vale', 'cuesta']
+                    question_cues = ['por qué', 'porque', 'por que', 'cómo', 'como', 'qué', 'que']
+
+                    has_property_word = any(cue in user_text_lc for cue in property_cues)
+                    has_intent_word = any(cue in user_text_lc for cue in intent_cues)
+                    has_digit = any(ch.isdigit() for ch in user_text_lc)
+                    asks_info = any(cue in user_text_lc for cue in (price_cues + question_cues))
+
+                    # Intención explícita si hay verbo de acción o suficientes restricciones ligadas a propiedades
+                    explicit_property_intent = has_intent_word or (has_property_word and (has_digit or any(w in user_text_lc for w in ['en ', 'cerca', 'zona', 'región', 'region', 'ciudad', 'comuna'])))
+
+                    is_conversational = (any(cue in user_text_lc for cue in conv_cues) or asks_info) and not explicit_property_intent
+
+                    if is_conversational:
+                        ai_response['search_mode'] = 'chat'
+                        ai_response['flyToLocation'] = None
+                        ai_response['suggestedFilters'] = None
+                        ai_response['recommendations'] = []
+                        if not ai_response.get('assistant_message') or ai_response['assistant_message'] in [
+                            'Tu búsqueda ha sido procesada.', 'Búsqueda procesada'
+                        ]:
+                            ai_response['assistant_message'] = (
+                                'Soy Sam, tu asistente IA para explorar ubicaciones y encontrar propiedades. '
+                                'Puedes preguntarme por lugares (por ejemplo: "Muéstrame Villarrica"), '
+                                'o describir lo que buscas ("granja con agua cerca de Osorno"). '
+                                '¿Sobre qué te gustaría que te ayude?'
+                            )
+
                     # Si el modo es "property_recommendation", buscar propiedades reales
                     if ai_response['search_mode'] == 'property_recommendation':
                         # Primera prioridad: intentar enriquecer las recomendaciones sugeridas por la IA si tienen IDs válidos.
@@ -282,7 +270,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                                         'name': prop.name,
                                         'price': float(prop.price),
                                         'size': prop.size,
-                                        'type': prop.get_type_display(),
+                                        'type': prop.type,
                                         'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                                         'has_water': prop.has_water,
                                         'has_views': prop.has_views,
@@ -301,8 +289,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                         else:
                             # Si la IA no proporcionó recomendaciones válidas, construimos una lista basada en los filtros sugeridos (si existen)
                             if ai_response.get('suggestedFilters'):
-                                search_filters = ai_response['suggestedFilters'].copy()
-                                real_properties = self._search_properties(search_filters)
+                                real_properties = self._search_properties({'searchText': user_query})
                             else:
                                 # Como último recurso, hacemos una búsqueda básica utilizando el texto del usuario
                                 real_properties = self._search_properties({'searchText': user_query})
@@ -314,7 +301,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                                     'name': prop.name,
                                     'price': float(prop.price),
                                     'size': prop.size,
-                                    'type': prop.get_type_display(),
+                                    'type': prop.type,
                                     'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                                     'has_water': prop.has_water,
                                     'has_views': prop.has_views,
@@ -333,7 +320,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                             'qué te parece', 'que te parece', 'mis gustos', 'qué recomiendas', 'me conviene'
                         ]
                         if any(p in user_last for p in followup_phrases):
-                            ai_response['assistant_message'] = "Entiendo. Antes de sugerir más, ¿qué te importa más: precio, agua, vistas, tamaño o ubicación?"
+                            ai_response['assistant_message'] = "Entiendo. Antes de sugerir más, ¿qué te importa más: ubicación, agua, vistas o tamaño?"
                             # Fomentar conversación: no repetir mensajes de conteo y reducir resultados
                             ai_response['recommendations'] = ai_response['recommendations'][:2]
                         # Si el usuario hace una pregunta directa (por qué, cómo, etc.), evitar respuestas de conteo
@@ -372,23 +359,23 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
 
                     # Crear respuesta de fallback con búsqueda básica
                     fallback_filters = self._extract_basic_filters(user_query)
-                    real_properties = self._search_properties(fallback_filters)
+                    real_properties = self._search_properties({'searchText': user_query})
 
                     fallback_response = {
                         'assistant_message': f"Procesé tu búsqueda y encontré {real_properties.count()} propiedades relacionadas.",
-                        'suggestedFilters': fallback_filters,
+                        'suggestedFilters': None,
                         'recommendations': [
                             {
                                 'id': prop.id,
                                 'name': prop.name,
                                 'price': float(prop.price),
                                 'size': prop.size,
-                                'type': prop.get_type_display(),  # Use display name for consistency
+                                'type': prop.type,
                                 'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
-                                'latitude': prop.latitude,  # Add latitude
-                                'longitude': prop.longitude,  # Add longitude
-                                'has_water': prop.has_water,  # Add has_water
-                                'has_views': prop.has_views,  # Add has_views
+                                'latitude': prop.latitude,
+                                'longitude': prop.longitude,
+                                'has_water': prop.has_water,
+                                'has_views': prop.has_views,
                                 'reason': f"Relacionada con: {user_query}"
                             } for prop in real_properties[:5]
                         ],
@@ -455,9 +442,8 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
         """Crea una respuesta de fallback cuando Gemini no está disponible."""
         logger.info(f"[GeminiService] Creando respuesta de fallback para: '{user_query}'")
         
-        # Usar filtros básicos para buscar propiedades
-        basic_filters = self._extract_basic_filters(user_query)
-        properties = self._search_properties(basic_filters)
+        # Búsqueda simple basada en texto libre
+        properties = self._search_properties({'searchText': user_query})
         
         recommendations = []
         for prop in properties[:5]:
@@ -466,7 +452,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                 'name': prop.name,
                 'price': float(prop.price),
                 'size': prop.size,
-                'type': prop.get_type_display(), # Use display name for consistency
+                'type': prop.type,
                 'plusvalia_score': float(prop.plusvalia_score) if prop.plusvalia_score is not None else None,
                 'latitude': prop.latitude, # Add latitude
                 'longitude': prop.longitude, # Add longitude
@@ -479,7 +465,7 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
             'search_mode': 'property_recommendation', # Fallback implies property recommendation
             'assistant_message': f"Encontré {len(recommendations)} propiedades relacionadas con tu búsqueda.",
             'flyToLocation': None,
-            'suggestedFilters': basic_filters,
+            'suggestedFilters': None,
             'recommendations': recommendations,
             'interpretation': f"Búsqueda procesada: {user_query}",
             'fallback': True

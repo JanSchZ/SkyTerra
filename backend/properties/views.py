@@ -27,15 +27,15 @@ import uuid
 import zipfile
 import shutil
 
-from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite
+from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite, RecordingOrder
 from .serializers import (
     PropertySerializer, PropertyListSerializer,
     TourSerializer, ImageSerializer, PropertyDocumentSerializer, PropertyVisitSerializer,
-    PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer
+    PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer, RecordingOrderSerializer
 )
 from skyterra_backend.permissions import IsOwnerOrAdmin
 from .services import GeminiService, GeminiServiceError, categorize_property_with_ai
-from .email_service import send_property_status_email
+from .email_service import send_property_status_email, send_recording_order_created_email, send_recording_order_status_email
 
 # Create your views here.
 logger = logging.getLogger(__name__)
@@ -159,8 +159,8 @@ class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Property.objects.filter(publication_status='approved').order_by('-created_at')
     serializer_class = PropertyPreviewSerializer
     pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['price', 'size', 'has_water', 'has_views', 'listing_type']
+    # Eliminamos filtros: el portal no expone filtros UI
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'size', 'created_at', 'plusvalia_score']
     permission_classes = [permissions.AllowAny]
@@ -186,9 +186,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     queryset = Property.objects.all().order_by('-created_at')
     serializer_class = PropertySerializer
     pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['price', 'size', 'has_water', 'has_views', 'listing_type', 'publication_status']
-    # 'location_name' se eliminó porque no existe en el modelo
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'description']
     ordering_fields = ['price', 'size', 'created_at', 'plusvalia_score']
 
@@ -244,38 +242,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
         # if not self.request.user.is_staff:
         #     queryset = queryset.filter(publication_status='approved')
 
-        # Filtros adicionales por rango - optimizados con índices si existen
-        min_price = self.request.query_params.get('min_price')
-        max_price = self.request.query_params.get('max_price')
-        min_size = self.request.query_params.get('min_size')
-        max_size = self.request.query_params.get('max_size')
-
-        # Usar filtering más eficiente con validación optimizada
-        filters = {}
-        if min_price:
-            try:
-                filters['price__gte'] = float(min_price)
-            except ValueError:
-                pass
-        if max_price:
-            try:
-                filters['price__lte'] = float(max_price)
-            except ValueError:
-                pass
-        if min_size:
-            try:
-                filters['size__gte'] = float(min_size)
-            except ValueError:
-                pass
-        if max_size:
-            try:
-                filters['size__lte'] = float(max_size)
-            except ValueError:
-                pass
-
-        # Aplicar filtros en bulk para mejor rendimiento
-        if filters:
-            queryset = queryset.filter(**filters)
+        # Sin filtros de rango ni booleanos: Sam decide internamente
 
         # Optimización adicional: ordenar por campos indexados cuando sea posible
         ordering = self.request.query_params.get('ordering', '-created_at')
@@ -320,7 +287,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     Una nueva propiedad ha sido enviada para revisión:
 
                     Nombre: {property_instance.name}
-                    Tipo: {property_instance.get_type_display()}
+                    Tipo: {property_instance.type or '-'}
                     Precio: {property_instance.price}
                     Tamaño: {property_instance.size} ha
                     Enviada por: {self.request.user.username} (ID: {self.request.user.id})
@@ -470,6 +437,12 @@ class PropertyViewSet(viewsets.ModelViewSet):
             property_instance.publication_status = new_status
             property_instance.save(update_fields=['publication_status', 'updated_at'])
 
+            # Notificar al dueño del cambio de estado
+            try:
+                send_property_status_email(property_instance)
+            except Exception:
+                logger.warning("Fallo al enviar email de cambio de estado de propiedad")
+
             # Invalidar caché después de cambiar estado
             invalidate_property_cache()
 
@@ -524,8 +497,7 @@ class TourViewSet(viewsets.ModelViewSet):
     # suele tomar el primer elemento para pre-visualización.
     queryset = Tour.objects.all().order_by('-created_at')
     serializer_class = TourSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['property', 'type']
+    filter_backends = []
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'get_stats']:
@@ -548,9 +520,18 @@ class TourViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         package_file = serializer.validated_data.pop('package_file')
+        prop = serializer.validated_data.get('property')
+
+        # Validar permisos: solo el propietario o staff pueden subir tours para una propiedad
+        try:
+            if not self.request.user.is_staff and getattr(prop, 'owner_id', None) != self.request.user.id:
+                raise PermissionDenied("Solo el propietario o staff puede subir tours para esta propiedad.")
+        except Exception:
+            # Si no hay prop o user, denegar de forma segura
+            raise PermissionDenied("Permisos insuficientes para subir tour.")
         
         # Validar extensión
-        allowed_extensions = ['.zip', '.ggpkg']
+        allowed_extensions = ['.zip']
         if not any(package_file.name.lower().endswith(ext) for ext in allowed_extensions):
             raise serializers.ValidationError({
                 'package_file': f"Tipo de archivo no permitido. Solo se permiten archivos: {', '.join(allowed_extensions)}"
@@ -729,8 +710,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     """Viewset para gestionar imágenes de propiedades"""
     queryset = Image.objects.all()
     serializer_class = ImageSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['property', 'type']
+    filter_backends = []
     ordering_fields = ['order']
     
     def get_queryset(self):
@@ -794,8 +774,7 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
     """Viewset to manage property documents (upload, list, delete)."""
     queryset = PropertyDocument.objects.all().order_by('-uploaded_at')
     serializer_class = PropertyDocumentSerializer
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['property', 'doc_type', 'status']
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['description']
     ordering_fields = ['uploaded_at']
 
@@ -874,6 +853,74 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
         send_property_status_email(document.property)
 
         return Response({'detail': 'Documento rechazado.'}, status=status.HTTP_200_OK)
+
+class RecordingOrderViewSet(viewsets.ModelViewSet):
+    """Gestiona las órdenes de grabación de tours 360."""
+    queryset = RecordingOrder.objects.all().order_by('-updated_at')
+    serializer_class = RecordingOrderSerializer
+    filter_backends = []
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [permissions.IsAdminUser]
+        elif self.action in ['create', 'my_orders']:
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ['set_status', 'assign']:
+            permission_classes = [permissions.IsAdminUser]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        mine = self.request.query_params.get('mine')
+        if mine in ('1', 'true', 'yes') and self.request.user.is_authenticated and not self.request.user.is_staff:
+            qs = qs.filter(requested_by=self.request.user)
+        return qs
+
+    def perform_create(self, serializer):
+        prop = serializer.validated_data.get('property')
+        user = self.request.user
+        if not user.is_staff and getattr(prop, 'owner_id', None) != user.id:
+            raise PermissionDenied("Solo el propietario puede solicitar grabación para esta propiedad.")
+        order = serializer.save(requested_by=user, status='created')
+        try:
+            send_recording_order_created_email(order)
+        except Exception:
+            logger.warning("Fallo al enviar email de creación de orden de grabación")
+
+    @action(detail=False, methods=['get'], url_path='mine')
+    def my_orders(self, request):
+        qs = RecordingOrder.objects.filter(requested_by=request.user).order_by('-updated_at')
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            ser = self.get_serializer(page, many=True)
+            return self.get_paginated_response(ser.data)
+        ser = self.get_serializer(qs, many=True)
+        return Response(ser.data)
+
+    @action(detail=True, methods=['post'], url_path='set-status')
+    def set_status(self, request, pk=None):
+        order = self.get_object()
+        new_status = request.data.get('status')
+        valid = [c[0] for c in RecordingOrder.STATUS_CHOICES]
+        if new_status not in valid:
+            return Response({'error': f'Estado inválido. Opciones: {", ".join(valid)}'}, status=status.HTTP_400_BAD_REQUEST)
+        order.status = new_status
+        if 'notes' in request.data:
+            order.notes = request.data.get('notes')
+        if 'scheduled_date' in request.data:
+            try:
+                from django.utils.dateparse import parse_datetime
+                order.scheduled_date = parse_datetime(request.data.get('scheduled_date'))
+            except Exception:
+                pass
+        order.save()
+        try:
+            send_recording_order_status_email(order)
+        except Exception:
+            logger.warning("Fallo al enviar email de estado de orden de grabación")
+        return Response(self.get_serializer(order).data)
 
 class PropertyVisitViewSet(viewsets.ModelViewSet):
     queryset = PropertyVisit.objects.all().order_by('-visited_at')

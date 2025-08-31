@@ -6,37 +6,39 @@ import { aiService } from '../../services/aiService'; // Ajusta la ruta si es ne
 const AIModelManager = () => {
   const [models, setModels] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Deshabilitado fetch automático para evitar bucles 401 si no hay sesión de staff
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const data = await aiService.getModels();
-        // API returns a plain list from /api/ai/models/
-        setModels(Array.isArray(data) ? data : (data.models || [])); 
-      } catch (error) {
-        console.error('Error fetching AI models:', error);
-        setError('No se pudieron cargar los modelos de IA.');
-      }
-      setIsLoading(false);
-    };
-
-    const fetchLogs = async () => {
-      try {
-        const data = await aiService.getLogs();
-        // API returns a plain list from /api/ai/logs/
-        setLogs(Array.isArray(data) ? data : (data.logs || []));
-      } catch (error) {
-        console.error('Error fetching AI logs:', error);
-        setError('No se pudieron cargar los logs de IA.');
-      }
-      setIsLoading(false);
-    };
-
-    fetchModels();
-    fetchLogs();
+    // No-op on mount. Usa botones explícitos para cargar si corresponde.
   }, []);
+
+  const fetchModels = async () => {
+    setIsLoading(true);
+    try {
+      const data = await aiService.getModels();
+      setModels(Array.isArray(data) ? data : (data.models || []));
+    } catch (error) {
+      console.error('Error fetching AI models:', error);
+      setError('No se pudieron cargar los modelos de IA.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchLogs = async () => {
+    setIsLoading(true);
+    try {
+      const data = await aiService.getLogs();
+      setLogs(Array.isArray(data) ? data : (data.logs || []));
+    } catch (error) {
+      console.error('Error fetching AI logs:', error);
+      setError('No se pudieron cargar los logs de IA.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleUpdate = async (modelId, modelPayload) => {
     try {
@@ -66,7 +68,12 @@ const AIModelManager = () => {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 2 }}>Gestionar Modelos de IA</Typography>
+      <Typography variant="h6" sx={{ mb: 2 }}>Gestión de Modelos de IA (carga manual)</Typography>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+        <Button variant="outlined" onClick={fetchModels}>Cargar Modelos</Button>
+        <Button variant="outlined" onClick={fetchLogs}>Cargar Logs</Button>
+      </Box>
+      {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>

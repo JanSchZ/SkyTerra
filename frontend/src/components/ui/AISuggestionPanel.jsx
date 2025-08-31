@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Paper, List, ListItem, ListItemText, Card, CardContent, Divider, Chip, IconButton, Tooltip } from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { tourService } from '../../services/api';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import { TextField } from '@mui/material';
@@ -23,7 +23,14 @@ const AISuggestionPanel = ({
   const [tourPreviews, setTourPreviews] = useState({});
   // Show up to 5 recommendations so counts like 4 are fully displayed
   const MAX_DISPLAY = 5;
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('skyterra.sam.collapsed');
+      return stored === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [followUp, setFollowUp] = useState("");
   const [displayedAssistant, setDisplayedAssistant] = useState('');
   const [lastRecommendations, setLastRecommendations] = useState([]);
@@ -59,6 +66,13 @@ const AISuggestionPanel = ({
     fetchPreviews();
   }, [recommendations]);
 
+  // Persist collapsed state
+  useEffect(() => {
+    try {
+      localStorage.setItem('skyterra.sam.collapsed', collapsed ? 'true' : 'false');
+    } catch (e) {}
+  }, [collapsed]);
+
   // Mantener últimas recomendaciones visibles mientras Sam piensa
   useEffect(() => {
     if (Array.isArray(recommendations) && recommendations.length > 0) {
@@ -77,11 +91,24 @@ const AISuggestionPanel = ({
   const shouldShow = hasContentToDisplay || currentQuery;
   const activeRecommendations = hasRecommendations ? recommendations : lastRecommendations;
 
+  // Auto-expand when content becomes available (e.g., a new AI response turns visibility on)
+  const prevShouldShowRef = useRef(shouldShow);
+  useEffect(() => {
+    if (shouldShow && !prevShouldShowRef.current) {
+      setCollapsed(false);
+    }
+    prevShouldShowRef.current = shouldShow;
+  }, [shouldShow]);
+
   return (
-    <>
-      {shouldShow && (
+    <LayoutGroup id="sam">
+      {/* Panel container */}
+      {shouldShow && !collapsed && (
         <motion.div
-          initial={false}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
           style={{
             position: 'absolute',
             top: 120,
@@ -94,6 +121,9 @@ const AISuggestionPanel = ({
             <Paper
               variant="glass"
               elevation={6}
+              component={motion.div}
+              layoutId="sam-card"
+              transition={{ type: 'spring', stiffness: 450, damping: 40 }}
               sx={(theme) => ({
                 // Siempre mantener el mismo tamaño - estado expandido
                 pt: 1.25,
@@ -127,6 +157,7 @@ const AISuggestionPanel = ({
                   background: 'transparent',
                 }
               })}
+              style={{ borderRadius: 20 }}
             >
                           {/* Contenido expandido siempre presente */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
@@ -142,11 +173,9 @@ const AISuggestionPanel = ({
                   }}>
                   Sam
                 </Typography>
-                {shouldShow && (
-                  <IconButton size="small" onClick={() => setCollapsed(true)} sx={{ ml: 1, color: 'rgba(255,255,255,0.8)' }}>
+                <IconButton size="small" onClick={() => setCollapsed(true)} sx={{ ml: 1, color: 'rgba(255,255,255,0.8)' }}>
                      <ArrowForwardIosIcon fontSize="small" style={{ transform: 'rotate(180deg)' }} />
                   </IconButton>
-                )}
               </Box>
 
               {/* Contenido principal sin animaciones para evitar saltos */}
@@ -241,7 +270,7 @@ const AISuggestionPanel = ({
                 </Box>
               )}
 
-              <AnimatePresence>
+              <AnimatePresence mode="sync">
                 {(activeRecommendations && activeRecommendations.length > 0) && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -333,7 +362,7 @@ const AISuggestionPanel = ({
         </motion.div>
       )}
 
-      {/* Collapsed state - small expand button */}
+      {/* Collapsed state - small expand button, always visible on map route */}
       {collapsed && shouldShow && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -348,6 +377,9 @@ const AISuggestionPanel = ({
           <Paper
             onClick={() => setCollapsed(false)}
             elevation={0}
+            component={motion.div}
+            layoutId="sam-card"
+            transition={{ type: 'spring', stiffness: 450, damping: 40 }}
             sx={{
               px: 1.5,
               py: 0.75,
@@ -365,12 +397,13 @@ const AISuggestionPanel = ({
                 boxShadow: '0 0 8px rgba(255,255,255,0.15)',
               }
             }}
+            style={{ borderRadius: 12 }}
           >
             <Typography variant="body2" sx={{ fontWeight: 400, letterSpacing: 0, color: '#ffffff', fontSize: '0.875rem' }}>Sam</Typography>
           </Paper>
         </motion.div>
       )}
-    </>
+    </LayoutGroup>
   );
 };
 

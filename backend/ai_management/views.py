@@ -2,6 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Count, Sum, Avg, Q
+from django.db.models.functions import TruncDate
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -25,9 +26,9 @@ class AIModelViewSet(viewsets.ModelViewSet):
         """Populate default AI models"""
         try:
             default_models_data = [
-                {"name": "Gemini 1.0 Pro", "api_name": "gemini-pro", "price_per_1k_tokens_input": 0.0001, "price_per_1k_tokens_output": 0.0002, "max_tokens": 32768, "is_active": True, "supports_thinking": False},
-                {"name": "Gemini 1.5 Flash", "api_name": "gemini-1.5-flash-latest", "price_per_1k_tokens_input": 0.00035, "price_per_1k_tokens_output": 0.0005, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
-                {"name": "Gemini 1.5 Pro", "api_name": "gemini-1.5-pro-latest", "price_per_1k_tokens_input": 0.0035, "price_per_1k_tokens_output": 0.007, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
+                {"name": "Gemini 2.5 Flash-Lite", "api_name": "gemini-2.5-flash-lite", "price_per_1k_tokens_input": 0.00010, "price_per_1k_tokens_output": 0.00040, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
+                {"name": "Gemini 2.5 Flash", "api_name": "gemini-2.5-flash", "price_per_1k_tokens_input": 0.00035, "price_per_1k_tokens_output": 0.0005, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
+                {"name": "Gemini 2.5 Pro", "api_name": "gemini-2.5-pro", "price_per_1k_tokens_input": 0.0035, "price_per_1k_tokens_output": 0.007, "max_tokens": 1048576, "is_active": True, "supports_thinking": True},
             ]
 
             for model_data in default_models_data:
@@ -64,6 +65,31 @@ class AIUsageLogViewSet(viewsets.ReadOnlyModelViewSet):
             total_cost=Sum('cost'),
             avg_response_time=Avg('response_time_ms')
         ).order_by('-request_count')
+
+        # Daily time-series (requests and token/cost aggregates per day)
+        daily_queryset = (
+            AIUsageLog.objects
+            .filter(timestamp__gte=start_date)
+            .annotate(day=TruncDate('timestamp'))
+            .values('day')
+            .annotate(
+                request_count=Count('id'),
+                total_tokens_input=Sum('tokens_input'),
+                total_tokens_output=Sum('tokens_output'),
+                total_cost=Sum('cost')
+            )
+            .order_by('day')
+        )
+        daily_stats = [
+            {
+                'date': item['day'].isoformat(),
+                'request_count': item['request_count'],
+                'total_tokens_input': item['total_tokens_input'] or 0,
+                'total_tokens_output': item['total_tokens_output'] or 0,
+                'total_cost': float(item['total_cost'] or 0),
+            }
+            for item in daily_queryset
+        ]
         
         # Success rate
         success_rate = AIUsageLog.objects.filter(
@@ -83,6 +109,7 @@ class AIUsageLogViewSet(viewsets.ReadOnlyModelViewSet):
             'total_tokens_output': total_tokens_output,
             'total_cost': float(total_cost),
             'usage_by_model': list(usage_by_model),
+            'daily': daily_stats,
             'success_rate': round(success_percentage, 2),
             'period_days': days
         })

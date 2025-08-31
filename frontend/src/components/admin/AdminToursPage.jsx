@@ -207,11 +207,12 @@ const AdminToursPage = () => {
     
     try {
       console.log('Attempting to delete tour:', selectedTour.id);
-      
-      // Ensure CSRF token is available before making the delete request
-      await authService.ensureCsrfCookie();
-      
-      await api.delete(`/tours/${selectedTour.id}/`);
+      // Obtener CSRF token explícito y enviarlo en el header
+      const csrfResp = await api.get('/auth/csrf/');
+      const csrfToken = csrfResp?.data?.csrfToken;
+      await api.delete(`/tours/${selectedTour.id}/`, {
+        headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {}
+      });
       await loadTours();
       await loadStats();
       setDeleteDialogOpen(false);
@@ -235,7 +236,11 @@ const AdminToursPage = () => {
     if (!selectedTour) return;
     
     try {
-      await api.patch(`/tours/${selectedTour.id}/`, tourData);
+      const csrfResp = await api.get('/auth/csrf/');
+      const csrfToken = csrfResp?.data?.csrfToken;
+      await api.patch(`/tours/${selectedTour.id}/`, tourData, {
+        headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {}
+      });
       await loadTours();
       setEditDialogOpen(false);
       setSelectedTour(null);

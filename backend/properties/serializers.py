@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model # Import get_user_model
 from django.conf import settings # Alternative for AUTH_USER_MODEL
-from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite
+from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite, RecordingOrder
 import json
 from payments.models import Subscription
 
@@ -70,7 +70,8 @@ class TourSerializer(serializers.ModelSerializer):
         # Get first image if available
         first_image = obj.property.images.first()
         if first_image:
-            property_data['images'] = [{'image': first_image.image.url if first_image.image else None}]
+            # Image model stores URL in field 'url'
+            property_data['images'] = [{'url': first_image.url}]
         else:
             property_data['images'] = []
         
@@ -287,3 +288,29 @@ class FavoriteSerializer(serializers.ModelSerializer):
         model = Favorite
         fields = ['id', 'user', 'property', 'property_details', 'created_at']
         read_only_fields = ['id', 'created_at', 'user'] 
+
+# -----------------------------
+# Recording Orders
+# -----------------------------
+
+class RecordingOrderSerializer(serializers.ModelSerializer):
+    property_details = PropertyPreviewSerializer(source='property', read_only=True)
+    requested_by_details = BasicUserSerializer(source='requested_by', read_only=True)
+    assigned_to_details = BasicUserSerializer(source='assigned_to', read_only=True)
+
+    class Meta:
+        model = RecordingOrder
+        fields = [
+            'id', 'property', 'property_details',
+            'requested_by', 'requested_by_details',
+            'assigned_to', 'assigned_to_details',
+            'status', 'scheduled_date', 'notes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'requested_by']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            validated_data['requested_by'] = request.user
+        return super().create(validated_data)

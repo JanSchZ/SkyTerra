@@ -119,13 +119,12 @@ const PropertyCard = ({ property }) => {
             <Typography variant="caption" sx={{ color:'text.secondary' }}>Plusvalía</Typography>
           </Box>
         )}
-         <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
-            {property.type && <Chip label={property.type === 'farm' ? 'Parcela/Granja' : property.type.charAt(0).toUpperCase() + property.type.slice(1)} size="small" variant="outlined" />}
-            {property.has_water && <Chip label="Agua" size="small" color="info" variant="outlined" />}
-            {property.has_views && <Chip label="Vistas" size="small" variant="outlined" />}
-            {property.has_tour && (
-                <Chip icon={<ViewInArIcon />} label="Tour 360°" size="small" variant="outlined" />
-            )}
+        <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>
+          {property.has_water && <Chip label="Agua" size="small" color="info" variant="outlined" />}
+          {property.has_views && <Chip label="Vistas" size="small" variant="outlined" />}
+          {property.has_tour && (
+            <Chip icon={<ViewInArIcon />} label="Tour 360°" size="small" variant="outlined" />
+          )}
         </Box>
       </CardContent>
       <CardActions sx={{ justifyContent: 'flex-end', pt: 0, pb:1, px:1 }} className="no-shine">

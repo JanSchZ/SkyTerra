@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Property, Tour, Image, PropertyDocument # Ensure Property is imported
+from .models import Property, Tour, Image, PropertyDocument, RecordingOrder # Ensure Property is imported
 
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
@@ -44,3 +44,9 @@ class PropertyDocumentAdmin(admin.ModelAdmin):
     list_display = ('property', 'doc_type', 'status', 'uploaded_at', 'reviewed_by')
     list_filter = ('doc_type',)
     search_fields = ('property__name', 'description')
+
+@admin.register(RecordingOrder)
+class RecordingOrderAdmin(admin.ModelAdmin):
+    list_display = ('id', 'property', 'requested_by', 'assigned_to', 'status', 'scheduled_date', 'updated_at')
+    list_filter = ('status',)
+    search_fields = ('property__name', 'requested_by__username', 'assigned_to__username')

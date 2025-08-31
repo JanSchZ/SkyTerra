@@ -64,6 +64,20 @@ export const api = axios.create({
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
+    // Adjuntar JWT de cabecera y CSRF si están disponibles
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      const csrfPersisted = localStorage.getItem('csrfToken');
+      if (csrfPersisted) {
+        config.headers = config.headers || {};
+        config.headers['X-CSRFToken'] = csrfPersisted;
+      }
+    } catch (_) {}
+
     // Debug: verificar cookies JWT antes de cada request
     const cookies = document.cookie.split(';').reduce((acc, cookie) => {
       const [key, value] = cookie.trim().split('=');
@@ -107,14 +121,37 @@ api.interceptors.response.use(
     });
     return response;
   },
-  error => {
+  async error => {
     console.error('[API Response Error]', error?.message || error);
 
-    // Manejo global de 401 sin redirigir agresivamente
+    // Manejo de 401 con intento de refresh
     if (error.response && error.response.status === 401) {
       const url = error.config?.url || '';
       const isLoginAttempt = url.endsWith('/auth/login/');
       const isAuthCheck = url.endsWith('/auth/user/');
+      const isRefresh = url.endsWith('/auth/token/refresh/');
+
+      // Intentar refresh una vez si hay refreshToken
+      const originalRequest = error.config || {};
+      if (!isLoginAttempt && !isAuthCheck && !isRefresh && !originalRequest._retry) {
+        originalRequest._retry = true;
+        try {
+          const refresh = localStorage.getItem('refreshToken');
+          if (refresh) {
+            const resp = await api.post('/auth/token/refresh/', { refresh });
+            const newAccess = resp?.data?.access;
+            if (newAccess) {
+              localStorage.setItem('accessToken', newAccess);
+              api.defaults.headers['Authorization'] = `Bearer ${newAccess}`;
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
+              return api(originalRequest);
+            }
+          }
+        } catch (e) {
+          // Falló refresh
+        }
+      }
 
       // Si la verificación explícita de sesión falla, limpiamos el usuario en caché.
       if (isAuthCheck) {
@@ -138,10 +175,25 @@ export const authService = {
   // Garantiza que exista la cookie CSRF para peticiones POST/PUT en modo JWT con cookies
   async ensureCsrfCookie() {
     try {
-      await api.get('/auth/csrf/');
+      const resp = await api.get('/auth/csrf/');
+      const token = resp?.data?.csrfToken;
+      if (token) {
+      try {
+      authService._csrfToken = token;
+      api.defaults.headers['X-CSRFToken'] = token;
+      localStorage.setItem('csrfToken', token);
+      } catch (_) {}
+      }
     } catch (e) {
       // Silencioso: en desarrollo puede no ser crítico si ya existe
       console.warn('No se pudo inicializar CSRF (posiblemente ya existe):', e?.response?.status || e?.message);
+      try {
+      const token = localStorage.getItem('csrfToken');
+      if (token) {
+      authService._csrfToken = token;
+      api.defaults.headers['X-CSRFToken'] = token;
+      }
+      } catch (_) {}
     }
   },
   // Iniciar sesión
@@ -149,6 +201,18 @@ export const authService = {
     try {
       await this.ensureCsrfCookie();
       const response = await api.post('/auth/login/', credentials);
+      // Guardar tokens JWT si vienen en el cuerpo (además de cookies)
+      try {
+        const access = response?.data?.access;
+        const refresh = response?.data?.refresh;
+        if (access) {
+          localStorage.setItem('accessToken', access);
+          api.defaults.headers['Authorization'] = `Bearer ${access}`;
+        }
+        if (refresh) {
+          localStorage.setItem('refreshToken', refresh);
+        }
+      } catch(_) {}
 
       // Tras login, pide el usuario para confirmar que las cookies se guardaron
       try {
@@ -372,6 +436,9 @@ export const authService = {
     } finally {
       // Limpia el estado del frontend independientemente del resultado del backend.
       localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      try { delete api.defaults.headers['Authorization']; } catch(_){}
       // No necesitamos quitar 'auth_token' porque ya no lo usamos.
     }
   },
@@ -493,8 +560,7 @@ export const propertyService = {
   // Para admin, el backend ya devuelve todas si el token es de un staff user.
   async getProperties(filters = {}) {
     try {
-      console.log('Aplicando filtros:', filters);
-      const response = await api.get('/properties/', { params: filters });
+      const response = await api.get('/properties/');
       return response.data;
     } catch (error) {
       console.error('Error fetching properties:', error);
@@ -503,15 +569,22 @@ export const propertyService = {
     }
   },
 
+  // Resumen para Dashboard Admin (propiedades por día, pendientes, tickets, usuarios)
+  async getAdminSummary() {
+    try {
+      const response = await api.get('/admin/dashboard-summary/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching admin summary:', error);
+      throw error;
+    }
+  },
+
   // NUEVA FUNCIÓN PARA OBTENER PROPIEDADES PAGINADAS CON OPTIMIZACIONES
   async getPaginatedProperties(page = 1, filters = {}, pageSize = 20) {
     try {
       // Optimizaciones de parámetros para mejor rendimiento
-      const params = {
-        ...filters,
-        page,
-        page_size: pageSize,
-      };
+      const params = { page, page_size: pageSize };
 
       // Agregar timestamp para evitar caché del navegador en desarrollo
       if (import.meta.env.MODE === 'development') {
@@ -551,11 +624,7 @@ export const propertyService = {
         useCache = true
       } = options;
 
-      const params = {
-        ...filters,
-        page,
-        page_size: pageSize,
-      };
+      const params = { page, page_size: pageSize };
 
       // Agregar parámetros de optimización
       if (prefetchImages) params.include_images = 'true';
@@ -726,7 +795,7 @@ export const propertyService = {
     const dataToSend = new FormData();
 
     Object.keys(propertyData).forEach(key => {
-      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'tour360' || key === 'documents' || key === 'utilities') {
+      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'documents' || key === 'utilities' || key === 'tour360') {
         // Handle these special cases below
       } else if (propertyData[key] !== null && propertyData[key] !== undefined) {
         dataToSend.append(key, propertyData[key]);
@@ -744,13 +813,7 @@ export const propertyService = {
       dataToSend.append('boundary_polygon', JSON.stringify(propertyData.boundary_polygon.geojson || propertyData.boundary_polygon));
     }
 
-    // Handle tour360
-    if (propertyData.tour360) {
-      dataToSend.append('new_tour_file', propertyData.tour360);
-    }
-    if (propertyData.tourToDelete && propertyData.existingTourId) {
-      dataToSend.append('tour_to_delete_id', propertyData.existingTourId);
-    }
+    // Tour 360: se sube por endpoint dedicado `/tours/` tras crear la propiedad
 
     // Handle documents
     propertyData.documents.forEach(file => dataToSend.append('new_documents', file));
@@ -852,10 +915,17 @@ export const tourService = {
   // Subir nuevo tour
   async uploadTour(tourData) {
     try {
-      // JWT via cookies; ensure CSRF then send multipart
-      await authService.ensureCsrfCookie?.();
+      // Obtener CSRF token explícito y enviar en header
+      let csrfToken;
+      try {
+        const csrfResp = await api.get('/auth/csrf/');
+        csrfToken = csrfResp?.data?.csrfToken;
+      } catch (_) {}
       const response = await api.post(`/tours/`, tourData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+          ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
+        }
       });
       return response.data;
     } catch (error) {
@@ -963,6 +1033,31 @@ export const favoritesService = {
   },
 };
 
+// ---------------------
+// Recording Orders Service
+// ---------------------
+export const recordingOrderService = {
+  async create(propertyId, payload = {}) {
+    await authService.ensureCsrfCookie?.();
+    const body = { property: propertyId, ...(payload || {}) };
+    const resp = await api.post('/recording-orders/', body);
+    return resp.data;
+  },
+  async list(params = {}) {
+    // Admin list
+    const resp = await api.get('/recording-orders/', { params });
+    return resp.data.results || resp.data;
+  },
+  async myOrders() {
+    const resp = await api.get('/recording-orders/mine/');
+    return resp.data.results || resp.data;
+  },
+  async setStatus(id, status, extra = {}) {
+    const resp = await api.post(`/recording-orders/${id}/set-status/`, { status, ...extra });
+    return resp.data;
+  },
+};
+
 // Hook personalizado para gestión optimizada de propiedades
 export const usePropertyService = () => {
   const [cache, setCache] = React.useState(new Map());
@@ -1021,7 +1116,7 @@ export const usePropertyService = () => {
     setLoadingStates(prev => new Map(prev).set(loadingKey, true));
 
     try {
-      const data = await propertyService.getPaginatedProperties(page, filters, pageSize);
+      const data = await propertyService.getPaginatedProperties(page, {}, pageSize);
       setCachedData(cacheKey, data);
 
       return data;
@@ -1076,9 +1171,12 @@ export default {
   auth: authService,
   tour: tourService,
   image: imageService,
+  recordingOrder: recordingOrderService,
   savedSearch: savedSearchService,
   favorites: favoritesService,
   compare: compareService,
   aiManagement: aiManagementService,
   usePropertyService
 };
+
+

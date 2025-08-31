@@ -172,7 +172,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         const chatResponse = {
           type:'chat',
           search_mode:'chat',
-          assistant_message:'¡Hola! ¿En qué puedo ayudarte a buscar propiedades o ubicaciones?',
+          assistant_message:'¡Hola! ¿En qué puedo ayudarte?',
           suggestedFilters:null,
           recommendations:[],
         };
@@ -259,11 +259,12 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         const hasRecs = recommendations && recommendations.length > 0;
         let resultType = hasRecs ? 'properties' : 'ai_response';
 
+        const inferredMode = search_mode || (hasRecs ? 'property_recommendation' : (flyToLocation ? 'location' : 'chat'));
         const processedResult = {
-          type: resultType,
-          search_mode: search_mode || (resultType === 'properties' ? 'property_recommendation' : 'location'),
-          assistant_message: assistant_message || (resultType === 'properties' ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
-          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [], listingType: null }) : null,
+          type: hasRecs ? 'properties' : (flyToLocation ? 'location' : 'ai_response'),
+          search_mode: inferredMode,
+          assistant_message: assistant_message || (hasRecs ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
+          suggestedFilters: null,
           interpretation: interpretation || assistant_message,
           recommendations: hasRecs ? (recommendations || []) : [],
           flyToLocation
@@ -272,7 +273,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         if (onSearch) {
           onSearch(processedResult);
         }
-        if (resultType === 'properties') {
+        if (processedResult.type === 'properties') {
           setShowResults(false);
         } else {
           setShowResults(false); // hide for location/chat minimalism

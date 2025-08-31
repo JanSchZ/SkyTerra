@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import PropertyViewSet, TourViewSet, ImageViewSet, PropertyDocumentViewSet, PropertyVisitViewSet, PropertyPreviewViewSet, ComparisonSessionViewSet, SavedSearchViewSet, FavoriteViewSet
+from .views import PropertyViewSet, TourViewSet, ImageViewSet, PropertyDocumentViewSet, PropertyVisitViewSet, PropertyPreviewViewSet, ComparisonSessionViewSet, SavedSearchViewSet, FavoriteViewSet, RecordingOrderViewSet
 
 # Define router and register viewsets
 router = DefaultRouter()
@@ -13,6 +13,7 @@ router.register(r'property-visits', PropertyVisitViewSet, basename='propertyvisi
 router.register(r'compare', ComparisonSessionViewSet, basename='comparisonsession')
 router.register(r'saved-searches', SavedSearchViewSet, basename='savedsearch')
 router.register(r'favorites', FavoriteViewSet, basename='favorite')
+router.register(r'recording-orders', RecordingOrderViewSet, basename='recordingorder')
 
 # urlpatterns will now only contain router URLs for this app
 urlpatterns = router.urls 

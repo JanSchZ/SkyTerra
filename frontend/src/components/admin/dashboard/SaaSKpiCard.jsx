@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, CardContent, Typography, Box } from '@mui/material';
-import { styled } from '@mui/material/styles';
 import { Line } from 'react-chartjs-2';
 
 const SaaSKpiCard = ({ kpi }) => {
@@ -22,7 +21,7 @@ const SaaSKpiCard = ({ kpi }) => {
     };
 
     return (
-        <Card elevation={0} sx={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: '4px', height: '100%' }}>
+        <Card elevation={0} sx={{ border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', height: '100%' }}>
             <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <Typography variant="subtitle1" color="text.primary">{kpi.title}</Typography>

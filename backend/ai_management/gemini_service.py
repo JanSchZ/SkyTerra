@@ -33,6 +33,8 @@ class SamService:
         
         # Get Sam configuration
         self.sam_config = SamConfiguration.get_config()
+        # Cache basic model lookup to minimize DB hits
+        self._cached_models = None
         
     def _get_current_model(self):
         """Get the currently configured model for Sam"""
@@ -48,14 +50,121 @@ class SamService:
             except Exception as e:
                 logger.error(f"Error getting fallback model: {e}")
                 raise GeminiServiceError("No se pudo obtener un modelo activo")
-        # Ensure api_name defaults to Gemini 2.0 Flash if missing
+        # Ensure api_name defaults to Gemini 2.5 Flash-Lite if missing
         if not getattr(self.sam_config.current_model, 'api_name', None):
-            self.sam_config.current_model.api_name = 'gemini-2.0-flash'
+            self.sam_config.current_model.api_name = 'gemini-2.5-flash-lite'
             try:
                 self.sam_config.current_model.save(update_fields=['api_name'])
             except Exception:
                 pass
         return self.sam_config.current_model
+
+    # -----------------------------
+    # Model router helpers
+    # -----------------------------
+    def _list_active_models(self):
+        if self._cached_models is None:
+            try:
+                self._cached_models = list(AIModel.objects.filter(is_active=True))
+            except Exception:
+                self._cached_models = []
+        return self._cached_models
+
+    def _find_model_by_keyword(self, keyword_candidates):
+        """Find first active 2.5 model whose api_name contains any keyword (case-insensitive)."""
+        api_candidates = [k.lower() for k in (keyword_candidates if isinstance(keyword_candidates, (list, tuple)) else [keyword_candidates])]
+        # Prefer 2.5 family strictly
+        for m in self._list_active_models():
+            api = (m.api_name or '').lower()
+            if '2.5' in api and any(k in api for k in api_candidates):
+                return m
+        return None
+
+    def _get_router_model(self):
+        """Use a fastest 2.5 model for routing (flash-lite > flash). Fallback to current."""
+        return self._find_model_by_keyword(['flash-lite', 'lite']) or self._find_model_by_keyword(['flash']) or self._get_current_model()
+
+    def _pick_target_model(self, route_label):
+        """Map route label to best available model among active ones."""
+        label = (route_label or '').lower()
+        if label in ('pro', 'reasoning', 'deep', 'complex'):
+            return self._find_model_by_keyword(['pro']) or self._get_current_model()
+        if label in ('lite', 'cheap', 'fastest'):
+            return self._find_model_by_keyword(['flash-lite', 'lite']) or self._find_model_by_keyword(['flash']) or self._get_current_model()
+        # default: 2.5 flash
+        return self._find_model_by_keyword(['flash']) or self._get_current_model()
+
+    def _simple_request(self, model, messages, request_type="chat", user=None):
+        """Send a minimal request to a specific model. Returns text and usage info."""
+        url = self.base_url.format(model=model.api_name)
+        request_data = {
+            "contents": messages,
+            "generationConfig": {
+                "temperature": min(max(self.sam_config.response_temperature, 0.0), 1.5),
+                "maxOutputTokens": model.max_tokens,
+                "topK": 40,
+                "topP": 0.95,
+            }
+        }
+        if model.supports_thinking:
+            request_data["generationConfig"]["thinking"] = False
+
+        headers = {"Content-Type": "application/json"}
+        params = {"key": self.api_key}
+
+        start_time = time.time()
+        response = requests.post(url, json=request_data, headers=headers, params=params, timeout=18)
+        response_time_ms = int((time.time() - start_time) * 1000)
+
+        if response.status_code != 200:
+            error_msg = f"Error HTTP {response.status_code}: {response.text}"
+            self._log_usage(model, 0, 0, 0, response_time_ms, False, error_msg, request_type, user)
+            raise GeminiServiceError(error_msg, response.status_code, response.text)
+
+        data = response.json()
+        if not data.get('candidates'):
+            error_msg = f"Formato de respuesta inesperado: {data}"
+            self._log_usage(model, 0, 0, 0, response_time_ms, False, error_msg, request_type, user)
+            raise GeminiServiceError(error_msg)
+
+        text = data['candidates'][0]['content']['parts'][0]['text']
+
+        # Estimate and log
+        tokens_input = int(self._estimate_tokens(' '.join([p['parts'][0]['text'] for p in messages if p.get('parts')])))
+        tokens_output = int(self._estimate_tokens(text))
+        cost = self._calculate_cost(model, tokens_input, tokens_output)
+        self._log_usage(model, tokens_input, tokens_output, cost, response_time_ms, True, request_type=request_type, user=user)
+        return text, {
+            'model_used': model.name,
+            'tokens_input': tokens_input,
+            'tokens_output': tokens_output,
+            'cost': cost,
+            'response_time_ms': response_time_ms,
+        }
+
+    def _route_model(self, user_message, request_type="chat"):
+        """Classify task complexity using a fast router model and return target model instance."""
+        router_model = self._get_router_model()
+        system = (
+            "Eres un enrutador de modelos. Clasifica la petición en JSON: {\n"
+            "  \"route\": \"lite|flash|pro\",\n"
+            "  \"reason\": \"breve\",\n"
+            "  \"complexity\": \"low|medium|high\"\n}"
+            "Criterios: low=saludo/pregunta breve; medium=resumen simple, extracción ligera; high=razonamiento, instrucciones largas, datos múltiples o alta precisión."
+        )
+        messages = [
+            {"role": "user", "parts": [{"text": system}]},
+            {"role": "user", "parts": [{"text": f"Tarea ({request_type}): {user_message}"}]},
+        ]
+        try:
+            text, _ = self._simple_request(router_model, messages, request_type="router")
+            # Expect strict JSON; if parse fails, default to flash (no heuristics)
+            obj = json.loads(text.strip().strip('`'))
+            route = (obj.get('route') or 'flash').lower()
+            return self._pick_target_model(route)
+        except Exception:
+            # conservative fallback
+            return self._get_current_model()
     
     def _get_system_prompt(self):
         """Get the system prompt for Sam"""
@@ -90,7 +199,7 @@ Instrucciones específicas:
                 property_info = {
                     'id': prop.id,
                     'name': prop.name,
-                    'type': prop.get_type_display(),
+                    'type': getattr(prop, 'type', None),
                     'price': float(prop.price),
                     'size': prop.size,
                     'has_water': prop.has_water,
@@ -133,11 +242,12 @@ Instrucciones específicas:
         return cost_input + cost_output
     
     def generate_response(self, user_message, user=None, conversation_history=None, request_type="chat"):
-        """Generate response using Sam configuration"""
+        """Generate response using Sam configuration with dynamic model routing"""
         if not self.sam_config.is_enabled:
             raise GeminiServiceError("Sam está deshabilitado actualmente")
         
-        model = self._get_current_model()
+        # Select target model via router (fast classification)
+        model = self._route_model(user_message, request_type=request_type)
         system_prompt = self._get_system_prompt()
         
         # Build conversation

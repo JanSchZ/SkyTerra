@@ -23,7 +23,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { motion, AnimatePresence } from 'framer-motion';
 import { liquidGlassTheme } from './theme/liquidGlassTheme';
 import { ThemeProvider as MuiThemeProvider, createTheme as createMuiTheme } from '@mui/material/styles';
-import { api, authService } from './services/api';
+import { api, authService, propertyService } from './services/api';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 import MapView from './components/map/MapView';
@@ -120,6 +120,7 @@ function App() {
   const navigate = useNavigate();
 
   const mapRef = React.useRef(null);
+  const [initialPropertiesData, setInitialPropertiesData] = useState(null);
 
   // Estado para el Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -176,14 +177,27 @@ function App() {
       window.removeEventListener('auth:invalid', handleAuthInvalid);
     };
   }, []);
+
+  // Prefetch first page of properties on first load to render immediately
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await propertyService.getPaginatedProperties(1, {}, 20);
+        if (!cancelled) setInitialPropertiesData(data);
+      } catch (_) {
+        // Silencio: el MapView hará su propio fetch si falla este prefetch
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   
   const handleAISearch = (aiGeneratedFilters) => {
     if (!aiGeneratedFilters) return;
     // console.log('AI search response (raw):', aiGeneratedFilters); // Debug log
 
-    if (aiGeneratedFilters.recommendations && aiGeneratedFilters.recommendations.length > 0 && aiGeneratedFilters.suggestedFilters) {
-      setAiAppliedFilters(aiGeneratedFilters.suggestedFilters);
-    }
+    // Eliminamos el uso de filtros sugeridos: Sam decide internamente
+    setAiAppliedFilters(null);
 
     if (aiGeneratedFilters.flyToLocation) {
         handleLocationSearch(aiGeneratedFilters.flyToLocation);
@@ -231,9 +245,9 @@ function App() {
     setAiSearchLoading(false);
     if (result && result.type !== 'error') {
       setAiSearchResult(result);
-      if (result.flyToLocation) {
+      if (result.search_mode === 'location' && result.flyToLocation) {
         handleLocationSearch(result.flyToLocation);
-      } else if (result.recommendations && result.recommendations.length > 0) {
+      } else if (result.search_mode === 'property_recommendation' && result.recommendations && result.recommendations.length > 0) {
         // fly to first recommendation automatically
         const first = result.recommendations[0];
         if (first.latitude && first.longitude) {
@@ -370,7 +384,7 @@ function App() {
         const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
         
         // Process location navigation
-        if (flyToLocation) {
+        if (search_mode === 'location' && flyToLocation) {
           handleLocationSearch({
             center: flyToLocation.center,
             zoom: flyToLocation.zoom || 12,
@@ -378,7 +392,7 @@ function App() {
             pitch: flyToLocation.pitch,
             bearing: flyToLocation.bearing,
           });
-        } else if (recommendations && recommendations.length > 0) {
+        } else if (search_mode === 'property_recommendation' && recommendations && recommendations.length > 0) {
           // If no direct flyToLocation, but we have recommendations, try to fly to the first one
           const firstReco = recommendations[0];
           if (firstReco && typeof firstReco.latitude === 'number' && typeof firstReco.longitude === 'number') {
@@ -393,16 +407,15 @@ function App() {
 
         // Process recommendations and filters
         const hasRecs = recommendations && recommendations.length > 0;
-        if (hasRecs && suggestedFilters) {
-          setAiAppliedFilters(suggestedFilters);
-        }
+        // No aplicar ni mostrar filtros
+        setAiAppliedFilters(null);
 
         // Create processed result similar to AISearchBar
         const processedResult = {
-          type: hasRecs ? 'properties' : 'ai_response',
-          search_mode: search_mode || (hasRecs ? 'property_recommendation' : 'location'),
+          type: hasRecs ? 'properties' : (flyToLocation ? 'location' : 'ai_response'),
+          search_mode: search_mode || (hasRecs ? 'property_recommendation' : (flyToLocation ? 'location' : 'chat')),
           assistant_message: assistant_message || (hasRecs ? 'Resultados de búsqueda:' : 'Respuesta de IA:'),
-          suggestedFilters: hasRecs ? (suggestedFilters || { propertyTypes: [], priceRange: [null, null], features: [], locations: [], listingType: null }) : null,
+          suggestedFilters: null,
           interpretation: interpretation || assistant_message,
           recommendations: hasRecs ? (recommendations || []) : [],
           flyToLocation
@@ -618,7 +631,7 @@ function App() {
         path="/" 
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} />
+            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
           </motion.div>
         } 
       />

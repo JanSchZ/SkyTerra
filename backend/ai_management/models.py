@@ -3,7 +3,7 @@ from django.conf import settings
 
 class AIModel(models.Model):
     name = models.CharField(max_length=100, unique=True, help_text='Nombre descriptivo para el modelo (ej. Gemini 2.5 Pro)')
-    api_name = models.CharField(max_length=100, unique=True, help_text='Nombre del modelo usado en la API de Google (ej. gemini-1.5-pro-latest)')
+    api_name = models.CharField(max_length=100, unique=True, help_text='Nombre del modelo usado en la API de Google (ej. gemini-2.5-pro)')
     price_per_1k_tokens_input = models.DecimalField(max_digits=10, decimal_places=6, help_text='Costo por 1000 tokens de entrada (prompt)')
     price_per_1k_tokens_output = models.DecimalField(max_digits=10, decimal_places=6, help_text='Costo por 1000 tokens de salida (respuesta)')
     system_prompt = models.TextField(blank=True, help_text='Instrucción de sistema por defecto para este modelo.')

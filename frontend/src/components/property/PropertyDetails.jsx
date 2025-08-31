@@ -38,7 +38,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CircularPlusvalia from '../ui/CircularPlusvalia';
-import { propertyService, tourService, imageService, authService, favoritesService } from '../../services/api';
+import { propertyService, tourService, imageService, authService, favoritesService, recordingOrderService } from '../../services/api';
 import config from '../../config/environment';
 import MapView from '../map/MapView';
 import axios from 'axios';
@@ -905,6 +905,30 @@ const PropertyDetails = () => {
 
             {/* Botón de contacto */}
             <Box sx={{ p: 3, borderTop: '1px solid rgba(30, 41, 59, 0.2)' }}>
+              {(() => {
+                const isOwner = isAuthenticated && property?.owner_details?.id === currentUser?.id;
+                const hasTour = (tours || []).length > 0;
+                if (isOwner && !hasTour) {
+                  return (
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={async () => {
+                        try {
+                          await recordingOrderService.create(property.id);
+                          setSnackbar({ open: true, severity: 'success', message: 'Solicitud de grabación enviada. Te avisaremos por email.' });
+                        } catch (e) {
+                          setSnackbar({ open: true, severity: 'error', message: e?.message || 'No se pudo crear la solicitud.' });
+                        }
+                      }}
+                      sx={{ mb: 1.5, textTransform: 'none' }}
+                    >
+                      Solicitar grabación 360°
+                    </Button>
+                  );
+                }
+                return null;
+              })()}
               <Button 
                 variant="contained" 
                 fullWidth

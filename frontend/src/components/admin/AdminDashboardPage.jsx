@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Grid, Typography } from '@mui/material';
 import SaaSKpiCard from './dashboard/SaaSKpiCard';
 import ProductionQueue from './dashboard/ProductionQueue';
@@ -9,36 +9,33 @@ import PlanDistributionChart from './dashboard/PlanDistributionChart';
 // Removed colorful icons to keep a professional grayscale look
 import AIModelManager from './AIModelManager';
 import AIUsageChart from './AIUsageChart';
+import { propertyService } from '../../services/api';
 
-const kpiData = [
-  {
-    title: 'Ingreso Mensual Recurrente (MRR)',
-    value: '$12,450',
-    trend: {
-      data: [10, 20, 15, 30, 25, 40, 35],
-      borderColor: '#111111',
-    },
-  },
-  {
-    title: 'Tasa de Abandono (Churn Rate)',
-    value: '2.5%',
-    note: {
-      text: '+0.5% vs objetivo',
-      color: '#6B7280',
-    },
-  },
-  {
-    title: 'Valor de Vida del Cliente (LTV)',
-    value: '$3,200',
-  },
-  {
-    title: 'Costo de Adquisición (CAC)',
-    value: '$450',
-  },
+const defaultKpis = [
+  { title: 'Propiedades pendientes', value: '0' },
+  { title: 'Publicadas hoy', value: '0' },
+  { title: 'Tickets abiertos', value: '0' },
 ];
 
 
 const AdminDashboardPage = () => {
+  const [kpis, setKpis] = useState(defaultKpis);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const summary = await propertyService.getAdminSummary();
+        setKpis([
+          { title: 'Propiedades pendientes', value: String(summary.pending_properties || 0) },
+          { title: 'Publicadas hoy', value: String(summary.published_today || 0) },
+          { title: 'Tickets abiertos', value: String(summary.open_tickets || 0) },
+        ]);
+      } catch (_) {
+        setKpis(defaultKpis);
+      }
+    })();
+  }, []);
+
   return (
         <Box sx={{ p: 3, minHeight: '100vh' }}>
             <Typography variant="h3" gutterBottom sx={{ fontWeight: 'bold', color: '#111111', mb: 3 }}>
@@ -47,13 +44,13 @@ const AdminDashboardPage = () => {
             <Grid container spacing={3}>
                 {/* First Row */}
                 <Grid item xs={12} md={4}>
-                    <SaaSKpiCard kpi={kpiData[0]} />
+                    <SaaSKpiCard kpi={kpis[0]} />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                    <SaaSKpiCard kpi={kpiData[1]} />
+                    <SaaSKpiCard kpi={kpis[1]} />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                    <SaaSKpiCard kpi={kpiData[2]} />
+                    <SaaSKpiCard kpi={kpis[2]} />
                 </Grid>
 
                 {/* Second Row */}

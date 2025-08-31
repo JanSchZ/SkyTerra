@@ -59,6 +59,7 @@ const MapView = forwardRef(({
   onLocationSelect,
   selectedPoint,
   suppressData = false,
+  initialData = null,
 }, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
@@ -69,7 +70,8 @@ const MapView = forwardRef(({
   // Estados
   const [properties, setProperties] = useState([]);
   const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([]));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialData);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [activeTourUrl, _setActiveTourUrl] = useState(null);
   const activeTourUrlRef = useRef(null);
@@ -301,97 +303,37 @@ const MapView = forwardRef(({
     // console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
   }, []);
 
-  // Serializar filters para la dependencia del useEffect
-  const serializedFilters = JSON.stringify(filters);
-  const serializedAppliedFilters = JSON.stringify(appliedFilters);
+  // Serialización de dependencias: ya no usamos filtros visibles
+  const serializedFilters = JSON.stringify({});
+  const serializedAppliedFilters = JSON.stringify({});
+
+  // Seed from initialData if provided
+  useEffect(() => {
+    if (initialData && Array.isArray(initialData.results)) {
+      setProperties(initialData.results);
+      setPropertiesGeoJSON(propertiesToGeoJSON(initialData.results));
+      setTotalProperties(initialData.count || initialData.results.length || 0);
+      setCurrentPage(1);
+      setHasNextPage(Boolean(initialData.next));
+      setLoading(false);
+    }
+  }, [initialData]);
 
   // Memoized fetchProperties function optimizada con caché
-  const fetchProperties = useCallback(async (pageToFetch = 1, currentFilters, aiFilters) => {
+  const fetchProperties = useCallback(async (pageToFetch = 1) => {
     if (pageToFetch === 1) {
-      setLoading(true);
-      // When filters change (pageToFetch === 1), we should reset properties
-      setProperties([]);
-      setPropertiesGeoJSON(propertiesToGeoJSON([]));
+      // Mantener datos en pantalla para evitar parpadeo. Solo full loading si no hay datos previos.
+      if (!Array.isArray(properties) || properties.length === 0) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
     } else {
       setLoadingMore(true);
     }
     setError(null);
     try {
-      let params = { ...currentFilters };
-
-      // Transform manual filters to API query params
-      if (params.propertyTypes) {
-        if (Array.isArray(params.propertyTypes) && params.propertyTypes.length > 0) {
-          params.type__in = params.propertyTypes.join(',');
-        }
-        delete params.propertyTypes;
-      }
-
-      if (params.priceMin !== undefined) {
-        params.min_price = params.priceMin;
-        delete params.priceMin;
-      }
-      if (params.priceMax !== undefined) {
-        params.max_price = params.priceMax;
-        delete params.priceMax;
-      }
-      if (params.sizeMin !== undefined) {
-        params.min_size = params.sizeMin;
-        delete params.sizeMin;
-      }
-      if (params.sizeMax !== undefined) {
-        params.max_size = params.sizeMax;
-        delete params.sizeMax;
-      }
-      // Boolean feature filters
-      if (params.hasWater !== undefined) {
-        params.has_water = params.hasWater;
-        delete params.hasWater;
-      }
-      if (params.hasViews !== undefined) {
-        params.has_views = params.hasViews;
-        delete params.hasViews;
-      }
-      if (params.has360Tour !== undefined) {
-        params.has_tour = params.has360Tour;
-        delete params.has360Tour;
-      }
-      // NEW: manual listing type filter
-      if (params.listingType !== undefined) {
-        params.listing_type = params.listingType;
-        delete params.listingType;
-      }
-
-      // If AI filters exist, they take precedence over manual filters
-      if (aiFilters && Object.keys(aiFilters).length > 0) {
-        params = {};
-        if (aiFilters.propertyTypes && aiFilters.propertyTypes.length > 0) {
-          params.type__in = aiFilters.propertyTypes.join(',');
-        }
-        if (aiFilters.priceRange && aiFilters.priceRange.length === 2) {
-          if (aiFilters.priceRange[0] !== null) params.min_price = aiFilters.priceRange[0];
-          if (aiFilters.priceRange[1] !== null) params.max_price = aiFilters.priceRange[1];
-        }
-        if (aiFilters.sizeRange && aiFilters.sizeRange.length === 2) {
-          if (aiFilters.sizeRange[0] !== null) params.min_size = aiFilters.sizeRange[0];
-          if (aiFilters.sizeRange[1] !== null) params.max_size = aiFilters.sizeRange[1];
-        }
-        if (aiFilters.features && aiFilters.features.length > 0) {
-          aiFilters.features.forEach(feature => {
-            if (feature.toLowerCase().includes('water')) params.has_water = true;
-            if (feature.toLowerCase().includes('views')) params.has_views = true;
-            if (feature.toLowerCase().includes('road')) params.has_road_access = true;
-          });
-        }
-        // NEW: listing type filter
-        if (aiFilters.listingType && (aiFilters.listingType === 'sale' || aiFilters.listingType === 'rent' || aiFilters.listingType === 'both')) {
-          params.listing_type = aiFilters.listingType;
-        }
-      }
-
-      // console.log("Parámetros finales para API:", params); // Debug log
-
-      // Usar el servicio optimizado con caché
+      const params = {}; // sin filtros; Sam decide internamente
       const data = await getPropertiesCached(params, pageToFetch, 20);
 
       // Debug solo en dev
@@ -444,11 +386,12 @@ const MapView = forwardRef(({
     } finally {
       if (pageToFetch === 1) {
         setLoading(false);
+        setRefreshing(false);
       } else {
         setLoadingMore(false);
       }
     }
-  }, [getPropertiesCached, prefetchNextPage]);
+  }, [getPropertiesCached, prefetchNextPage, properties]);
 
   useEffect(() => {
     if (editable || suppressData) {
@@ -463,12 +406,12 @@ const MapView = forwardRef(({
       return; // Don't fetch if editable
     }
 
-    const combinedFiltersForRef = JSON.stringify({ manual: filters, ai: appliedFilters });
+    const combinedFiltersForRef = 'no-filters';
 
     // Not editable: Fetch properties if filters (manual or AI) changed or if it's the first load for these filters
     if (combinedFiltersForRef !== lastFetchedPage1FiltersRef.current) {
       // console.log('MapView: Filters (manual or AI) changed or first non-editable load for current combined filters. Fetching page 1.');
-      fetchProperties(1, filters, appliedFilters); // Call with current manual and AI filters
+      fetchProperties(1);
       lastFetchedPage1FiltersRef.current = combinedFiltersForRef; // Record that these combined filters have been fetched for page 1
     }
     // If combinedFiltersForRef === lastFetchedPage1FiltersRef.current, it means we've already fetched page 1
@@ -478,9 +421,9 @@ const MapView = forwardRef(({
 
   const handleLoadMore = useCallback(() => { // This function can now call the memoized fetchProperties
     if (hasNextPage && !loadingMore) {
-      fetchProperties(currentPage + 1, filters, appliedFilters); // Pass current manual and AI filters
+      fetchProperties(currentPage + 1);
     }
-  }, [hasNextPage, loadingMore, currentPage, fetchProperties, filters, appliedFilters]);
+  }, [hasNextPage, loadingMore, currentPage, fetchProperties]);
 
   const MAPBOX_TOKEN = config.mapbox.accessToken;
 
@@ -1714,9 +1657,7 @@ const MapView = forwardRef(({
                   <Typography variant="body2" sx={{ mb: 0.5, color:'white', opacity:0.85 }}>
                     Tamaño: {popupInfo.size} ha
                   </Typography>
-                  {popupInfo.type && (
-                    <Chip label={popupInfo.type} size="small" variant="outlined" sx={{ borderColor:'rgba(255,255,255,0.6)', color:'white' }} />
-                  )}
+                  {/* Oculto: no mostramos etiquetas de tipo/categoría */}
                 </CardContent>
                 <Box sx={{ width: 140, height: 100, mr: 1, mt: 1, flex: '0 0 40%' }}>
                   {tourPreviews[popupInfo.id] ? (

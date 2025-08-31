@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework import permissions
 from .serializers import UserDetailsSerializer
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 
 def get_southern_chile_properties(request):
@@ -36,4 +37,5 @@ class CSRFTokenView(APIView):
 
     @method_decorator(ensure_csrf_cookie)
     def get(self, request, *args, **kwargs):
-        return Response({"detail": "CSRF cookie set"})
+        token = get_token(request)
+        return Response({"detail": "CSRF cookie set", "csrfToken": token})

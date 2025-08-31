@@ -38,7 +38,7 @@ function FileDropArea({ onFileSelected, disabled, file }) {
         type="file"
         hidden
         disabled={disabled}
-        accept=".zip,.ggpkg"
+        accept=".zip"
         onChange={(e) => onFileSelected(e.target.files?.[0])}
       />
       {file ? (
@@ -46,7 +46,7 @@ function FileDropArea({ onFileSelected, disabled, file }) {
       ) : (
         <Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
           <CloudUploadIcon color="primary" />
-          <Typography variant="body2">Arrastra y suelta o haz clic para seleccionar (.zip / .ggpkg)</Typography>
+          <Typography variant="body2">Arrastra y suelta o haz clic para seleccionar (.zip Pano2VR)</Typography>
         </Box>
       )}
     </Box>
@@ -57,6 +57,7 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
   const [file, setFile] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [propertyIdInput, setPropertyIdInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState(''); // 'uploading', 'processing', 'success', 'error'
@@ -65,7 +66,7 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
   const handleFileSelect = (f) => {
     if (!f) return;
     // Validar tipo de archivo
-    const allowedExtensions = ['.zip', '.ggpkg'];
+    const allowedExtensions = ['.zip'];
     const isValidFile = allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext));
     
     if (!isValidFile) {
@@ -99,13 +100,30 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
 
   const handleUpload = async () => {
     if (!file) return;
-    
+    const effectivePropertyId = propertyId || propertyIdInput?.trim();
+    if (!effectivePropertyId) {
+      setError('Debe indicar el ID de propiedad');
+      return;
+    }
     const form = new FormData();
-    form.append('property', propertyId);
+    form.append('property', effectivePropertyId);
     form.append('package_file', file);
     if (name) form.append('name', name);
     if (description) form.append('description', description);
-    
+            
+            {/* Seleccionar propiedad si no viene dada */}
+            {!propertyId && (
+              <TextField 
+                label="ID de Propiedad" 
+                value={propertyIdInput} 
+                onChange={(e)=>setPropertyIdInput(e.target.value)} 
+                fullWidth 
+                size="small" 
+                disabled={loading}
+                helperText="Ingresa el ID de la propiedad para asociar el tour"
+              />
+            )}
+
     try {
       setLoading(true);
       setUploadStatus('uploading');
