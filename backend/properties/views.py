@@ -1375,7 +1375,7 @@ class FavoriteViewSet(viewsets.ModelViewSet):
         return (
             Favorite.objects.filter(user=self.request.user)
             .select_related('property')
-            .prefetch_related('property__images')
+            .prefetch_related('property__images', 'property__tours')
             .order_by('-created_at')
         )
 

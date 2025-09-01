@@ -310,13 +310,13 @@ const AISuggestionPanel = ({
                             onMouseEnter={() => onSuggestionHover && onSuggestionHover(rec)}
                             onMouseLeave={() => onSuggestionHover && onSuggestionHover(null)} // Clear hover
                           >
-                            <Box sx={{ position:'relative', height: 130, mb: 1 }}>
+                            <Box sx={{ position:'relative', width:'100%', aspectRatio: '1 / 1', mb: 1, borderRadius: 1.5, overflow: 'hidden' }}>
                               {tourPreviews[rec.id] ? (
                                 <iframe
                                   src={tourPreviews[rec.id]}
                                   width="100%"
                                   height="100%"
-                                  style={{ border: 0 }}
+                                  style={{ border: 0, position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                                   title={`Tour preview ${rec.name}`}
                                 />
                               ) : (

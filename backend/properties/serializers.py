@@ -220,6 +220,7 @@ class PropertyPreviewSerializer(serializers.ModelSerializer):
     """Serializer para mostrar información mínima de una propiedad a usuarios anónimos"""
     main_image = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
+    previewTourUrl = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
@@ -232,6 +233,7 @@ class PropertyPreviewSerializer(serializers.ModelSerializer):
             'longitude',
             'main_image',
             'images',
+            'previewTourUrl',
         ]
 
     def get_main_image(self, obj):
@@ -241,6 +243,19 @@ class PropertyPreviewSerializer(serializers.ModelSerializer):
     def get_images(self, obj):
         qs = obj.images.order_by('order', 'created_at')[:5]
         return [{'id': img.id, 'url': img.url} for img in qs]
+
+    def get_previewTourUrl(self, obj):
+        """Obtener la URL del tour virtual para preview"""
+        try:
+            # Buscar el primer tour activo de la propiedad
+            first_tour = obj.tours.filter(status='active').exclude(url__isnull=True).exclude(url='').first()
+            if first_tour:
+                # Usar el método get_url del TourSerializer para construir la URL absoluta
+                tour_serializer = TourSerializer(first_tour, context=self.context)
+                return tour_serializer.get_url(first_tour)
+        except Exception:
+            pass
+        return None
 
 class PropertyVisitSerializer(serializers.ModelSerializer):
     class Meta:

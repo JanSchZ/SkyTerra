@@ -836,42 +836,58 @@ export const propertyService = {
   preparePropertyData(propertyData) {
     const dataToSend = new FormData();
 
-    Object.keys(propertyData).forEach(key => {
-      if (key === 'images' || key === 'imagesToDelete' || key === 'boundary_polygon' || key === 'documents' || key === 'utilities' || key === 'tour360') {
-        // Handle these special cases below
+    // Normalizar colecciones para evitar TypeError en .forEach o .length
+    const images = Array.isArray(propertyData?.images) ? propertyData.images : [];
+    const imagesToDelete = Array.isArray(propertyData?.imagesToDelete) ? propertyData.imagesToDelete : [];
+    const documents = Array.isArray(propertyData?.documents) ? propertyData.documents : [];
+    const utilities = Array.isArray(propertyData?.utilities) ? propertyData.utilities : [];
+    const boundaryPolygon = propertyData?.boundary_polygon || null;
+
+    Object.keys(propertyData || {}).forEach(key => {
+      if (
+        key === 'images' ||
+        key === 'imagesToDelete' ||
+        key === 'boundary_polygon' ||
+        key === 'documents' ||
+        key === 'utilities' ||
+        key === 'tour360'
+      ) {
+        // Campos tratados de forma especial más abajo
       } else if (propertyData[key] !== null && propertyData[key] !== undefined) {
         dataToSend.append(key, propertyData[key]);
       }
     });
 
-    // Handle images
-    propertyData.images.forEach(file => dataToSend.append('new_images', file));
-    if (propertyData.imagesToDelete.length > 0) {
-      dataToSend.append('images_to_delete_ids', JSON.stringify(propertyData.imagesToDelete));
+    // Imágenes nuevas
+    images.forEach(file => dataToSend.append('new_images', file));
+    // IDs de imágenes a eliminar
+    if (imagesToDelete.length > 0) {
+      dataToSend.append('images_to_delete_ids', JSON.stringify(imagesToDelete));
     }
 
-    // Handle boundary_polygon
-    if (propertyData.boundary_polygon) {
-      dataToSend.append('boundary_polygon', JSON.stringify(propertyData.boundary_polygon.geojson || propertyData.boundary_polygon));
+    // Límite/Polígono
+    if (boundaryPolygon) {
+      dataToSend.append('boundary_polygon', JSON.stringify(boundaryPolygon.geojson || boundaryPolygon));
     }
 
     // Tour 360: se sube por endpoint dedicado `/tours/` tras crear la propiedad
 
-    // Handle documents
-    propertyData.documents.forEach(file => dataToSend.append('new_documents', file));
+    // Documentos nuevos
+    documents.forEach(file => dataToSend.append('new_documents', file));
 
-    // Handle new fields
-    if (propertyData.terrain) {
+    // Campos adicionales
+    if (propertyData?.terrain) {
       dataToSend.append('terrain', propertyData.terrain);
     }
-    if (propertyData.access) {
+    if (propertyData?.access) {
       dataToSend.append('access', propertyData.access);
     }
-    if (propertyData.legalStatus) {
-      dataToSend.append('legal_status', propertyData.legalStatus); // Map frontend name to backend name
+    if (propertyData?.legalStatus) {
+      // Mapear nombre de frontend a backend
+      dataToSend.append('legal_status', propertyData.legalStatus);
     }
-    if (propertyData.utilities && propertyData.utilities.length > 0) {
-      dataToSend.append('utilities', JSON.stringify(propertyData.utilities));
+    if (utilities.length > 0) {
+      dataToSend.append('utilities', JSON.stringify(utilities));
     }
 
     return dataToSend;
