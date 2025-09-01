@@ -41,10 +41,12 @@ const TourViewer = () => {
         }
         
         const tour = await tourService.getTour(tourId);
-        
-        // Validación adicional de seguridad
-        if (!tour || !tour.url || !tour.url.includes('/media/tours/') ||
-            tour.url.includes('placeholder') || tour.url.includes('test')) {
+
+        // Validación adicional de seguridad y compatibilidad
+        const urlStr = tour?.url || '';
+        const looksMedia = typeof urlStr === 'string' && (urlStr.includes('/media/tours/') || urlStr.includes('/media\\tours\\'));
+        const isInvalid = !tour || !urlStr || !looksMedia || urlStr.includes('placeholder') || urlStr.includes('test');
+        if (isInvalid) {
           const propId = tour?.property || tour?.property_id;
           if (propId) {
             navigate(`/property/${propId}`);
@@ -59,8 +61,9 @@ const TourViewer = () => {
         setTourData(tour);
         
         // También cargar los datos de la propiedad relacionada
-        if (tour && (tour.property || tour.property_id)) {
-          const propId = tour.property || tour.property_id;
+        const relatedPropId = tour?.property || tour?.property_id;
+        if (tour && relatedPropId) {
+          const propId = relatedPropId;
           const property = await propertyService.getProperty(propId);
           setPropertyData(property);
           // Check if property is a favorite

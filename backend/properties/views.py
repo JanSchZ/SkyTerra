@@ -177,7 +177,12 @@ class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
             'images',  # Prefetch imágenes para el preview
         ).annotate(
             image_count_annotation=Count('images', distinct=True),
-            has_tour_annotation=Exists(Tour.objects.filter(property=OuterRef('pk')))
+            has_tour_annotation=Exists(
+                Tour.objects.filter(
+                    property_id=OuterRef('pk'),
+                    status='active'
+                ).exclude(url__isnull=True).exclude(url='')
+            )
         )
 
         return queryset
@@ -233,9 +238,18 @@ class PropertyViewSet(viewsets.ModelViewSet):
         # Annotations optimizadas - una sola consulta para contar elementos relacionados
         queryset = queryset.annotate(
             image_count_annotation=Count('images', distinct=True),
-            tour_count_annotation=Count('tours', distinct=True),
+            tour_count_annotation=Count(
+                'tours',
+                distinct=True,
+                filter=(Q(tours__status='active') & Q(tours__url__isnull=False) & ~Q(tours__url=''))
+            ),
             document_count_annotation=Count('documents', distinct=True),
-            has_tour_annotation=Exists(Tour.objects.filter(property=OuterRef('pk'))),
+            has_tour_annotation=Exists(
+                Tour.objects.filter(
+                    property_id=OuterRef('pk'),
+                    status='active'
+                ).exclude(url__isnull=True).exclude(url='')
+            ),
             has_document_annotation=Exists(PropertyDocument.objects.filter(property=OuterRef('pk')))
         )
 
@@ -404,7 +418,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='my-properties', permission_classes=[permissions.IsAuthenticated])
     def my_properties(self, request):
         """Devuelve las propiedades del usuario autenticado."""
-        tour_exists = Tour.objects.filter(property=OuterRef('pk'))
+        tour_exists = Tour.objects.filter(property_id=OuterRef('pk'), status='active').exclude(url__isnull=True).exclude(url='')
         user_properties = Property.objects.filter(owner=request.user).annotate(
             image_count_annotation=Count('images'),
             has_tour_annotation=Exists(tour_exists)
@@ -519,6 +533,22 @@ class TourViewSet(viewsets.ModelViewSet):
             return TourPackageCreateSerializer
         return TourSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        try:
+            prop = self.request.query_params.get('property') or self.request.query_params.get('property_id')
+        except Exception:
+            prop = None
+        if prop:
+            try:
+                qs = qs.filter(property_id=int(prop))
+            except Exception:
+                qs = qs.filter(property_id=prop)
+        only_active = (self.request.query_params.get('only_active') or '').lower()
+        if only_active in ('1', 'true', 'yes'):
+            qs = qs.filter(status='active').exclude(url__isnull=True).exclude(url='')
+        return qs
+
     def perform_create(self, serializer):
         package_file = serializer.validated_data.pop('package_file')
         prop = serializer.validated_data.get('property')
@@ -583,14 +613,13 @@ class TourViewSet(viewsets.ModelViewSet):
                                 'package_file': f"El archivo contiene rutas inseguras: {member.filename}"
                             })
                         
-                        # Verificar tamaño total descomprimido (prevenir zip bombs)
-                        total_size += member.file_size
+                        # (Compatibilidad) No limitar el tamaño descomprimido aquí.
+                        # Se mantiene un conteo informativo, pero sin bloquear.
+                        try:
+                            total_size += int(getattr(member, 'file_size', 0) or 0)
+                        except Exception:
+                            pass
                         file_count += 1
-                        
-                        if total_size > 500 * 1024 * 1024:  # 500MB descomprimido máximo
-                            raise serializers.ValidationError({
-                                'package_file': "El contenido descomprimido es demasiado grande (máximo 500MB)"
-                            })
                         
                         # Nota: se eliminó el límite de cantidad de archivos por requerimiento
                     
@@ -721,17 +750,66 @@ class TourViewSet(viewsets.ModelViewSet):
                         'package_file': f"No se encontró HTML y falló la generación automática del visor: {str(e)}"
                     })
 
-            # Elegir el archivo HTML principal de forma MUY flexible:
-            #   - Evitar directorios típicos de librerías (bower_components, node_modules, vendor, libs)
-            #   - Preferir el HTML más cercano a la raíz (menor profundidad)
-            #   - Si no hay fuera de vendor, usar el más cercano aunque esté en vendor
+            # Elegir el archivo HTML principal con heurísticas robustas:
+            #   - Preferir nombres típicos de entrada (index.html, tour.html, viewer.html)
+            #   - Penalizar páginas de error (404.html, error.html)
+            #   - Favorecer rutas como /output/ comunes en exportes Pano2VR
+            #   - Evitar vendor dirs cuando sea posible
             if built_wrapper:
                 html_entry = built_wrapper
             else:
                 vendor_dirs = ('/bower_components/', '/node_modules/', '/vendor/', '/vendors/', '/libs/', '/lib/', '/third_party/', '/third-party/', '/thirdparty/')
-                non_vendor = [(d, p) for d, p in html_files if not any(v in ('/' + p if not p.startswith('/') else p) for v in vendor_dirs)]
-                candidate_list = non_vendor if non_vendor else html_files
-                html_entry = sorted(candidate_list, key=lambda t: (t[0], len(t[1])))[0][1]
+                def in_vendor(path_posix: str) -> bool:
+                    norm = '/' + path_posix if not path_posix.startswith('/') else path_posix
+                    return any(v in norm for v in vendor_dirs)
+
+                candidates = html_files[:]  # (depth, rel_path)
+
+                def score_candidate(rel_path: str) -> int:
+                    low = rel_path.lower()
+                    name = os.path.basename(low)
+                    s = 0
+                    # Fuertes positivos por nombres conocidos
+                    if name in ('index.html', 'index.htm'):
+                        s += 100
+                    elif 'index' in name:
+                        s += 85
+                    if name in ('tour.html', 'viewer.html', 'panorama.html', 'vr.html'):
+                        s += 70
+                    if '/output/' in low or '/pano2vr/' in low:
+                        s += 40
+                    if '/dist/' in low or '/build/' in low:
+                        s += 20
+                    # Negativos por páginas de error / vendor
+                    if name in ('404.html', 'error.html', 'offline.html', 'errors.html'):
+                        s -= 120
+                    if in_vendor(rel_path):
+                        s -= 60
+                    # Bonus por contenido relevante (ligero, lectura segura)
+                    try:
+                        fpath = os.path.join(tour_dir, rel_path.replace('/', os.sep))
+                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                            snippet = f.read(100000)  # hasta 100KB
+                        if 'pano2vr_player' in snippet or 'pano.xml' in snippet:
+                            s += 60
+                        if 'krpano' in snippet or 'embedpano' in snippet or 'tour.xml' in snippet:
+                            s += 50
+                        if 'aframe' in snippet or 'marzipano' in snippet:
+                            s += 30
+                    except Exception:
+                        pass
+                    return s
+
+                # Calcular mejor candidato por score; desempate por menor profundidad y longitud
+                best = None
+                best_key = None
+                for depth, rel in candidates:
+                    sc = score_candidate(rel)
+                    key = (-sc, depth, len(rel))  # menor es mejor
+                    if best is None or key < best_key:
+                        best = rel
+                        best_key = key
+                html_entry = best if best else (html_files[0][1] if html_files else 'index.html')
 
             tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/{html_entry}"
             

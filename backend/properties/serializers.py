@@ -34,7 +34,11 @@ class TourSerializer(serializers.ModelSerializer):
     # Build an absolute URL so that the frontend can always load the tour correctly, even when
     # it runs on a different sub-domain (e.g. app.skyterra.cl vs api.skyterra.cl).
     url = serializers.SerializerMethodField()
-    property = serializers.SerializerMethodField()
+    # Maintain backward-compatibility: expose the property as an id, and also
+    # provide lightweight details under property_details.
+    property = serializers.IntegerField(source='property.id', read_only=True)
+    property_id = serializers.IntegerField(source='property.id', read_only=True)
+    property_details = serializers.SerializerMethodField()
 
     def get_url(self, obj):
         """Return an absolute URL for the tour.
@@ -51,31 +55,33 @@ class TourSerializer(serializers.ModelSerializer):
         # Relative URL (e.g. "/media/tours/…") – prepend current host
         request = self.context.get('request')
         if request is not None:
-            return request.build_absolute_uri(obj.url)
+            try:
+                return request.build_absolute_uri(obj.url)
+            except Exception:
+                pass
 
         # As a fallback (should not normally happen), just return the stored value
         return obj.url
 
-    def get_property(self, obj):
-        """Return property details including name and first image."""
-        if not obj.property:
+    def get_property_details(self, obj):
+        """Return minimal property details including the first image.
+
+        Kept intentionally lightweight to avoid heavy nested serialization.
+        """
+        try:
+            prop = getattr(obj, 'property', None)
+            if not prop:
+                return None
+            payload = {
+                'id': prop.id,
+                'name': getattr(prop, 'name', None),
+                'type': getattr(prop, 'type', None),
+            }
+            first_image = getattr(prop, 'images', None).first() if getattr(prop, 'images', None) else None
+            payload['images'] = [{'url': first_image.url}] if first_image else []
+            return payload
+        except Exception:
             return None
-        
-        property_data = {
-            'id': obj.property.id,
-            'name': obj.property.name,
-            'type': obj.property.type,
-        }
-        
-        # Get first image if available
-        first_image = obj.property.images.first()
-        if first_image:
-            # Image model stores URL in field 'url'
-            property_data['images'] = [{'url': first_image.url}]
-        else:
-            property_data['images'] = []
-        
-        return property_data
 
     class Meta:
         model = Tour
@@ -88,7 +94,9 @@ class TourSerializer(serializers.ModelSerializer):
             'package_path',
             'type',
             'status',
-            'property',  # Property is useful to have here
+            'property',
+            'property_id',
+            'property_details',
             'uploaded_at',  # Renamed from created_at
             'updated_at'
         ]
