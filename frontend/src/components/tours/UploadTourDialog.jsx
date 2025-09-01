@@ -38,7 +38,7 @@ function FileDropArea({ onFileSelected, disabled, file }) {
         type="file"
         hidden
         disabled={disabled}
-        accept=".zip"
+        accept=".zip,.ggpkg"
         onChange={(e) => onFileSelected(e.target.files?.[0])}
       />
       {file ? (
@@ -46,7 +46,7 @@ function FileDropArea({ onFileSelected, disabled, file }) {
       ) : (
         <Box sx={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
           <CloudUploadIcon color="primary" />
-          <Typography variant="body2">Arrastra y suelta o haz clic para seleccionar (.zip Pano2VR)</Typography>
+          <Typography variant="body2">Arrastra y suelta o haz clic para seleccionar (.zip o .ggpkg)</Typography>
         </Box>
       )}
     </Box>
@@ -66,7 +66,7 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
   const handleFileSelect = (f) => {
     if (!f) return;
     // Validar tipo de archivo
-    const allowedExtensions = ['.zip'];
+    const allowedExtensions = ['.zip', '.ggpkg'];
     const isValidFile = allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext));
     
     if (!isValidFile) {
@@ -110,19 +110,6 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
     form.append('package_file', file);
     if (name) form.append('name', name);
     if (description) form.append('description', description);
-            
-            {/* Seleccionar propiedad si no viene dada */}
-            {!propertyId && (
-              <TextField 
-                label="ID de Propiedad" 
-                value={propertyIdInput} 
-                onChange={(e)=>setPropertyIdInput(e.target.value)} 
-                fullWidth 
-                size="small" 
-                disabled={loading}
-                helperText="Ingresa el ID de la propiedad para asociar el tour"
-              />
-            )}
 
     try {
       setLoading(true);
@@ -271,6 +258,19 @@ export default function UploadTourDialog({ open, onClose, propertyId, onUploaded
               helperText="Descripción opcional del tour"
             />
             
+            {/* Seleccionar propiedad si no viene dada */}
+            {!propertyId && (
+              <TextField 
+                label="ID de Propiedad" 
+                value={propertyIdInput} 
+                onChange={(e)=>setPropertyIdInput(e.target.value)} 
+                fullWidth 
+                size="small" 
+                disabled={loading}
+                helperText="Ingresa el ID de la propiedad para asociar el tour"
+              />
+            )}
+
             {/* Barra de progreso mejorada */}
             {loading && (
               <Box sx={{ mt: 2 }}>

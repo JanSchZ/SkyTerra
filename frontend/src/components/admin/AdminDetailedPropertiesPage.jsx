@@ -11,7 +11,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import TourIcon from '@mui/icons-material/Tour';
 import DescriptionIcon from '@mui/icons-material/Description';
 import FolderIcon from '@mui/icons-material/Folder';
-import UploadTourDialog from '../tours/UploadTourDialog';
+import ManagePropertyToursDialog from './ManagePropertyToursDialog.jsx';
 
 const SearchContainer = styled(Paper)(({ theme }) => ({
   display: 'flex',
@@ -70,7 +70,7 @@ const PlusvaliaScore = ({ score }) => {
 const AdminDetailedPropertiesPage = () => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectedProperty, setSelectedProperty] = useState(null);
-    const [tourModalOpen, setTourModalOpen] = useState(false);
+    const [manageToursOpen, setManageToursOpen] = useState(false);
     const [docsModalOpen, setDocsModalOpen] = useState(false);
     
     // Estados para datos y búsqueda
@@ -98,7 +98,7 @@ const AdminDetailedPropertiesPage = () => {
     };
 
     const handleOpenTourModal = () => {
-        setTourModalOpen(true);
+        setManageToursOpen(true);
         handleCloseMenu();
     };
     
@@ -181,6 +181,18 @@ const AdminDetailedPropertiesPage = () => {
                 </Box>
             )
         },
+        {
+            field: 'has_tour',
+            headerName: 'Tour 360°',
+            minWidth: 140,
+            renderCell: (params) => (
+              params?.value ? (
+                <Chip label="Activo" color="success" size="small" />
+              ) : (
+                <Chip label="Sin tour" size="small" />
+              )
+            )
+        },
         { 
             field: 'location_name', 
             headerName: 'Ubicación', 
@@ -234,6 +246,9 @@ const AdminDetailedPropertiesPage = () => {
             cellClassName: 'actions',
             getActions: ({ row }) => {
                 return [
+                    <IconButton key="tour" title="Gestionar tour" onClick={() => { setSelectedProperty(row); setManageToursOpen(true); }}>
+                        <TourIcon />
+                    </IconButton>,
                     <IconButton key="menu" onClick={(e) => handleOpenMenu(e, row)}>
                         <MoreVertIcon />
                     </IconButton>
@@ -274,6 +289,7 @@ const AdminDetailedPropertiesPage = () => {
                 placeholder="Buscar propiedades por nombre..."
                 value={searchTerm}
                 onChange={handleSearchChange}
+                autoComplete="off"
                 sx={{ flex: 1 }}
             />
             {searchLoading && (
@@ -328,13 +344,13 @@ const AdminDetailedPropertiesPage = () => {
 
         {selectedProperty && (
             <>
-                <UploadTourDialog
-                    open={tourModalOpen}
-                    onClose={() => setTourModalOpen(false)}
+                <ManagePropertyToursDialog
+                    open={manageToursOpen}
+                    onClose={() => setManageToursOpen(false)}
                     propertyId={selectedProperty?.id}
-                    onUploaded={() => {
-                        setTourModalOpen(false);
-                        // Refresh the property data to show new tour
+                    propertyName={selectedProperty?.name}
+                    onChange={() => {
+                        // Refresh the property data to reflect tour state
                         loadProperties(searchTerm, paginationModel.page, paginationModel.pageSize);
                     }}
                 />

@@ -1585,6 +1585,12 @@ const MapView = forwardRef(({
               color="#1E8578"
             />
           )}
+          {!editable && propertyBoundaries && propertyBoundaries.type === 'Feature' && (
+            <Source id="boundary-preview" type="geojson" data={propertyBoundaries}>
+              <Layer id="boundary-preview-fill" type="fill" paint={{ 'fill-color': '#2E7D32', 'fill-opacity': 0.25 }} />
+              <Layer id="boundary-preview-line" type="line" paint={{ 'line-color': '#2E7D32', 'line-width': 2 }} />
+            </Source>
+          )}
           {!editable && propertiesGeoJSON && (
             <Source
               id="properties-source"

@@ -87,6 +87,7 @@ class TourSerializer(serializers.ModelSerializer):
             'url',
             'package_path',
             'type',
+            'status',
             'property',  # Property is useful to have here
             'uploaded_at',  # Renamed from created_at
             'updated_at'

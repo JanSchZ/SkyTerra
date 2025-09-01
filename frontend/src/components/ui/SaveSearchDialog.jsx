@@ -49,6 +49,7 @@ const SaveSearchDialog = ({ open, onClose, defaultFilters, defaultName }) => {
           value={name}
           onChange={(e) => setName(e.target.value)}
           margin="normal"
+          autoComplete="off"
         />
         <FormControlLabel
           control={<Switch checked={emailAlert} onChange={(e) => setEmailAlert(e.target.checked)} />}

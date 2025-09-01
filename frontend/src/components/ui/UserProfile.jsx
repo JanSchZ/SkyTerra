@@ -51,6 +51,7 @@ export default function UserProfile({ user }) {
         onChange={handleChange}
         fullWidth
         margin="normal"
+        autoComplete="off"
       />
       <TextField
         label="Apellido"
@@ -59,6 +60,7 @@ export default function UserProfile({ user }) {
         onChange={handleChange}
         fullWidth
         margin="normal"
+        autoComplete="off"
       />
       <TextField
         label="Email"
@@ -67,6 +69,7 @@ export default function UserProfile({ user }) {
         onChange={handleChange}
         fullWidth
         margin="normal"
+        autoComplete="off"
         disabled
       />
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}

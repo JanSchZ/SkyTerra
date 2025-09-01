@@ -28,6 +28,7 @@ const AdminSettingsPage = () => {
                             label="Nombre de la Plataforma"
                             defaultValue="SkyTerra"
                             variant="outlined"
+                            autoComplete="off"
                             sx={{ mb: 2 }}
                             InputLabelProps={{
                                 sx: { color: 'text.secondary' }
@@ -38,6 +39,7 @@ const AdminSettingsPage = () => {
                             label="Email de Contacto Principal"
                             defaultValue="contacto@skyterra.dev"
                             variant="outlined"
+                            autoComplete="off"
                             InputLabelProps={{
                                 sx: { color: 'text.secondary' }
                             }}

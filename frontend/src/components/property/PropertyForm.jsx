@@ -319,7 +319,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={3}>
             <Grid xs={12} md={8}>
-              <TextField fullWidth label="Nombre de la propiedad" name="name" value={formData.name} onChange={handleChange} error={!!formErrors.name} helperText={formErrors.name} required />
+              <TextField fullWidth label="Nombre de la propiedad" name="name" value={formData.name} onChange={handleChange} error={!!formErrors.name} helperText={formErrors.name} autoComplete="off" required />
             </Grid>
             <Grid xs={12} md={6}>
               <TextField fullWidth label="Tipo" name="propertyType" select SelectProps={{ native: true }} value={formData.propertyType} onChange={handleChange}>
@@ -395,6 +395,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
                 onChange={handleChange}
                 error={!!formErrors.price}
                 helperText={formErrors.price || 'En CLP'}
+                autoComplete="off"
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
             </Grid>
@@ -418,6 +419,7 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
                 onChange={handleChange}
                 error={!!formErrors.size}
                 helperText={formErrors.size || 'En hectáreas'}
+                autoComplete="off"
                 InputProps={{ endAdornment: <InputAdornment position="end">ha</InputAdornment> }}
               />
             </Grid>
@@ -430,16 +432,16 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
             </Grid>
             {(formData.listingType === 'rent' || formData.listingType === 'both') && (
               <Grid xs={12} sm={6} md={4}>
-                <TextField fullWidth label="Precio Arriendo (CLP)" name="rentPrice" type="number" value={formData.rentPrice} onChange={handleChange} error={!!formErrors.rentPrice} helperText={formErrors.rentPrice} required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
+                <TextField fullWidth label="Precio Arriendo (CLP)" name="rentPrice" type="number" value={formData.rentPrice} onChange={handleChange} error={!!formErrors.rentPrice} helperText={formErrors.rentPrice} autoComplete="off" required InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }} />
               </Grid>
             )}
             {(formData.listingType === 'rent' || formData.listingType === 'both') && (
               <Grid xs={12}>
-                <TextField fullWidth multiline minRows={3} label="Términos de Arriendo (Opcional)" name="rentalTerms" value={formData.rentalTerms} onChange={handleChange} />
+                <TextField fullWidth multiline minRows={3} label="Términos de Arriendo (Opcional)" name="rentalTerms" value={formData.rentalTerms} onChange={handleChange} autoComplete="off" />
               </Grid>
             )}
             <Grid xs={12}>
-              <TextField fullWidth label="Descripción detallada" name="description" value={formData.description} onChange={handleChange} multiline rows={5} />
+              <TextField fullWidth label="Descripción detallada" name="description" value={formData.description} onChange={handleChange} multiline rows={5} autoComplete="off" />
             </Grid>
             {formData.boundary_polygon?.area && (
               <Grid xs={12}>

@@ -64,13 +64,34 @@ export const api = axios.create({
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
-    // Adjuntar JWT de cabecera y CSRF si están disponibles
+    // Adjuntar JWT/CSRF con lógica para endpoints públicos
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      if (accessToken) {
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = `Bearer ${accessToken}`;
+      const url = (config.url || '').toString();
+      const method = (config.method || 'get').toLowerCase();
+      const skipAuth = config.skipAuth === true;
+      const isPublicGet = method === 'get' && !(
+        url.includes('/auth/user/') ||
+        url.startsWith('/admin/') ||
+        url.includes('/my-properties') ||
+        url.startsWith('/favorites') ||
+        url.startsWith('/saved-searches') ||
+        url.startsWith('/recording-orders') ||
+        url.startsWith('/ai/')
+      );
+
+      if (isPublicGet || skipAuth) {
+        // No enviar cookies en GET públicos para evitar 401 por JWT expirado
+        config.withCredentials = false;
       }
+
+      if (!skipAuth && !isPublicGet) {
+        const accessToken = localStorage.getItem('accessToken');
+        if (accessToken) {
+          config.headers = config.headers || {};
+          config.headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+      }
+
       const csrfPersisted = localStorage.getItem('csrfToken');
       if (csrfPersisted) {
         config.headers = config.headers || {};
@@ -153,6 +174,24 @@ api.interceptors.response.use(
         }
       }
 
+      // Intento extra: si es GET público y venía Authorization inválida, reintentar sin Auth
+      try {
+        const method = (originalRequest.method || 'get').toLowerCase();
+        const oUrl = (originalRequest.url || '').toString();
+        const isPotentialPublicGet = method === 'get' && (
+          oUrl.startsWith('/auth/csrf/') ||
+          oUrl.startsWith('/properties/') ||
+          oUrl.startsWith('/properties-preview/') ||
+          oUrl.startsWith('/tours/')
+        );
+        if (isPotentialPublicGet && !originalRequest._publicRetry) {
+          originalRequest._publicRetry = true;
+          if (originalRequest.headers) delete originalRequest.headers['Authorization'];
+          originalRequest.skipAuth = true;
+          return api(originalRequest);
+        }
+      } catch (_) {}
+
       // Si la verificación explícita de sesión falla, limpiamos el usuario en caché.
       if (isAuthCheck) {
         localStorage.removeItem('user');
@@ -175,7 +214,7 @@ export const authService = {
   // Garantiza que exista la cookie CSRF para peticiones POST/PUT en modo JWT con cookies
   async ensureCsrfCookie() {
     try {
-      const resp = await api.get('/auth/csrf/');
+      const resp = await api.get('/auth/csrf/', { skipAuth: true });
       const token = resp?.data?.csrfToken;
       if (token) {
       try {
@@ -200,7 +239,10 @@ export const authService = {
   async login(credentials) {
     try {
       await this.ensureCsrfCookie();
-      const response = await api.post('/auth/login/', credentials);
+      // Asegurar que no se envíe ningún Authorization previo en el login
+      try { if (api.defaults && api.defaults.headers) { delete api.defaults.headers['Authorization']; } } catch(_) {}
+      // Necesitamos cookies para CSRF, pero omitimos Authorization
+      const response = await api.post('/auth/login/', credentials, { skipAuth: true, withCredentials: true });
       // Guardar tokens JWT si vienen en el cuerpo (además de cookies)
       try {
         const access = response?.data?.access;
@@ -918,7 +960,7 @@ export const tourService = {
       // Obtener CSRF token explícito y enviar en header
       let csrfToken;
       try {
-        const csrfResp = await api.get('/auth/csrf/');
+        const csrfResp = await api.get('/auth/csrf/', { skipAuth: true });
         csrfToken = csrfResp?.data?.csrfToken;
       } catch (_) {}
       const response = await api.post(`/tours/`, tourData, {

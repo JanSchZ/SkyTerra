@@ -10,7 +10,6 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import PsychologyIcon from '@mui/icons-material/Psychology'; // Sam AI icon
-import TourIcon from '@mui/icons-material/Tour'; // Tours virtuales icon
 
 const drawerWidth = 240;
 const collapsedDrawerWidth = 60;
@@ -18,7 +17,6 @@ const collapsedDrawerWidth = 60;
 const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
     { text: 'Propiedades', icon: <BusinessIcon />, path: '/admin/properties' },
-    { text: 'Tours Virtuales', icon: <TourIcon />, path: '/admin/tours' },
     { text: 'Tickets', icon: <ConfirmationNumberIcon />, path: '/admin/tickets' },
     { text: 'Cupones', icon: <LocalOfferIcon />, path: '/admin/coupons' },
     { text: 'Usuarios', icon: <PeopleIcon />, path: '/admin/users' },

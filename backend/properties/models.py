@@ -161,6 +161,7 @@ class Tour(models.Model):
     url = models.URLField(max_length=1024, blank=True, null=True) # Allow blank/null if package_path is used
     package_path = models.CharField(max_length=512, blank=True, null=True)
     type = models.CharField(max_length=50, choices=[('360', '360°'), ('video', 'Video'), ('package', 'Package'), ('other', 'Other')])
+    status = models.CharField(max_length=20, choices=[('processing', 'Processing'), ('active', 'Active'), ('error', 'Error')], default='active')
     created_at = models.DateTimeField(auto_now_add=True) # Serves as uploaded_at for now
     updated_at = models.DateTimeField(auto_now=True)
 

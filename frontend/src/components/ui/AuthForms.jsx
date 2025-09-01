@@ -117,6 +117,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onSwitc
           onChange={(e) => setLoginIdentifier(e.target.value)}
           margin="normal"
           autoFocus
+          autoComplete="off"
           disabled={loading}
           error={!!formErrors.username || !!formErrors.email}
           helperText={formErrors.username || formErrors.email}
@@ -131,6 +132,7 @@ export const LoginForm = ({ onLogin, loading, error, onSwitchToRegister, onSwitc
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           margin="normal"
+          autoComplete="new-password"
           disabled={loading}
           error={!!formErrors.password}
           helperText={formErrors.password}
@@ -355,24 +357,24 @@ export const RegisterForm = ({ onRegister, loading, error, onSwitchToLogin, onCl
         {/* Campos específicos según tipo */}
         {sellerType === 'individual' && (
           <>
-            <TextField label="Nombre Completo" type="text" name="name" fullWidth required value={formData.name} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.name} helperText={formErrors.name} sx={commonTextFieldStyles} />
-            <TextField label="RUT" type="text" name="rut" fullWidth required value={formData.rut} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.rut} helperText={formErrors.rut} sx={commonTextFieldStyles} />
-            <TextField label="Teléfono" type="tel" name="phone" fullWidth required value={formData.phone} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.phone} helperText={formErrors.phone} sx={commonTextFieldStyles} />
+            <TextField label="Nombre Completo" type="text" name="name" fullWidth required value={formData.name} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.name} helperText={formErrors.name} sx={commonTextFieldStyles} />
+            <TextField label="RUT" type="text" name="rut" fullWidth required value={formData.rut} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.rut} helperText={formErrors.rut} sx={commonTextFieldStyles} />
+            <TextField label="Teléfono" type="tel" name="phone" fullWidth required value={formData.phone} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.phone} helperText={formErrors.phone} sx={commonTextFieldStyles} />
           </>
         )}
 
         {sellerType === 'professional' && (
           <>
-            <TextField label="Nombre de Empresa" type="text" name="companyName" fullWidth required value={formData.companyName} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.companyName} helperText={formErrors.companyName} sx={commonTextFieldStyles} />
-            <TextField label="RUT de Empresa" type="text" name="companyRUT" fullWidth required value={formData.companyRUT} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.companyRUT} helperText={formErrors.companyRUT} sx={commonTextFieldStyles} />
-            <TextField label="Certificación (opcional)" type="text" name="certification" fullWidth value={formData.certification} onChange={handleChange} margin="normal" disabled={loading} sx={commonTextFieldStyles} />
-            <TextField label="Número de Listados" type="number" name="listingCount" fullWidth required value={formData.listingCount} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.listingCount} helperText={formErrors.listingCount} sx={commonTextFieldStyles} />
+            <TextField label="Nombre de Empresa" type="text" name="companyName" fullWidth required value={formData.companyName} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.companyName} helperText={formErrors.companyName} sx={commonTextFieldStyles} />
+            <TextField label="RUT de Empresa" type="text" name="companyRUT" fullWidth required value={formData.companyRUT} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.companyRUT} helperText={formErrors.companyRUT} sx={commonTextFieldStyles} />
+            <TextField label="Certificación (opcional)" type="text" name="certification" fullWidth value={formData.certification} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} sx={commonTextFieldStyles} />
+            <TextField label="Número de Listados" type="number" name="listingCount" fullWidth required value={formData.listingCount} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.listingCount} helperText={formErrors.listingCount} sx={commonTextFieldStyles} />
           </>
         )}
 
-        <TextField label="Correo Electrónico" type="email" name="email" fullWidth required value={formData.email} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.email} helperText={formErrors.email} sx={commonTextFieldStyles} />
-        <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
-        <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles} />
+        <TextField label="Correo Electrónico" type="email" name="email" fullWidth required value={formData.email} onChange={handleChange} margin="normal" autoComplete="off" disabled={loading} error={!!formErrors.email} helperText={formErrors.email} sx={commonTextFieldStyles} />
+        <TextField label="Contraseña" type={showPassword ? 'text' : 'password'} name="password" fullWidth required value={formData.password} onChange={handleChange} margin="normal" autoComplete="new-password" disabled={loading} error={!!formErrors.password} helperText={formErrors.password} sx={commonTextFieldStyles} InputProps={{ endAdornment: (<InputAdornment position="end"><IconButton onClick={() => setShowPassword(!showPassword)} edge="end" sx={{ color: '#8b949e' }}>{showPassword ? <VisibilityOff fontSize="small"/> : <Visibility fontSize="small"/>}</IconButton></InputAdornment>)}} />
+        <TextField label="Confirmar Contraseña" type={showPassword ? 'text' : 'password'} name="confirmPassword" fullWidth required value={formData.confirmPassword} onChange={handleChange} margin="normal" autoComplete="new-password" disabled={loading} error={!!formErrors.confirmPassword} helperText={formErrors.confirmPassword} sx={commonTextFieldStyles} />
         
         <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 3, mb: 2, py: 1.5, borderRadius: '8px', textTransform: 'none', fontWeight: 500 }} disabled={loading} startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null} >
           {loading ? 'Registrando...' : 'Crear Cuenta'}
@@ -439,6 +441,7 @@ export const ForgotPasswordForm = ({ onForgotPassword, loading, error, success, 
           onChange={(e) => setEmail(e.target.value)}
           margin="normal"
           autoFocus
+          autoComplete="off"
           disabled={loading || success}
           sx={commonTextFieldStyles}
         />

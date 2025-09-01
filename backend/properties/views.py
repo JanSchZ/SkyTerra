@@ -16,6 +16,7 @@ from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from functools import wraps
+import re
 import hashlib
 import logging
 import traceback
@@ -531,7 +532,7 @@ class TourViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Permisos insuficientes para subir tour.")
         
         # Validar extensión
-        allowed_extensions = ['.zip']
+        allowed_extensions = ['.zip', '.ggpkg']
         if not any(package_file.name.lower().endswith(ext) for ext in allowed_extensions):
             raise serializers.ValidationError({
                 'package_file': f"Tipo de archivo no permitido. Solo se permiten archivos: {', '.join(allowed_extensions)}"
@@ -591,10 +592,7 @@ class TourViewSet(viewsets.ModelViewSet):
                                 'package_file': "El contenido descomprimido es demasiado grande (máximo 500MB)"
                             })
                         
-                        if file_count > 1000:  # Máximo 1000 archivos
-                            raise serializers.ValidationError({
-                                'package_file': "El archivo contiene demasiados archivos (máximo 1000)"
-                            })
+                        # Nota: se eliminó el límite de cantidad de archivos por requerimiento
                     
                     zip_ref.extractall(tour_dir)
                     
@@ -612,6 +610,33 @@ class TourViewSet(viewsets.ModelViewSet):
             # Eliminar archivo ZIP original
             os.remove(package_path)
 
+            # Post-proceso: sanitizar referencias absolutas tipo file:///C:/... dentro de html/js para evitar CORS
+            try:
+                file_uri_pattern = re.compile(r"file:///[A-Za-z]:[^'\"\s>]*")
+                for root_dir, _dirs, files in os.walk(tour_dir):
+                    for fname in files:
+                        lower = fname.lower()
+                        if lower.endswith(('.html', '.htm', '.js')):
+                            fpath = os.path.join(root_dir, fname)
+                            try:
+                                with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                                    content = f.read()
+                                def _to_relative(m):
+                                    uri = m.group(0)
+                                    # Mantener querystring si existe
+                                    base, sep, query = uri.partition('?')
+                                    basename = os.path.basename(base)
+                                    return basename + (sep + query if sep else '')
+                                new_content = file_uri_pattern.sub(_to_relative, content)
+                                if new_content != content:
+                                    with open(fpath, 'w', encoding='utf-8', errors='ignore') as f:
+                                        f.write(new_content)
+                            except Exception:
+                                # No bloquear por errores de sanitización
+                                pass
+            except Exception:
+                pass
+
             # Buscar archivos HTML
             html_files = []
             try:
@@ -627,13 +652,86 @@ class TourViewSet(viewsets.ModelViewSet):
                     'package_file': f"Error explorando contenido del tour: {str(e)}"
                 })
 
+            # Si no hay HTML visibles, intentar construir un contenedor mínimo para Pano2VR
+            built_wrapper = None
             if not html_files:
-                raise serializers.ValidationError({
-                    'package_file': "No se encontró ningún archivo HTML en el tour. Un tour válido debe contener al menos un archivo .html o .htm"
-                })
+                try:
+                    # Buscar player y config de Pano2VR
+                    player_js_path = None
+                    pano_xml_path = None
+                    skin_js_path = None
+                    for root_dir, _dirs, files in os.walk(tour_dir):
+                        for fname in files:
+                            low = fname.lower()
+                            if low == 'pano2vr_player.js':
+                                player_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                            elif low == 'pano.xml':
+                                pano_xml_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                            elif low == 'skin.js':
+                                skin_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                    # Buscar three.js si existe
+                    three_js_path = None
+                    for root_dir, _dirs, files in os.walk(tour_dir):
+                        for fname in files:
+                            low = fname.lower()
+                            if low in ('three.min.js', 'three.js'):
+                                three_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                                break
+                        if three_js_path:
+                            break
+                    if player_js_path and pano_xml_path:
+                        wrapper_name = 'index_auto.html'
+                        wrapper_path = os.path.join(tour_dir, wrapper_name)
+                        skin_script = f'<script src="{skin_js_path}"></script>' if skin_js_path else ''
+                        three_script = f'<script src="{three_js_path}"></script>' if three_js_path else ''
+                        html = (
+                            '<!DOCTYPE html>'
+                            '<html lang="es">'
+                            '<head>'
+                            '<meta charset="utf-8" />'
+                            '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+                            '<title>Tour 360°</title>'
+                            f'{three_script}'
+                            f'<script src="{player_js_path}"></script>'
+                            f'{skin_script}'
+                            '</head>'
+                            '<body style="margin:0; padding:0; overflow:hidden; background:#000">'
+                            '<div id="pano" style="width:100vw; height:100vh;"></div>'
+                            '<script>'
+                            '  try {'
+                            '    var player = new pano2vrPlayer("pano");'
+                            f'    player.readConfigUrlAsync("{pano_xml_path}");'
+                            '  } catch (e) { console.error(e); }'
+                            '</script>'
+                            '</body>'
+                            '</html>'
+                        )
+                        with open(wrapper_path, 'w', encoding='utf-8') as f:
+                            f.write(html)
+                        built_wrapper = wrapper_name
+                    else:
+                        # Sin HTML ni player + xml => error explícito
+                        raise serializers.ValidationError({
+                            'package_file': "No se encontró HTML ni recursos mínimos de Pano2VR (pano2vr_player.js y pano.xml). Asegúrate de exportar para Web."
+                        })
+                except serializers.ValidationError:
+                    raise
+                except Exception as e:
+                    raise serializers.ValidationError({
+                        'package_file': f"No se encontró HTML y falló la generación automática del visor: {str(e)}"
+                    })
 
-            # Elegir el archivo HTML principal (más cercano a la raíz)
-            html_entry = sorted(html_files, key=lambda t: t[0])[0][1]
+            # Elegir el archivo HTML principal de forma MUY flexible:
+            #   - Evitar directorios típicos de librerías (bower_components, node_modules, vendor, libs)
+            #   - Preferir el HTML más cercano a la raíz (menor profundidad)
+            #   - Si no hay fuera de vendor, usar el más cercano aunque esté en vendor
+            if built_wrapper:
+                html_entry = built_wrapper
+            else:
+                vendor_dirs = ('/bower_components/', '/node_modules/', '/vendor/', '/vendors/', '/libs/', '/lib/', '/third_party/', '/third-party/', '/thirdparty/')
+                non_vendor = [(d, p) for d, p in html_files if not any(v in ('/' + p if not p.startswith('/') else p) for v in vendor_dirs)]
+                candidate_list = non_vendor if non_vendor else html_files
+                html_entry = sorted(candidate_list, key=lambda t: (t[0], len(t[1])))[0][1]
 
             tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/{html_entry}"
             
@@ -641,6 +739,7 @@ class TourViewSet(viewsets.ModelViewSet):
                 url=tour_url, 
                 package_path=os.path.join('tours', str(tour_uuid)),
                 type='package',
+                status='active',
                 tour_id=tour_uuid
             )
             

@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { Box, Stepper, Step, StepLabel, Button, Paper, Typography, TextField, Slider, Grid, Card, Snackbar, Alert, MenuItem, Chip, IconButton } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { liquidGlassTheme } from '../../theme/liquidGlassTheme';
 import { motion, AnimatePresence } from 'framer-motion';
 import MapView from '../map/MapView';
+import BoundaryEditor from '../map/BoundaryEditor';
 import { propertyService, tourService } from '../../services/api';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -11,12 +12,7 @@ import { useNavigate } from 'react-router-dom';
 
 const steps = ['Información básica', 'Ubicación y límites', 'Medios', 'Revisar'];
 
-const propertyTypes = [
-  { value: 'farm', label: 'Parcela / Granja', icon: '🌿' },
-  { value: 'ranch', label: 'Rancho', icon: '🐄' },
-  { value: 'forest', label: 'Bosque', icon: '🌲' },
-  { value: 'lake', label: 'Terreno con Lago/Río', icon: '💧' },
-];
+// Tipos predefinidos eliminados: Sam infiere categorías automáticamente
 
 const terrainOptions = [
   { value: 'flat', label: 'Plano' },
@@ -47,6 +43,7 @@ const utilitiesList = [
 export default function CreatePublicationWizard() {
   const navigate = useNavigate();
   const theme = useMemo(() => liquidGlassTheme('light'), []);
+  const boundaryEditorRef = useRef(null);
 
   const [activeStep, setActiveStep] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -55,7 +52,7 @@ export default function CreatePublicationWizard() {
   const [propertyData, setPropertyData] = useState({
     name: '',
     description: '',
-    type: 'farm',
+    type: '',
     listingType: 'sale',
     price: 50000000,
     rentPrice: '',
@@ -69,12 +66,11 @@ export default function CreatePublicationWizard() {
     boundary_polygon: null,
     images: [],
     documents: [],
-    tour360: null,
   });
 
   const [imagePreviews, setImagePreviews] = useState([]); // {url, file}
   const [documentPreviews, setDocumentPreviews] = useState([]); // {name, file}
-  const [tourName, setTourName] = useState('');
+  // Tour 360° se gestiona exclusivamente en Admin > Propiedades
 
   const handleToggleUtility = (key) => {
     setPropertyData((prev) => ({
@@ -114,15 +110,9 @@ export default function CreatePublicationWizard() {
     setPropertyData((prev) => ({ ...prev, documents: prev.documents.filter((_, i) => i !== idx) }));
   };
 
-  const handleTourUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPropertyData((prev) => ({ ...prev, tour360: file }));
-    setTourName(file.name);
-    e.target.value = null;
-  };
+  // Sin manejador de Tour 360° aquí; flujo unificado en gestión de propiedades
 
-  const validate = () => {
+  const validateBasic = () => {
     if (!propertyData.name.trim()) return 'El nombre es obligatorio';
     if (!propertyData.description.trim()) return 'La descripción es obligatoria';
     if (!propertyData.price || Number(propertyData.price) <= 0) return 'Precio inválido';
@@ -130,7 +120,13 @@ export default function CreatePublicationWizard() {
     if (propertyData.listingType !== 'sale') {
       if (!propertyData.rentPrice || Number(propertyData.rentPrice) <= 0) return 'Precio de arriendo requerido (>0)';
     }
-    if (!propertyData.latitude || !propertyData.longitude) return 'Define la ubicación en el mapa';
+    return null;
+  };
+
+  const validate = () => {
+    const basic = validateBasic();
+    if (basic) return basic;
+    if (!propertyData.boundary_polygon) return 'Dibuja el polígono de la propiedad en el mapa';
     return null;
   };
 
@@ -158,27 +154,13 @@ export default function CreatePublicationWizard() {
         images: propertyData.images,
         documents: propertyData.documents,
         // Tour se sube por endpoint de tours, no aquí
-        tour360: null,
+        // Tour 360° se gestiona desde Admin > Propiedades
         listing_type: propertyData.listingType,
         rent_price: propertyData.listingType !== 'sale' ? Number(propertyData.rentPrice) : undefined,
       };
       const created = await propertyService.createProperty(payload);
       setSnackbar({ open: true, message: 'Propiedad creada con éxito', severity: 'success' });
-      // Subir Tour 360 si fue seleccionado, antes de navegar
-      if (propertyData.tour360 && created && created.id) {
-        try {
-          const form = new FormData();
-          form.append('property', created.id);
-          form.append('package_file', propertyData.tour360);
-          if (tourName) form.append('name', tourName);
-          await tourService.uploadTour(form);
-        } catch (tourErr) {
-          console.error('Error al subir el tour:', tourErr);
-          setSnackbar({ open: true, message: 'Propiedad creada, pero falló la subida del tour', severity: 'warning' });
-          setTimeout(() => navigate('/dashboard'), 1500);
-          return;
-        }
-      }
+      // Nota: la carga de Tour 360° se realiza en Admin > Propiedades
 
       setTimeout(() => navigate('/dashboard'), 1200);
     } catch (e) {
@@ -195,15 +177,9 @@ export default function CreatePublicationWizard() {
         return (
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <TextField fullWidth label="Nombre de la propiedad" value={propertyData.name} onChange={(e) => setPropertyData({ ...propertyData, name: e.target.value })} />
+              <TextField fullWidth label="Nombre de la propiedad" value={propertyData.name} onChange={(e) => setPropertyData({ ...propertyData, name: e.target.value })} autoComplete="off" />
             </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField select fullWidth label="Tipo" value={propertyData.type} onChange={(e) => setPropertyData({ ...propertyData, type: e.target.value })}>
-                {propertyTypes.map((t) => (
-                  <MenuItem key={t.value} value={t.value}>{t.icon} {t.label}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
+            {/* Eliminado: no pedimos 'Tipo' fijo */}
             <Grid item xs={12} md={6}>
               <TextField select fullWidth label="Modalidad" value={propertyData.listingType} onChange={(e) => setPropertyData({ ...propertyData, listingType: e.target.value })}>
                 <MenuItem value="sale">Venta</MenuItem>
@@ -215,17 +191,17 @@ export default function CreatePublicationWizard() {
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Precio (CLP)</Typography>
               <Slider value={Number(propertyData.price) || 0} min={1000000} max={1000000000} step={1000000} onChange={(e, v) => setPropertyData({ ...propertyData, price: v })} valueLabelDisplay="auto" valueLabelFormat={(v) => `$${Number(v).toLocaleString()}`} />
-              <TextField fullWidth type="number" value={propertyData.price} onChange={(e) => setPropertyData({ ...propertyData, price: e.target.value })} />
+              <TextField fullWidth type="number" value={propertyData.price} onChange={(e) => setPropertyData({ ...propertyData, price: e.target.value })} autoComplete="off" />
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>Tamaño (hectáreas)</Typography>
               <Slider value={Number(propertyData.size) || 0} min={0.1} max={1000} step={0.1} onChange={(e, v) => setPropertyData({ ...propertyData, size: v })} valueLabelDisplay="auto" valueLabelFormat={(v) => `${v} ha`} />
-              <TextField fullWidth type="number" value={propertyData.size} onChange={(e) => setPropertyData({ ...propertyData, size: e.target.value })} />
+              <TextField fullWidth type="number" value={propertyData.size} onChange={(e) => setPropertyData({ ...propertyData, size: e.target.value })} autoComplete="off" />
             </Grid>
 
             {(propertyData.listingType === 'rent' || propertyData.listingType === 'both') && (
               <Grid item xs={12} md={6}>
-                <TextField fullWidth type="number" label="Precio Arriendo (CLP)" value={propertyData.rentPrice} onChange={(e) => setPropertyData({ ...propertyData, rentPrice: e.target.value })} />
+                <TextField fullWidth type="number" label="Precio Arriendo (CLP)" value={propertyData.rentPrice} onChange={(e) => setPropertyData({ ...propertyData, rentPrice: e.target.value })} autoComplete="off" />
               </Grid>
             )}
 
@@ -255,7 +231,7 @@ export default function CreatePublicationWizard() {
             </Grid>
 
             <Grid item xs={12}>
-              <TextField fullWidth multiline minRows={4} label="Descripción" value={propertyData.description} onChange={(e) => setPropertyData({ ...propertyData, description: e.target.value })} />
+              <TextField fullWidth multiline minRows={4} label="Descripción" value={propertyData.description} onChange={(e) => setPropertyData({ ...propertyData, description: e.target.value })} autoComplete="off" />
             </Grid>
           </Grid>
         );
@@ -263,40 +239,30 @@ export default function CreatePublicationWizard() {
         return (
           <Box>
             <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
-              Haz clic en el mapa para fijar ubicación. Opcionalmente activa “Dibujar” y traza el polígono del terreno.
+              Dibuja el polígono del terreno. Calcularemos ubicación central y área automáticamente.
             </Typography>
-            <MapView
-              editable
-              embedded
-              suppressData
-              height={420}
-              disableIntroAnimation
-              filters={{}}
-              appliedFilters={{}}
+            <BoundaryEditor
+              ref={boundaryEditorRef}
               initialViewState={{ longitude: -70.6693, latitude: -33.4489, zoom: 5 }}
-              onBoundariesUpdate={(b) => {
-                if (!b) {
+              height={560}
+              square
+              existingFeature={propertyData.boundary_polygon}
+              onChange={(res) => {
+                if (!res) {
                   setPropertyData((prev) => ({ ...prev, boundary_polygon: null }));
                   return;
                 }
-                setPropertyData((prev) => ({ ...prev, boundary_polygon: b.geojson, latitude: b.center[1], longitude: b.center[0], size: b.area || prev.size }));
+                const { feature, centroid, areaHectares } = res;
+                setPropertyData((prev) => ({
+                  ...prev,
+                  boundary_polygon: feature,
+                  latitude: centroid[1],
+                  longitude: centroid[0],
+                  size: areaHectares || prev.size
+                }));
               }}
-              onLocationSelect={({ longitude, latitude }) => {
-                setPropertyData((prev) => ({ ...prev, latitude, longitude }));
-              }}
-              selectedPoint={propertyData.latitude && propertyData.longitude ? { latitude: propertyData.latitude, longitude: propertyData.longitude } : null}
             />
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Latitud" value={propertyData.latitude ?? ''} InputProps={{ readOnly: true }} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Longitud" value={propertyData.longitude ?? ''} InputProps={{ readOnly: true }} />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Área (ha)" value={propertyData.boundary_polygon ? (Number(propertyData.size || 0).toFixed(2)) : ''} placeholder="—" InputProps={{ readOnly: true }} />
-              </Grid>
-            </Grid>
+            {/* Área removida del UI del mapa para mayor limpieza */}
           </Box>
         );
       case 2:
@@ -327,13 +293,9 @@ export default function CreatePublicationWizard() {
 
             <Grid item xs={12} md={6}>
               <Typography variant="h6" sx={{ mb: 1 }}>Tour 360°</Typography>
-              <Button variant="outlined" component="label" startIcon={<CloudUploadIcon />}> 
-                {tourName || 'Subir paquete .zip (Pano2VR)'}
-                <input hidden type="file" accept=".zip" onChange={handleTourUpload} />
-              </Button>
-              {tourName && (
-                <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>{tourName}</Typography>
-              )}
+              <Typography variant="body2" color="text.secondary">
+                La carga de tours se realiza en Admin &gt; Propiedades.
+              </Typography>
             </Grid>
 
             <Grid item xs={12} md={6}>
@@ -359,7 +321,7 @@ export default function CreatePublicationWizard() {
               <Paper variant="glass" sx={{ p: 2 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>Información básica</Typography>
                 <Typography><b>Nombre:</b> {propertyData.name}</Typography>
-                <Typography><b>Tipo:</b> {propertyTypes.find((t) => t.value === propertyData.type)?.label}</Typography>
+                {/* Sin tipo fijo en el resumen */}
                 <Typography><b>Modalidad:</b> {propertyData.listingType === 'sale' ? 'Venta' : propertyData.listingType === 'rent' ? 'Arriendo' : 'Venta y Arriendo'}</Typography>
                 <Typography><b>Precio:</b> ${Number(propertyData.price).toLocaleString()}</Typography>
                 {propertyData.listingType !== 'sale' && (
@@ -377,7 +339,18 @@ export default function CreatePublicationWizard() {
                 <Typography variant="h6" sx={{ mb: 1 }}>Ubicación</Typography>
                 <Typography><b>Lat/Lon:</b> {propertyData.latitude}, {propertyData.longitude}</Typography>
                 <Box sx={{ mt: 1, height: 160 }}>
-                  <MapView staticView filters={{}} appliedFilters={{}} initialViewState={{ longitude: propertyData.longitude, latitude: propertyData.latitude, zoom: 12 }} />
+                  <MapView
+                    embedded
+                    height={160}
+                    suppressData
+                    disableIntroAnimation
+                    initialGeoJsonBoundary={propertyData.boundary_polygon}
+                    initialViewState={{
+                      longitude: propertyData.longitude ?? -70.6693,
+                      latitude: propertyData.latitude ?? -33.4489,
+                      zoom: propertyData.longitude != null && propertyData.latitude != null ? 12 : 4
+                    }}
+                  />
                 </Box>
               </Paper>
             </Grid>
@@ -385,7 +358,7 @@ export default function CreatePublicationWizard() {
               <Paper variant="glass" sx={{ p: 2 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>Medios</Typography>
                 <Typography variant="body2">Imágenes: {imagePreviews.length}</Typography>
-                <Typography variant="body2">Tour: {tourName || 'N/D'}</Typography>
+                <Typography variant="body2">Tour: gestión en Admin &gt; Propiedades</Typography>
                 <Typography variant="body2">Documentos: {documentPreviews.length}</Typography>
               </Paper>
             </Grid>
@@ -408,7 +381,18 @@ export default function CreatePublicationWizard() {
           </Stepper>
 
           <AnimatePresence mode="wait">
-            <motion.div key={activeStep} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.2 }}>
+            <motion.div
+              key={activeStep}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.2 }}
+              onAnimationComplete={() => {
+                if (activeStep === 1) {
+                  requestAnimationFrame(() => {
+                    boundaryEditorRef.current?.resizeMap();
+                    setTimeout(() => boundaryEditorRef.current?.resizeMap(), 120);
+                  });
+                }
+              }}
+            >
               <Paper variant="glass" sx={{ p: { xs: 2, md: 3 }, minHeight: 320 }}>
                 {renderStepContent()}
               </Paper>
@@ -423,15 +407,12 @@ export default function CreatePublicationWizard() {
                 onClick={() => {
                   // Validación mínima por paso
                   if (activeStep === 0) {
-                    const msg = validate();
-                    if (msg && !msg.toLowerCase().includes('define la ubicación')) {
-                      setSnackbar({ open: true, message: msg, severity: 'error' });
-                      return;
-                    }
+                    const msg = validateBasic();
+                    if (msg) { setSnackbar({ open: true, message: msg, severity: 'error' }); return; }
                   }
                   if (activeStep === 1) {
-                    if (!propertyData.latitude || !propertyData.longitude) {
-                      setSnackbar({ open: true, message: 'Selecciona la ubicación o dibuja los límites', severity: 'error' });
+                    if (!propertyData.boundary_polygon) {
+                      setSnackbar({ open: true, message: 'Dibuja el polígono de la propiedad en el mapa', severity: 'error' });
                       return;
                     }
                   }

@@ -56,7 +56,7 @@ const Login = () => {
             id="email"
             label="Correo electrónico"
             name="email"
-            autoComplete="email"
+            autoComplete="off"
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -70,7 +70,7 @@ const Login = () => {
             label="Contraseña"
             type="password"
             id="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
