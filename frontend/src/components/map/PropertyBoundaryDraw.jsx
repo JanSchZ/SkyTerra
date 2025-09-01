@@ -18,6 +18,17 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
   useEffect(() => {
     if (!map) return;
 
+    // For accurate drawing, force Mercator projection while editing (Mapbox Draw no soporta 'globe')
+    let previousProjection = null;
+    try {
+      previousProjection = map.getProjection ? map.getProjection() : null;
+      if (map.setProjection) {
+        map.setProjection({ name: 'mercator' });
+      }
+      // Aplanar la vista para evitar offsets visuales
+      try { map.setPitch(0); map.setBearing(0); } catch (_) {}
+    } catch (_) {}
+
     const draw = new MapboxDraw({
       displayControlsDefault: false,
       controls: {
@@ -94,6 +105,25 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
             'circle-stroke-color': '#4caf50',
             'circle-stroke-width': 3
           }
+        },
+        // Static (final) polygon stays visible
+        {
+          id: 'gl-draw-polygon-fill-static',
+          type: 'fill',
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'mode', 'static']],
+          paint: {
+            'fill-color': '#2E7D32',
+            'fill-opacity': 0.25
+          }
+        },
+        {
+          id: 'gl-draw-polygon-stroke-static',
+          type: 'line',
+          filter: ['all', ['==', '$type', 'Polygon'], ['==', 'mode', 'static']],
+          paint: {
+            'line-color': '#2E7D32',
+            'line-width': 2
+          }
         }
       ]
     });
@@ -149,6 +179,13 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
           }
         }
         drawRef.current = null;
+
+        // Restaurar proyección original
+        try {
+          if (previousProjection && map.setProjection) {
+            map.setProjection(previousProjection);
+          }
+        } catch (_) {}
       } else {
         console.warn("PropertyBoundaryDraw: Map not available or style not loaded during cleanup.")
       }
@@ -260,6 +297,12 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
           center: center,
           geojson: polygon
         });
+
+        // Poner el polígono en modo "static" para que quede visible
+        try {
+          drawRef.current.setFeatureProperty(polygon.id, 'mode', 'static');
+          drawRef.current.changeMode('simple_select');
+        } catch (_) {}
       }
     }
   };

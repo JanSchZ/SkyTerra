@@ -461,6 +461,11 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
             <MapView 
               ref={mapViewRef}
               editable={true}
+              onBoundariesUpdate={handleBoundariesUpdate}
+              onLocationSelect={({ longitude, latitude }) => {
+                setFormData(prev => ({ ...prev, longitude, latitude }));
+              }}
+              initialGeoJsonBoundary={formData.boundary_polygon}
               initialViewState={{
                 longitude: parseFloat(formData.longitude) || -70.6693,
                 latitude: parseFloat(formData.latitude) || -33.4489,
@@ -469,13 +474,6 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
                 bearing: 0
               }}
             />
-            {mapboxMapInstance && (
-              <PropertyBoundaryDraw 
-                map={mapboxMapInstance} 
-                onBoundariesUpdate={handleBoundariesUpdate} 
-                existingBoundaries={formData.boundary_polygon} 
-              />
-            )}
           </Box>
         </TabPanel>
 

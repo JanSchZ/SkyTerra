@@ -306,7 +306,41 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     }
   };
 
-  const handleKeyPress = (e) => { if (e.key === 'Enter') handleSearch(); };
+  const handleEnterFly = async (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!query.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      if (onSearchStart) onSearchStart(query.trim());
+      const geoResults = await searchLocation(query.trim());
+      if (geoResults.length > 0) {
+        const firstResult = geoResults[0];
+        const center = firstResult.center;
+        const placeName = firstResult.place_name || firstResult.text;
+        let zoom = 12;
+        if (firstResult.place_type?.includes('country')) zoom = 5;
+        else if (firstResult.place_type?.includes('region')) zoom = 8;
+        else if (firstResult.place_type?.includes('district')) zoom = 10;
+        else if (firstResult.place_type?.includes('place')) zoom = 11;
+
+        if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
+        setShowResults(false);
+        if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: placeName, center } });
+      } else {
+        // Fallback to full search (AI) if no geocode results
+        await handleSearch();
+      }
+    } catch (err) {
+      console.error('Error en geocode al presionar Enter:', err);
+      setError('No se encontró la ubicación.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => { handleEnterFly(e); };
   const handleCloseResults = () => { setShowResults(false); };
 
   const handleLocationClick = (location) => {
@@ -323,8 +357,9 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
-        autoComplete="off"
-        inputProps={{ autoComplete: 'off', name: 'ai-search-input' }}
+        autoComplete="new-password" /* evitar autocompletado del navegador */
+        inputProps={{ autoComplete: 'new-password', name: 'ai-search-input', spellCheck: 'false', 'data-lpignore': 'true' }}
+        onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'new-password'); e.target.setAttribute('autocorrect','off'); } catch(_){} }}
         InputProps={{
           endAdornment: loading ? (
             <InputAdornment position="end">

@@ -17,6 +17,7 @@ import {
   Alert,
   Chip,
   Grow,
+  Fade,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
@@ -82,6 +83,28 @@ const AppWrapper = () => {
     <ThemeModeContext.Provider value={themeMode}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
+        <style>
+          {`
+            .page-transition-enter {
+              opacity: 0;
+              transform: translateY(20px) scale(0.95);
+            }
+            .page-transition-enter-active {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+              transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+            .page-transition-exit {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+            .page-transition-exit-active {
+              opacity: 0;
+              transform: translateY(-20px) scale(1.02);
+              transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+          `}
+        </style>
         <App />
       </ThemeProvider>
     </ThemeModeContext.Provider>
@@ -125,6 +148,10 @@ function App() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+
+  // Estado para navegación fluida
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navigationTarget, setNavigationTarget] = useState(null);
 
   const hoverTimeoutRef = useRef(null);
 
@@ -331,6 +358,26 @@ function App() {
       return;
     }
     setSnackbarOpen(false);
+  };
+
+  // Función para navegación fluida con animación
+  const handleSmoothNavigation = async (targetPath) => {
+    if (isNavigating) return; // Prevenir múltiples clics
+
+    setIsNavigating(true);
+    setNavigationTarget(targetPath);
+
+    // Pequeño delay para mostrar el efecto de carga
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Navegar a la ruta
+    navigate(targetPath);
+
+    // Resetear estado después de la navegación
+    setTimeout(() => {
+      setIsNavigating(false);
+      setNavigationTarget(null);
+    }, 500);
   };
 
   const [userMenuAnchorEl, setUserMenuAnchorEl] = useState(null);
@@ -670,7 +717,21 @@ function App() {
       <Route path="/payment-cancelled" element={<ProtectedRoute user={user} element={<PaymentCancelled />} />} />
 
       {/* Página de Login dedicada */}
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 1.02 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+            duration: 0.4
+          }}
+        >
+          <Login />
+        </motion.div>
+      } />
 
       {/* Fallback route */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -863,24 +924,144 @@ function App() {
                       </Menu>
                     </>
                   ) : (
-                    <Button
-                      variant="outlined"
-                      onClick={() => navigate('/login')}
-                      sx={(theme)=>({
-                        borderColor: 'rgba(120, 120, 120, 0.7)', color: '#ffffff', fontWeight: 300,
-                        padding: '6px 12px', fontSize: '0.8rem',
-                        backgroundColor: 'rgba(22, 27, 34, 0.7)', backdropFilter: 'blur(6px)',
-                        '&:hover': { borderColor: '#58a6ff', backgroundColor: 'rgba(30, 58, 138, 0.2)' }
-                      })}
+                    <motion.div
+                      whileHover={{
+                        scale: 1.05,
+                        boxShadow: '0 0 25px rgba(255, 255, 255, 0.6)',
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 17
+                      }}
+                      style={{
+                        display: 'inline-block',
+                        borderRadius: '4px',
+                        overflow: 'hidden'
+                      }}
                     >
-                      Login
-                    </Button>
+                      <motion.div
+                        animate={isNavigating && navigationTarget === '/login' ? {
+                          scale: [1, 1.1, 0.9],
+                          opacity: [1, 0.8, 0]
+                        } : {}}
+                        transition={{
+                          duration: 0.6,
+                          ease: [0.25, 0.46, 0.45, 0.94]
+                        }}
+                        style={{ display: 'inline-block' }}
+                      >
+                        <Button
+                          variant="outlined"
+                          onClick={() => handleSmoothNavigation('/login')}
+                          disabled={isNavigating}
+                          sx={(theme)=>({
+                            borderColor: 'rgba(120, 120, 120, 0.7)',
+                            color: '#ffffff',
+                            fontWeight: 300,
+                            padding: '6px 12px',
+                            fontSize: '0.8rem',
+                            backgroundColor: 'rgba(22, 27, 34, 0.7)',
+                            backdropFilter: 'blur(6px)',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: '4px',
+                            opacity: isNavigating && navigationTarget === '/login' ? 0.7 : 1,
+                            '&::before': {
+                              content: '""',
+                              position: 'absolute',
+                              top: 0,
+                              left: '-100%',
+                              width: '100%',
+                              height: '100%',
+                              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent)',
+                              transition: 'left 0.5s',
+                            },
+                            '&:hover': {
+                              borderColor: 'rgba(255, 255, 255, 0.8)',
+                              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                              '&::before': {
+                                left: '100%',
+                              }
+                            },
+                            '&:disabled': {
+                              opacity: 0.6,
+                              cursor: 'not-allowed'
+                            }
+                          })}
+                        >
+                          {isNavigating && navigationTarget === '/login' ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <CircularProgress size={14} sx={{ color: 'rgba(255,255,255,0.8)' }} />
+                              <span>Cargando...</span>
+                            </Box>
+                          ) : (
+                            'Login'
+                          )}
+                        </Button>
+                      </motion.div>
+                    </motion.div>
                   )}
                 </Box>
               </Box>
               {/* Removed AppliedFiltersDisplay to keep filters internal and invisible to user */}
             </Box>
           )}
+
+          {/* Overlay de transición de navegación */}
+          <AnimatePresence>
+            {isNavigating && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(13, 17, 23, 0.3)',
+                  backdropFilter: 'blur(2px)',
+                  zIndex: 9999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                >
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 3,
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 2,
+                      minWidth: 200,
+                    }}
+                  >
+                    <CircularProgress sx={{ color: 'rgba(255, 255, 255, 0.8)' }} size={32} />
+                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)', fontWeight: 300 }}>
+                      Cargando...
+                    </Typography>
+                  </Paper>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Snackbar para notificaciones */}
           <Snackbar

@@ -3,13 +3,13 @@
 
 // Estilo personalizado SkyTerra con bordes grises
 // Helper: fecha (UTC) para tiles diarios de NASA (usamos "ayer" para mayor disponibilidad)
-// (Desactivado por ahora) tiles de nubes NASA
-// const oneDayMs = 24 * 60 * 60 * 1000;
-// const d = new Date(Date.now() - oneDayMs);
-// const YYYY = d.getUTCFullYear();
-// const MM = String(d.getUTCMonth() + 1).padStart(2, '0');
-// const DD = String(d.getUTCDate()).padStart(2, '0');
-// const GIBS_DATE = `${YYYY}-${MM}-${DD}`;
+// Tiles de nubes NASA GIBS: usar fecha (UTC) del día anterior para mayor estabilidad
+const oneDayMs = 24 * 60 * 60 * 1000;
+const d = new Date(Date.now() - oneDayMs);
+const YYYY = d.getUTCFullYear();
+const MM = String(d.getUTCMonth() + 1).padStart(2, '0');
+const DD = String(d.getUTCDate()).padStart(2, '0');
+const GIBS_DATE = `${YYYY}-${MM}-${DD}`;
 const skyTerraCustomStyle = {
   version: 8,
   name: "SkyTerra Custom - Daylight Earth",
@@ -82,6 +82,16 @@ const skyTerraCustomStyle = {
       url: "mapbox://mapbox.satellite",
       type: "raster",
       tileSize: 256 // Usar 256 para satélite puede ser más performante
+    },
+    // Fuente raster de NASA GIBS (VIIRS TrueColor) para overlay de nubes
+    "nasa-gibs": {
+      type: "raster",
+      tiles: [
+        `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${GIBS_DATE}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`
+      ],
+      tileSize: 256,
+      maxzoom: 9,
+      attribution: "Imagery courtesy of NASA GIBS, NASA EOSDIS"
     }
   },
   sprite: "mapbox://sprites/mapbox/satellite-streets-v12", // Asegúrate que el sprite exista
@@ -102,7 +112,27 @@ const skyTerraCustomStyle = {
         "raster-brightness-max": 0.92
       }
     },
-    // Clouds overlay removed for stability; can be re-enabled once tiles are confirmed
+    // Overlay de nubes NASA GIBS (TrueColor) con opacidad moderada
+    {
+      id: "nasa-clouds-overlay",
+      type: "raster",
+      source: "nasa-gibs",
+      minzoom: 0,
+      maxzoom: 9,
+      paint: {
+        // Sin ajustes de color para evitar blanqueo del fondo
+        "raster-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.35,
+          1.5, 0.30,
+          2.5, 0.18,
+          3.0, 0.10,
+          3.4, 0.04,
+          3.6, 0.0
+        ],
+        "raster-fade-duration": 50
+      }
+    },
     // Terrain hillshade to add subtle relief and perceived detail over satellite
     {
       id: "terrain-hillshade",
@@ -268,7 +298,7 @@ const skyTerraCustomStyle = {
         "line-opacity": 0.5
       }
     },
-    // Países
+    // Países (asegurar visibilidad de etiquetas)
     {
       id: "country-labels",
       type: "symbol",
@@ -296,9 +326,9 @@ const skyTerraCustomStyle = {
         "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 98%)",
-        "text-halo-color": "hsla(210, 30%, 6%, 0.7)",
-        "text-halo-width": 1.2
+        "text-color": "#f2f2f2",
+        "text-halo-color": "rgba(0,0,0,0.6)",
+        "text-halo-width": 1.4
       }
     },
     // Ciudades principales (alta jerarquía)
@@ -313,7 +343,7 @@ const skyTerraCustomStyle = {
         ["<=", ["coalesce", ["get", "rank"], ["get", "label_rank"], 999], 4]
       ],
       layout: {
-        "text-field": ["get", "name"],
+        "text-field": ["coalesce", ["get", "name_es"], ["get", "name"]],
         "text-font": ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
@@ -328,9 +358,9 @@ const skyTerraCustomStyle = {
         "icon-allow-overlap": false
       },
       paint: {
-        "text-color": "hsl(0, 0%, 96%)",
-        "text-halo-color": "hsla(210, 30%, 6%, 0.65)",
-        "text-halo-width": 1.05
+        "text-color": "#efefef",
+        "text-halo-color": "rgba(0,0,0,0.55)",
+        "text-halo-width": 1.15
       }
     },
     // Ciudades secundarias (mediana jerarquía)
@@ -402,7 +432,7 @@ const skyTerraCustomStyle = {
       id: "village-labels",
       type: "symbol",
       source: "composite",
-      "source-layer": "place_label",
+      "source-layer": "place-label",
       minzoom: 12,
       filter: ["all",
         ["==", ["get", "type"], "village"]

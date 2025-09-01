@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useRef } from 'react';
-import { Box, Stepper, Step, StepLabel, Button, Paper, Typography, TextField, Slider, Grid, Card, Snackbar, Alert, MenuItem, Chip, IconButton } from '@mui/material';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { Box, Stepper, Step, StepLabel, Button, Paper, Typography, TextField, Slider, Grid, Card, Snackbar, Alert, MenuItem, Chip, IconButton, CircularProgress, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { liquidGlassTheme } from '../../theme/liquidGlassTheme';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,6 +48,10 @@ export default function CreatePublicationWizard() {
   const [activeStep, setActiveStep] = useState(0);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchAbortRef = useRef(null);
 
   const [propertyData, setPropertyData] = useState({
     name: '',
@@ -67,6 +71,40 @@ export default function CreatePublicationWizard() {
     images: [],
     documents: [],
   });
+  // Geocoding for step 2 search bar (outside map)
+  useEffect(() => {
+    if (activeStep !== 1) return;
+    const q = (searchQuery || '').trim();
+    if (q.length < 3) { setSearchResults([]); if (searchAbortRef.current) { try { searchAbortRef.current.abort(); } catch (_) {} } return; }
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    const t = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}&language=es&limit=6`;
+        const resp = await fetch(endpoint, { signal: controller.signal });
+        const data = await resp.json();
+        const feats = Array.isArray(data?.features) ? data.features : [];
+        setSearchResults(feats.map(f => ({ id: f.id, place_name: f.place_name_es || f.place_name, center: f.center })));
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.error('Geocoding error:', e);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+    return () => { clearTimeout(t); try { controller.abort(); } catch (_) {} };
+  }, [searchQuery, activeStep]);
+
+  const handlePickSearchResult = (res) => {
+    if (!res || !Array.isArray(res.center) || res.center.length < 2) return;
+    const [lon, lat] = res.center;
+    // Center map via BoundaryEditor ref when mounted
+    try {
+      boundaryEditorRef.current?.flyTo?.({ center: [lon, lat], zoom: 13.5, duration: 1200 });
+    } catch (_) {}
+    setPropertyData(prev => ({ ...prev, longitude: lon, latitude: lat }));
+    setSearchResults([]);
+  };
 
   const [imagePreviews, setImagePreviews] = useState([]); // {url, file}
   const [documentPreviews, setDocumentPreviews] = useState([]); // {name, file}
@@ -241,12 +279,47 @@ export default function CreatePublicationWizard() {
             <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
               Dibuja el polígono del terreno. Calcularemos ubicación central y área automáticamente.
             </Typography>
+            {/* Search bar outside the map */}
+            <Box sx={{ mb: 1.5 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Buscar dirección, ciudad o lugar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                variant="outlined"
+                InputProps={{ endAdornment: searchLoading ? <CircularProgress size={16} /> : null }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(255,255,255,0.98)',
+                    '& fieldset': { borderColor: 'rgba(0,0,0,0.18)' },
+                    '&:hover fieldset': { borderColor: 'rgba(0,0,0,0.28)' },
+                    '&.Mui-focused fieldset': { borderColor: '#1976d2' }
+                  }
+                }}
+              />
+              {searchResults.length > 0 && (
+                <Paper elevation={2} sx={{ mt: 0.5, borderRadius: 2, maxHeight: 260, overflowY: 'auto' }}>
+                  <List dense>
+                    {searchResults.map((r) => (
+                      <ListItem key={r.id} disableGutters>
+                        <ListItemButton onClick={() => handlePickSearchResult(r)}>
+                          <ListItemText primary={r.place_name} />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              )}
+            </Box>
             <BoundaryEditor
               ref={boundaryEditorRef}
               initialViewState={{ longitude: -70.6693, latitude: -33.4489, zoom: 5 }}
               height={560}
               square
               existingFeature={propertyData.boundary_polygon}
+              overlaySearch={false}
               onChange={(res) => {
                 if (!res) {
                   setPropertyData((prev) => ({ ...prev, boundary_polygon: null }));

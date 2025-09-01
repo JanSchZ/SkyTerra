@@ -366,6 +366,16 @@ body, html {
   backdrop-filter: blur(16px);
 }
 
+/* Cambiar borde de foco de los TextField (MUI) a estilo near-black + sutil "frost" blanco */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(10,10,10,0.95) !important; /* near-black */
+  box-shadow: 0 0 0 6px rgba(255,255,255,0.04); /* sutil halo frost */
+}
+
+.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
 .property-card {
   background: var(--bg-primary);
   border-radius: 16px;

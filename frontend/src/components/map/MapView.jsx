@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef, useMemo } from 'react';
-import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip } from '@mui/material';
+import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip, TextField, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
 import { propertyService, tourService, usePropertyService } from '../../services/api';
 import Map, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -106,6 +106,7 @@ const MapView = forwardRef(({
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isRotating, setIsRotating] = useState(false); // Estado para la rotación del globo
   const [connectionType, setConnectionType] = useState('4g');
+  const [isMapUIReady, setIsMapUIReady] = useState(false); // Mapa listo (idle)
   const mapRef = useRef(null);
   const rotationFrameId = useRef(null); // Ref para el ID de la animación de rotación
   const rotationPrevTimeRef = useRef(null); // timestamp del frame previo
@@ -119,6 +120,11 @@ const MapView = forwardRef(({
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewPropertyId, setPreviewPropertyId] = useState(null);
   const [tourCache, setTourCache] = useState({}); // propertyId -> tourUrl
+  // Geocoder state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchAbortRef = useRef(null);
 
   // Side preview panel state
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -834,7 +840,7 @@ const MapView = forwardRef(({
       return;
     }
 
-    if (isMapLoaded && !loading) {
+    if (isMapUIReady && isMapLoaded && !loading) {
       autoFlightAttemptedRef.current = true;
       
       let userCountry = 'default';
@@ -856,7 +862,7 @@ const MapView = forwardRef(({
         performAutoFlight('chile');
       }
     } 
-  }, [isMapLoaded, loading, properties, editable, autoFlyCompleted, getCountryFromCoords, performAutoFlight, disableIntroAnimation]);
+  }, [isMapUIReady, isMapLoaded, loading, properties, editable, autoFlyCompleted, getCountryFromCoords, performAutoFlight, disableIntroAnimation]);
 
   // Función para ir a la ubicación actual del usuario (botón manual)
   const handleGoToMyLocation = () => {
@@ -941,6 +947,10 @@ const MapView = forwardRef(({
       });
 
       // console.log('✅ Configuración del mapa completada');
+      try {
+        // Marcar UI lista cuando el mapa queda idle (sin tareas pendientes de render)
+        map.once('idle', () => setIsMapUIReady(true));
+      } catch (_) {}
       
       // Llamar al callback externo si existe
       if (onLoad) {
@@ -1330,6 +1340,9 @@ const MapView = forwardRef(({
       }
     },
     getMapInstance: () => mapRef.current,
+    getMap: () => {
+      try { return mapRef.current?.getMap?.(); } catch (_) { return null; }
+    },
     openPropertyTour: async (prop, options = {}) => {
       try {
         const propertyId = (prop && prop.id) ? prop.id : prop;
@@ -1446,14 +1459,43 @@ const MapView = forwardRef(({
     fetchPreview();
   }, [popupInfo]);
 
-  // Si se está cargando y no es editable, muestra el spinner
-  if (loading && !editable) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0d1117' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // Eliminar return bloqueante: siempre renderizamos el mapa y mostramos overlay si hace falta
+
+  // Buscar lugares con Mapbox Geocoding (debounced)
+  useEffect(() => {
+    const q = (searchQuery || '').trim();
+    if (!editable) return; // solo en modo edición/publicación
+    if (q.length < 3) { setSearchResults([]); if (searchAbortRef.current) { try { searchAbortRef.current.abort(); } catch (_) {} } return; }
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+    const t = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_TOKEN}&language=es&limit=6`;
+        const resp = await fetch(endpoint, { signal: controller.signal });
+        const data = await resp.json();
+        const feats = Array.isArray(data?.features) ? data.features : [];
+        setSearchResults(feats.map(f => ({ id: f.id, place_name: f.place_name_es || f.place_name, center: f.center })));
+      } catch (e) {
+        if (e?.name !== 'AbortError') console.error('Geocoding error:', e);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+    return () => { clearTimeout(t); try { controller.abort(); } catch (_) {} };
+  }, [searchQuery, editable, MAPBOX_TOKEN]);
+
+  const handleSelectSearchResult = useCallback((res) => {
+    if (!res || !Array.isArray(res.center) || res.center.length < 2) return;
+    const [lon, lat] = res.center;
+    if (mapRef.current) {
+      mapRef.current.flyTo({ center: [lon, lat], zoom: 14, duration: 1200, essential: true });
+    }
+    if (editable && onLocationSelect) {
+      onLocationSelect({ longitude: lon, latitude: lat });
+    }
+    setSearchResults([]);
+  }, [editable, onLocationSelect]);
 
   return (
     <Box sx={{ 
@@ -1494,7 +1536,8 @@ const MapView = forwardRef(({
         </Box>
       )}
       
-      {!loading && !error && (
+      {/* Mapa siempre visible para que pueda inicializar y disparar 'idle' */}
+      {!error && (
         <Map
           ref={mapRef}
           {...viewState}
@@ -1569,6 +1612,36 @@ const MapView = forwardRef(({
                 color: 'white',
              }}
           />
+          {editable && (
+            <Box sx={{ position: 'absolute', top: embedded ? 8 : 16, left: '50%', transform: 'translateX(-50%)', zIndex: 10, width: 'min(720px, 92vw)' }}>
+              <Paper elevation={3} sx={{ p: 1, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.92)' }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Buscar dirección, ciudad o lugar..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoComplete="new-password"
+                  inputProps={{ autoComplete: 'new-password', spellCheck: 'false', 'data-lpignore': 'true' }}
+                  onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'new-password'); e.target.setAttribute('autocorrect','off'); } catch(_){} }}
+                  InputProps={{ endAdornment: searchLoading ? <CircularProgress size={16} /> : null }}
+                />
+                {searchResults.length > 0 && (
+                  <Paper elevation={4} sx={{ mt: 1, borderRadius: 2, maxHeight: 280, overflowY: 'auto' }}>
+                    <List dense>
+                      {searchResults.map((r) => (
+                        <ListItem key={r.id} disableGutters>
+                          <ListItemButton onClick={() => handleSelectSearchResult(r)}>
+                            <ListItemText primary={r.place_name} />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Paper>
+                )}
+              </Paper>
+            </Box>
+          )}
           {editable && isDrawingMode && mapRef.current && (
             <PropertyBoundaryDraw 
               map={mapRef.current.getMap()} 
@@ -1690,8 +1763,37 @@ const MapView = forwardRef(({
         </Alert>
       </Snackbar>
 
+      {/* Splash de carga hasta que el mapa esté realmente listo */}
       <AnimatePresence>
-        {!disableIntroAnimation && showOverlay && (
+        {(!isMapUIReady || (loading && !editable)) && !error && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: '#0d1117',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 120,
+            }}
+          >
+            <Box sx={{ textAlign: 'center', color: 'white' }}>
+              <CircularProgress sx={{ color: 'rgba(255,255,255,0.85)' }} />
+              <Typography sx={{ mt: 2, color: 'rgba(255,255,255,0.85)' }}>Cargando mapa...</Typography>
+            </Box>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Intro/animación solo cuando el mapa ya está listo */}
+      <AnimatePresence>
+        {!disableIntroAnimation && showOverlay && isMapUIReady && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
