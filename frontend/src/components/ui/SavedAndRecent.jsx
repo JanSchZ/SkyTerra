@@ -3,6 +3,7 @@ import { Box, Typography, Paper, IconButton, Button, Chip, Link } from '@mui/mat
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService } from '../../services/api';
 
@@ -33,12 +34,20 @@ const HorizontalScroller = ({ children, ariaLabel }) => {
   );
 };
 
-const CardTile = ({ item, onToggleSelect, selected }) => {
+const CardTile = ({ item, onToggleSelect, selected, onUnfavorite }) => {
   const hasTour = !!item.previewTourUrl;
   const imageUrl = item.main_image || (item.images && item.images[0]?.url) || null;
   return (
-    <Paper variant="glass" sx={{ width: 280, minWidth: 280, borderRadius: 2, overflow: 'hidden' }}>
-      <Box sx={{ width: '100%', height: 160, backgroundColor: '#111' }}>
+    <Paper variant="glass" sx={{ width: 280, minWidth: 280, borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+      <Box sx={{ width: '100%', height: 160, backgroundColor: '#111', position: 'relative' }}>
+        <IconButton
+          aria-label="Quitar de guardados"
+          onClick={() => onUnfavorite?.(item.id)}
+          size="small"
+          sx={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.45)', color: 'white', '&:hover': { backgroundColor: 'rgba(0,0,0,0.7)' } }}
+        >
+          <FavoriteIcon fontSize="small" />
+        </IconButton>
         {hasTour ? (
           <iframe src={item.previewTourUrl} width="100%" height="160" style={{ border: 0 }} title={`Preview ${item.name}`} />
         ) : (
@@ -61,9 +70,12 @@ const CardTile = ({ item, onToggleSelect, selected }) => {
           variant={selected ? 'contained' : 'outlined'}
           startIcon={<CompareArrowsIcon />}
           onClick={() => onToggleSelect(item.id)}
-          sx={{ mt: 1 }}
+          sx={{ mt: 1, mr: 1 }}
         >
           {selected ? 'Seleccionada' : 'Comparar'}
+        </Button>
+        <Button size="small" color="error" onClick={() => onUnfavorite?.(item.id)} sx={{ mt: 1 }}>
+          Quitar
         </Button>
       </Box>
     </Paper>
@@ -114,6 +126,16 @@ const SavedAndRecent = () => {
     navigate(`/compare?ids=${selected.join(',')}`);
   };
 
+  const handleUnfavorite = async (propertyId) => {
+    try {
+      await favoritesService.removeByProperty(propertyId);
+      setSaved((prev) => prev.filter((p) => p.id !== propertyId));
+      setSelected((prev) => prev.filter((id) => id !== propertyId));
+    } catch (err) {
+      console.error('No se pudo quitar de guardados:', err);
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" sx={{ mb: 2 }}>Guardados</Typography>
@@ -132,7 +154,7 @@ const SavedAndRecent = () => {
       ) : (
         <HorizontalScroller ariaLabel="Guardados">
           {saved.map((f) => (
-            <CardTile key={`sav-${f.id}`} item={f} onToggleSelect={toggleSelect} selected={selected.includes(f.id)} />
+            <CardTile key={`sav-${f.id}`} item={f} onToggleSelect={toggleSelect} selected={selected.includes(f.id)} onUnfavorite={handleUnfavorite} />
           ))}
         </HorizontalScroller>
       )}

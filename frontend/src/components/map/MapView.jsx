@@ -304,6 +304,9 @@ const MapView = forwardRef(({
 
   const mapStyle = config.mapbox.style;
   
+  // Mostrar popups solo cuando el usuario está lo suficientemente cerca
+  const POPUP_MIN_ZOOM = 10; // umbral a partir del cual se habilitan los popups por hover
+  
   useEffect(() => {
     // console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
   }, []);
@@ -561,6 +564,10 @@ const MapView = forwardRef(({
   };
 
   const handleMarkerHover = (property) => {
+    try {
+      const currentZoom = mapRef.current?.getMap?.()?.getZoom?.() ?? 0;
+      if (currentZoom < POPUP_MIN_ZOOM) return;
+    } catch (_) {}
     setPopupInfo(property);
     clearTimeout(window.tooltipHideTimeout);
   };
@@ -1242,6 +1249,12 @@ const MapView = forwardRef(({
     const map = mapRef.current.getMap();
     if (!map) return;
 
+    // Evitar selección si el zoom es bajo (coherente con hover)
+    const currentZoom = map.getZoom();
+    if (currentZoom < POPUP_MIN_ZOOM) {
+      return;
+    }
+
     // Check if layers exist before querying
     const unclusteredLayerExists = map.getLayer(unclusteredPointLayer.id);
 
@@ -1302,6 +1315,14 @@ const MapView = forwardRef(({
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
     if (!map) return;
+
+    // Ocultar popups si el zoom es bajo (no invasivo en vista lejana)
+    const currentZoom = map.getZoom();
+    if (currentZoom < POPUP_MIN_ZOOM) {
+      map.getCanvas().style.cursor = '';
+      if (popupInfo) setPopupInfo(null);
+      return;
+    }
 
     // Check if layer exists before querying
     const unclusteredLayerExists = map.getLayer(unclusteredPointLayer.id);
@@ -1726,37 +1747,49 @@ const MapView = forwardRef(({
               onClose={() => setPopupInfo(null)}
               anchor="bottom"
               offset={15} 
-              maxWidth="300px"
+              maxWidth="420px"
             >
               <Card elevation={0} sx={{ 
-                maxWidth: 320, 
+                width: 420,
                 display: 'flex',
-                backgroundColor: 'rgba(40,40,40,0.4)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.25)',
+                alignItems: 'center',
+                backgroundColor: 'rgba(20,20,24,0.28)',
+                backdropFilter: 'blur(12px) saturate(120%)',
+                WebkitBackdropFilter: 'blur(12px) saturate(120%)',
+                border: '1px solid rgba(255,255,255,0.18)',
                 borderRadius: '16px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-                color: 'white'
+                boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+                color: 'white',
+                columnGap: '10px'
               }}>
-                <CardContent sx={{ p: 1.5, pr: 1, '&:last-child': { pb: 1.5 }, flex: '1 1 60%' }}>
-                  <Typography gutterBottom variant="subtitle1" component="div" sx={{fontSize: '0.95rem', fontWeight: 'bold', color:'white'}}>
+                <CardContent sx={{ p: 1.5, pr: 1, '&:last-child': { pb: 1.5 }, flex: '1 1 50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 170 }}>
+                  <Typography gutterBottom variant="subtitle1" component="div" sx={{fontSize: '1rem', fontWeight: 500, color:'rgba(255,255,255,0.95)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'}}>
                     {popupInfo.name}
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 0.5, color:'white', opacity:0.85 }}>
                     Precio: {getPriceDisplay(popupInfo)}
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 0.5, color:'white', opacity:0.85 }}>
-                    Tamaño: {popupInfo.size} ha
+                    Tamaño: {Number(popupInfo.size).toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} ha
                   </Typography>
                   {/* Oculto: no mostramos etiquetas de tipo/categoría */}
                 </CardContent>
-                <Box sx={{ width: 140, height: 100, mr: 1, mt: 1, flex: '0 0 40%' }}>
+                <Box sx={{
+                  width: 170,
+                  height: 170,
+                  m: 1,
+                  flex: '0 0 42%',
+                  alignSelf: 'center',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                }}>
                   {tourPreviews[popupInfo.id] ? (
-                    <iframe src={tourPreviews[popupInfo.id]} width="100%" height="100%" style={{ border: 0 }} title={`Preview ${popupInfo.name}`} />
+                    <iframe src={tourPreviews[popupInfo.id]} width="100%" height="100%" style={{ border: 0, display: 'block' }} title={`Preview ${popupInfo.name}`} />
                   ) : (
                     (popupInfo.images && popupInfo.images.length > 0) ? (
-                      <CardMedia component="img" image={popupInfo.images[0].url} alt={popupInfo.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <CardMedia component="img" image={popupInfo.images[0].url} alt={popupInfo.name} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     ) : null
                   )}
                 </Box>

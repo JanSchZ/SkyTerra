@@ -189,6 +189,39 @@ class PropertyPreviewViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        """
+        Permite filtrar por múltiples IDs usando el query param `id__in=1,2,3`.
+        Mantiene paginación y ordering estándar. Si alguno de los IDs no existe
+        o no está publicado (approved), simplemente no aparecerá en los
+        resultados.
+        """
+        try:
+            ids_param = request.query_params.get('id__in')
+            queryset = self.get_queryset()
+            if ids_param:
+                try:
+                    raw_ids = [x.strip() for x in ids_param.split(',') if x.strip()]
+                    ids = [int(x) for x in raw_ids]
+                    if ids:
+                        queryset = queryset.filter(id__in=ids)
+                except Exception:
+                    # Si el parámetro viene mal formado, ignorarlo y continuar sin filtro
+                    pass
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        except Exception as exc:
+            logger.error("Error en PropertyPreviewViewSet.list: %s", exc)
+            serializer = self.get_serializer(self.get_queryset()[:0], many=True)
+            # Responder vacío para no romper UX si hay algún problema puntual
+            return Response(serializer.data)
+
 class PropertyViewSet(viewsets.ModelViewSet):
     """Viewset para la gestión de propiedades inmobiliarias"""
     queryset = Property.objects.all().order_by('-created_at')

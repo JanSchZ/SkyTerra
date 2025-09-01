@@ -24,7 +24,7 @@ const CircularPlusvalia = ({ value = 0, size = 56, strokeWidth = 6, color }) => 
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(0,0,0,0.12)"
+          stroke="rgba(255,255,255,0.16)"
           strokeWidth={strokeWidth}
         />
         <circle

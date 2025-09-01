@@ -69,7 +69,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
           <Paper
             variant="glass"
             elevation={6}
-            sx={{ width: 320, p: 2, backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', backgroundColor:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', flexDirection:'column', color:'#ffffff' }}
+            sx={{ width: 320, p: 2, backdropFilter:'blur(12px) saturate(120%)', WebkitBackdropFilter:'blur(12px) saturate(120%)', backgroundColor:'rgba(20,20,24,0.28)', border:'1px solid rgba(255,255,255,0.18)', display:'flex', flexDirection:'column', color:'#ffffff', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }}
           >
             {/* Preview - 1:1 aspect ratio */}
             <Box sx={{ position:'relative', width:'100%', height:280, mb:1.5, borderRadius:1, overflow:'hidden' }}>
@@ -96,10 +96,13 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                   left:10,
                   padding:0,
                   minWidth:0,
-                  backgroundColor:'transparent',
-                  border:'none',
-                  color: isSaved ? '#000' : 'rgba(255,255,255,0.85)',
-                  '&:hover':{ color: isSaved ? '#000' : 'rgba(255,255,255,0.95)' },
+                  backgroundColor:'rgba(0,0,0,0.25)',
+                  border:'1px solid rgba(255,255,255,0.18)',
+                  backdropFilter: 'blur(6px)',
+                  WebkitBackdropFilter: 'blur(6px)',
+                  borderRadius: '10px',
+                  color: isSaved ? '#ffffff' : 'rgba(255,255,255,0.85)',
+                  '&:hover':{ color: isSaved ? '#ffffff' : 'rgba(255,255,255,0.95)', backgroundColor: 'rgba(0,0,0,0.32)' },
                   width: 44,
                   height: 44,
                   display: 'flex',
@@ -109,7 +112,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                 aria-label={isSaved ? 'Quitar de guardados' : 'Guardar'}
               >
                 {isSaved ? (
-                  <BookmarkIcon sx={{ color:'#000', fontSize: 28 }} />
+                  <BookmarkIcon sx={{ color:'#ffffff', fontSize: 28 }} />
                 ) : (
                   <BookmarkBorderIcon sx={{ fontSize: 28 }} />
                 )}
@@ -140,13 +143,13 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
               { /* normalize price label to remove "/mes" */ }
               { /* priceLabelClean computed below in render scope */ }
               
-                <Box sx={{ display:'inline-block', mb:0.75, px:1, py:0.5, borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.10)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.18)' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight:700, fontSize: '0.9rem', color: '#ffffff' }}>{property.name}</Typography>
+                <Box sx={{ display:'inline-block', mb:0.75, px:1, py:0.5, borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight:500, fontSize: '0.95rem', color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.01em' }}>{property.name}</Typography>
                 </Box>
-                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: '#ffffff' }}>
+                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: 'rgba(255,255,255,0.88)' }}>
                   Precio: {getPriceDisplay ? getPriceDisplay(property).replace(/\s*\/mes\s*$/, '') : 'N/D'}
                 </Typography>
-                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: '#ffffff' }}>Tamaño: {Number(property.size).toLocaleString('es-CL')} ha</Typography>
+                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: 'rgba(255,255,255,0.88)' }}>Tamaño: {Number(property.size).toLocaleString('es-CL')} ha</Typography>
                 {property.bedrooms && (
                   <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Dormitorios: {property.bedrooms}</Typography>
                 )}
@@ -176,7 +179,14 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                 sx={{ 
                   minWidth: '80px',
                   px: 3,
-                  py: 1
+                  py: 1,
+                  backgroundColor: 'rgba(0,0,0,0.35)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(255,255,255,0.20)',
+                  backdropFilter: 'blur(6px)',
+                  WebkitBackdropFilter: 'blur(6px)',
+                  boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
+                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.5)', boxShadow: '0 8px 24px rgba(0,0,0,0.26)' }
                 }}
               >
                 Ir

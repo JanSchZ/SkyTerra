@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -10,13 +10,14 @@ import {
   Chip,
   CircularProgress,
 } from '@mui/material';
-import axios from 'axios';
+import { api } from '../../services/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 /**
- * Vista que muestra hasta 4 propiedades lado a lado para comparación.
- * Acepta lista de ids en query param ?ids=1,2,3
- * Si no hay ids, intenta recuperar sesión /api/compare/ (GET) y redirige con ids.
+ * Vista que muestra hasta 4 propiedades lado a lado para comparación, con cada
+ * tour a la derecha y su tarjeta de especificaciones a la izquierda.
+ * Acepta lista de ids en query param ?ids=1,2,3. Si no hay ids, intenta
+ * recuperar una sesión existente /compare/ (GET) y redirige con ids.
  */
 const CompareView = () => {
   const [propsData, setPropsData] = useState([]);
@@ -24,34 +25,50 @@ const CompareView = () => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const fetchedRef = useRef(false);
 
   const idsParam = searchParams.get('ids');
+  const ids = useMemo(() => {
+    return (idsParam ? idsParam.split(',') : [])
+      .map((x) => parseInt(x, 10))
+      .filter((n) => !Number.isNaN(n))
+      .slice(0, 4);
+  }, [idsParam]);
+
+  const buildTourUrl = (url) => {
+    if (!url) return '';
+    const hasHash = url.includes('#');
+    const [prefix, tail] = hasHash ? url.split('#') : url.split('?');
+    const params = new URLSearchParams(tail || '');
+    params.set('autoLoad', 'true');
+    if (!params.has('autoRotate')) params.set('autoRotate', '0');
+    return `${prefix}${hasHash ? '#' : '?'}${params.toString()}`;
+  };
 
   useEffect(() => {
+    if (fetchedRef.current) return; // evita doble ejecución en StrictMode
+    fetchedRef.current = true;
+
     const fetchData = async () => {
       setLoading(true);
       try {
-        let ids = idsParam ? idsParam.split(',').map((x) => parseInt(x)) : [];
         if (ids.length === 0) {
           // GET current comparison session
-          const resp = await axios.get('/api/compare/');
+          const resp = await api.get('/compare/', { skipAuth: true });
           const session = resp.data?.results?.[0] || resp.data?.[0];
-          ids = session?.properties?.map((p) => p.id) || [];
-          if (ids.length > 0) {
-            navigate(`/compare?ids=${ids.join(',')}`, { replace: true });
+          const sessionIds = session?.properties?.map((p) => p.id) || [];
+          if (sessionIds.length > 0) {
+            navigate(`/compare?ids=${sessionIds.join(',')}`, { replace: true });
           }
         } else {
-          if (ids.length > 4) ids = ids.slice(0, 4);
-          const resp = await axios.get('/api/properties-preview/', {
-            params: { id__in: ids.join(',') }, // assumes backend filter
+          const resp = await api.get('/properties-preview/', {
+            params: { id__in: ids.join(','), page_size: ids.length },
+            skipAuth: true,
           });
-          // But DRF default filter not set; fallback fetch individual
-          const properties = [];
-          for (const id of ids) {
-            const r = await axios.get(`/api/properties-preview/${id}/`);
-            properties.push(r.data);
-          }
-          setPropsData(properties);
+          const results = resp?.data?.results || resp?.data || [];
+          const byId = new Map(results.map((p) => [p.id, p]));
+          const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+          setPropsData(ordered);
         }
       } catch (err) {
         setError('Error al cargar comparación');
@@ -61,7 +78,7 @@ const CompareView = () => {
       }
     };
     fetchData();
-  }, [idsParam, navigate]);
+  }, [ids, navigate]);
 
   if (loading) {
     return (
@@ -94,24 +111,44 @@ const CompareView = () => {
   );
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>Comparación de Propiedades</Typography>
+    <Box sx={{ p: 2 }}>
+      <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold' }}>Comparación</Typography>
 
-      <Grid container spacing={2} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         {propsData.map((p) => (
-          <Grid item xs={12 / propsData.length} key={p.id}>
-            <Card variant="glass">
-              {p.main_image && (
-                <CardMedia component="img" image={p.main_image} height="160" alt={p.name} />
-              )}
-              <CardContent>
-                <Typography variant="h6" noWrap>{p.name}</Typography>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+          <Grid item xs={12} md={12 / Math.min(propsData.length, 4)} key={`col-${p.id}`}>
+            <Box sx={{ display: 'flex', height: { xs: 420, md: '70vh' }, backgroundColor: '#0c0c0c', borderRadius: 2, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.35)' }}>
+              <Box sx={{ width: { xs: 220, md: 300 }, p: 2, color: 'white', background: 'linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))', borderRight: '1px solid rgba(255,255,255,0.18)' }}>
+                <Typography variant="h6" sx={{ mb: 1 }} noWrap>{p.name}</Typography>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
                   {p.price ? Number(p.price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) : '—'}
                 </Typography>
-                <Chip label={`${p.size} ha`} size="small" />
-              </CardContent>
-            </Card>
+                <Chip label={`${p.size} ha`} size="small" sx={{ mb: 2 }} />
+                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
+                <Typography variant="body2" sx={{ mb: 1 }}>Lat/Lon</Typography>
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  {p.latitude && p.longitude ? `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}` : '—'}
+                </Typography>
+                {p.main_image && (
+                  <Card elevation={0} sx={{ backgroundColor: 'transparent' }}>
+                    <CardMedia component="img" image={p.main_image} height="120" alt={p.name} sx={{ objectFit: 'cover', borderRadius: 1 }} />
+                  </Card>
+                )}
+              </Box>
+              <Box sx={{ flex: 1, position: 'relative', backgroundColor: '#000' }}>
+                {p.previewTourUrl ? (
+                  <iframe src={buildTourUrl(p.previewTourUrl)} title={`Tour ${p.id}`} width="100%" height="100%" frameBorder="0" allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking" style={{ position: 'absolute', inset: 0, border: 'none' }} />
+                ) : (
+                  p.main_image ? (
+                    <CardMedia component="img" image={p.main_image} alt={p.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <Box sx={{ color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                      <Typography variant="body2">Sin tour ni imagen</Typography>
+                    </Box>
+                  )
+                )}
+              </Box>
+            </Box>
           </Grid>
         ))}
       </Grid>
@@ -119,7 +156,6 @@ const CompareView = () => {
       {renderRow('Precio', (p) => p.price ? Number(p.price).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' }) : '—')}
       {renderRow('Tamaño', (p) => `${p.size} ha`)}
       {renderRow('Coordenadas', (p) => `${p.latitude?.toFixed(4)}, ${p.longitude?.toFixed(4)}`)}
-      {/* Aquí se pueden añadir más filas comparativas con métricas avanzadas */}
     </Box>
   );
 };
