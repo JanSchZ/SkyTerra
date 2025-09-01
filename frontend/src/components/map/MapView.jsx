@@ -1207,9 +1207,9 @@ const MapView = forwardRef(({
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 4,   // Zoom bajo = puntos pequeños
-        12, 8,  // Zoom medio = puntos medianos  
-        16, 12  // Zoom alto = puntos grandes
+        8, 6,   // Zoom bajo = puntos pequeños (aumentado para mejor puntería)
+        12, 10, // Zoom medio = puntos medianos (aumentado)
+        16, 14  // Zoom alto = puntos grandes (aumentado)
       ],
       'circle-stroke-width': [
         'interpolate',
@@ -1252,9 +1252,13 @@ const MapView = forwardRef(({
 
     const queryLayers = [unclusteredPointLayer.id];
 
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: queryLayers 
-    });
+    // Aumentar el radio de búsqueda alrededor del click para facilitar selección
+    const pad = 12; // píxeles alrededor del punto de click
+    const bbox = [
+      [event.point.x - pad, event.point.y - pad],
+      [event.point.x + pad, event.point.y + pad]
+    ];
+    const features = map.queryRenderedFeatures(bbox, { layers: queryLayers });
 
     if (features && features.length > 0) {
       const feature = features[0];
@@ -1303,19 +1307,29 @@ const MapView = forwardRef(({
     const unclusteredLayerExists = map.getLayer(unclusteredPointLayer.id);
 
     if (unclusteredLayerExists) {
-      const features = map.queryRenderedFeatures(event.point, {
-        layers: [unclusteredPointLayer.id]
-      });
+      // Usar un cuadro alrededor del cursor para mejorar la detección del hover
+      const pad = 10; // píxeles de margen para hover
+      const bbox = [
+        [event.point.x - pad, event.point.y - pad],
+        [event.point.x + pad, event.point.y + pad]
+      ];
+      const features = map.queryRenderedFeatures(bbox, { layers: [unclusteredPointLayer.id] });
       map.getCanvas().style.cursor = features && features.length > 0 ? 'pointer' : '';
       if (features && features.length > 0) {
         const feature = features[0];
+        // Evitar que se oculte el popup justo al mover dentro del área
+        try { clearTimeout(window.tooltipHideTimeout); } catch (_) {}
         setPopupInfo({
           ...feature.properties,
           longitude: feature.geometry.coordinates[0],
           latitude: feature.geometry.coordinates[1],
         });
       } else {
-        setPopupInfo(null);
+        // Introducir una pequeña demora para evitar parpadeo al salir levemente del punto
+        try { clearTimeout(window.tooltipHideTimeout); } catch (_) {}
+        window.tooltipHideTimeout = setTimeout(() => {
+          setPopupInfo(null);
+        }, 150);
       }
     } else {
       // If layer doesn't exist, ensure cursor is default and no popup
