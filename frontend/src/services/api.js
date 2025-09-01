@@ -626,7 +626,7 @@ export const propertyService = {
   async getPaginatedProperties(page = 1, filters = {}, pageSize = 20) {
     try {
       // Optimizaciones de parámetros para mejor rendimiento
-      const params = { page, page_size: pageSize };
+      const params = { page, page_size: pageSize, ...(filters || {}) };
 
       // Agregar timestamp para evitar caché del navegador en desarrollo
       if (import.meta.env.MODE === 'development') {

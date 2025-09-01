@@ -23,6 +23,8 @@ import traceback
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
+from django.utils._os import safe_join
+import mimetypes
 import os
 import uuid
 import zipfile
@@ -515,7 +517,7 @@ class TourViewSet(viewsets.ModelViewSet):
     filter_backends = []
 
     def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'get_stats']:
+        if self.action in ['list', 'retrieve', 'get_stats', 'serve_content']:
             permission_classes = [permissions.AllowAny]
         elif self.action == 'create':
             # Allow any authenticated user to create tours (including admins)
@@ -666,162 +668,69 @@ class TourViewSet(viewsets.ModelViewSet):
             except Exception:
                 pass
 
-            # Buscar archivos HTML
-            html_files = []
+            # Buscar archivos de entrada del tour (HTML, HTM, PHP)
+            entry_files = []
             try:
                 for root_dir, _dirs, files in os.walk(tour_dir):
                     for fname in files:
-                        if fname.lower().endswith(('.html', '.htm')):
+                        if fname.lower().endswith(('.html', '.htm', '.php')):
                             rel_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir)
                             rel_path_posix = rel_path.replace('\\', '/')  # Normalizar separadores
                             depth = rel_path_posix.count('/')
-                            html_files.append((depth, rel_path_posix))
+                            entry_files.append((depth, rel_path_posix))
             except Exception as e:
                 raise serializers.ValidationError({
                     'package_file': f"Error explorando contenido del tour: {str(e)}"
                 })
 
-            # Si no hay HTML visibles, intentar construir un contenedor mínimo para Pano2VR
-            built_wrapper = None
-            if not html_files:
-                try:
-                    # Buscar player y config de Pano2VR
-                    player_js_path = None
-                    pano_xml_path = None
-                    skin_js_path = None
-                    for root_dir, _dirs, files in os.walk(tour_dir):
-                        for fname in files:
-                            low = fname.lower()
-                            if low == 'pano2vr_player.js':
-                                player_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
-                            elif low == 'pano.xml':
-                                pano_xml_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
-                            elif low == 'skin.js':
-                                skin_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
-                    # Buscar three.js si existe
-                    three_js_path = None
-                    for root_dir, _dirs, files in os.walk(tour_dir):
-                        for fname in files:
-                            low = fname.lower()
-                            if low in ('three.min.js', 'three.js'):
-                                three_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
-                                break
-                        if three_js_path:
-                            break
-                    if player_js_path and pano_xml_path:
-                        wrapper_name = 'index_auto.html'
-                        wrapper_path = os.path.join(tour_dir, wrapper_name)
-                        skin_script = f'<script src="{skin_js_path}"></script>' if skin_js_path else ''
-                        three_script = f'<script src="{three_js_path}"></script>' if three_js_path else ''
-                        html = (
-                            '<!DOCTYPE html>'
-                            '<html lang="es">'
-                            '<head>'
-                            '<meta charset="utf-8" />'
-                            '<meta name="viewport" content="width=device-width, initial-scale=1" />'
-                            '<title>Tour 360°</title>'
-                            f'{three_script}'
-                            f'<script src="{player_js_path}"></script>'
-                            f'{skin_script}'
-                            '</head>'
-                            '<body style="margin:0; padding:0; overflow:hidden; background:#000">'
-                            '<div id="pano" style="width:100vw; height:100vh;"></div>'
-                            '<script>'
-                            '  try {'
-                            '    var player = new pano2vrPlayer("pano");'
-                            f'    player.readConfigUrlAsync("{pano_xml_path}");'
-                            '  } catch (e) { console.error(e); }'
-                            '</script>'
-                            '</body>'
-                            '</html>'
-                        )
-                        with open(wrapper_path, 'w', encoding='utf-8') as f:
-                            f.write(html)
-                        built_wrapper = wrapper_name
-                    else:
-                        # Sin HTML ni player + xml => error explícito
+            # Seleccionar el archivo de entrada principal usando lógica mejorada
+            html_entry = self._select_tour_entry_file(tour_dir, entry_files)
+
+            if not html_entry:
+                # Si no se encontró ningún archivo de entrada válido, intentar generar uno automático para Pano2VR
+                html_entry = self._generate_pano2vr_wrapper(tour_dir)
+
+            # Prefer a stable, backend-served URL to avoid issues with dev media serving
+            # Example: /api/tours/content/<uuid>/<relative-entry>
+            tour_url = f"/api/tours/content/{tour_uuid}/{html_entry}"
+
+            # Validar que el archivo de entrada existe y es accesible
+            entry_file_path = os.path.join(tour_dir, html_entry.replace('/', os.sep))
+            if not os.path.isfile(entry_file_path):
+                logger.error(f"Archivo de entrada no encontrado: {entry_file_path}")
+                raise serializers.ValidationError({
+                    'package_file': f"El archivo de entrada seleccionado '{html_entry}' no existe en el paquete"
+                })
+
+            # Verificar que el archivo no está vacío y tiene contenido válido
+            try:
+                with open(entry_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(1024)  # Leer primeros 1KB
+                    if not content.strip():
                         raise serializers.ValidationError({
-                            'package_file': "No se encontró HTML ni recursos mínimos de Pano2VR (pano2vr_player.js y pano.xml). Asegúrate de exportar para Web."
+                            'package_file': f"El archivo de entrada '{html_entry}' está vacío"
                         })
-                except serializers.ValidationError:
-                    raise
-                except Exception as e:
-                    raise serializers.ValidationError({
-                        'package_file': f"No se encontró HTML y falló la generación automática del visor: {str(e)}"
-                    })
 
-            # Elegir el archivo HTML principal con heurísticas robustas:
-            #   - Preferir nombres típicos de entrada (index.html, tour.html, viewer.html)
-            #   - Penalizar páginas de error (404.html, error.html)
-            #   - Favorecer rutas como /output/ comunes en exportes Pano2VR
-            #   - Evitar vendor dirs cuando sea posible
-            if built_wrapper:
-                html_entry = built_wrapper
-            else:
-                vendor_dirs = ('/bower_components/', '/node_modules/', '/vendor/', '/vendors/', '/libs/', '/lib/', '/third_party/', '/third-party/', '/thirdparty/')
-                def in_vendor(path_posix: str) -> bool:
-                    norm = '/' + path_posix if not path_posix.startswith('/') else path_posix
-                    return any(v in norm for v in vendor_dirs)
+                    # Para archivos PHP, verificar que tienen estructura básica
+                    if html_entry.lower().endswith('.php'):
+                        if '<?php' not in content and '<!DOCTYPE' not in content:
+                            logger.warning(f"Archivo PHP '{html_entry}' no parece tener estructura válida")
 
-                candidates = html_files[:]  # (depth, rel_path)
+            except (IOError, OSError) as e:
+                logger.error(f"Error accediendo al archivo de entrada: {e}")
+                raise serializers.ValidationError({
+                    'package_file': f"Error accediendo al archivo de entrada '{html_entry}': {str(e)}"
+                })
 
-                def score_candidate(rel_path: str) -> int:
-                    low = rel_path.lower()
-                    name = os.path.basename(low)
-                    s = 0
-                    # Fuertes positivos por nombres conocidos
-                    if name in ('index.html', 'index.htm'):
-                        s += 100
-                    elif 'index' in name:
-                        s += 85
-                    if name in ('tour.html', 'viewer.html', 'panorama.html', 'vr.html'):
-                        s += 70
-                    if '/output/' in low or '/pano2vr/' in low:
-                        s += 40
-                    if '/dist/' in low or '/build/' in low:
-                        s += 20
-                    # Negativos por páginas de error / vendor
-                    if name in ('404.html', 'error.html', 'offline.html', 'errors.html'):
-                        s -= 120
-                    if in_vendor(rel_path):
-                        s -= 60
-                    # Bonus por contenido relevante (ligero, lectura segura)
-                    try:
-                        fpath = os.path.join(tour_dir, rel_path.replace('/', os.sep))
-                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
-                            snippet = f.read(100000)  # hasta 100KB
-                        if 'pano2vr_player' in snippet or 'pano.xml' in snippet:
-                            s += 60
-                        if 'krpano' in snippet or 'embedpano' in snippet or 'tour.xml' in snippet:
-                            s += 50
-                        if 'aframe' in snippet or 'marzipano' in snippet:
-                            s += 30
-                    except Exception:
-                        pass
-                    return s
-
-                # Calcular mejor candidato por score; desempate por menor profundidad y longitud
-                best = None
-                best_key = None
-                for depth, rel in candidates:
-                    sc = score_candidate(rel)
-                    key = (-sc, depth, len(rel))  # menor es mejor
-                    if best is None or key < best_key:
-                        best = rel
-                        best_key = key
-                html_entry = best if best else (html_files[0][1] if html_files else 'index.html')
-
-            tour_url = f"{settings.MEDIA_URL}tours/{tour_uuid}/{html_entry}"
-            
             instance = serializer.save(
-                url=tour_url, 
+                url=tour_url,
                 package_path=os.path.join('tours', str(tour_uuid)),
                 type='package',
                 status='active',
                 tour_id=tour_uuid
             )
-            
-            logger.info(f"Tour {instance.id} procesado exitosamente: {len(html_files)} archivos HTML encontrados, usando {html_entry}")
+
+            logger.info(f"Tour {instance.id} procesado exitosamente: {len(entry_files)} archivos de entrada encontrados, usando {html_entry}")
 
             # Asegurar un solo tour por propiedad: eliminar anteriores
             deleted_count = Tour.objects.filter(property=instance.property).exclude(id=instance.id).count()
@@ -842,6 +751,311 @@ class TourViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({
                 'package_file': f"Error interno procesando el tour: {str(e)}"
             })
+
+    @action(detail=False, methods=['get'], url_path=r'content/(?P<tour_uuid>[^/]+)/(?P<subpath>.*)', permission_classes=[permissions.AllowAny])
+    def serve_content(self, request, tour_uuid=None, subpath=''):
+        """
+        Sirve archivos del paquete del tour desde el disco de manera segura.
+
+        Esto evita depender de la ruta /media/ cuando el entorno de desarrollo
+        o el despliegue no está sirviendo MEDIA_URL directamente.
+
+        Ejemplo de URL final expuesta por la API:
+        /api/tours/content/<tour_uuid>/<ruta_relativa_al_html_de_entrada>
+        """
+        try:
+            # Validar que el tour exista
+            tour = Tour.objects.filter(tour_id=tour_uuid).first()
+            if not tour:
+                return Response({'detail': 'Tour no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+            base_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
+            # Normalizar separadores y prevenir traversal
+            subpath = subpath.replace('..', '').lstrip('/').replace('\\', '/')
+            try:
+                full_path = safe_join(base_dir, subpath)
+            except Exception:
+                return Response({'detail': 'Ruta no permitida'}, status=status.HTTP_404_NOT_FOUND)
+
+            if not os.path.isfile(full_path):
+                return Response({'detail': 'Archivo no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+            # Detectar content-type
+            ctype, _ = mimetypes.guess_type(full_path)
+            # Evitar descarga de .php: no ejecutamos PHP, pero podemos servirlo como HTML estático
+            if not ctype or os.path.splitext(full_path)[1].lower() == '.php':
+                ctype = 'text/html'
+
+            # Usar FileResponse para transmitir el archivo
+            from django.http import FileResponse
+            resp = FileResponse(open(full_path, 'rb'), content_type=ctype)
+            # Sugerir nombre del archivo
+            resp["Content-Disposition"] = f"inline; filename=\"{os.path.basename(full_path)}\""
+            # Establecer una CSP permisiva SOLO para este contenido (no global)
+            client = getattr(settings, 'CLIENT_URL', 'http://localhost:3000')
+            csp_value = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://player.vimeo.com; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: blob: https:; "
+                "media-src 'self' data: blob:; "
+                "font-src 'self' data:; "
+                "connect-src 'self' https://www.youtube.com https://player.vimeo.com; "
+                f"frame-ancestors 'self' {client}; "
+                "frame-src 'self' https://www.youtube.com https://player.vimeo.com; "
+                "object-src 'none'"
+            )
+            resp['Content-Security-Policy'] = csp_value
+            return resp
+        except Exception as e:
+            logger.error(f"Error sirviendo contenido de tour {tour_uuid}: {e}", exc_info=True)
+            return Response({'detail': 'Error interno'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _select_tour_entry_file(self, tour_dir, entry_files):
+        """
+        Selecciona el archivo de entrada principal del tour usando lógica mejorada.
+
+        Args:
+            tour_dir: Directorio raíz del tour
+            entry_files: Lista de tuplas (depth, rel_path) con archivos candidatos
+
+        Returns:
+            str: Ruta relativa del archivo de entrada seleccionado, o None si no se encuentra
+        """
+        if not entry_files:
+            return None
+
+        # Directorios a evitar (contienen archivos de configuración/plantillas)
+        vendor_dirs = ('/bower_components/', '/node_modules/', '/vendor/', '/vendors/',
+                      '/libs/', '/lib/', '/third_party/', '/third-party/', '/thirdparty/')
+        plugin_dirs = ('/modules/', '/plugins/', '/themes/')
+
+        def in_forbidden_dir(path_posix):
+            """Verifica si el archivo está en un directorio prohibido"""
+            norm = '/' + path_posix if not path_posix.startswith('/') else path_posix
+            return any(forbidden in norm for forbidden in vendor_dirs + plugin_dirs)
+
+        def analyze_file_content(file_path):
+            """
+            Analiza el contenido del archivo para determinar si es un visor válido.
+
+            Returns:
+                dict: Información sobre el tipo de archivo y su score
+            """
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read(100000)  # Leer hasta 100KB
+
+                content_lower = content.lower()
+
+                # Detectar diferentes tipos de tours
+                is_lapentor = 'lapentor' in content_lower and 'ng-app' in content_lower
+                is_pano2vr = 'pano2vr' in content_lower or 'pano2vr_player' in content_lower
+                is_krpano = 'krpano' in content_lower or 'embedpano' in content_lower
+                is_tour_viewer = any(keyword in content_lower for keyword in [
+                    'tour.xml', 'panorama', '360', 'vr', 'viewer'
+                ])
+
+                # Penalizar archivos de configuración/plantillas
+                is_config = any(keyword in content_lower for keyword in [
+                    'config.html', 'template.html', 'tpl.html', 'readme'
+                ]) or 'config' in file_path.lower()
+
+                # Penalizar páginas de error
+                is_error_page = any(keyword in content_lower for keyword in [
+                    '404', 'not found', 'error', 'sorry', 'oops'
+                ]) and len(content) < 2000  # Páginas de error suelen ser cortas
+
+                return {
+                    'is_lapentor': is_lapentor,
+                    'is_pano2vr': is_pano2vr,
+                    'is_krpano': is_krpano,
+                    'is_tour_viewer': is_tour_viewer,
+                    'is_config': is_config,
+                    'is_error_page': is_error_page,
+                    'has_body': '<body' in content_lower,
+                    'has_scripts': '<script' in content_lower
+                }
+            except Exception:
+                return {}
+
+        def calculate_score(depth, rel_path, file_info):
+            """Calcula el score de un archivo candidato"""
+            low = rel_path.lower()
+            name = os.path.basename(low)
+            score = 0
+
+            # === PUNTOS POSITIVOS ===
+
+            # Archivos principales (máximo prioridad)
+            if name in ('index.php', 'index.html', 'index.htm'):
+                score += 200
+            elif 'index' in name:
+                score += 150
+
+            # Nombres comunes de tours
+            if name in ('tour.html', 'viewer.html', 'panorama.html', 'vr.html', 'main.html'):
+                score += 120
+
+            # Archivos específicos de sistemas de tour
+            if file_info.get('is_lapentor') and name == 'index.php':
+                score += 300  # Lapentor usa index.php como entrada principal
+            if file_info.get('is_pano2vr'):
+                score += 100
+            if file_info.get('is_krpano'):
+                score += 100
+
+            # Contenido de tour válido
+            if file_info.get('is_tour_viewer'):
+                score += 80
+            if file_info.get('has_body') and file_info.get('has_scripts'):
+                score += 50
+
+            # Directorios favorables
+            if '/output/' in low or '/dist/' in low or '/build/' in low:
+                score += 40
+
+            # Archivos en raíz tienen bonus
+            if depth == 0:
+                score += 30
+
+            # === PUNTOS NEGATIVOS ===
+
+            # Archivos de error
+            if file_info.get('is_error_page') or name in ('404.html', 'error.html', 'offline.html'):
+                score -= 500
+
+            # Archivos de configuración y plantillas
+            if file_info.get('is_config') or name in ('config.html', 'readme.html', 'template.html'):
+                score -= 400
+
+            # Directorios prohibidos
+            if in_forbidden_dir(rel_path):
+                score -= 300
+
+            # Archivos muy profundos
+            if depth > 5:
+                score -= 50
+
+            # Penalizar PHP fuertemente (no ejecutable aquí)
+            if name.endswith('.php'):
+                score -= 250
+
+            return score
+
+        # Filtrar candidatos válidos
+        candidates = []
+        for depth, rel_path in entry_files:
+            file_path = os.path.join(tour_dir, rel_path.replace('/', os.sep))
+            file_info = analyze_file_content(file_path)
+            score = calculate_score(depth, rel_path, file_info)
+
+            # Solo incluir candidatos con score positivo
+            if score > 0:
+                candidates.append((score, depth, len(rel_path), rel_path))
+
+        if not candidates:
+            return None
+
+        # Ordenar por score (descendente), luego por profundidad (ascendente), luego por longitud (ascendente)
+        candidates.sort(key=lambda x: (-x[0], x[1], x[2]))
+
+        best_candidate = candidates[0][3]
+        # Evitar .php si existe alternativa HTML
+        try:
+            if best_candidate.lower().endswith('.php'):
+                base_dir = os.path.dirname(best_candidate)
+                # Buscar otro candidato .html en el mismo nivel
+                for sc, d, ln, rp in candidates:
+                    if d == candidates[0][1] and rp.lower().endswith(('.html', '.htm')) and os.path.dirname(rp) == base_dir:
+                        best_candidate = rp
+                        break
+        except Exception:
+            pass
+
+        logger.info(f"Archivo de entrada seleccionado: {best_candidate} (score: {candidates[0][0]})")
+
+        return best_candidate
+
+    def _generate_pano2vr_wrapper(self, tour_dir):
+        """
+        Intenta generar un wrapper automático para tours Pano2VR.
+
+        Args:
+            tour_dir: Directorio del tour
+
+        Returns:
+            str: Nombre del archivo wrapper generado, o None si falla
+        """
+        try:
+            # Buscar archivos necesarios de Pano2VR
+            player_js_path = None
+            pano_xml_path = None
+            skin_js_path = None
+
+            for root_dir, _dirs, files in os.walk(tour_dir):
+                for fname in files:
+                    low = fname.lower()
+                    if low == 'pano2vr_player.js':
+                        player_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                    elif low == 'pano.xml':
+                        pano_xml_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                    elif low == 'skin.js':
+                        skin_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+
+            # Buscar three.js si existe
+            three_js_path = None
+            for root_dir, _dirs, files in os.walk(tour_dir):
+                for fname in files:
+                    low = fname.lower()
+                    if low in ('three.min.js', 'three.js'):
+                        three_js_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir).replace('\\', '/')
+                        break
+                if three_js_path:
+                    break
+
+            if player_js_path and pano_xml_path:
+                wrapper_name = 'index_auto.html'
+                wrapper_path = os.path.join(tour_dir, wrapper_name)
+
+                skin_script = f'<script src="{skin_js_path}"></script>' if skin_js_path else ''
+                three_script = f'<script src="{three_js_path}"></script>' if three_js_path else ''
+
+                html = (
+                    '<!DOCTYPE html>'
+                    '<html lang="es">'
+                    '<head>'
+                    '<meta charset="utf-8" />'
+                    '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+                    '<title>Tour 360°</title>'
+                    f'{three_script}'
+                    f'<script src="{player_js_path}"></script>'
+                    f'{skin_script}'
+                    '</head>'
+                    '<body style="margin:0; padding:0; overflow:hidden; background:#000">'
+                    '<div id="pano" style="width:100vw; height:100vh;"></div>'
+                    '<script>'
+                    '  try {'
+                    '    var player = new pano2vrPlayer("pano");'
+                    f'    player.readConfigUrlAsync("{pano_xml_path}");'
+                    '  } catch (e) { console.error(e); }'
+                    '</script>'
+                    '</body>'
+                    '</html>'
+                )
+
+                with open(wrapper_path, 'w', encoding='utf-8') as f:
+                    f.write(html)
+
+                logger.info(f"Wrapper Pano2VR generado automáticamente: {wrapper_name}")
+                return wrapper_name
+            else:
+                logger.warning("No se encontraron archivos necesarios para generar wrapper Pano2VR")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error generando wrapper Pano2VR: {e}")
+            return None
 
     @action(detail=False, methods=['get'], url_path='stats', permission_classes=[permissions.AllowAny])
     def get_stats(self, request):

@@ -121,7 +121,7 @@ const AdminDetailedPropertiesPage = () => {
                 filters.search = search;
             }
             
-            const response = await propertyService.getPaginatedProperties(page + 1, filters);
+            const response = await propertyService.getPaginatedProperties(page + 1, filters, pageSize);
             
             setProperties(response.results || []);
             setTotalCount(response.count || 0);

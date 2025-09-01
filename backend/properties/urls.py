@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
 from .views import PropertyViewSet, TourViewSet, ImageViewSet, PropertyDocumentViewSet, PropertyVisitViewSet, PropertyPreviewViewSet, ComparisonSessionViewSet, SavedSearchViewSet, FavoriteViewSet, RecordingOrderViewSet
 
@@ -16,4 +16,10 @@ router.register(r'favorites', FavoriteViewSet, basename='favorite')
 router.register(r'recording-orders', RecordingOrderViewSet, basename='recordingorder')
 
 # urlpatterns will now only contain router URLs for this app
-urlpatterns = router.urls 
+urlpatterns = [
+    # Servir archivos de paquetes de tours vía backend (evita depender de MEDIA_URL)
+    re_path(r'^tours/content/(?P<tour_uuid>[^/]+)/(?P<subpath>.*)$', TourViewSet.as_view({'get': 'serve_content'}), name='tour-content'),
+]
+
+# Incluir las rutas generadas por el router
+urlpatterns += router.urls 

@@ -44,8 +44,12 @@ const TourViewer = () => {
 
         // Validación adicional de seguridad y compatibilidad
         const urlStr = tour?.url || '';
-        const looksMedia = typeof urlStr === 'string' && (urlStr.includes('/media/tours/') || urlStr.includes('/media\\tours\\'));
-        const isInvalid = !tour || !urlStr || !looksMedia || urlStr.includes('placeholder') || urlStr.includes('test');
+        const looksMedia = typeof urlStr === 'string' && (
+          urlStr.includes('/media/tours/') ||
+          urlStr.includes('/api/tours/content/') ||
+          urlStr.includes('/media\\tours\\')
+        );
+        const isInvalid = !tour || !urlStr || !looksMedia || urlStr.includes('placeholder');
         if (isInvalid) {
           const propId = tour?.property || tour?.property_id;
           if (propId) {
