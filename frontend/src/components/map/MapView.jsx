@@ -20,20 +20,19 @@ import PropertySidePreview from '../property/PropertySidePreview';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => {
-  // Ensure properties is an array
   const validProperties = Array.isArray(properties) ? properties : [];
-  
-  return {
-    type: 'FeatureCollection',
-    features: validProperties.map(prop => ({
+  const features = [];
+  for (const prop of validProperties) {
+    const lon = Number(prop?.longitude);
+    const lat = Number(prop?.latitude);
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue; // skip invalid coords
+    features.push({
       type: 'Feature',
-      properties: { ...prop }, // Keep all property data here
-      geometry: {
-        type: 'Point',
-        coordinates: [prop.longitude, prop.latitude]
-      }
-    }))
-  };
+      properties: { ...prop },
+      geometry: { type: 'Point', coordinates: [lon, lat] }
+    });
+  }
+  return { type: 'FeatureCollection', features };
 };
 
 // Helper function to ensure safe array operations
