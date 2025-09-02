@@ -199,16 +199,21 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
       if (isLikelyLocationQuery) {
         const predefinedLocation = PREDEFINED_LOCATIONS[searchTermLowerCase];
         if (predefinedLocation) {
-          if (onLocationSearch) {
-            onLocationSearch({
-              center: predefinedLocation.center,
-              zoom: predefinedLocation.zoom,
-              locationName: predefinedLocation.name
-            });
-          }
-          setSearchResult({ type: 'location', locationName: predefinedLocation.name, coordinates: predefinedLocation.center, interpretation: `Volando a ${predefinedLocation.name}...` });
+          const fly = {
+            center: predefinedLocation.center,
+            zoom: predefinedLocation.zoom,
+            name: predefinedLocation.name,
+          };
+          if (onLocationSearch) onLocationSearch({ center: fly.center, zoom: fly.zoom, locationName: fly.name });
+          setSearchResult({ type: 'location', locationName: fly.name, coordinates: fly.center, interpretation: `Volando a ${fly.name}...` });
           setShowResults(true); setLoading(false);
-          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: predefinedLocation.name, center: predefinedLocation.center } });
+          if (onSearchComplete) onSearchComplete({
+            type: 'location',
+            search_mode: 'location',
+            assistant_message: `Volando a ${fly.name}...`,
+            interpretation: `Volando a ${fly.name}...`,
+            flyToLocation: fly,
+          });
           return;
         }
 
@@ -224,10 +229,17 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
           else if (firstResult.place_type?.includes('district')) zoom = 10;
           else if (firstResult.place_type?.includes('place')) zoom = 11;
 
+          const fly = { center, zoom, name: placeName };
           if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
           setSearchResult({ type: 'location', locationName: placeName, coordinates: center, interpretation: `Volando a ${placeName}...`, allResults: geoResults.map(r => ({ name: r.place_name || r.text, center: r.center, type: r.place_type?.[0] || 'place' })) });
           setShowResults(true); setLoading(false);
-          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: placeName, center } });
+          if (onSearchComplete) onSearchComplete({
+            type: 'location',
+            search_mode: 'location',
+            assistant_message: `Volando a ${placeName}...`,
+            interpretation: `Volando a ${placeName}...`,
+            flyToLocation: fly,
+          });
           return;
         }
         // If geocoder didn't return confident result, fall through to AI search.
@@ -250,9 +262,19 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
             pitch: flyToLocation.pitch,
             bearing: flyToLocation.bearing,
           });
-          setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: interpretation || `Volando a ${flyToLocation.name || searchTerm}...` }); // Use original searchTerm
+          const flyMsg = interpretation || `Volando a ${flyToLocation.name || searchTerm}...`;
+          const processedLocation = {
+            type: 'location',
+            search_mode: 'location',
+            assistant_message: flyMsg,
+            interpretation: flyMsg,
+            flyToLocation,
+            suggestedFilters: null,
+            recommendations: [],
+          };
+          setSearchResult({ type: 'location', locationName: flyToLocation.name || searchTerm, coordinates: flyToLocation.center, interpretation: flyMsg });
           setShowResults(true); setLoading(false);
-          if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: flyToLocation.name || searchTerm, center: flyToLocation.center } });
+          if (onSearchComplete) onSearchComplete(processedLocation);
           return;
         }
 
@@ -325,9 +347,16 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         else if (firstResult.place_type?.includes('district')) zoom = 10;
         else if (firstResult.place_type?.includes('place')) zoom = 11;
 
+        const fly = { center, zoom, name: placeName };
         if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
         setShowResults(false);
-        if (onSearchComplete) onSearchComplete({ type: 'location_result', data: { locationName: placeName, center } });
+        if (onSearchComplete) onSearchComplete({
+          type: 'location',
+          search_mode: 'location',
+          assistant_message: `Volando a ${placeName}...`,
+          interpretation: `Volando a ${placeName}...`,
+          flyToLocation: fly,
+        });
       } else {
         // Fallback to full search (AI) if no geocode results
         await handleSearch();

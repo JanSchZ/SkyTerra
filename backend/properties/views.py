@@ -37,7 +37,7 @@ from .serializers import (
     PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer, RecordingOrderSerializer
 )
 from skyterra_backend.permissions import IsOwnerOrAdmin
-from .services import GeminiService, GeminiServiceError, categorize_property_with_ai
+from .services import GeminiService, GeminiServiceError, categorize_property_with_ai, create_fallback_response_simple
 from .email_service import send_property_status_email, send_recording_order_created_email, send_recording_order_status_email
 
 # Create your views here.
@@ -1185,10 +1185,20 @@ class AISearchView(APIView):
             # The AI helper already returns the expected JSON structure for the frontend
             return Response(ai_response, status=status.HTTP_200_OK)
         except GeminiServiceError as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Fallback: si no hay API key o falla el proveedor, devolver recomendaciones básicas
+            try:
+                fallback = create_fallback_response_simple(query)
+                return Response(fallback, status=status.HTTP_200_OK)
+            except Exception:
+                return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            logger.error(f'Error in AISearchView: {str(e)}')
-            return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f'Error in AISearchView: {str(e)}', exc_info=True)
+            # Fallback genérico
+            try:
+                fallback = create_fallback_response_simple(request.data.get('query') or request.data.get('current_query') or '')
+                return Response(fallback, status=status.HTTP_200_OK)
+            except Exception:
+                return Response({'error': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request, *args, **kwargs):
         logger.debug("AISearchView GET reached; advise to use POST for AI search")

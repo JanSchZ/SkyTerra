@@ -472,6 +472,51 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
         } 
 
 
+# Fallback accesible sin necesidad de instanciar GeminiService (por ejemplo, cuando no hay API key)
+def create_fallback_response_simple(user_query: str):
+    try:
+        qs = Property.objects.all()
+        q = (user_query or '').strip()
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
+        props = list(qs[:5])
+        recs = []
+        for prop in props:
+            recs.append({
+                'id': prop.id,
+                'name': prop.name,
+                'price': float(prop.price),
+                'size': prop.size,
+                'type': getattr(prop, 'type', None),
+                'plusvalia_score': float(prop.plusvalia_score) if getattr(prop, 'plusvalia_score', None) is not None else None,
+                'latitude': getattr(prop, 'latitude', None),
+                'longitude': getattr(prop, 'longitude', None),
+                'has_water': getattr(prop, 'has_water', False),
+                'has_views': getattr(prop, 'has_views', False),
+                'reason': f"Coincide con tu búsqueda: {q}" if q else "Propiedad destacada"
+            })
+        return {
+            'search_mode': 'property_recommendation',
+            'assistant_message': f"Encontré {len(recs)} propiedades relacionadas con tu búsqueda.",
+            'flyToLocation': None,
+            'suggestedFilters': None,
+            'recommendations': recs,
+            'interpretation': f"Búsqueda procesada: {q}" if q else "Búsqueda procesada",
+            'fallback': True
+        }
+    except Exception:
+        # En caso de error inesperado, devolver estructura vacía válida
+        return {
+            'search_mode': 'chat',
+            'assistant_message': 'No pude generar sugerencias ahora. Intenta con otra búsqueda.',
+            'flyToLocation': None,
+            'suggestedFilters': None,
+            'recommendations': [],
+            'interpretation': 'Búsqueda procesada',
+            'fallback': True
+        }
+
+
 # ------------------------------
 # Enriquecimiento por IA: Categorizar y resumir propiedades
 # ------------------------------

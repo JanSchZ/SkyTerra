@@ -227,16 +227,18 @@ const MapView = forwardRef(({
     if (
       slide && slide.dynamicWords && slide.dynamicWords.length > 0 && showOverlay && !disableIntroAnimation
     ) {
-      const stepMs = 1800; // ritmo de lectura con ligera reducción para suavizar ciclo
-      // Programar cambios de palabra
+      const initialDelay = 2000; // Delay inicial para mostrar "Compra" más tiempo
+      const stepMs = 2200; // Aumentar el tiempo de cada palabra para mejor lectura
+      
+      // Programar cambios de palabra con delay inicial
       slide.dynamicWords.forEach((_, i) => {
         const t = setTimeout(() => {
           setDynamicWordIndex(i);
-        }, i * stepMs);
+        }, initialDelay + (i * stepMs));
         dynamicTimersRef.current.push(t);
       });
       // Avanzar al siguiente slide tras mostrar la última palabra
-      const totalMs = slide.dynamicWords.length * stepMs + 150;
+      const totalMs = initialDelay + (slide.dynamicWords.length * stepMs) + 500;
       const advance = setTimeout(() => {
         setCurrentTextIndex((prev) => (prev + 1) % descriptiveTexts.length);
       }, totalMs);
@@ -248,6 +250,14 @@ const MapView = forwardRef(({
       dynamicTimersRef.current = [];
     };
   }, [currentTextIndex, showOverlay, disableIntroAnimation]);
+
+  // Reset de índices cuando aparece el overlay por primera vez
+  useEffect(() => {
+    if (showOverlay && !disableIntroAnimation) {
+      setCurrentTextIndex(0);
+      setDynamicWordIndex(0);
+    }
+  }, [showOverlay, disableIntroAnimation]);
 
   // Rotar texto (slides normales) cada ~7.5s para mejor lectura
   useEffect(() => {
@@ -1838,9 +1848,9 @@ const MapView = forwardRef(({
         )}
       </AnimatePresence>
 
-      {/* Intro/animación solo cuando el mapa ya está listo */}
+      {/* Intro/animación solo cuando el mapa ya está listo y no hay carga */}
       <AnimatePresence>
-        {!disableIntroAnimation && showOverlay && isMapUIReady && (
+        {!disableIntroAnimation && showOverlay && isMapUIReady && !loading && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}

@@ -366,15 +366,21 @@ body, html {
   backdrop-filter: blur(16px);
 }
 
-/* Cambiar borde de foco de los TextField (MUI) a estilo near-black + sutil "frost" blanco */
-.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-  border-color: rgba(10,10,10,0.95) !important; /* near-black */
-  box-shadow: 0 0 0 6px rgba(255,255,255,0.04); /* sutil halo frost */
+/* Nota: Evitamos sobreescribir globalmente el borde de los TextField de MUI
+   para no afectar la barra de búsqueda principal (AISearchBar) ni el panel de Sam. 
+   Si se requiere un estilo específico en alguna vista, envuélvelo con una clase
+   de alcance (por ejemplo, .wizard-scope) y define ahí los estilos. */
+
+/* Ejemplo de alcance opcional para formularios claros del wizard:
+.wizard-scope .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #1976d2 !important;
+  box-shadow: none;
 }
 
-.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
+.wizard-scope .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
+*/
 
 .property-card {
   background: var(--bg-primary);

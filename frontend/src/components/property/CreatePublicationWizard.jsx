@@ -444,7 +444,7 @@ export default function CreatePublicationWizard() {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box sx={{ bgcolor: '#fff', minHeight: '100vh', py: { xs: 2, md: 4 } }}>
+      <Box className="wizard-scope" sx={{ bgcolor: '#fff', minHeight: '100vh', py: { xs: 2, md: 4 } }}>
         <Box sx={{ px: { xs: 2, md: 4 }, maxWidth: 1200, mx: 'auto' }}>
           <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>Nueva Propiedad</Typography>
           <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
