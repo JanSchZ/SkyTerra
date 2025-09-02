@@ -311,9 +311,12 @@ function App() {
 
   const handleSuggestionClick = async (rec) => {
     try {
-      // Navegar siempre a la vista de detalle y abrir tour automáticamente
-      // Usamos un flag en localStorage que PropertyDetails interpreta para omitir vuelo
-      // y abrir el primer tour disponible.
+      // Intentar abrir el tour directamente en el mapa con animación de zoom + fade
+      if (mapRef.current?.openPropertyTour) {
+        const opened = await mapRef.current.openPropertyTour(rec, { duration: 3000, zoom: 14.8 });
+        if (opened) return;
+      }
+      // Fallback: navegar a la vista de detalle y abrir tour automáticamente
       try { localStorage.setItem('skipAutoFlight', 'true'); } catch (_) {}
       navigate(`/property/${rec.id}`);
     } catch (e) {

@@ -100,6 +100,7 @@ const MapView = forwardRef(({
   const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
+  const [tourTransitionDuration, setTourTransitionDuration] = useState(350);
   const [autoFlyCompleted, setAutoFlyCompleted] = useState(disableIntroAnimation);
   const [showOverlay, setShowOverlay] = useState(!disableIntroAnimation);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
@@ -1413,15 +1414,30 @@ const MapView = forwardRef(({
         const lat = parseFloat(prop?.latitude);
         const lon = parseFloat(prop?.longitude);
 
+        // Mostrar overlay/estado de navegación mientras hacemos zoom-in
+        // Pequeña demora para evitar un dark flash inmediato al click
+        setTourTransitionDuration(duration);
+        setTimeout(() => setNavigatingToTour(true), 150);
+
         if (map && !isNaN(lat) && !isNaN(lon)) {
-          map.flyTo({ center: [lon, lat], zoom, pitch: 0, bearing: 0, duration, essential: true });
+          map.flyTo({
+            center: [lon, lat],
+            zoom,
+            pitch: 0,
+            bearing: 0,
+            duration,
+            essential: true,
+            easing: (t) => 1 - Math.pow(1 - t, 3)
+          });
           setTimeout(() => {
-            _setActiveTourUrl(url);
-            _setActiveTourPropertyId(propertyId);
-          }, duration + 100);
+            setActiveTourUrl(url);
+            setActiveTourPropertyId(propertyId);
+            setNavigatingToTour(false);
+          }, duration + 120);
         } else {
-          _setActiveTourUrl(url);
-          _setActiveTourPropertyId(propertyId);
+          setActiveTourUrl(url);
+          setActiveTourPropertyId(propertyId);
+          setNavigatingToTour(false);
         }
         return true;
       } catch (e) {
@@ -2031,26 +2047,56 @@ const MapView = forwardRef(({
         onClose={() => setPreviewModalOpen(false)}
       />
 
-      {/* Overlay del tour 360° */}
-      {activeTourUrl && (
-        <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
-          <iframe
-            src={activeTourUrl}
-            width="100%"
-            height="100%"
-            style={{ border: 'none' }}
-            allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
-            title="Tour Virtual 360°"
+      {/* Overlay de navegación al tour (fade sutil) */}
+      <AnimatePresence>
+        {navigatingToTour && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.55 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: Math.max(0.25, (tourTransitionDuration || 350) / 1000), ease: [0.25, 0.1, 0.25, 1] }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.36) 60%, rgba(0,0,0,0.5) 100%)',
+              zIndex: 35,
+              pointerEvents: 'none'
+            }}
           />
-          <Fab
-            size="medium"
-            onClick={() => { setActiveTourUrl(null); setActiveTourPropertyId(null); }}
-            sx={{ position: 'absolute', top: '24px', right: '24px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { backgroundColor: 'rgba(0,0,0,0.8)' } }}
+        )}
+      </AnimatePresence>
+
+      {/* Overlay del tour 360° con animación de aparición */}
+      <AnimatePresence>
+        {activeTourUrl && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.985 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.985 }}
+            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}
           >
-            <CloseIcon />
-          </Fab>
-        </Box>
-      )}
+            <iframe
+              src={activeTourUrl}
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+              allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
+              title="Tour Virtual 360°"
+            />
+            <Fab
+              size="medium"
+              onClick={() => { setActiveTourUrl(null); setActiveTourPropertyId(null); }}
+              sx={{ position: 'absolute', top: '24px', right: '24px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', '&:hover': { backgroundColor: 'rgba(0,0,0,0.8)' } }}
+            >
+              <CloseIcon />
+            </Fab>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Panel lateral de preview */}
       <PropertySidePreview
