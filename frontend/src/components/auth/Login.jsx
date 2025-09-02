@@ -106,14 +106,25 @@ const Login = () => {
             />
           </Box>
 
-          <Button
-            fullWidth
-            variant="text"
-            onClick={() => navigate('/')}
-            sx={{ color: '#6B7280' }}
-          >
-            Volver al inicio
-          </Button>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => navigate('/signup')}
+              sx={{ color: '#111111', fontWeight: 500 }}
+            >
+              ¿No tienes cuenta? Regístrate
+            </Button>
+
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => navigate('/')}
+              sx={{ color: '#6B7280' }}
+            >
+              Volver al inicio
+            </Button>
+          </Box>
         </Box>
       </Box>
     </Container>

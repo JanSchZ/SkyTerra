@@ -55,6 +55,7 @@ import CheckoutPage from './components/checkout/CheckoutPage.jsx';
 import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
 import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
 import Login from './components/auth/Login';
+import SignUp from './components/auth/SignUp';
 import './App.css';
 import SavedAndRecent from './components/ui/SavedAndRecent';
 
@@ -730,6 +731,23 @@ function App() {
           }}
         >
           <Login />
+        </motion.div>
+      } />
+
+      {/* Página de Registro dedicada */}
+      <Route path="/signup" element={
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 1.02 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 30,
+            duration: 0.4
+          }}
+        >
+          <SignUp />
         </motion.div>
       } />
 
