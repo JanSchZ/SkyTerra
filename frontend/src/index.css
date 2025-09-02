@@ -117,7 +117,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .mapboxgl-popup-close-button:hover {
-  color: var(--navy-primary);
+  color: #111111;
 }
 
 /* Animaciones globales */
@@ -161,7 +161,7 @@ iframe {
 /* Mejoras para scroll en contenedores con desbordamiento */
 .scroll-container {
   scrollbar-width: thin;
-  scrollbar-color: var(--navy-light) transparent;
+  scrollbar-color: #9CA3AF transparent;
 }
 
 .scroll-container::-webkit-scrollbar {
@@ -174,12 +174,12 @@ iframe {
 }
 
 .scroll-container::-webkit-scrollbar-thumb {
-  background-color: var(--navy-light);
+  background-color: #9CA3AF;
   border-radius: 3px;
 }
 
 .scroll-container::-webkit-scrollbar-thumb:hover {
-  background-color: var(--navy-medium);
+  background-color: #6B7280;
 }
 
 /* Optimizaciones para dispositivos móviles */
@@ -219,8 +219,8 @@ iframe {
 
 .input-field:focus {
   outline: none;
-  border-color: var(--navy-primary);
-  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+  border-color: #111111;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.1);
 }
 
 @keyframes glassFlow {

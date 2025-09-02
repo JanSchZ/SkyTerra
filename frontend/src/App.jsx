@@ -134,7 +134,17 @@ function App() {
   const [aiAppliedFilters, setAiAppliedFilters] = useState(null);
   const [aiSearchLoading, setAiSearchLoading] = useState(false);
   const [aiSearchResult, setAiSearchResult] = useState(null);
-  const [conversationHistory, setConversationHistory] = useState([]);
+  const [conversationHistory, setConversationHistory] = useState(() => {
+    try {
+      const stored = localStorage.getItem('skyterra.sam.history');
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (Array.isArray(parsed)) {
+        try { window.__skyterraConversationHistory = parsed; } catch (_) {}
+        return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
   // Removed top-bar save search dialog/button per request
 
   const muiTheme = useMuiTheme();
@@ -218,6 +228,14 @@ function App() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Persist conversation history
+  useEffect(() => {
+    try {
+      localStorage.setItem('skyterra.sam.history', JSON.stringify(conversationHistory));
+      try { window.__skyterraConversationHistory = conversationHistory; } catch (_) {}
+    } catch (_) {}
+  }, [conversationHistory]);
   
   const handleAISearch = (aiGeneratedFilters) => {
     if (!aiGeneratedFilters) return;
@@ -259,9 +277,12 @@ function App() {
     }
   };
 
-  const handleSearchStart = () => {
+  const handleSearchStart = (searchText) => {
     setAiSearchLoading(true);
     setAiSearchResult(null);
+    if (typeof searchText === 'string' && searchText.trim()) {
+      setConversationHistory(prev => [...prev, { role: 'user', content: searchText.trim() }]);
+    }
     // Hide the intro overlay when search starts
     if (mapRef.current?.hideIntroOverlay) {
       mapRef.current.hideIntroOverlay();
@@ -272,6 +293,10 @@ function App() {
     setAiSearchLoading(false);
     if (result && result.type !== 'error') {
       setAiSearchResult(result);
+      // Append assistant message to history if present
+      if (result.assistant_message) {
+        setConversationHistory(prev => [...prev, { role: 'assistant', content: result.assistant_message }]);
+      }
       if (result.search_mode === 'location' && result.flyToLocation) {
         handleLocationSearch(result.flyToLocation);
       } else if (result.search_mode === 'property_recommendation' && result.recommendations && result.recommendations.length > 0) {
@@ -286,15 +311,11 @@ function App() {
 
   const handleSuggestionClick = async (rec) => {
     try {
-      // Intentar abrir directamente el tour 360° sobre el mapa si existe
-      const opened = await mapRef.current?.openPropertyTour?.(rec, { duration: 3000, zoom: 14.5 });
-      if (!opened) {
-        // Fallback a la vista de detalles si no hay tour válido
-        if (rec.latitude && rec.longitude) {
-          handleLocationSearch({ center:[rec.longitude, rec.latitude], zoom:14, pitch:60, bearing:0 });
-        }
-        navigate(`/property/${rec.id}`);
-      }
+      // Navegar siempre a la vista de detalle y abrir tour automáticamente
+      // Usamos un flag en localStorage que PropertyDetails interpreta para omitir vuelo
+      // y abrir el primer tour disponible.
+      try { localStorage.setItem('skipAutoFlight', 'true'); } catch (_) {}
+      navigate(`/property/${rec.id}`);
     } catch (e) {
       console.error('Error handling suggestion click:', e);
       navigate(`/property/${rec.id}`);
@@ -348,6 +369,9 @@ function App() {
   const handleLogout = async () => {
     await authService.logout();
     setUser(null);
+    // Clear Sam conversation history on logout
+    try { localStorage.removeItem('skyterra.sam.history'); } catch (_) {}
+    setConversationHistory([]);
     setSnackbarMessage('Has cerrado sesión.');
     setSnackbarSeverity('info');
     setSnackbarOpen(true);

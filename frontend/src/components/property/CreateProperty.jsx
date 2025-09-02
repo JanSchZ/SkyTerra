@@ -83,7 +83,7 @@ const CreateProperty = () => {
         justifyContent: 'center',
         backgroundColor: '#0d1117'
       }}>
-        <CircularProgress sx={{ color: '#3b82f6' }} />
+        <CircularProgress sx={{ color: '#c9d1d9' }} />
         <Typography sx={{ ml: 2, color: 'white' }}>Cargando...</Typography>
       </Box>
     );

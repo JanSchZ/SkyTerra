@@ -295,7 +295,7 @@ export default function CreatePublicationWizard() {
                     backgroundColor: 'rgba(255,255,255,0.98)',
                     '& fieldset': { borderColor: 'rgba(0,0,0,0.18)' },
                     '&:hover fieldset': { borderColor: 'rgba(0,0,0,0.28)' },
-                    '&.Mui-focused fieldset': { borderColor: '#1976d2' }
+                    '&.Mui-focused fieldset': { borderColor: '#111111' }
                   }
                 }}
               />

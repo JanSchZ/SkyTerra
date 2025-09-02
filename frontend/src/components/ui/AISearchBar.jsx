@@ -9,7 +9,6 @@ import {
   ListItem,
   ListItemText,
   Divider,
-  Chip,
   useTheme,
   InputAdornment,
   IconButton,
@@ -103,22 +102,8 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const theme = useTheme();
 
-  const chipSx = {
-    borderRadius: '6px',
-    fontWeight: 400,
-    backgroundColor: alpha(theme.palette.primary.main, 0.25),
-    color: theme.palette.primary.light,
-    border: `1px solid ${alpha(theme.palette.primary.main, 0.4)}`,
-    '& .MuiChip-icon': {
-      color: theme.palette.primary.light,
-      fontSize: '1rem',
-      marginLeft: '5px',
-      marginRight: '-4px'
-    },
-    '&:hover': {
-      backgroundColor: alpha(theme.palette.primary.main, 0.35),
-    }
-  };
+  // Randomized input name/id to prevent browser autocomplete suggestions from prior entries
+  const [inputName] = useState(() => `ai-search-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
   const handleInputChange = (e) => {
     setQuery(e.target.value);
@@ -249,7 +234,18 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
       // AI SEARCH FALLBACK / PROPERTY QUERY
       // ---------------------------------------------------------------
 
-      const response = await api.post('/ai-search/', { query: searchTerm, conversation_history: [] });
+      // Include existing conversation history if available
+      let conversationHistory = [];
+      try {
+        if (Array.isArray(window.__skyterraConversationHistory)) {
+          conversationHistory = window.__skyterraConversationHistory;
+        } else {
+          const stored = localStorage.getItem('skyterra.sam.history');
+          const parsed = stored ? JSON.parse(stored) : [];
+          if (Array.isArray(parsed)) conversationHistory = parsed;
+        }
+      } catch (_) {}
+      const response = await api.post('/ai-search/', { query: searchTerm, conversation_history: conversationHistory });
       if (response.data && typeof response.data === 'object') {
         const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
         const hasContentForPropertyList = (suggestedFilters && Object.values(suggestedFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== null && (Array.isArray(v) ? v.some(subVal => subVal !== null) : true )))) || (recommendations && recommendations.length > 0);
@@ -336,29 +332,55 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     setError(null);
     try {
       if (onSearchStart) onSearchStart(query.trim());
-      const geoResults = await searchLocation(query.trim());
-      if (geoResults.length > 0) {
-        const firstResult = geoResults[0];
-        const center = firstResult.center;
-        const placeName = firstResult.place_name || firstResult.text;
-        let zoom = 12;
-        if (firstResult.place_type?.includes('country')) zoom = 5;
-        else if (firstResult.place_type?.includes('region')) zoom = 8;
-        else if (firstResult.place_type?.includes('district')) zoom = 10;
-        else if (firstResult.place_type?.includes('place')) zoom = 11;
-
-        const fly = { center, zoom, name: placeName };
-        if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
+      // Detección de saludos para evitar geocodificar frases como "Hola Sam"
+      const greetingRegex = /^(hola|buenas|hello|hi|qué tal|que tal|hey)(\s+.*)?$/i;
+      if (greetingRegex.test(query.trim().toLowerCase())) {
+        const chatResponse = {
+          type: 'chat',
+          search_mode: 'chat',
+          assistant_message: '¡Hola! ¿En qué puedo ayudarte?',
+          suggestedFilters: null,
+          recommendations: [],
+        };
         setShowResults(false);
-        if (onSearchComplete) onSearchComplete({
-          type: 'location',
-          search_mode: 'location',
-          assistant_message: `Volando a ${placeName}...`,
-          interpretation: `Volando a ${placeName}...`,
-          flyToLocation: fly,
-        });
+        if (onSearchComplete) onSearchComplete(chatResponse);
+        setLoading(false);
+        return;
+      }
+      // Usar la MISMA heurística que handleSearch: solo geocodificar si es consulta corta y no inmobiliaria
+      const searchTermLowerCase = query.trim().toLowerCase();
+      const wordCount = searchTermLowerCase.split(/\s+/).filter(Boolean).length;
+      const propertyKeywordsRegex = /(propiedad|propiedades|terreno|terrenos|granja|finca|campo|casa|parcela|parcel|lote|rancho|ranch|farm|forest|bosque)/;
+      const isLikelyLocationQuery = wordCount <= 3 && !propertyKeywordsRegex.test(searchTermLowerCase);
+
+      if (isLikelyLocationQuery) {
+        const geoResults = await searchLocation(searchTermLowerCase);
+        if (geoResults.length > 0) {
+          const firstResult = geoResults[0];
+          const center = firstResult.center;
+          const placeName = firstResult.place_name || firstResult.text;
+          let zoom = 12;
+          if (firstResult.place_type?.includes('country')) zoom = 5;
+          else if (firstResult.place_type?.includes('region')) zoom = 8;
+          else if (firstResult.place_type?.includes('district')) zoom = 10;
+          else if (firstResult.place_type?.includes('place')) zoom = 11;
+
+          const fly = { center, zoom, name: placeName };
+          if (onLocationSearch) onLocationSearch({ center, zoom, locationName: placeName });
+          setShowResults(false);
+          if (onSearchComplete) onSearchComplete({
+            type: 'location',
+            search_mode: 'location',
+            assistant_message: `Volando a ${placeName}...`,
+            interpretation: `Volando a ${placeName}...`,
+            flyToLocation: fly,
+          });
+        } else {
+          // Sin resultados confiables: ir a IA
+          await handleSearch();
+        }
       } else {
-        // Fallback to full search (AI) if no geocode results
+        // No geocodificar en consultas largas o inmobiliarias: ir a IA
         await handleSearch();
       }
     } catch (err) {
@@ -386,9 +408,19 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
-        autoComplete="new-password" /* evitar autocompletado del navegador */
-        inputProps={{ autoComplete: 'new-password', name: 'ai-search-input', spellCheck: 'false', 'data-lpignore': 'true' }}
-        onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'new-password'); e.target.setAttribute('autocorrect','off'); } catch(_){} }}
+        autoComplete="off"
+        inputProps={{
+          id: inputName,
+          name: inputName,
+          autoComplete: 'off',
+          autoCorrect: 'off',
+          autoCapitalize: 'none',
+          spellCheck: 'false',
+          inputMode: 'search',
+          'data-lpignore': 'true',
+          'data-form-type': 'other'
+        }}
+        onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'off'); e.target.setAttribute('autocorrect','off'); e.target.setAttribute('autocapitalize','none'); } catch(_){} }}
         InputProps={{
           endAdornment: loading ? (
             <InputAdornment position="end">

@@ -185,7 +185,7 @@ const PropertyDetails = () => {
         
         // Cargar tours reales
         try {
-          const actualTours = await tourService.getPropertyTours(id);
+          const actualTours = await (tourService.getPropertyTours ? tourService.getPropertyTours(id) : tourService.getTours(id));
           setTours(actualTours.results || actualTours || []);
         } catch (tourError) {
           console.warn('No se pudieron cargar los tours para la propiedad:', tourError);
@@ -397,7 +397,7 @@ const PropertyDetails = () => {
         justifyContent: 'center',
         backgroundColor: '#0d1117'
       }}>
-        <CircularProgress sx={{ color: '#3b82f6' }} />
+        <CircularProgress sx={{ color: '#c9d1d9' }} />
       </Box>
     );
   }
@@ -485,25 +485,25 @@ const PropertyDetails = () => {
 
       {/* Botón flotante para volver (si no hay tour activo) */}
       {!activeTourUrl && (
-        <Fab
-          onClick={handleGoBack}
-          sx={{
-            position: 'absolute',
-            top: isMobile ? '20px' : '30px',
-            right: isMobile ? '20px' : '30px',
-            zIndex: 10,
-            backgroundColor: 'rgba(22, 27, 34, 0.9)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(30, 41, 59, 0.3)',
-            color: '#c9d1d9',
-            '&:hover': {
-              backgroundColor: 'rgba(22, 27, 34, 0.95)',
-              borderColor: 'rgba(30, 58, 138, 0.5)',
-            }
-          }}
-        >
-          <ArrowBackIcon />
-        </Fab>
+          <Fab
+            onClick={handleGoBack}
+            sx={{
+              position: 'absolute',
+              top: isMobile ? '20px' : '30px',
+              right: isMobile ? '20px' : '30px',
+              zIndex: 10,
+              backgroundColor: 'rgba(22, 27, 34, 0.9)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              color: '#c9d1d9',
+              '&:hover': {
+                backgroundColor: 'rgba(22, 27, 34, 0.95)',
+                borderColor: 'rgba(255,255,255,0.28)',
+              }
+            }}
+          >
+            <ArrowBackIcon />
+          </Fab>
       )}
 
       {/* Panel de detalles flotante (si no hay tour activo y showDetails es true) */}
@@ -563,7 +563,7 @@ const PropertyDetails = () => {
                   variant="h6" 
                   sx={{ 
                     fontWeight: 400, 
-                    color: '#3b82f6' 
+                    color: '#ffffff' 
                   }}
                 >
                   {getPriceDisplay()}
@@ -600,9 +600,9 @@ const PropertyDetails = () => {
                   label={property?.type || 'Propiedad'} 
                   size="small" 
                   sx={{ 
-                    backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                    color: '#60a5fa',
-                    border: '1px solid rgba(30, 58, 138, 0.3)',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: '#c9d1d9',
+                    border: '1px solid rgba(255,255,255,0.2)',
                     fontWeight: 300
                   }}
                 />
@@ -612,9 +612,9 @@ const PropertyDetails = () => {
                     label="Agua" 
                     size="small" 
                     sx={{ 
-                      backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(30, 58, 138, 0.3)',
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      color: '#c9d1d9',
+                      border: '1px solid rgba(255,255,255,0.2)',
                       fontWeight: 300
                     }}
                   />
@@ -625,9 +625,9 @@ const PropertyDetails = () => {
                     label="Vistas" 
                     size="small" 
                     sx={{ 
-                      backgroundColor: 'rgba(30, 58, 138, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(30, 58, 138, 0.3)',
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      color: '#c9d1d9',
+                      border: '1px solid rgba(255,255,255,0.2)',
                       fontWeight: 300
                     }}
                   />
@@ -649,11 +649,11 @@ const PropertyDetails = () => {
                   textTransform: 'none',
                   minHeight: '48px',
                   '&.Mui-selected': {
-                    color: '#3b82f6'
+                    color: '#ffffff'
                   }
                 },
                 '& .MuiTabs-indicator': {
-                  backgroundColor: '#3b82f6'
+                  backgroundColor: '#ffffff'
                 }
               }}
             >
@@ -684,7 +684,7 @@ const PropertyDetails = () => {
                   <List sx={{ p: 0 }}>
                     <ListItem sx={{ px: 0, py: 1 }}>
                       <ListItemIcon sx={{ minWidth: '40px' }}>
-                        <LocationOnIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        <LocationOnIcon sx={{ color: '#c9d1d9', fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
                         primary="Coordenadas"
@@ -703,7 +703,7 @@ const PropertyDetails = () => {
                     
                     <ListItem sx={{ px: 0, py: 1 }}>
                       <ListItemIcon sx={{ minWidth: '40px' }}>
-                        <SquareFootIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        <SquareFootIcon sx={{ color: '#c9d1d9', fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
                         primary="Superficie"
@@ -722,7 +722,7 @@ const PropertyDetails = () => {
                     
                     <ListItem sx={{ px: 0, py: 1 }}>
                       <ListItemIcon sx={{ minWidth: '40px' }}>
-                        <AttachMoneyIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                        <AttachMoneyIcon sx={{ color: '#c9d1d9', fontSize: '20px' }} />
                       </ListItemIcon>
                       <ListItemText 
                         primary={property?.listing_type === 'rent' ? 'Precio mensual de arriendo' : (property?.listing_type === 'both' ? 'Precio de venta / arriendo' : 'Precio de venta')}
@@ -742,7 +742,7 @@ const PropertyDetails = () => {
                     {property?.plusvalia_score !== null && (
                       <ListItem sx={{ px: 0, py: 1 }}>
                         <ListItemIcon sx={{ minWidth: '40px' }}>
-                          <TrendingUpIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                          <TrendingUpIcon sx={{ color: '#c9d1d9', fontSize: '20px' }} />
                         </ListItemIcon>
                         <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
                           <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} />
@@ -866,7 +866,7 @@ const PropertyDetails = () => {
                       {property.documents.map((doc) => (
                         <ListItem key={doc.id} sx={{ px: 0, py: 1, display:'flex', alignItems:'center', gap:1 }}>
                           <ListItemIcon sx={{ minWidth: '40px' }}>
-                            <ViewInArIcon sx={{ color: '#3b82f6', fontSize: '20px' }} />
+                          <ViewInArIcon sx={{ color: '#c9d1d9', fontSize: '20px' }} />
                           </ListItemIcon>
                           <ListItemText
                             primary={doc.doc_type ? doc.doc_type.toUpperCase() : 'Documento'}
@@ -891,7 +891,7 @@ const PropertyDetails = () => {
                             rel="noopener noreferrer"
                             variant="outlined"
                             size="small"
-                            sx={{ ml: 1, textTransform: 'none', borderColor:'rgba(30, 58, 138, 0.4)', color:'#60a5fa', '&:hover':{ borderColor:'rgba(30, 58, 138, 0.6)', backgroundColor:'rgba(30, 58, 138, 0.1)' } }}
+                            sx={{ ml: 1, textTransform: 'none', borderColor:'rgba(255,255,255,0.3)', color:'#c9d1d9', '&:hover':{ borderColor:'rgba(255,255,255,0.5)', backgroundColor:'rgba(255,255,255,0.08)' } }}
                           >
                             Ver
                           </Button>
@@ -933,14 +933,14 @@ const PropertyDetails = () => {
                 variant="contained" 
                 fullWidth
                 sx={{ 
-                  backgroundColor: 'rgba(30, 58, 138, 0.9)',
-                  color: 'white',
+                  backgroundColor: '#111111',
+                  color: '#ffffff',
                   fontWeight: 400,
                   textTransform: 'none',
                   borderRadius: '12px',
                   py: 1.5,
                   '&:hover': {
-                    backgroundColor: 'rgba(30, 58, 138, 1)',
+                    backgroundColor: '#000000',
                     transform: 'translateY(-1px)'
                   }
                 }}
