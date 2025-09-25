@@ -17,6 +17,7 @@ import {
   alpha
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloseIcon from '@mui/icons-material/Close';
@@ -93,7 +94,16 @@ const PREDEFINED_LOCATIONS = {
   'india': { center: [78.9629, 20.5937], zoom: 5, name: 'India' },
 };
 
-const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart, onSearchComplete }) => {
+const AISearchBar = ({
+  onSearch,
+  onLocationSearch,
+  onQuerySubmit,
+  onSearchStart,
+  onSearchComplete,
+  variant = 'default',
+  placeholder,
+  autoFocus = false,
+}) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -399,12 +409,107 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     setShowResults(false);
   };
 
+  const isHeroVariant = variant === 'hero';
+  const effectivePlaceholder = placeholder || (isHeroVariant ? 'Buscar terrenos...' : 'Buscar ubicación o propiedades...');
+
+  const inputStyles = isHeroVariant
+    ? {
+        '& .MuiOutlinedInput-root': {
+          height: { xs: 64, md: 72 },
+          borderRadius: '999px',
+          backgroundColor: 'rgba(255,255,255,0.94)',
+          border: '1px solid rgba(15,23,42,0.08)',
+          boxShadow: '0 32px 68px rgba(15,23,42,0.18)',
+          transition: 'all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          color: '#0f172a',
+          paddingRight: { xs: 1, md: 2 },
+          '& fieldset': { border: 'none' },
+          '&:hover': {
+            boxShadow: '0 36px 84px rgba(15,23,42,0.22)',
+            transform: 'translateY(-2px)',
+          },
+          '&.Mui-focused': {
+            boxShadow: '0 38px 90px rgba(15,23,42,0.28)',
+            transform: 'translateY(-3px)',
+          },
+          '& .MuiOutlinedInput-input': {
+            color: '#0f172a',
+            fontSize: { xs: '1rem', md: '1.05rem' },
+            fontWeight: 400,
+            padding: { xs: '18px 20px', md: '22px 28px' },
+            '::placeholder': {
+              color: 'rgba(15,23,42,0.55)',
+              fontWeight: 400,
+            },
+          },
+        },
+      }
+    : {
+        '& .MuiOutlinedInput-root': {
+          backgroundColor: 'rgba(255,255,255,0.18)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          borderRadius: '12px',
+          border: '1px solid rgba(255,255,255,0.25)',
+          color: '#ffffff',
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          '& fieldset': { borderColor: 'transparent' },
+          '&:hover fieldset': { borderColor: 'transparent' },
+          '&.Mui-focused fieldset': { borderColor: 'transparent' },
+          '&.Mui-focused': {
+            backgroundColor: 'rgba(255,255,255,0.22)',
+            boxShadow: '0 0 12px rgba(255,255,255,0.4)',
+            transform: 'translateY(-1px)',
+          },
+          '&:hover': {
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            transform: 'translateY(-0.5px)',
+          },
+        },
+        '& .MuiOutlinedInput-input': {
+          color: '#ffffff',
+          '::placeholder': { color: 'rgba(255,255,255,0.75)' },
+        },
+      };
+
+  const iconButtonStyles = isHeroVariant
+    ? {
+        backgroundColor: '#0f172a',
+        color: '#ffffff',
+        borderRadius: '999px',
+        width: { xs: 52, md: 60 },
+        height: { xs: 52, md: 60 },
+        ml: { xs: 1, md: 1.5 },
+        boxShadow: '0 18px 38px rgba(15,23,42,0.32)',
+        transition: 'transform 0.35s ease, box-shadow 0.35s ease, background 0.35s ease',
+        '&:hover': {
+          backgroundColor: '#111b2f',
+          transform: 'translateX(4px) scale(1.05)',
+          boxShadow: '0 22px 45px rgba(15,23,42,0.35)',
+        },
+        '&:active': {
+          transform: 'translateX(1px) scale(0.98)',
+        },
+        '&:disabled': {
+          backgroundColor: 'rgba(148,163,184,0.32)',
+          color: '#1e293b',
+          boxShadow: 'none',
+        },
+      }
+    : {
+        color: 'rgba(255,255,255,0.7)',
+        '&:hover': { color: 'rgba(255,255,255,0.9)' },
+        '&:disabled': { color: 'rgba(255,255,255,0.3)' },
+      };
+
+  const endIcon = isHeroVariant ? <ArrowForwardRoundedIcon /> : <SearchIcon />;
+
   return (
     <Box sx={{ width: '100%', position: 'relative' }}>
       <TextField
         fullWidth
         variant="outlined"
-        placeholder="Buscar ubicación o propiedades..."
+        placeholder={effectivePlaceholder}
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
@@ -421,51 +526,30 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
           'data-form-type': 'other'
         }}
         onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'off'); e.target.setAttribute('autocorrect','off'); e.target.setAttribute('autocapitalize','none'); } catch(_){} }}
+        autoFocus={autoFocus}
         InputProps={{
+          sx: isHeroVariant
+            ? {
+                pr: { xs: 1.5, md: 2 },
+              }
+            : undefined,
           endAdornment: loading ? (
             <InputAdornment position="end">
-              <CircularProgress size={20} sx={{ color: 'rgba(255,255,255,0.7)' }} />
+              <CircularProgress size={isHeroVariant ? 24 : 20} sx={{ color: isHeroVariant ? '#0f172a' : 'rgba(255,255,255,0.7)' }} />
             </InputAdornment>
           ) : (
             <InputAdornment position="end">
               <IconButton
                 onClick={handleSearch}
                 disabled={!query.trim()}
-                sx={{ 
-                  color: 'rgba(255,255,255,0.7)',
-                  '&:hover': { color: 'rgba(255,255,255,0.9)' },
-                  '&:disabled': { color: 'rgba(255,255,255,0.3)' }
-                }}
+                sx={iconButtonStyles}
               >
-                <SearchIcon />
+                {endIcon}
               </IconButton>
             </InputAdornment>
           )
         }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.25)',
-            color: '#ffffff',
-            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-            '& fieldset': { borderColor: 'transparent' },
-            '&:hover fieldset': { borderColor: 'transparent' },
-            '&.Mui-focused fieldset': { borderColor: 'transparent' },
-            '&.Mui-focused': {
-              backgroundColor: 'rgba(255,255,255,0.22)',
-              boxShadow: '0 0 12px rgba(255,255,255,0.4)',
-              transform: 'translateY(-1px)',
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              transform: 'translateY(-0.5px)',
-            }
-          },
-          input: { color: '#ffffff', '::placeholder': { color: 'rgba(255,255,255,0.75)' } },
-        }}
+        sx={inputStyles}
       />
       
       {error && !showResults && (
