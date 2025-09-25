@@ -93,7 +93,16 @@ const PREDEFINED_LOCATIONS = {
   'india': { center: [78.9629, 20.5937], zoom: 5, name: 'India' },
 };
 
-const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart, onSearchComplete }) => {
+const AISearchBar = ({
+  onSearch,
+  onLocationSearch,
+  onQuerySubmit,
+  onSearchStart,
+  onSearchComplete,
+  variant = 'default',
+  placeholder,
+  autoFocus = false,
+}) => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -399,12 +408,84 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     setShowResults(false);
   };
 
+  const isHeroVariant = variant === 'hero';
+  const effectivePlaceholder = placeholder || (isHeroVariant ? 'Buscar terrenos...' : 'Buscar ubicación o propiedades...');
+
+  const handleHeroSubmit = (event) => {
+    event.preventDefault();
+    if (!query.trim() || loading) return;
+    handleSearch();
+  };
+
+  if (isHeroVariant) {
+    return (
+      <form id="searchForm" className="search" role="search" onSubmit={handleHeroSubmit}>
+        <input
+          id="searchInput"
+          type="text"
+          placeholder={effectivePlaceholder}
+          value={query}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyPress}
+          autoComplete="off"
+          spellCheck="false"
+          autoCapitalize="none"
+          disabled={loading}
+        />
+        <button
+          aria-label="Buscar"
+          className="search__go"
+          type="submit"
+          disabled={!query.trim() || loading}
+        >
+          {loading ? <span className="search__spinner" aria-hidden="true" /> : '➜'}
+        </button>
+      </form>
+    );
+  }
+
+  const inputStyles = {
+    '& .MuiOutlinedInput-root': {
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+      borderRadius: '12px',
+      border: '1px solid rgba(255,255,255,0.25)',
+      color: '#ffffff',
+      transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+      '& fieldset': { borderColor: 'transparent' },
+      '&:hover fieldset': { borderColor: 'transparent' },
+      '&.Mui-focused fieldset': { borderColor: 'transparent' },
+      '&.Mui-focused': {
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        boxShadow: '0 0 12px rgba(255,255,255,0.4)',
+        transform: 'translateY(-1px)',
+      },
+      '&:hover': {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        transform: 'translateY(-0.5px)',
+      },
+    },
+    '& .MuiOutlinedInput-input': {
+      color: '#ffffff',
+      '::placeholder': { color: 'rgba(255,255,255,0.75)' },
+    },
+  };
+
+  const iconButtonStyles = {
+    color: 'rgba(255,255,255,0.7)',
+    '&:hover': { color: 'rgba(255,255,255,0.9)' },
+    '&:disabled': { color: 'rgba(255,255,255,0.3)' },
+  };
+
+  const endIcon = <SearchIcon />;
+
   return (
     <Box sx={{ width: '100%', position: 'relative' }}>
       <TextField
         fullWidth
         variant="outlined"
-        placeholder="Buscar ubicación o propiedades..."
+        placeholder={effectivePlaceholder}
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
@@ -421,51 +502,30 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
           'data-form-type': 'other'
         }}
         onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'off'); e.target.setAttribute('autocorrect','off'); e.target.setAttribute('autocapitalize','none'); } catch(_){} }}
+        autoFocus={autoFocus}
         InputProps={{
+          sx: isHeroVariant
+            ? {
+                pr: { xs: 1.5, md: 2 },
+              }
+            : undefined,
           endAdornment: loading ? (
             <InputAdornment position="end">
-              <CircularProgress size={20} sx={{ color: 'rgba(255,255,255,0.7)' }} />
+              <CircularProgress size={isHeroVariant ? 24 : 20} sx={{ color: isHeroVariant ? '#0f172a' : 'rgba(255,255,255,0.7)' }} />
             </InputAdornment>
           ) : (
             <InputAdornment position="end">
               <IconButton
                 onClick={handleSearch}
                 disabled={!query.trim()}
-                sx={{ 
-                  color: 'rgba(255,255,255,0.7)',
-                  '&:hover': { color: 'rgba(255,255,255,0.9)' },
-                  '&:disabled': { color: 'rgba(255,255,255,0.3)' }
-                }}
+                sx={iconButtonStyles}
               >
-                <SearchIcon />
+                {endIcon}
               </IconButton>
             </InputAdornment>
           )
         }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.25)',
-            color: '#ffffff',
-            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-            '& fieldset': { borderColor: 'transparent' },
-            '&:hover fieldset': { borderColor: 'transparent' },
-            '&.Mui-focused fieldset': { borderColor: 'transparent' },
-            '&.Mui-focused': {
-              backgroundColor: 'rgba(255,255,255,0.22)',
-              boxShadow: '0 0 12px rgba(255,255,255,0.4)',
-              transform: 'translateY(-1px)',
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              transform: 'translateY(-0.5px)',
-            }
-          },
-          input: { color: '#ffffff', '::placeholder': { color: 'rgba(255,255,255,0.75)' } },
-        }}
+        sx={inputStyles}
       />
       
       {error && !showResults && (

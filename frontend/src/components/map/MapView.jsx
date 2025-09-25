@@ -59,6 +59,7 @@ const MapView = forwardRef(({
   selectedPoint,
   suppressData = false,
   initialData = null,
+  landingPresentation = false,
 }, ref) => {
   const navigate = useNavigate();
   const { mode, theme } = useContext(ThemeModeContext);
@@ -1558,17 +1559,69 @@ const MapView = forwardRef(({
     setSearchResults([]);
   }, [editable, onLocationSelect]);
 
+  const heroModeActive = landingPresentation && !embedded;
+
+  const heroTransition =
+    'transform 900ms cubic-bezier(0.16, 1, 0.3, 1), ' +
+    'border-radius 900ms cubic-bezier(0.16, 1, 0.3, 1), ' +
+    'box-shadow 900ms cubic-bezier(0.16, 1, 0.3, 1), ' +
+    'filter 900ms cubic-bezier(0.16, 1, 0.3, 1), ' +
+    'clip-path 900ms cubic-bezier(0.16, 1, 0.3, 1), ' +
+    'opacity 700ms ease';
+
+  const mapSurfaceStyle = useMemo(
+    () => ({
+      width: '100%',
+      height: '100%',
+      borderRadius: heroModeActive ? '62px' : 0,
+      overflow: 'hidden',
+      transition: 'border-radius 900ms cubic-bezier(0.16, 1, 0.3, 1)',
+    }),
+    [heroModeActive],
+  );
+
   return (
-    <Box sx={{ 
-      width: '100%', 
-      height: embedded ? (embeddedHeight || 420) : '100vh', 
-      position: embedded ? 'relative' : 'fixed', 
-      top: embedded ? 'auto' : 0, 
-      left: embedded ? 'auto' : 0, 
-      zIndex: 1,
-      borderRadius: embedded ? 2 : 0,
-      overflow: 'hidden'
-    }}>
+    <Box
+      sx={(theme) => ({
+        width: '100%',
+        height: embedded ? (embeddedHeight || 420) : '100vh',
+        position: embedded ? 'relative' : 'fixed',
+        top: embedded ? 'auto' : 0,
+        left: embedded ? 'auto' : 0,
+        zIndex: heroModeActive ? 2 : 1,
+        borderRadius: embedded ? 2 : heroModeActive ? '62px' : 0,
+        overflow: embedded ? 'hidden' : heroModeActive ? 'visible' : 'hidden',
+        pointerEvents: heroModeActive ? 'none' : 'auto',
+        transition: heroTransition,
+        transformOrigin: heroModeActive ? 'center center' : '50% 50%',
+        transform: heroModeActive ? 'translate(18vw, -6vh) scale(0.56)' : 'translate3d(0, 0, 0) scale(1)',
+        boxShadow: heroModeActive ? '0 55px 120px rgba(15,23,42,0.36)' : 'none',
+        filter: heroModeActive ? 'saturate(1.08) contrast(1.04) brightness(1.02)' : 'none',
+        clipPath: heroModeActive ? 'ellipse(70% 78% at 75% 50%)' : 'none',
+        willChange: heroModeActive ? 'transform, clip-path, filter, opacity' : undefined,
+        opacity: heroModeActive ? 0.97 : 1,
+        [theme.breakpoints.down('xl')]: heroModeActive
+          ? { transform: 'translate(14vw, -4vh) scale(0.6)' }
+          : {},
+        [theme.breakpoints.down('lg')]: heroModeActive
+          ? { transform: 'translate(10vw, -2vh) scale(0.63)' }
+          : {},
+        [theme.breakpoints.down('md')]: heroModeActive
+          ? {
+              transform: 'translate(0, -2vh) scale(0.82)',
+              clipPath: 'ellipse(90% 78% at 60% 50%)',
+              opacity: 0.82,
+            }
+          : {},
+        [theme.breakpoints.down('sm')]: heroModeActive
+          ? {
+              transform: 'translate(-6vw, -2vh) scale(0.98)',
+              clipPath: 'ellipse(120% 85% at 56% 50%)',
+              opacity: 0.7,
+            }
+          : {},
+      })}
+    >
       {loading && !error && (
         <Box sx={{
           position: 'absolute', 
@@ -1633,7 +1686,8 @@ const MapView = forwardRef(({
           interactiveLayerIds={!editable ? [unclusteredPointLayer.id] : []} 
           onMouseMove={onMapMouseMove} 
           onMouseLeave={onMapMouseLeave} 
-           preserveDrawingBuffer={false}
+          preserveDrawingBuffer={false}
+          style={mapSurfaceStyle}
         >
            <NavigationControl 
             position="bottom-right"

@@ -35,6 +35,7 @@ import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import LandingV2 from './components/ui/LandingV2';
+import LandingHero from './components/ui/LandingHero';
 import CreatePublicationWizard from './components/property/CreatePublicationWizard';
 
 import CompareView from './components/property/CompareView';
@@ -155,6 +156,19 @@ function App() {
   const mapRef = React.useRef(null);
   const [initialPropertiesData, setInitialPropertiesData] = useState(null);
 
+  const [showLandingExperience, setShowLandingExperience] = useState(() => {
+    const isHome = location.pathname === '/';
+    if (typeof window === 'undefined') {
+      return isHome;
+    }
+    try {
+      const dismissed = sessionStorage.getItem('skyterra.landing.dismissed') === 'true';
+      return isHome && !dismissed;
+    } catch (_) {
+      return isHome;
+    }
+  });
+
   // Estado para el Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -227,6 +241,70 @@ function App() {
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      setShowLandingExperience(false);
+      return;
+    }
+    if (typeof window === 'undefined') {
+      setShowLandingExperience(true);
+      return;
+    }
+    try {
+      const dismissed = sessionStorage.getItem('skyterra.landing.dismissed') === 'true';
+      setShowLandingExperience(!dismissed);
+    } catch (_) {
+      setShowLandingExperience(true);
+    }
+  }, [location.pathname]);
+
+  const handleLandingHeroDismiss = React.useCallback((reason, payload) => {
+    try {
+      sessionStorage.setItem('skyterra.landing.dismissed', 'true');
+    } catch (_) {}
+    setShowLandingExperience(false);
+
+    const hasPayload = payload && Array.isArray(payload.center);
+    if ((reason === 'explore' || reason === 'search') && (hasPayload || mapRef.current?.getMap)) {
+      const fallbackZoom = () => {
+        try {
+          const mapInstance = mapRef.current?.getMap?.();
+          return mapInstance?.getZoom?.() ?? 4.5;
+        } catch (_) {
+          return 4.5;
+        }
+      };
+
+      const flyOptions = {
+        center: hasPayload ? payload.center : undefined,
+        zoom: hasPayload ? (payload.zoom ?? 6) : Math.min(fallbackZoom() + 2.5, 8),
+        pitch: payload?.pitch ?? 0,
+        bearing: payload?.bearing ?? 0,
+        duration: payload?.duration ?? 1600,
+        essential: true,
+      };
+
+      setTimeout(() => {
+        try {
+          mapRef.current?.flyTo({
+            ...flyOptions,
+            center: flyOptions.center || (() => {
+              try {
+                const mapInstance = mapRef.current?.getMap?.();
+                const center = mapInstance?.getCenter?.();
+                return center ? [center.lng, center.lat] : undefined;
+              } catch (_) {
+                return undefined;
+              }
+            })(),
+          });
+        } catch (error) {
+          console.warn('No se pudo aplicar flyTo tras cerrar el hero:', error);
+        }
+      }, 120);
+    }
   }, []);
 
   // Persist conversation history
@@ -629,8 +707,9 @@ function App() {
   };
 
   // Determine if the top bar should be shown
-  const showTopBar = 
-    location.pathname === '/' || 
+  const isHomeRoute = location.pathname === '/';
+  const showTopBar =
+    (isHomeRoute && !showLandingExperience) ||
     location.pathname.startsWith('/property/');
 
   // Helper function to format ranges (price, size)
@@ -705,7 +784,12 @@ function App() {
         path="/" 
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
+            <MapView
+              ref={mapRef}
+              appliedFilters={aiAppliedFilters}
+              filters={{}}
+              initialData={initialPropertiesData}
+            />
           </motion.div>
         } 
       />
@@ -813,6 +897,18 @@ function App() {
         >
           {/* UI principal siempre visible (Header Minimalista, etc.) */}
           {/* Condición para no mostrar en property, tour, o dashboard */}
+          <AnimatePresence>
+            {isHomeRoute && showLandingExperience && (
+              <LandingHero
+                onDismiss={handleLandingHeroDismiss}
+                onSearch={handleAISearch}
+                onLocationSearch={handleLocationSearch}
+                onSearchStart={handleSearchStart}
+                onSearchComplete={handleSearchComplete}
+              />
+            )}
+          </AnimatePresence>
+
           {showTopBar && (
             <Box // This Box is the main container for the top bar elements
               sx={{
@@ -835,10 +931,17 @@ function App() {
                   width: '100%',
                 }}
               >
-                <Typography 
+                <Typography
                   variant={isMobile ? "h6" : "h5"}
-                  component="div" 
-                  onClick={() => navigate('/')}
+                  component="div"
+                  onClick={() => {
+                    if (isHomeRoute) {
+                      try { sessionStorage.removeItem('skyterra.landing.dismissed'); } catch (_) {}
+                      setShowLandingExperience(true);
+                    } else {
+                      navigate('/');
+                    }
+                  }}
                   sx={(theme)=>({
                     color: theme.palette.common.white,
                     fontFamily: '"Source Code Pro", monospace',
@@ -1125,8 +1228,8 @@ function App() {
           </AnimatePresence>
 
           {/* Render AI suggestion panel only on main map route */}
-          {location.pathname === '/' && (
-            <AISuggestionPanel 
+          {location.pathname === '/' && !showLandingExperience && (
+            <AISuggestionPanel
                isLoading={aiSearchLoading}
                assistantMessage={aiSearchResult?.assistant_message}
                recommendations={aiSearchResult?.recommendations}
