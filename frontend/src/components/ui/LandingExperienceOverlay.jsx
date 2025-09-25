@@ -20,10 +20,15 @@ const searchBarVariants = {
   exit: { opacity: 0, y: -80, transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } },
 };
 
-const planetVariants = {
-  initial: { opacity: 0, scale: 0.8 },
-  animate: { opacity: 1, scale: 1, transition: { delay: 0.1, duration: 0.9, ease: [0.25, 0.1, 0.25, 1] } },
-  exit: { opacity: 0, scale: 1.1, transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } },
+const haloVariants = {
+  initial: { opacity: 0, scale: 0.85, x: 60 },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    x: 0,
+    transition: { delay: 0.1, duration: 0.9, ease: [0.25, 0.1, 0.25, 1] },
+  },
+  exit: { opacity: 0, scale: 1.08, x: -40, transition: { duration: 0.55, ease: [0.4, 0, 0.2, 1] } },
 };
 
 const LandingExperienceOverlay = ({
@@ -75,27 +80,27 @@ const LandingExperienceOverlay = ({
         sx={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(120deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.94) 44%, rgba(15,23,42,0.18) 68%, rgba(15,23,42,0.05) 78%, rgba(15,23,42,0) 88%)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
+          background:
+            'linear-gradient(112deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.94) 36%, rgba(255,255,255,0.74) 52%, rgba(15,23,42,0.2) 70%, rgba(15,23,42,0.06) 82%, rgba(15,23,42,0) 92%)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          pointerEvents: 'none',
         }}
       />
 
       <Box
         component={motion.div}
-        variants={planetVariants}
+        variants={haloVariants}
         initial="initial"
         animate="animate"
         exit="exit"
         sx={{
           position: 'absolute',
           top: '50%',
-          right: { xs: '-40%', md: '6%' },
-          width: { xs: '120vw', sm: '80vw', md: 'min(60vw, 640px)' },
+          right: { xs: '-32%', sm: '-10%', md: '5%' },
+          width: { xs: '140vw', sm: '90vw', md: 'min(64vw, 680px)' },
           aspectRatio: '1 / 1',
           transform: 'translateY(-50%)',
-          borderRadius: '50%',
-          boxShadow: { xs: 'none', md: '0 45px 120px rgba(15,23,42,0.35)' },
           pointerEvents: 'none',
           display: { xs: 'none', sm: 'block' },
         }}
@@ -103,23 +108,34 @@ const LandingExperienceOverlay = ({
         <Box
           sx={{
             position: 'absolute',
-            inset: 0,
+            inset: '-16%',
             borderRadius: '50%',
-            border: '1px solid rgba(255,255,255,0.25)',
-            background:
-              'radial-gradient(circle at 32% 28%, rgba(255,255,255,0.58), rgba(255,255,255,0) 55%),' +
-              'radial-gradient(circle at 68% 75%, rgba(15,23,42,0.55), rgba(15,23,42,0) 68%)',
-            mixBlendMode: 'screen',
+            background: 'radial-gradient(circle, rgba(15,23,42,0.28), rgba(15,23,42,0))',
+            filter: 'blur(36px)',
+            opacity: 0.75,
           }}
         />
         <Box
           sx={{
             position: 'absolute',
-            inset: '-12%',
+            inset: 0,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(15,23,42,0.24), rgba(15,23,42,0))',
-            filter: 'blur(24px)',
-            opacity: 0.65,
+            border: '1px solid rgba(255,255,255,0.32)',
+            mixBlendMode: 'screen',
+            background:
+              'radial-gradient(circle at 32% 28%, rgba(255,255,255,0.58), rgba(255,255,255,0) 55%),' +
+              'radial-gradient(circle at 72% 78%, rgba(15,23,42,0.5), rgba(15,23,42,0) 68%)',
+            opacity: 0.9,
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: '11%',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 50% 28%, rgba(255,255,255,0.38), rgba(255,255,255,0))',
+            mixBlendMode: 'screen',
+            opacity: 0.85,
           }}
         />
       </Box>

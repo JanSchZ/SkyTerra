@@ -744,7 +744,13 @@ function App() {
         path="/" 
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
+            <MapView
+              ref={mapRef}
+              appliedFilters={aiAppliedFilters}
+              filters={{}}
+              initialData={initialPropertiesData}
+              landingPresentation={showLandingExperience}
+            />
           </motion.div>
         } 
       />
