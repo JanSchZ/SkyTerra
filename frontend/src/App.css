@@ -352,10 +352,10 @@ body, html {
 
 /* Nuevos estilos para elementos específicos de SkyTerra */
 .skyterra-brand {
-  font-family: 'Source Code Pro', monospace;
-  font-weight: 400;
+  font-family: 'Helvetica', Arial, sans-serif;
+  font-weight: 700;
   color: var(--navy-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 .search-container {

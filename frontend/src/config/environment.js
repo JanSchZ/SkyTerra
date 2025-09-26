@@ -308,7 +308,7 @@ const skyTerraCustomStyle = {
       filter: ["==", ["get", "type"], "country"],
       layout: {
         "text-field": ["get", "name_es"],
-        "text-font": ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           0, 10,
@@ -344,7 +344,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["coalesce", ["get", "name_es"], ["get", "name"]],
-        "text-font": ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           4, 14,
@@ -376,7 +376,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Source Code Pro Semibold", "Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Semibold", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           7, 10,
@@ -408,7 +408,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Source Code Pro Regular", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-font": ["Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           10, 9,
@@ -439,7 +439,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Source Code Pro Regular", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-font": ["Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           12, 8,
@@ -468,7 +468,7 @@ const skyTerraCustomStyle = {
       filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], true, false],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Source Code Pro Semibold", "Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Semibold", "Arial Unicode MS Regular"],
         "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 16],
         "text-anchor": "top",
         "icon-image": ["concat", ["get", "maki"], "-15"],
@@ -491,7 +491,7 @@ const skyTerraCustomStyle = {
       filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], false, true],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Source Code Pro Regular", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-font": ["Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
         "text-size": ["interpolate", ["linear"], ["zoom"], 14, 9, 17, 13],
         "text-anchor": "top",
         "icon-image": ["concat", ["get", "maki"], "-11"],
