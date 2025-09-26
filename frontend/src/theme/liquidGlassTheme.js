@@ -52,12 +52,12 @@ export const liquidGlassTheme = (mode = 'light') => {
     typography: {
       fontFamily: '"Helvetica", Arial, sans-serif',
       fontSize: 14,
-      h1: { fontFamily: '"Source Code Pro", monospace', fontWeight: 300 },
-      h2: { fontFamily: '"Source Code Pro", monospace', fontWeight: 300 },
-      h3: { fontFamily: '"Source Code Pro", monospace', fontWeight: 700 },
-      h4: { fontFamily: '"Source Code Pro", monospace', fontWeight: 600 },
-      h5: { fontFamily: '"Source Code Pro", monospace', fontWeight: 500 },
-      h6: { fontFamily: '"Source Code Pro", monospace', fontWeight: 500 },
+      h1: { fontFamily: '"Helvetica", Arial, sans-serif', fontWeight: 700, letterSpacing: '-0.01em' },
+      h2: { fontFamily: '"Helvetica", Arial, sans-serif', fontWeight: 700, letterSpacing: '-0.01em' },
+      h3: { fontFamily: '"Helvetica", Arial, sans-serif', fontWeight: 700, letterSpacing: '-0.01em' },
+      h4: { fontFamily: '"Helvetica", Arial, sans-serif', fontWeight: 700, letterSpacing: '-0.01em' },
+      h5: { fontFamily: '"Helvetica", Arial, sans-serif', fontWeight: 700, letterSpacing: '-0.005em' },
+      h6: { fontFamily: '"Helvetica", Arial, sans-serif', fontWeight: 700, letterSpacing: '-0.005em' },
       subtitle1: { fontWeight: 600 },
       subtitle2: { fontWeight: 600, color: palette.text.secondary },
       caption: { color: palette.text.secondary }

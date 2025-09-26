@@ -901,15 +901,15 @@ function App() {
                   width: '100%',
                 }}
               >
-                <Typography 
+                <Typography
                   variant={isMobile ? "h6" : "h5"}
-                  component="div" 
+                  component="div"
                   onClick={() => navigate('/')}
                   sx={(theme)=>({
                     color: theme.palette.common.white,
-                    fontFamily: '"Source Code Pro", monospace',
-                    fontWeight: 400,
-                    letterSpacing: '0.01em',
+                    fontFamily: '"Helvetica", Arial, sans-serif',
+                    fontWeight: 700,
+                    letterSpacing: '-0.01em',
                     cursor: 'pointer',
                     userSelect: 'none',
                     paddingRight: 2,
