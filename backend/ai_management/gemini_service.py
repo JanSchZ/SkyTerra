@@ -247,19 +247,32 @@ Instrucciones específicas:
             raise GeminiServiceError("Sam está deshabilitado actualmente")
         
         # Select target model via router (fast classification)
-        model = self._route_model(user_message, request_type=request_type)
+        user_message_clean = (user_message or "").strip()
+
+        model = self._route_model(user_message_clean, request_type=request_type)
         system_prompt = self._get_system_prompt()
         
         # Build conversation
         messages = [{"role": "user", "parts": [{"text": system_prompt}]}]
-        
+
         # Add conversation history if provided
         if conversation_history:
-            for msg in conversation_history[-self.sam_config.max_history_messages:]:
-                messages.append({"role": msg.get("role", "user"), "parts": [{"text": msg.get("content", "")}]})
-        
+            max_history = max(self.sam_config.max_history_messages, 0)
+            trimmed_history = conversation_history[-max_history:] if max_history else []
+            for msg in trimmed_history:
+                content = (msg.get("content") or "").strip()
+                if not content:
+                    continue
+                role = (msg.get("role") or "user").lower()
+                if role in ("assistant", "sam", "bot", "model"):
+                    role = "model"
+                elif role != "user":
+                    role = "user"
+                # Gemini expects model replies to arrive as role="model", so normalise stored history.
+                messages.append({"role": role, "parts": [{"text": content}]})
+
         # Add current user message
-        messages.append({"role": "user", "parts": [{"text": user_message}]})
+        messages.append({"role": "user", "parts": [{"text": user_message_clean}]})
         
         # Prepare the request
         url = self.base_url.format(model=model.api_name)
@@ -306,7 +319,7 @@ Instrucciones específicas:
                             generated_text = candidate['content']['parts'][0]['text']
                             
                             # Estimate tokens and calculate cost
-                            tokens_input = self._estimate_tokens(system_prompt + user_message)
+                            tokens_input = self._estimate_tokens(system_prompt + user_message_clean)
                             tokens_output = self._estimate_tokens(generated_text)
                             cost = self._calculate_cost(model, tokens_input, tokens_output)
                             

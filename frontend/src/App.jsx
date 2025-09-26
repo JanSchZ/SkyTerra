@@ -289,17 +289,47 @@ function App() {
     }
   };
 
+  const createPropertyHistoryEntry = (recs) => {
+    if (!Array.isArray(recs) || recs.length === 0) return null;
+    const snapshot = recs
+      .slice(0, 5)
+      .map(({ id, name, price, latitude, longitude, reason, size, type }) => ({
+        id,
+        name,
+        price,
+        latitude,
+        longitude,
+        reason,
+        size,
+        type,
+      }))
+      .filter((item) => Object.values(item).some((value) => value !== undefined && value !== null && value !== ''));
+    if (snapshot.length === 0) return null;
+    return { role: 'assistant', content: '', properties: snapshot };
+  };
+
+
   const handleSearchComplete = (result) => {
     setAiSearchLoading(false);
     if (result && result.type !== 'error') {
       setAiSearchResult(result);
-      // Append assistant message to history if present
-      if (result.assistant_message) {
-        setConversationHistory(prev => [...prev, { role: 'assistant', content: result.assistant_message }]);
+      const hasRecs = Array.isArray(result.recommendations) && result.recommendations.length > 0;
+      if (result.assistant_message || hasRecs) {
+        setConversationHistory((prev) => {
+          const next = [...prev];
+          if (result.assistant_message) {
+            next.push({ role: 'assistant', content: result.assistant_message });
+          }
+          const propertyEntry = createPropertyHistoryEntry(result.recommendations);
+          if (propertyEntry) {
+            next.push(propertyEntry);
+          }
+          return next;
+        });
       }
       if (result.search_mode === 'location' && result.flyToLocation) {
         handleLocationSearch(result.flyToLocation);
-      } else if (result.search_mode === 'property_recommendation' && result.recommendations && result.recommendations.length > 0) {
+      } else if (result.search_mode === 'property_recommendation' && hasRecs) {
         // fly to first recommendation automatically
         const first = result.recommendations[0];
         if (first.latitude && first.longitude) {
@@ -309,21 +339,50 @@ function App() {
     }
   };
 
+
   const handleSuggestionClick = async (rec) => {
     try {
-      // Intentar abrir el tour directamente en el mapa con animación de zoom + fade
       if (mapRef.current?.openPropertyTour) {
         const opened = await mapRef.current.openPropertyTour(rec, { duration: 3000, zoom: 14.8 });
         if (opened) return;
       }
-      // Fallback: navegar a la vista de detalle y abrir tour automáticamente
-      try { localStorage.setItem('skipAutoFlight', 'true'); } catch (_) {}
-      navigate(`/property/${rec.id}`);
+
+      if (mapRef.current?.openPropertyPanel) {
+        const openedPanel = await mapRef.current.openPropertyPanel(rec);
+        if (openedPanel) {
+          if (rec && typeof rec.latitude === 'number' && typeof rec.longitude === 'number') {
+            handleLocationSearch({
+              center: [rec.longitude, rec.latitude],
+              zoom: 13,
+              pitch: 60,
+              bearing: 0,
+            });
+          }
+          return;
+        }
+      }
+
+      if (rec && typeof rec.latitude === 'number' && typeof rec.longitude === 'number') {
+        handleLocationSearch({
+          center: [rec.longitude, rec.latitude],
+          zoom: 13,
+          pitch: 60,
+          bearing: 0,
+        });
+        return;
+      }
+
+      setSnackbarMessage('No pude abrir esa propiedad. Intenta otra recomendacion.');
+      setSnackbarSeverity('warning');
+      setSnackbarOpen(true);
     } catch (e) {
       console.error('Error handling suggestion click:', e);
-      navigate(`/property/${rec.id}`);
+      setSnackbarMessage('Ocurrio un error al abrir la propiedad.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
     }
   };
+
 
   const handleLogin = async (credentials) => {
     try {
@@ -497,10 +556,17 @@ function App() {
 
         setAiSearchResult(processedResult);
         
-        if(assistant_message){
-           const updatedHistory = [...newHistory,{ role:'assistant', content: assistant_message }];
-           setConversationHistory(updatedHistory);
-           try { window.__skyterraConversationHistory = updatedHistory; } catch (_) {}
+        if (assistant_message || hasRecs) {
+          const updatedHistory = [...newHistory];
+          if (assistant_message) {
+            updatedHistory.push({ role: 'assistant', content: assistant_message });
+          }
+          const propertyEntry = createPropertyHistoryEntry(recommendations);
+          if (propertyEntry) {
+            updatedHistory.push(propertyEntry);
+          }
+          setConversationHistory(updatedHistory);
+          try { window.__skyterraConversationHistory = updatedHistory; } catch (_) {}
         }
       }
     } catch (err) { console.error(err); }

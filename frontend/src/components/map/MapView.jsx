@@ -464,60 +464,103 @@ const MapView = forwardRef(({
     return formatPrice(property.price);
   };
 
-  const handleMarkerClick = async (property) => {
-    // Si el usuario no está autenticado, mantenemos la lógica existente de modal rápido
-    // if (!localStorage.getItem('auth_token')) {
-    //   setPreviewPropertyId(property.id);
-    //   setPreviewModalOpen(true);
-    // }
-
-    // Abrir panel lateral con información de la propiedad
-    setSelectedProperty(property.id);
-    setSidePanelProperty(property);
-    setSidePanelOpen(true);
-
-    // Register recent view locally
+  const openSidePanelForProperty = useCallback(async (propertyLike) => {
     try {
-      const recentRaw = localStorage.getItem('recently_viewed_properties');
-      const recentArr = recentRaw ? JSON.parse(recentRaw) : [];
-      const entry = {
-        id: property.id,
-        name: property.name,
-        price: property.price,
-        size: property.size,
-        type: property.type,
-        images: property.images || [],
-        main_image: property.main_image || null,
-        previewTourUrl: null,
-      };
-      const filtered = recentArr.filter((x) => x.id !== entry.id);
-      const next = [entry, ...filtered].slice(0, 20);
-      localStorage.setItem('recently_viewed_properties', JSON.stringify(next));
-    } catch (_) {}
+      const propertyId = typeof propertyLike === 'object' && propertyLike !== null ? propertyLike.id : propertyLike;
+      let property = typeof propertyLike === 'object' && propertyLike !== null ? { ...propertyLike } : null;
 
-    // Prefetch del tour para mostrar preview
-    if (!tourPreviews[property.id]) {
-      try {
-        const tours = await tourService.getPropertyTours(property.id);
-        if (tours && tours.length > 0) {
-          let url = tours[0].url;
-          if (url && !url.includes('autoLoad=')) url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
-          if (url && !url.includes('autoRotate=')) url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
-          setTourPreviews(prev => ({ ...prev, [property.id]: url }));
-          setTourCache(prev => ({ ...prev, [property.id]: url }));
-
-          // Update recent entry with preview URL
-          try {
-            const raw = localStorage.getItem('recently_viewed_properties');
-            const arr = raw ? JSON.parse(raw) : [];
-            const updated = arr.map((it) => it.id === property.id ? { ...it, previewTourUrl: url } : it);
-            localStorage.setItem('recently_viewed_properties', JSON.stringify(updated));
-          } catch (_) {}
-        }
-      } catch (err) {
-        console.error('Error prefetching tour for side panel:', err);
+      if (!propertyId) {
+        return false;
       }
+
+      if (!property || typeof property !== 'object') {
+        const existing = properties.find((item) => item.id === propertyId);
+        property = existing ? { ...existing } : null;
+      } else if (property.id != null) {
+        const existing = properties.find((item) => item.id === property.id);
+        if (existing) {
+          property = { ...existing, ...property };
+        }
+      }
+
+      if (!property || typeof property !== 'object') {
+        try {
+          property = await propertyService.getProperty(propertyId);
+        } catch (err) {
+          console.error('Error fetching property before opening side panel:', err);
+          return false;
+        }
+      } else if (!property.description || !property.images || property.images.length === 0 || property.latitude == null || property.longitude == null) {
+        try {
+          const enriched = await propertyService.getProperty(property.id);
+          if (enriched) {
+            property = { ...enriched, ...property };
+          }
+        } catch (err) {
+          console.warn('Could not enrich property data for side panel:', err);
+        }
+      }
+
+      if (!property || !property.id) {
+        return false;
+      }
+
+      setSelectedProperty(property.id);
+      setSidePanelProperty(property);
+      setSidePanelOpen(true);
+
+      try {
+        const recentRaw = localStorage.getItem('recently_viewed_properties');
+        const recentArr = recentRaw ? JSON.parse(recentRaw) : [];
+        const entry = {
+          id: property.id,
+          name: property.name,
+          price: property.price,
+          size: property.size,
+          type: property.type,
+          images: property.images || [],
+          main_image: property.main_image || null,
+          previewTourUrl: null,
+        };
+        const filtered = recentArr.filter((item) => item.id !== entry.id);
+        const next = [entry, ...filtered].slice(0, 20);
+        localStorage.setItem('recently_viewed_properties', JSON.stringify(next));
+      } catch (_) {}
+
+      if (!tourPreviews[property.id]) {
+        try {
+          const tours = await tourService.getPropertyTours(property.id);
+          if (tours && tours.length > 0) {
+            let url = tours[0].url;
+            if (url && !url.includes('autoLoad=')) {
+              url += (url.includes('?') ? '&' : '?') + 'autoLoad=true';
+            }
+            if (url && !url.includes('autoRotate=')) {
+              url += (url.includes('?') ? '&' : '?') + 'autoRotate=0';
+            }
+            setTourPreviews((prev) => ({ ...prev, [property.id]: url }));
+            setTourCache((prev) => ({ ...prev, [property.id]: url }));
+            try {
+              const raw = localStorage.getItem('recently_viewed_properties');
+              const arr = raw ? JSON.parse(raw) : [];
+              const updated = arr.map((item) => (item.id === property.id ? { ...item, previewTourUrl: url } : item));
+              localStorage.setItem('recently_viewed_properties', JSON.stringify(updated));
+            } catch (_) {}
+          }
+        } catch (err) {
+          console.error('Error prefetching tour for side panel:', err);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error opening property panel:', error);
+      return false;
     }
+  }, [properties, setSelectedProperty, setSidePanelProperty, setSidePanelOpen, tourPreviews, setTourPreviews, setTourCache]);
+
+  const handleMarkerClick = async (property) => {
+    await openSidePanelForProperty(property);
   };
 
   // Ejecuta animación de zoom suave y abre tour virtual automáticamente
@@ -1376,7 +1419,6 @@ const MapView = forwardRef(({
     }
     setPopupInfo(null);
   }, []);
-
   useImperativeHandle(ref, () => ({
     flyTo: (options) => {
       if (mapRef.current && isMapLoaded) {
@@ -1445,6 +1487,10 @@ const MapView = forwardRef(({
         return false;
       }
     },
+    openPropertyPanel: async (prop) => {
+      return openSidePanelForProperty(prop);
+    },
+
     showRecommendationsTour: (recs, options = {}) => {
       if (!Array.isArray(recs) || recs.length === 0 || !mapRef.current) return;
 

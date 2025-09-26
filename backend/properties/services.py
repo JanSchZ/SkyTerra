@@ -188,7 +188,65 @@ Responde SOLO con el JSON, sin texto adicional. Asegúrate que `flyToLocation.ce
                     raise GeminiServiceError("SamService no disponible en este entorno")
 
                 sam_instance = self._sam_class()
-                result = sam_instance.generate_response(prompt, request_type="ai_property_search")
+
+                sanitized_history = None
+                if isinstance(conversation_history, list):
+                    sanitized_history = []
+                    for entry in conversation_history:
+                        if not isinstance(entry, dict):
+                            continue
+                        content = (entry.get('content') or '').strip()
+                        properties_meta = entry.get('properties')
+                        property_summary = ''
+                        if isinstance(properties_meta, list) and properties_meta:
+                            summary_items = []
+                            for prop in properties_meta[:5]:
+                                if not isinstance(prop, dict):
+                                    continue
+                                name = (prop.get('name') or '').strip()
+                                identifier = prop.get('id')
+                                price = prop.get('price')
+                                reason = (prop.get('reason') or '').strip()
+                                lat = prop.get('latitude')
+                                lng = prop.get('longitude')
+                                details_parts = []
+                                label = name if name else (f'Propiedad {identifier}' if identifier is not None else '')
+                                if label:
+                                    details_parts.append(label)
+                                if identifier is not None and name:
+                                    details_parts.append(f'ID {identifier}')
+                                if price not in (None, ''):
+                                    try:
+                                        value = float(price)
+                                        details_parts.append(f'precio aprox. ${value:,.0f}')
+                                    except (TypeError, ValueError):
+                                        pass
+                                if lat is not None and lng is not None:
+                                    details_parts.append(f'coords ({lat}, {lng})')
+                                if reason:
+                                    details_parts.append(reason)
+                                if details_parts:
+                                    summary_items.append(', '.join(details_parts))
+                            if summary_items:
+                                property_summary = 'Propiedades sugeridas previamente: ' + '; '.join(summary_items)
+                        if property_summary:
+                            content = content + '\n\n' + property_summary if content else property_summary
+                        if not content:
+                            continue
+                        role = (entry.get('role') or 'user').lower()
+                        if role in ('assistant', 'sam', 'bot', 'model'):
+                            role = 'assistant'
+                        elif role != 'user':
+                            role = 'user'
+                        sanitized_history.append({'role': role, 'content': content})
+                    if not sanitized_history:
+                        sanitized_history = None
+
+                result = sam_instance.generate_response(
+                    prompt,
+                    conversation_history=sanitized_history,
+                    request_type="ai_property_search"
+                )
                 content = (result or {}).get('response', '') if isinstance(result, dict) else str(result)
 
                 try:
