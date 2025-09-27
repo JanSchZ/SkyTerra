@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'support_tickets', # Nueva app para tickets de soporte
     'payments', # App para cupones y pagos
     'ai_management', # App para gestionar la IA
+    'media_manager', # App para presign de media
 ]
 
 SITE_ID = 1
@@ -357,7 +358,10 @@ if USE_S3:
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
+    AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL')  # Compatible con Cloudflare R2 u otros
     AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com")
+    AWS_S3_SIGNATURE_VERSION = os.getenv('AWS_S3_SIGNATURE_VERSION', 's3v4')
+    AWS_S3_ADDRESSING_STYLE = os.getenv('AWS_S3_ADDRESSING_STYLE', 'auto')
 
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
@@ -381,6 +385,9 @@ else:
 
     # Use WhiteNoise's compressed storage backend for efficient serving
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Prefijo de carga para presign
+MEDIA_UPLOADS_PREFIX = os.getenv('MEDIA_UPLOADS_PREFIX', 'uploads/')
 
 # Email configuration for password reset
 # IMPORTANT: Replace with your actual email provider's details and credentials.

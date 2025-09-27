@@ -31,6 +31,7 @@ from skyterra_backend.views_admin import AdminDashboardSummaryView, AdminUserLis
 from rest_framework import routers
 from support_tickets.views import TicketViewSet, TicketResponseViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from django.urls import include as dj_include
 
 def home_view(request):
     """Vista simple para la página de inicio"""
@@ -88,6 +89,7 @@ urlpatterns = [
     path('api/', include('properties.urls')),
     path('api/payments/', include('payments.urls')),
     path('api/ai/', include('ai_management.urls')),
+    path('api/media/', dj_include('media_manager.urls')),
     path('api/', include(router.urls)),
 ]
 
