@@ -3,12 +3,12 @@
 Este repo despliega en dos plataformas y usa almacenamiento S3‑compatible para media.
 
 ## Servicios elegidos
-- Frontend (SPA React): Vercel (root: `frontend`, build: `npm run build`, output: `dist`).
-- Backend (Django/DRF): Railway (root: `backend`) con Postgres gestionado.
+- Frontend (SPA React): Vercel (root: `apps/web`, build: `npm run build`, output: `dist`).
+- Backend (Django/DRF): Railway (root: `services/api`) con Postgres gestionado.
 - Media (tours ZIP, fotos 360, videos puntuales): Cloudflare R2 (o AWS S3) + CDN.
 
 ## Variables de entorno (Backend en Railway)
-Crea un servicio en Railway apuntando a la carpeta `backend` (Monorepo Root Directory).
+Crea un servicio en Railway apuntando a la carpeta `services/api` (Monorepo Root Directory).
 
 1) Base
 - `DEBUG` = `False`
@@ -41,8 +41,8 @@ Start command (Railway):
 
 ## Variables de entorno (Frontend en Vercel)
 - `VITE_API_BASE_URL` = `https://api.tu-dominio.com/api`
-- Mapbox/Stripe/OAuth `VITE_*` según `frontend/env.example`.
-Root Directory: `frontend`.
+- Mapbox/Stripe/OAuth `VITE_*` según `apps/web/env.example`.
+Root Directory: `apps/web`.
 
 ## Flujo de subida de media
 - Front pide a backend una URL firmada:
@@ -68,8 +68,8 @@ Configura CORS del bucket para permitir tu dominio del frontend. Ejemplo S3 JSON
 
 ## Dev alineado a Prod
 - Levanta Postgres local con `docker-compose.yml` (`db` + `redis` opcional).
-- En `backend/.env` usa la `DATABASE_URL` del contenedor.
-- Puedes mantener `USE_S3=False` en dev y usar `backend/media/`.
+- En `services/api/.env` usa la `DATABASE_URL` del contenedor.
+- Puedes mantener `USE_S3=False` en dev y usar `services/api/media/`.
 
 ## Dominios
 - Backend: `api.tu-dominio.com` → CNAME al dominio de Railway.
@@ -84,4 +84,3 @@ Configura CORS del bucket para permitir tu dominio del frontend. Ejemplo S3 JSON
 - No almacenes binarios en Postgres; guarda metadatos y claves/URLs.
 - Si el uso de video crece, evalúa Cloudflare Stream.
 - Mantén `.env` fuera del repo; usa gestores de secretos.
-

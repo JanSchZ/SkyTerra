@@ -21,7 +21,7 @@ services:
   # SkyTerra Backend (Django)
   web:
     build: 
-      context: ./backend
+      context: ./services/api
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -41,10 +41,15 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
       - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
+      - AWS_S3_CUSTOM_DOMAIN=${AWS_S3_CUSTOM_DOMAIN}
+      - AWS_S3_SIGNATURE_VERSION=${AWS_S3_SIGNATURE_VERSION}
+      - AWS_S3_ADDRESSING_STYLE=${AWS_S3_ADDRESSING_STYLE}
+      - MEDIA_UPLOADS_PREFIX=${MEDIA_UPLOADS_PREFIX}
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-      - ./backend/logs:/app/logs
+      - ./services/api/logs:/app/logs
     command: ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "60", "skyterra_backend.wsgi:application"]
 
 volumes:

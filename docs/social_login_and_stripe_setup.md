@@ -77,7 +77,7 @@ STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
 
 ## Frontend Configuration
 
-In `frontend/src/services/api.js`, ensure authentication endpoints are set up for social logins.
+In `apps/web/src/services/api.js`, ensure authentication endpoints are set up for social logins.
 
 For Google in `src/components/ui/AuthForms.jsx`:
 - Use `@react-oauth/google` for sign-in buttons.

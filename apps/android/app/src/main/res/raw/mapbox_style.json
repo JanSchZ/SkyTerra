@@ -1,0 +1,28 @@
+{
+  "version": 8,
+  "name": "SkyTerra Dark",
+  "sources": {
+    "mapbox-tiles": {
+      "type": "vector",
+      "url": "mapbox://mapbox.mapbox-streets-v8"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#020617"
+      }
+    },
+    {
+      "id": "land",
+      "type": "fill",
+      "source": "mapbox-tiles",
+      "source-layer": "land",
+      "paint": {
+        "fill-color": "#0F172A"
+      }
+    }
+  ]
+}

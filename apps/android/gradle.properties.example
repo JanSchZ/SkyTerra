@@ -1,0 +1,1 @@
+# Copy to apps/android/gradle.properties or ~/.gradle/gradle.properties\nMAPBOX_DOWNLOADS_TOKEN=pk.your-service-token\nMAPBOX_ACCESS_TOKEN=pk.your-public-token\nMAPBOX_STYLE_URI=mapbox://styles/skyterra/<style-id>\n

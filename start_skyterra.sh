@@ -7,8 +7,8 @@
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Definir las rutas completas del backend y frontend
-BACKEND_DIR="$BASE_DIR/backend"
-FRONTEND_DIR="$BASE_DIR/frontend"
+BACKEND_DIR="$BASE_DIR/services/api"
+FRONTEND_DIR="$BASE_DIR/apps/web"
 
 echo "DEBUG: Directorio actual de trabajo (PWD): $PWD"
 echo "DEBUG: BASE_DIR: $BASE_DIR"

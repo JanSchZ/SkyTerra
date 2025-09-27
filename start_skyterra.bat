@@ -4,8 +4,8 @@ REM ## Script de inicio rápido para SkyTerra en Windows ##
 REM Este script inicia el backend (Django) y el frontend (React) en ventanas separadas.
 
 SET "SCRIPT_DIR=%~dp0"
-SET "BACKEND_DIR=%SCRIPT_DIR%backend"
-SET "FRONTEND_DIR=%SCRIPT_DIR%frontend"
+SET "BACKEND_DIR=%SCRIPT_DIR%services\api"
+SET "FRONTEND_DIR=%SCRIPT_DIR%apps\web"
 
 REM Iniciar el Backend
 echo Iniciando el backend...

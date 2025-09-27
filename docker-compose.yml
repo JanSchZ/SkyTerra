@@ -35,7 +35,7 @@ services:
 
   # SkyTerra Backend (Django)
   web:
-    build: ./backend
+    build: ./services/api
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -51,9 +51,9 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/staticfiles:/app/staticfiles
-      - ./backend/media:/app/media
-      - ./backend/logs:/app/logs
+      - ./services/api/staticfiles:/app/staticfiles
+      - ./services/api/media:/app/media
+      - ./services/api/logs:/app/logs
 
 volumes:
   pgdata:
