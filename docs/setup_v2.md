@@ -11,6 +11,14 @@ Esta guia explica como levantar el proyecto completo en un nuevo equipo (backend
 - Opcional: Docker Desktop para levantar Postgres/Redis localmente
 - Opcional: credenciales S3/R2 para almacenamiento de media
 
+### Archivos `.env`
+- `./.env` (raíz): variables compartidas para backend/frontend. Crea con `cp env.example .env`.
+- `services/api/.env`: secretos exclusivos de Django (Stripe secret, DB, S3, SMTP). Crea con `cp services/api/.env.example services/api/.env`.
+- `apps/web/.env`: variables expuestas al navegador (Mapbox, API base, OAuth públicos). Crea con `cp env.example .env` dentro de `apps/web`.
+- `apps/operator-mobile/.env`: URL del backend y tokens móviles. Crea con `cp .env.example .env` dentro de `apps/operator-mobile`.
+
+> Recuerda: los archivos `.env` nunca deben versionarse. Usa los `.env.example` como plantilla.
+
 ## 1. Clonar
 ```bash
 git clone <repo>

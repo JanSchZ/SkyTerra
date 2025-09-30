@@ -33,6 +33,7 @@ gunicorn==21.2.0
 # Environment management
 python-decouple==3.8
 python-dotenv==1.0.1
+setuptools>=70.0
 
 # Filtering utilities used by 'django_filters' app
 django-filter==24.2
@@ -45,7 +46,9 @@ google-generativeai==0.5.0
 requests==2.31.0
 
 # Validation and utilities
-Pillow==10.0.0
+# Pillow 10.0.0 no longer builds cleanly on Python 3.13 (nuevos devs en macOS arm64)
+# Se actualiza a una versión con wheel precompilado compatible.
+Pillow==11.3.0
 
 # Development tools (remove in production if needed)
 django-debug-toolbar==4.2.0

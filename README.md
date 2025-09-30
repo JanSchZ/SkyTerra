@@ -69,6 +69,17 @@ For a complete, up‑to‑date onboarding guide (all apps, env vars, tokens and 
 - docs/setup_v2.md
 - docs/pre_commit_checklist.md (qué revisar antes de enviar PR)
 
+### Environment Files Overview
+
+| Archivo | Ubicación | Cómo crearlo | Variables clave |
+| --- | --- | --- | --- |
+| `.env` (raíz) | `./.env` | `cp env.example .env` | Configuración compartida para Django, Stripe, Mapbox y OAuth. Puede actuar como archivo único si no deseas separarlos. |
+| Backend (Django) | `services/api/.env` | `cp services/api/.env.example services/api/.env` | `SECRET_KEY`, `DATABASE_URL`, `STRIPE_*`, `USE_S3`, SMTP y proveedores sociales. Ejecuta comandos de Django dentro de `services/api`. |
+| Web (Vite) | `apps/web/.env` | `cp apps/web/env.example apps/web/.env` | `VITE_API_BASE_URL`, `VITE_MAPBOX_ACCESS_TOKEN`, claves públicas para OAuth y Stripe. Reinicia `npm run dev` tras modificarlas. |
+| Operator App (Expo) | `apps/operator-mobile/.env` | `cp apps/operator-mobile/.env.example apps/operator-mobile/.env` | `API_URL` y cualquier token específico del cliente móvil. Reinicia `npm run start` tras editarlo. |
+
+> **Importante:** Nunca subas tus `.env` reales al repositorio. Usa los archivos `*.env.example` como referencia y ajusta los valores según tu entorno (desarrollo, staging, producción).
+
 ### 1. Clone the Repository
 
 ```bash
