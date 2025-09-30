@@ -2,7 +2,7 @@
 
 ## Overview
 
-SkyTerra is a cutting-edge geospatial property platform designed to revolutionize how users discover, analyze, and manage real estate. It features AI-powered search, interactive map visualizations, virtual 360° tours, and robust property management tools.
+SkyTerra is a cutting-edge geospatial property platform designed to revolutionize how users discover, analyze, and manage real estate. It features AI-powered search, interactive map visualizations, virtual 360-degree tours, and robust property management tools.
 
 ## Project Structure
 
@@ -17,35 +17,41 @@ The monorepo is organized into top-level packages:
 
 ```
 .
-├─ services/
-│  └─ api/               # Django/DRF backend (Railway target)
-├─ apps/
-│  ├─ web/               # Customer-facing SPA (Vercel)
-│  ├─ android/           # Native Android (Kotlin + Compose + Mapbox)
-│  └─ operator-mobile/   # Expo RN app for operators
-├─ infra/                # Docker compose, Nginx, deploy docs
-├─ tools/                # Scripts & utilities
-└─ docs/                 # Documentation (see setup_v2.md)
+|- services/
+|  |- api/               # Django/DRF backend (Railway target)
+|- apps/
+|  |- web/               # Customer-facing SPA (Vercel)
+|  |- android/           # Native Android (Kotlin + Compose + Mapbox)
+|  `- operator-mobile/   # Expo RN app for operators
+|- infra/                # Docker compose, Nginx, deploy docs
+|- tools/                # Scripts & utilities
+`- docs/                 # Documentation (see setup_v2.md)
 ```
 
 ```
 .
-├─ apps/
-│  ├─ web/               # Main customer-facing SPA (Vercel target)
-│  └─ operator-mobile/   # Placeholder for upcoming operator mobile app
-├─ services/
-│  └─ api/               # Django/DRF backend (Railway target)
-├─ infra/                # Docker compose, Nginx, deployment docs
-├─ docs/                 # Architecture & setup guides
-└─ tools/                # Internal automation scripts/diagrams
+|- apps/
+|  |- web/               # Main customer-facing SPA (Vercel target)
+|  `- operator-mobile/   # Placeholder for upcoming operator mobile app
+|- services/
+|  `- api/               # Django/DRF backend (Railway target)
+|- infra/                # Docker compose, Nginx, deployment docs
+|- docs/                 # Architecture & setup guides
+`- tools/                # Internal automation scripts/diagrams
 ```
+
+## Default Deployment Stack
+
+- Backend API + managed Postgres: Railway
+- Frontend web (apps/web): Vercel
+- Object storage (media, tours, video): Cloudflare R2 (S3-compatible)
 
 ## Key Features
 
 *   **AI-Powered Search**: Natural language query interpretation powered by Google Gemini.
 *   **Geospatial Visualization**: Interactive property exploration using Mapbox GL JS.
 *   **Smart Filtering**: Advanced filtering capabilities by type, price, features, and location.
-*   **Virtual Tours**: Immersive 360° virtual tours for properties.
+*   **Virtual Tours**: Immersive 360-degree virtual tours for properties.
 *   **Secure Payments**: Integrated Stripe for subscription management and secure transactions.
 *   **Support Ticketing**: Built-in system for user support and issue resolution.
 
@@ -56,7 +62,8 @@ Before you begin, ensure you have the following installed:
 *   **Python**: Version 3.9 or higher (3.13 recommended).
 *   **Node.js**: Version 18.x or higher.
 *   **npm**: Comes bundled with Node.js.
-*   **PostgreSQL**: A database instance is recommended for production. SQLite is used by default for development.
+*   **PostgreSQL**: Managed instance on Railway recommended for dev/prod. SQLite stays as local fallback.
+*   **Railway / Vercel / R2 accounts**: Railway for backend + Postgres, Vercel for apps/web, Cloudflare R2 for media uploads.
 *   **Google Gemini API Key**: Obtain one from [Google AI Studio](https://makersuite.google.com/app/apikey).
 *   **Mapbox Access Token**: Get your public token from [Mapbox](https://account.mapbox.com/).
 *   **Stripe API Keys**: Obtain your secret and publishable keys from your [Stripe Dashboard](https://dashboard.stripe.com/apikeys).
@@ -64,21 +71,21 @@ Before you begin, ensure you have the following installed:
 
 ## Setup Instructions
 
-For a complete, up‑to‑date onboarding guide (all apps, env vars, tokens and common pitfalls), see:
+For a complete, up-to-date onboarding guide (all apps, env vars, tokens and common pitfalls), see:
 
 - docs/setup_v2.md
-- docs/pre_commit_checklist.md (qué revisar antes de enviar PR)
+- docs/pre_commit_checklist.md (que revisar antes de enviar PR)
 
 ### Environment Files Overview
 
-| Archivo | Ubicación | Cómo crearlo | Variables clave |
+| Archivo | Ubicacion | Como crearlo | Variables clave |
 | --- | --- | --- | --- |
-| `.env` (raíz) | `./.env` | `cp env.example .env` | Configuración compartida para Django, Stripe, Mapbox y OAuth. Puede actuar como archivo único si no deseas separarlos. |
+| `.env` (raiz) | `./.env` | `cp env.example .env` | Configuracion compartida para Django, Stripe, Mapbox y OAuth. Puede actuar como archivo unico si no deseas separarlos. |
 | Backend (Django) | `services/api/.env` | `cp services/api/.env.example services/api/.env` | `SECRET_KEY`, `DATABASE_URL`, `STRIPE_*`, `USE_S3`, SMTP y proveedores sociales. Ejecuta comandos de Django dentro de `services/api`. |
-| Web (Vite) | `apps/web/.env` | `cp apps/web/env.example apps/web/.env` | `VITE_API_BASE_URL`, `VITE_MAPBOX_ACCESS_TOKEN`, claves públicas para OAuth y Stripe. Reinicia `npm run dev` tras modificarlas. |
-| Operator App (Expo) | `apps/operator-mobile/.env` | `cp apps/operator-mobile/.env.example apps/operator-mobile/.env` | `API_URL` y cualquier token específico del cliente móvil. Reinicia `npm run start` tras editarlo. |
+| Web (Vite) | `apps/web/.env` | `cp apps/web/env.example apps/web/.env` | `VITE_API_BASE_URL`, `VITE_MAPBOX_ACCESS_TOKEN`, claves publicas para OAuth y Stripe. Reinicia `npm run dev` tras modificarlas. |
+| Operator App (Expo) | `apps/operator-mobile/.env` | `cp apps/operator-mobile/.env.example apps/operator-mobile/.env` | `API_URL` y cualquier token especifico del cliente movil. Reinicia `npm run start` tras editarlo. |
 
-> **Importante:** Nunca subas tus `.env` reales al repositorio. Usa los archivos `*.env.example` como referencia y ajusta los valores según tu entorno (desarrollo, staging, producción).
+> **Importante:** Nunca subas tus `.env` reales al repositorio. Usa los archivos `*.env.example` como referencia y ajusta los valores segun tu entorno (desarrollo, staging, produccion).
 
 ### 1. Clone the Repository
 
@@ -119,7 +126,7 @@ GOOGLE_GEMINI_API_KEY=your_google_gemini_api_key_here
 # Client URL (frontend base URL used for redirects)
 CLIENT_URL=http://localhost:3000
 
-# AWS / S3 (optional – required only if USE_S3=True in Django settings)
+# AWS / S3 (optional - required only if USE_S3=True in Django settings)
 # AWS_ACCESS_KEY_ID=
 # AWS_SECRET_ACCESS_KEY=
 # AWS_STORAGE_BUCKET_NAME=
@@ -296,3 +303,4 @@ python manage.py test
 ---
 
 Developed by the SkyTerra team.
+

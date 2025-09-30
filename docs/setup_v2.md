@@ -5,17 +5,22 @@ Esta guia explica como levantar el proyecto completo en un nuevo equipo (backend
 ## 0. Requisitos
 - Python 3.10+ (recomendado 3.13)
 - Node.js 20 (npm incluido)
-- PostgreSQL 15+ (local, Docker o gestionado)
+- PostgreSQL 15+ (Railway gestionado recomendado para dev y produccion)
 - Git
 - Mapbox account (tokens de downloads y access)
 - Opcional: Docker Desktop para levantar Postgres/Redis localmente
 - Opcional: credenciales S3/R2 para almacenamiento de media
 
+### Stack recomendado (prod/dev)
+- Backend + DB: Railway (servicio deploy + Postgres gestionado)
+- Frontend: Vercel (monorepo apps/web)
+- Media: Cloudflare R2 (S3 compatible para objetos, tours, videos)
+
 ### Archivos `.env`
-- `./.env` (raíz): variables compartidas para backend/frontend. Crea con `cp env.example .env`.
+- `./.env` (raiz): variables compartidas para backend/frontend. Crea con `cp env.example .env`.
 - `services/api/.env`: secretos exclusivos de Django (Stripe secret, DB, S3, SMTP). Crea con `cp services/api/.env.example services/api/.env`.
-- `apps/web/.env`: variables expuestas al navegador (Mapbox, API base, OAuth públicos). Crea con `cp env.example .env` dentro de `apps/web`.
-- `apps/operator-mobile/.env`: URL del backend y tokens móviles. Crea con `cp .env.example .env` dentro de `apps/operator-mobile`.
+- `apps/web/.env`: variables expuestas al navegador (Mapbox, API base, OAuth publicos). Crea con `cp env.example .env` dentro de `apps/web`.
+- `apps/operator-mobile/.env`: URL del backend y tokens moviles. Crea con `cp .env.example .env` dentro de `apps/operator-mobile`.
 
 > Recuerda: los archivos `.env` nunca deben versionarse. Usa los `.env.example` como plantilla.
 
@@ -38,9 +43,9 @@ cp .env.example .env
 ```
 Editar `services/api/.env`:
 - `SECRET_KEY`
-- `DATABASE_URL` (postgres://...)
+- `DATABASE_URL` (postgres://...) -> copia la cadena `DATABASE_URL` desde Railway (Service > Variables).
 - `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`
-- Para media en R2/S3: `USE_S3=True`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL`
+- Para media en Cloudflare R2: `USE_S3=True`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_ENDPOINT_URL` (formato https://<accountid>.r2.cloudflarestorage.com)
 - Stripe, OAuth, etc. segun entorno
 
 Aplicar migraciones y crear superusuario opcional:
@@ -106,11 +111,11 @@ docker compose up -d db redis
 ```
 Ajustar `DATABASE_URL` y `REDIS_URL` en `services/api/.env`.
 
-## 7. Media en R2 o S3
-- Crear bucket privado.
-- Configurar CORS para permitir dominios de web/frontend.
-- En `services/api/.env` activar `USE_S3=True` y definir todas las variables AWS/R2.
-- Uso: `POST /api/media/presign-upload` y `POST /api/media/presign-read` ya estan listos.
+## 7. Media en Cloudflare R2 (S3-compatible)
+- Crear bucket privado en Cloudflare R2 (S3 compatible).
+- Configurar CORS en R2 para permitir dominios de web/frontend (dev y prod).
+- En `services/api/.env` activar `USE_S3=True` y definir todas las variables AWS/R2 (endpoint, bucket, claves).
+- Uso: `POST /api/media/presign-upload` y `POST /api/media/presign-read` ya estan listos para R2.
 
 ## 8. Despliegue recomendado
 - Backend (`services/api`) -> Railway (gunicorn) + Postgres gestionado + Redis opcional.
@@ -118,6 +123,13 @@ Ajustar `DATABASE_URL` y `REDIS_URL` en `services/api/.env`.
 - Operadores (`apps/operator-mobile`) -> Expo EAS Build + OTA.
 - Android (`apps/android`) -> EAS Build o CI propio firmando AAB.
 - Media -> Cloudflare R2 (o S3) + CDN.
+
+## 8.1 Pasos rapidos: Railway + Vercel + R2
+1. **Railway**: crea un servicio desde el repo apuntando a `services/api` (Monorepo Root). Agrega el plugin Postgres y copia la `DATABASE_URL` a tus `.env` locales y variables de entorno en Railway. Configura `RAILWAY_STATIC_URL` como dominio temporal o usa Cloudflare para CNAME.
+2. **Postgres gestionado**: dentro de Railway, usa la pestana `Variables` del plugin para obtener usuario, password y host. Habilita SSL (`?sslmode=require`) cuando despliegues.
+3. **Cloudflare R2**: crea un bucket privado, genera Access Key/Secret. Configura una regla de dominio publico si necesitas CDN y usa el endpoint `https://<accountid>.r2.cloudflarestorage.com`. En `services/api/.env` pon `USE_S3=True` y rellena `AWS_*`.
+4. **Frontend en Vercel**: importa el repo, selecciona `apps/web` como root. Copia variables `VITE_*`, `STRIPE_PUBLISHABLE_KEY`, `CLIENT_URL` y apunta `VITE_API_BASE_URL` al dominio Railway (o al custom).
+5. **CI variables compartidas**: usa Vercel y Railway para guardar las mismas claves (Stripe, Mapbox, Gemini). Mantene un archivo `docs/infra_variables.md` actualizado con responsables.
 
 ## 9. Checklist post-clone
 1. `git status` limpio.

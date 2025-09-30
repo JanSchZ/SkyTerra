@@ -22,7 +22,7 @@ function Add-Manual {
 function Test-CommandAvailable {
     param([string]$Name, [string]$Hint)
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        Write-Host "[FALTA] No se encontró '$Name'."
+        Write-Host "[FALTA] No se encontro '$Name'."
         Add-Manual "Instala '$Name'. Sugerencia: $Hint"
         $script:FailedSteps++
         return $false
@@ -45,21 +45,21 @@ function Test-VersionGreaterOrEqual {
 
 function Run-Step {
     param([string]$Description, [ScriptBlock]$Action)
-    Write-Host "`n→ $Description"
+    Write-Host "`n==> $Description"
     try {
         & $Action
         if ($LASTEXITCODE -ne 0) {
-            throw "Código de salida $LASTEXITCODE"
+            throw "Codigo de salida $LASTEXITCODE"
         }
         Write-Host "[OK] $Description"
     } catch {
-        Write-Host "[ERROR] $Description: $($_.Exception.Message)"
+        Write-Host "[ERROR] ${Description}: $($_.Exception.Message)"
         Add-Manual "$Description. Ejecuta manualmente y corrige el error mostrado."
         $script:FailedSteps++
     }
 }
 
-Write-Host "SkyTerra – Setup automático para Windows"
+Write-Host "SkyTerra - Setup automatico para Windows"
 Write-Host "Proyecto: $ProjectRoot"
 
 $pythonCmd = $null
@@ -70,7 +70,7 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
     $pythonCmd = (Get-Command py).Source
     $pythonArgs = @('-3')
 } else {
-    Write-Host "[ERROR] No se encontró Python en el PATH."
+    Write-Host "[ERROR] No se encontro Python en el PATH."
     Add-Manual "Instala Python 3.9+ desde https://www.python.org/downloads/ (habilita 'Add Python to PATH')."
     $FailedSteps++
 }
@@ -78,53 +78,58 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 $pythonOk = $false
 if ($pythonCmd) {
     try {
-        $pyVersion = (& $pythonCmd @pythonArgs '-c' 'import sys; print(".".join(map(str, sys.version_info[:3])))').Trim()
-        Write-Host "Python detectado: $pyVersion"
-        if (-not (Test-VersionGreaterOrEqual $pyVersion '3.9.0')) {
-            Write-Host "[WARN] Se recomienda Python 3.9 o superior."
-            Add-Manual "Actualiza Python (versión actual: $pyVersion)."
+        $versionOutput = (& $pythonCmd @pythonArgs '--version' 2>&1).Trim()
+        if ($versionOutput -match '^Python\s+([0-9\.]+)') {
+            $pyVersion = $matches[1]
+            Write-Host "Python detectado: $pyVersion"
+            if (-not (Test-VersionGreaterOrEqual $pyVersion '3.9.0')) {
+                Write-Host "[WARN] Se recomienda Python 3.9 o superior."
+                Add-Manual "Actualiza Python (version actual: $pyVersion)."
+            }
+            $pythonOk = $true
+        } else {
+            throw "Salida inesperada: $versionOutput"
         }
-        $pythonOk = $true
     } catch {
-        Write-Host "[ERROR] No se pudo obtener la versión de Python: $($_.Exception.Message)"
-        Add-Manual "Verifica la instalación de Python."
+        Write-Host ("[ERROR] No se pudo obtener la version de Python: {0}" -f $_.Exception.Message)
+        Add-Manual "Verifica la instalacion de Python."
         $FailedSteps++
     }
 }
 
-$nodeAvailable = Test-CommandAvailable -Name node -Hint 'Descarga la versión LTS en https://nodejs.org/'
+$nodeAvailable = Test-CommandAvailable -Name node -Hint 'Descarga la version LTS en https://nodejs.org/'
 if ($nodeAvailable) {
     $nodeVersion = ((& node -v).Trim()).TrimStart('v')
     Write-Host "Node detectado: $nodeVersion"
     if (-not (Test-VersionGreaterOrEqual $nodeVersion '18.0.0')) {
         Write-Host "[WARN] Se recomienda Node 18 o superior."
-        Add-Manual "Actualiza Node (versión actual: $nodeVersion)."
+        Add-Manual "Actualiza Node (version actual: $nodeVersion)."
     }
 }
 
 $npmAvailable = Test-CommandAvailable -Name npm -Hint 'npm se instala junto con Node.js; reinstala Node si falta'
 
 if (-not (Test-Path $BackendDir)) {
-    Write-Host "[ERROR] No se encontró el backend en $BackendDir"
+    Write-Host ("[ERROR] No se encontro el backend en {0}" -f $BackendDir)
     Add-Manual "Verifica que la carpeta services/api exista."
 }
 
 if (-not (Test-Path $FrontendDir)) {
-    Write-Host "[ERROR] No se encontró el frontend en $FrontendDir"
+    Write-Host ("[ERROR] No se encontro el frontend en {0}" -f $FrontendDir)
     Add-Manual "Verifica que la carpeta apps/web exista."
 }
 
 if (-not (Test-Path $EnvFile)) {
     if (Test-Path $EnvExample) {
         Copy-Item $EnvExample $EnvFile
-        Write-Host "[OK] Se creó .env a partir de env.example"
-        Add-Manual "Revisa y completa $EnvFile con tus claves reales (Stripe, Mapbox, etc.)."
+        Write-Host "[OK] Se creo .env a partir de env.example"
+        Add-Manual ("Revisa y completa {0} con tus claves reales (Railway DATABASE_URL, Cloudflare R2 AWS_*, Stripe, Mapbox)." -f $EnvFile)
     } else {
-        Write-Host "[ERROR] No se encontró env.example para generar .env"
-        Add-Manual "Crea manualmente .env siguiendo la documentación."
+        Write-Host "[ERROR] No se encontro env.example para generar .env"
+        Add-Manual "Crea manualmente .env siguiendo la documentacion."
     }
 } else {
-    Write-Host "[OK] Se detectó $EnvFile"
+    Write-Host "[OK] Se detecto $EnvFile"
 }
 
 $dbMode = 'sqlite'
@@ -137,10 +142,10 @@ if (Test-Path $EnvFile) {
             $dbMode = 'custom'
             Write-Host "[INFO] DATABASE_URL personalizado detectado."
         } elseif ($dbValue -eq $dbPlaceholder) {
-            Write-Host "[WARN] DATABASE_URL usa un placeholder. Se usará SQLite local."
-            Add-Manual "Actualiza DATABASE_URL en $EnvFile o comenta la línea para usar SQLite."
+            Write-Host "[WARN] DATABASE_URL usa un placeholder. Se usara SQLite local."
+            Add-Manual "Copia la DATABASE_URL desde Railway en $EnvFile o comenta la linea para usar SQLite."
         } else {
-            Write-Host "[INFO] No se configuró DATABASE_URL. Se usará SQLite local."
+            Write-Host "[INFO] No se configuro DATABASE_URL. Se usara SQLite local."
         }
     }
 }
@@ -172,8 +177,8 @@ if ($pythonOk -and (Test-Path $BackendDir)) {
             Run-Step "Aplicar migraciones Django" $migrationBlock
         }
     } else {
-        Write-Host "[ERROR] No se encontró el intérprete de la venv en $VenvPython"
-        Add-Manual "Revisa la creación de la venv en $VenvDir"
+        Write-Host "[ERROR] No se encontro el interprete de la venv en $VenvPython"
+        Add-Manual "Revisa la creacion de la venv en $VenvDir"
     }
 }
 
@@ -183,14 +188,14 @@ if ((Test-Path $FrontendDir) -and $npmAvailable) {
         try {
             npm install
             if ($LASTEXITCODE -ne 0) {
-                throw "Código de salida $LASTEXITCODE"
+                throw "Codigo de salida $LASTEXITCODE"
             }
         } finally {
             Pop-Location
         }
     }
 } elseif (Test-Path $FrontendDir) {
-    Add-Manual "No se pudieron instalar dependencias frontend porque npm no está disponible."
+    Add-Manual "No se pudieron instalar dependencias frontend porque npm no esta disponible."
 }
 
 Write-Host "`n=== Resumen ==="
@@ -201,7 +206,7 @@ if (($ManualActions.Count -eq 0) -and ($FailedSteps -eq 0)) {
     foreach ($action in $ManualActions) {
         Write-Host " - $action"
     }
-    Write-Host "Revisa los mensajes anteriores para más detalles."
+    Write-Host "Revisa los mensajes anteriores para mas detalles."
 }
 
-Write-Host "Listo. Usa start_skyterra.bat para iniciar backend y frontend en Windows."
+Write-Host 'Listo. Usa start_skyterra.bat para iniciar backend y frontend en Windows.'
