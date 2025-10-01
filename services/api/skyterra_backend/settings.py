@@ -353,13 +353,12 @@ USE_TZ = True
 USE_S3 = os.getenv('USE_S3', 'False') == 'True'
 
 if USE_S3:
-    # AWS S3 settings
+    # AWS S3 / Cloudflare R2 settings
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
     AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
     AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL')  # Compatible con Cloudflare R2 u otros
-    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN', f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com")
     AWS_S3_SIGNATURE_VERSION = os.getenv('AWS_S3_SIGNATURE_VERSION', 's3v4')
     AWS_S3_ADDRESSING_STYLE = os.getenv('AWS_S3_ADDRESSING_STYLE', 'auto')
 
@@ -371,10 +370,25 @@ if USE_S3:
     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    # Resolver el dominio/base URL para S3/R2
+    _custom_domain = os.getenv('AWS_S3_CUSTOM_DOMAIN')
+    if _custom_domain:
+        # Caso 1: dominio propio (CDN) provisto
+        _base = f"https://{_custom_domain.strip().rstrip('/')}"
+    elif AWS_S3_ENDPOINT_URL:
+        # Caso 2: endpoint tipo R2 sin dominio propio → usar addressing style path
+        _base = f"{AWS_S3_ENDPOINT_URL.rstrip('/')}/{AWS_STORAGE_BUCKET_NAME}"
+    else:
+        # Caso 3: S3 clásico
+        _base = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
-    # No STATIC_ROOT/MEDIA_ROOT needed when using S3
+    # En nuestra configuración actual los estáticos se subieron a la raíz del bucket
+    # (p.ej. 'admin/', 'rest_framework/'). Por eso, apuntamos STATIC_URL a la base.
+    STATIC_URL = f"{_base}/"
+    # Para media también usamos la base; los prefijos se manejan a nivel de claves
+    MEDIA_URL = f"{_base}/"
+
+    # No STATIC_ROOT/MEDIA_ROOT needed when using S3/R2
 else:
     # Local/staticfile approach (development or single-instance prod)
     STATIC_URL = '/static/'
