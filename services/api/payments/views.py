@@ -15,6 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import json
 import logging
+from typing import Any, Optional
 
 from .models import (
     Coupon,
@@ -154,6 +155,60 @@ class StripeWebhookView(APIView):
     """
     permission_classes = [] # No authentication required for webhooks
 
+    @staticmethod
+    def _retrieve_stripe_subscription(subscription_id: Optional[str]) -> Optional[dict[str, Any]]:
+        if not subscription_id:
+            return None
+        try:
+            return stripe.Subscription.retrieve(subscription_id)
+        except stripe.error.StripeError as exc:  # type: ignore[attr-defined]
+            logger.warning(f"Could not retrieve Stripe subscription {subscription_id}: {exc}")
+        return None
+
+    def _find_local_subscription(
+        self,
+        *,
+        stripe_subscription_id: Optional[str] = None,
+        stripe_customer_id: Optional[str] = None,
+    ) -> Optional[Subscription]:
+        subscription = None
+        if stripe_subscription_id:
+            subscription = Subscription.objects.filter(stripe_subscription_id=stripe_subscription_id).first()
+        if not subscription and stripe_customer_id:
+            subscription = Subscription.objects.filter(stripe_customer_id=stripe_customer_id).first()
+        return subscription
+
+    def _sync_subscription(
+        self,
+        *,
+        stripe_subscription: Optional[dict[str, Any]] = None,
+        subscription_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
+        default_status: Optional[str] = None,
+        fetch_from_stripe: bool = False,
+    ) -> None:
+        payload = stripe_subscription
+        if payload is None and fetch_from_stripe:
+            payload = self._retrieve_stripe_subscription(subscription_id)
+
+        stripe_sub_id = (payload or {}).get('id') or subscription_id
+        stripe_cust_id = (payload or {}).get('customer') or customer_id
+
+        subscription = self._find_local_subscription(
+            stripe_subscription_id=stripe_sub_id,
+            stripe_customer_id=stripe_cust_id,
+        )
+
+        if not subscription:
+            logger.warning(
+                "Stripe webhook: local subscription not found (stripe_subscription_id=%s, stripe_customer_id=%s)",
+                stripe_sub_id,
+                stripe_cust_id,
+            )
+            return
+
+        subscription.apply_stripe_payload(payload, default_status=default_status)
+
     def post(self, request, format=None):
         # Ensure Stripe API key is set for any API calls inside the handler
         stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -222,12 +277,13 @@ class StripeWebhookView(APIView):
                 if subscription_id:
                     try:
                         stripe_subscription = stripe.Subscription.retrieve(subscription_id)
-                        subscription.current_period_end = timezone.datetime.fromtimestamp(
-                            stripe_subscription.current_period_end, tz=timezone.utc
-                        )
                     except stripe.error.StripeError as e:
                         logger.warning(f"Could not retrieve Stripe subscription {subscription_id}: {e}")
-                subscription.save()
+                        stripe_subscription = None
+                else:
+                    stripe_subscription = None
+
+                subscription.apply_stripe_payload(stripe_subscription, default_status='active')
                 logger.info(f"Subscription for user {user.username} updated/created. Status: {subscription.status}")
 
             except User.DoesNotExist:
@@ -236,46 +292,55 @@ class StripeWebhookView(APIView):
             except Exception as e:
                 logger.error(f"Error processing checkout.session.completed for session {session['id']}: {e}", exc_info=True)
 
-        elif event['type'] == 'invoice.payment_succeeded':
+        elif event['type'] in {'invoice.payment_succeeded', 'invoice.paid'}:
             invoice = event['data']['object']
             logger.info(f"Invoice payment succeeded: {invoice['id']}")
-            # Update subscription status, etc.
-            # You might want to fetch the subscription from your DB using invoice.subscription
-            # and update its status and current_period_end
+            self._sync_subscription(
+                subscription_id=invoice.get('subscription'),
+                customer_id=invoice.get('customer'),
+                default_status='active',
+                fetch_from_stripe=True,
+            )
 
         elif event['type'] == 'invoice.payment_failed':
             invoice = event['data']['object']
             logger.warning(f"Invoice payment failed: {invoice['id']}")
-            # Update subscription status to past_due or canceled
+            self._sync_subscription(
+                subscription_id=invoice.get('subscription'),
+                customer_id=invoice.get('customer'),
+                default_status='past_due',
+                fetch_from_stripe=False,
+            )
+
+        elif event['type'] == 'customer.subscription.created':
+            stripe_subscription = event['data']['object']
+            logger.info(f"Customer subscription created: {stripe_subscription['id']}")
+            self._sync_subscription(
+                stripe_subscription=stripe_subscription,
+                subscription_id=stripe_subscription.get('id'),
+                customer_id=stripe_subscription.get('customer'),
+                default_status=stripe_subscription.get('status'),
+            )
 
         elif event['type'] == 'customer.subscription.updated':
             stripe_subscription = event['data']['object']
             logger.info(f"Customer subscription updated: {stripe_subscription['id']}")
-            try:
-                subscription = Subscription.objects.get(stripe_subscription_id=stripe_subscription['id'])
-                subscription.status = stripe_subscription['status']
-                subscription.current_period_end = timezone.datetime.fromtimestamp(
-                    stripe_subscription.current_period_end, tz=timezone.utc
-                )
-                subscription.save()
-                logger.info(f"Subscription {subscription.id} updated to status {subscription.status}")
-            except Subscription.DoesNotExist:
-                logger.warning(f"Subscription with Stripe ID {stripe_subscription['id']} not found in DB.")
-            except Exception as e:
-                logger.error(f"Error processing customer.subscription.updated for {stripe_subscription['id']}: {e}", exc_info=True)
+            self._sync_subscription(
+                stripe_subscription=stripe_subscription,
+                subscription_id=stripe_subscription.get('id'),
+                customer_id=stripe_subscription.get('customer'),
+                default_status=stripe_subscription.get('status'),
+            )
 
         elif event['type'] == 'customer.subscription.deleted':
             stripe_subscription = event['data']['object']
             logger.info(f"Customer subscription deleted: {stripe_subscription['id']}")
-            try:
-                subscription = Subscription.objects.get(stripe_subscription_id=stripe_subscription['id'])
-                subscription.status = 'canceled'
-                subscription.save()
-                logger.info(f"Subscription {subscription.id} marked as canceled.")
-            except Subscription.DoesNotExist:
-                logger.warning(f"Subscription with Stripe ID {stripe_subscription['id']} not found in DB for deletion.")
-            except Exception as e:
-                logger.error(f"Error processing customer.subscription.deleted for {stripe_subscription['id']}: {e}", exc_info=True)
+            self._sync_subscription(
+                stripe_subscription=stripe_subscription,
+                subscription_id=stripe_subscription.get('id'),
+                customer_id=stripe_subscription.get('customer'),
+                default_status='canceled',
+            )
 
         else:
             # Unhandled event type

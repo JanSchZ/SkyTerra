@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
@@ -10,11 +11,26 @@ class Subscription(models.Model):
     Represents a user's subscription status.
     """
     STATUS_CHOICES = [
+        ('trialing', 'Trialing'),
         ('active', 'Active'),
-        ('canceled', 'Canceled'),
         ('past_due', 'Past Due'),
+        ('canceled', 'Canceled'),
+        ('unpaid', 'Unpaid'),
+        ('paused', 'Paused'),
         ('incomplete', 'Incomplete'),
+        ('incomplete_expired', 'Incomplete Expired'),
     ]
+
+    STATUS_MAP = {
+        'trialing': 'trialing',
+        'active': 'active',
+        'past_due': 'past_due',
+        'canceled': 'canceled',
+        'unpaid': 'unpaid',
+        'paused': 'paused',
+        'incomplete': 'incomplete',
+        'incomplete_expired': 'incomplete_expired',
+    }
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='subscription')
     stripe_customer_id = models.CharField(max_length=255, blank=True, null=True)
@@ -30,6 +46,49 @@ class Subscription(models.Model):
     class Meta:
         verbose_name = _("Subscription")
         verbose_name_plural = _("Subscriptions")
+
+    @classmethod
+    def normalize_status(cls, raw_status: str | None) -> str:
+        """Map Stripe status values to our internal choices."""
+        if not raw_status:
+            return 'incomplete'
+        return cls.STATUS_MAP.get(raw_status.lower(), 'incomplete')
+
+    def apply_stripe_payload(self, stripe_subscription: dict | None = None, default_status: str | None = None) -> None:
+        """Update the local subscription instance using Stripe subscription data."""
+        data = stripe_subscription or {}
+        updated_fields: list[str] = []
+
+        stripe_id = data.get('id')
+        if stripe_id and stripe_id != self.stripe_subscription_id:
+            self.stripe_subscription_id = stripe_id
+            updated_fields.append('stripe_subscription_id')
+
+        customer_id = data.get('customer') or data.get('customer_id')
+        if customer_id and customer_id != self.stripe_customer_id:
+            self.stripe_customer_id = customer_id
+            updated_fields.append('stripe_customer_id')
+
+        status = data.get('status') or default_status
+        if status:
+            normalized = self.normalize_status(status)
+            if normalized != self.status:
+                self.status = normalized
+                updated_fields.append('status')
+
+        period_end = data.get('current_period_end')
+        if period_end:
+            dt_value = timezone.datetime.fromtimestamp(period_end, tz=timezone.utc)
+            if self.current_period_end != dt_value:
+                self.current_period_end = dt_value
+                updated_fields.append('current_period_end')
+
+        if updated_fields:
+            # auto_now fields must be included when update_fields is provided
+            updated_fields.append('updated_at')
+            self.save(update_fields=updated_fields)
+        else:
+            self.save()
 
 class Coupon(models.Model):
     """
