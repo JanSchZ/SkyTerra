@@ -310,10 +310,18 @@ export const authService = {
       console.log('🔄 Intentando registrar usuario:', { 
         email: userData.email, 
         username: userData.username,
-        hasPassword: !!userData.password 
+        hasPassword: !!(userData.password || userData.password1) 
       });
-      
-      const response = await api.post('/auth/registration/', userData);
+
+      const payload = { ...userData };
+      if (payload.password && !payload.password1) {
+        payload.password1 = payload.password;
+      }
+      if (payload.password2 === undefined && payload.password) {
+        payload.password2 = payload.password;
+      }
+
+      const response = await api.post('/auth/registration/', payload);
       console.log('✅ Registro exitoso:', response.data);
       
       // El backend manejará el login después del registro y enviará la cookie.
@@ -1239,4 +1247,3 @@ export default {
   aiManagement: aiManagementService,
   usePropertyService
 };
-

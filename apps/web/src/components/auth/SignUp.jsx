@@ -17,17 +17,28 @@ const SignUp = () => {
   const auth = useContext(AuthContext);
 
   const handleInputChange = (field) => (e) => {
+    const { value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [field]: e.target.value
+      [field]: value
     }));
-    // Clear field-specific error when user starts typing
-    if (fieldErrors[field]) {
-      setFieldErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
+
+    // Clear field-specific errors when the user edits inputs
+    setFieldErrors(prev => {
+      if (!prev || Object.keys(prev).length === 0) return prev;
+
+      const next = { ...prev };
+      if (field === 'password') {
+        delete next.password;
+        delete next.password1;
+      } else if (field === 'password2') {
+        delete next.password2;
+      } else if (next[field]) {
+        delete next[field];
+      }
+
+      return next;
+    });
   };
 
   const handleSignUp = async (e) => {
@@ -56,20 +67,51 @@ const SignUp = () => {
     }
 
     try {
-      await auth.handleRegister(formData);
+      const payload = {
+        email: formData.email,
+        username: formData.username,
+        password1: formData.password,
+        password2: formData.password2
+      };
+
+      await auth.handleRegister(payload);
       // El manejo de la navegación ya está en handleRegister en App.jsx
     } catch (err) {
       // Handle specific field errors from backend
       if (err.response?.data) {
         const backendErrors = {};
-        Object.keys(err.response.data).forEach(key => {
-          if (Array.isArray(err.response.data[key])) {
-            backendErrors[key] = err.response.data[key][0];
-          } else {
-            backendErrors[key] = err.response.data[key];
+        let generalError = null;
+
+        Object.entries(err.response.data).forEach(([key, value]) => {
+          const message = Array.isArray(value) ? value[0] : value;
+
+          switch (key) {
+            case 'password':
+            case 'password1':
+              backendErrors.password = message;
+              break;
+            case 'password2':
+              backendErrors.password2 = message;
+              break;
+            case 'email':
+            case 'username':
+              backendErrors[key] = message;
+              break;
+            case 'non_field_errors':
+            case 'detail':
+              generalError = message;
+              break;
+            default:
+              backendErrors[key] = message;
           }
         });
-        setFieldErrors(backendErrors);
+
+        if (Object.keys(backendErrors).length > 0) {
+          setFieldErrors(backendErrors);
+        }
+        if (generalError) {
+          setError(generalError);
+        }
       } else {
         setError(err.message || 'Error en el registro. Inténtalo de nuevo.');
       }
