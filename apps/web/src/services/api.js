@@ -17,6 +17,11 @@ const getBaseURL = () => {
     return '/api';
   }
 
+  // 2) Si hay VITE_API_BASE_URL definida, úsala siempre en hosts no locales
+  //    (evita forzar subdominios api.* cuando no existen)
+  const envBaseEarly = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (envBaseEarly) return envBaseEarly;
+
   // 2) Codespaces
   if (hostname.includes('github.dev') || hostname.includes('codespaces.io')) {
     const backendUrl = origin.replace(/:\d+/, ':8000');
@@ -41,8 +46,6 @@ const getBaseURL = () => {
   }
 
   // 5) Producción misma raíz o fallback
-  const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
-  if (envBase) return envBase;
   if (import.meta.env.MODE === 'development') console.log('🌐 Producción/Fallback: /api');
   return '/api';
 };
@@ -1236,5 +1239,4 @@ export default {
   aiManagement: aiManagementService,
   usePropertyService
 };
-
 
