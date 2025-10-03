@@ -431,6 +431,7 @@ const PropertyDetails = () => {
         <MapView 
           ref={mapRef}
           initialViewState={mapViewState}
+          initialGeoJsonBoundary={property?.boundary_polygon}
           editable={false}
           filters={{ propertyId: id }}
           onLoad={handleMapLoad}

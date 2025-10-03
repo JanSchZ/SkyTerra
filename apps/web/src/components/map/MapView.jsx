@@ -3,6 +3,7 @@ import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar,
 import { propertyService, tourService, usePropertyService } from '../../services/api';
 import Map, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import * as turf from '@turf/turf';
 import EditIcon from '@mui/icons-material/Edit';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
@@ -17,6 +18,94 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PropertyPreviewModal from '../property/PropertyPreviewModal';
 import CloseIcon from '@mui/icons-material/Close';
 import PropertySidePreview from '../property/PropertySidePreview';
+
+const toFeaturePolygon = (boundary) => {
+  if (!boundary) return null;
+
+  if (boundary.type === 'Feature' && boundary.geometry?.type === 'Polygon') {
+    return boundary;
+  }
+
+  if (boundary.geojson?.type === 'Feature' && boundary.geojson.geometry?.type === 'Polygon') {
+    return boundary.geojson;
+  }
+
+  if (boundary.geometry?.type === 'Polygon') {
+    return {
+      type: 'Feature',
+      properties: boundary.properties || {},
+      geometry: boundary.geometry,
+    };
+  }
+
+  if (boundary.coordinates) {
+    return {
+      type: 'Feature',
+      properties: boundary.properties || {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: boundary.coordinates,
+      },
+    };
+  }
+
+  if (Array.isArray(boundary)) {
+    return {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: boundary,
+      },
+    };
+  }
+
+  return null;
+};
+
+const normalizeBoundary = (boundary) => {
+  if (!boundary) return null;
+
+  const feature = toFeaturePolygon(boundary);
+  if (!feature?.geometry?.coordinates) return null;
+
+  const normalized = {
+    ...(boundary && typeof boundary === 'object' && !Array.isArray(boundary) ? boundary : {}),
+    type: 'Feature',
+    geojson: feature,
+    feature,
+    coordinates: feature.geometry.coordinates,
+  };
+
+  if (!normalized.center) {
+    try {
+      const centroid = turf.center(feature)?.geometry?.coordinates;
+      if (Array.isArray(centroid)) {
+        normalized.center = centroid;
+      }
+    } catch (_) {
+      /* no-op */
+    }
+  }
+
+  if (normalized.center && Array.isArray(normalized.center) && normalized.center.length === 2) {
+    normalized.longitude = normalized.center[0];
+    normalized.latitude = normalized.center[1];
+  }
+
+  if (normalized.area == null) {
+    try {
+      const areaSqMeters = turf.area(feature);
+      if (Number.isFinite(areaSqMeters)) {
+        normalized.area = areaSqMeters / 10000;
+      }
+    } catch (_) {
+      /* no-op */
+    }
+  }
+
+  return normalized;
+};
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => {
@@ -97,7 +186,7 @@ const MapView = forwardRef(({
   const [popupInfo, setPopupInfo] = useState(null);
   const [tourPreviews, setTourPreviews] = useState({});
   const [isDrawingMode, setIsDrawingMode] = useState(editable);
-  const [propertyBoundaries, setPropertyBoundaries] = useState(initialGeoJsonBoundary || null);
+  const [propertyBoundaries, setPropertyBoundaries] = useState(() => normalizeBoundary(initialGeoJsonBoundary));
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
   const [tourTransitionDuration, setTourTransitionDuration] = useState(350);
@@ -109,6 +198,7 @@ const MapView = forwardRef(({
   const [connectionType, setConnectionType] = useState('4g');
   const [isMapUIReady, setIsMapUIReady] = useState(false); // Mapa listo (idle)
   const mapRef = useRef(null);
+  const containerRef = useRef(null);
   const rotationFrameId = useRef(null); // Ref para el ID de la animación de rotación
   const rotationPrevTimeRef = useRef(null); // timestamp del frame previo
   const flightTimeoutIdRef = useRef(null);
@@ -119,6 +209,90 @@ const MapView = forwardRef(({
   const recommendationsTourTimeoutRef = useRef(null);
   const idleRotationTimeoutRef = useRef(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+
+  const boundaryFeature = useMemo(() => {
+    if (!propertyBoundaries) return null;
+    return propertyBoundaries.geojson || toFeaturePolygon(propertyBoundaries);
+  }, [propertyBoundaries]);
+
+  const boundaryCenter = useMemo(() => {
+    if (propertyBoundaries?.center && Array.isArray(propertyBoundaries.center)) {
+      return propertyBoundaries.center;
+    }
+    if (boundaryFeature) {
+      try {
+        const centroid = turf.center(boundaryFeature)?.geometry?.coordinates;
+        if (Array.isArray(centroid)) return centroid;
+      } catch (_) {
+        /* no-op */
+      }
+    }
+    return null;
+  }, [propertyBoundaries, boundaryFeature]);
+
+  const propertyMarkerCoords = useMemo(() => {
+    if (boundaryCenter) {
+      return boundaryCenter;
+    }
+    if (selectedPoint && Number.isFinite(selectedPoint.longitude) && Number.isFinite(selectedPoint.latitude)) {
+      return [selectedPoint.longitude, selectedPoint.latitude];
+    }
+    return null;
+  }, [boundaryCenter, selectedPoint]);
+
+  const forceMapResize = useCallback(() => {
+    if (!mapRef.current) return;
+
+    const executeResize = () => {
+      try { mapRef.current.resize?.(); } catch (_) {}
+      try { mapRef.current.getMap?.().resize(); } catch (_) {}
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(executeResize);
+    } else {
+      setTimeout(executeResize, 16);
+    }
+  }, []);
+
+  useEffect(() => {
+    const normalized = normalizeBoundary(initialGeoJsonBoundary);
+    setPropertyBoundaries((prev) => {
+      if (!normalized && !prev) {
+        return prev;
+      }
+      if (normalized && prev && prev.geojson === normalized.geojson) {
+        return prev;
+      }
+      return normalized;
+    });
+  }, [initialGeoJsonBoundary]);
+
+  useEffect(() => {
+    forceMapResize();
+
+    const element = containerRef.current;
+    const ResizeObserverRef = (typeof window !== 'undefined') ? window.ResizeObserver : null;
+
+    if (!element || !ResizeObserverRef) {
+      return undefined;
+    }
+
+    const observer = new ResizeObserverRef(() => forceMapResize());
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [forceMapResize]);
+
+  useEffect(() => {
+    if (isMapLoaded) {
+      forceMapResize();
+    }
+  }, [isMapLoaded, forceMapResize]);
+
+  useEffect(() => {
+    forceMapResize();
+  }, [embedded, embeddedHeight, forceMapResize]);
   const [previewPropertyId, setPreviewPropertyId] = useState(null);
   const [tourCache, setTourCache] = useState({}); // propertyId -> tourUrl
   // Geocoder state
@@ -552,12 +726,20 @@ const MapView = forwardRef(({
         }
       }
 
+      if (!editable) {
+        const normalizedBoundary = normalizeBoundary(property.boundary_polygon);
+        setPropertyBoundaries(normalizedBoundary || null);
+        if (normalizedBoundary) {
+          forceMapResize();
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('Error opening property panel:', error);
       return false;
     }
-  }, [properties, setSelectedProperty, setSidePanelProperty, setSidePanelOpen, tourPreviews, setTourPreviews, setTourCache]);
+  }, [properties, setSelectedProperty, setSidePanelProperty, setSidePanelOpen, tourPreviews, setTourPreviews, setTourCache, editable, forceMapResize]);
 
   const handleMarkerClick = async (property) => {
     await openSidePanelForProperty(property);
@@ -641,14 +823,16 @@ const MapView = forwardRef(({
         severity: 'success'
       });
     }
+    forceMapResize();
   };
 
   const handleBoundariesUpdate = (boundaries) => {
-    setPropertyBoundaries(boundaries);
+    const normalized = normalizeBoundary(boundaries);
+    setPropertyBoundaries(normalized);
     if (onBoundariesUpdate) {
-      onBoundariesUpdate(boundaries);
+      onBoundariesUpdate(normalized);
     }
-    // console.log('Boundaries updated:', boundaries); // Debug log
+    // console.log('Boundaries updated:', normalized); // Debug log
   };
 
   // Países y sus recorridos de vuelo
@@ -1222,40 +1406,35 @@ const MapView = forwardRef(({
   }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, prefetchToursInViewport, tourCache]);
 
   const renderPropertyBoundaries = (property) => {
-    if (property && property.boundary_polygon && property.boundary_polygon.coordinates) {
-      return (
-        <Source
-          id={`boundary-source-${property.id}`}
-          type="geojson"
-          data={{
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              type: 'Polygon',
-              coordinates: property.boundary_polygon.coordinates
-            }
-          }}
-        >
-          <Layer
-            id={`boundary-fill-${property.id}`}
-            type="fill"
-            paint={{
-              'fill-color': selectedProperty === property.id ? '#4CAF50' : '#2196F3',
-              'fill-opacity': selectedProperty === property.id ? 0.3 : 0.1,
-            }}
-          />
-          <Layer
-            id={`boundary-line-${property.id}`}
-            type="line"
-            paint={{
-              'line-color': selectedProperty === property.id ? '#4CAF50' : '#2196F3',
-              'line-width': selectedProperty === property.id ? 3 : 2,
-            }}
-          />
-        </Source>
-      );
+    const feature = toFeaturePolygon(property?.boundary_polygon);
+    if (!feature?.geometry?.coordinates) {
+      return null;
     }
-    return null;
+
+    return (
+      <Source
+        id={`boundary-source-${property.id}`}
+        type="geojson"
+        data={feature}
+      >
+        <Layer
+          id={`boundary-fill-${property.id}`}
+          type="fill"
+          paint={{
+            'fill-color': selectedProperty === property.id ? '#4CAF50' : '#2196F3',
+            'fill-opacity': selectedProperty === property.id ? 0.3 : 0.1,
+          }}
+        />
+        <Layer
+          id={`boundary-line-${property.id}`}
+          type="line"
+          paint={{
+            'line-color': selectedProperty === property.id ? '#4CAF50' : '#2196F3',
+            'line-width': selectedProperty === property.id ? 3 : 2,
+          }}
+        />
+      </Source>
+    );
   };
 
   const unclusteredPointLayer = {
@@ -1757,15 +1936,21 @@ const MapView = forwardRef(({
               compact={embedded}
             />
           )}
-          {editable && (propertyBoundaries?.center || selectedPoint) && (
+          {editable && !isDrawingMode && boundaryFeature && (
+            <Source id="editable-boundary-preview" type="geojson" data={boundaryFeature}>
+              <Layer id="editable-boundary-preview-fill" type="fill" paint={{ 'fill-color': '#2E7D32', 'fill-opacity': 0.25 }} />
+              <Layer id="editable-boundary-preview-line" type="line" paint={{ 'line-color': '#2E7D32', 'line-width': 2 }} />
+            </Source>
+          )}
+          {editable && propertyMarkerCoords && (
             <Marker
-              longitude={(propertyBoundaries?.center || [selectedPoint.longitude, selectedPoint.latitude])[0]}
-              latitude={(propertyBoundaries?.center || [selectedPoint.longitude, selectedPoint.latitude])[1]}
+              longitude={propertyMarkerCoords[0]}
+              latitude={propertyMarkerCoords[1]}
               color="#1E8578"
             />
           )}
-          {!editable && propertyBoundaries && propertyBoundaries.type === 'Feature' && (
-            <Source id="boundary-preview" type="geojson" data={propertyBoundaries}>
+          {!editable && boundaryFeature && (
+            <Source id="boundary-preview" type="geojson" data={boundaryFeature}>
               <Layer id="boundary-preview-fill" type="fill" paint={{ 'fill-color': '#2E7D32', 'fill-opacity': 0.25 }} />
               <Layer id="boundary-preview-line" type="line" paint={{ 'line-color': '#2E7D32', 'line-width': 2 }} />
             </Source>

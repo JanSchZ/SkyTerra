@@ -137,6 +137,12 @@ const PropertyForm = ({ property, onSave, onCancel, isLoading = false, error = n
           const mapInstance = mapViewRef.current.getMap();
           if (mapInstance) {
             setMapboxMapInstance(mapInstance);
+            try { mapInstance.resize(); } catch (_) {}
+            if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+              window.requestAnimationFrame(() => {
+                try { mapInstance.resize(); } catch (_) {}
+              });
+            }
             if (formData.latitude && formData.longitude) {
               mapViewRef.current.flyTo({
                 center: [parseFloat(formData.longitude), parseFloat(formData.latitude)],
