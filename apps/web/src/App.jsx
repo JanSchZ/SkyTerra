@@ -174,7 +174,10 @@ function App() {
 
         // Primero verificar si hay indicios de sesión antes de hacer llamada al backend
         const localUser = localStorage.getItem('user');
-        if (!localUser) {
+        if (!localUser || localUser === 'undefined' || localUser === 'null') {
+          if (localUser === 'undefined' || localUser === 'null') {
+            localStorage.removeItem('user');
+          }
           // No hay usuario en localStorage, no hacer llamada al backend
           setUser(null);
           setLoadingAuth(false);
@@ -409,16 +412,26 @@ function App() {
   const handleRegister = async (userData) => {
     try {
       const authData = await authService.register(userData);
-      const user = authData.user;
-      setUser(user);
-      setSnackbarMessage('¡Registro exitoso! Bienvenido.');
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-      if (user?.is_staff) {
-        navigate('/admin');
-      } else {
-        navigate('/');
+      const user = authData?.user?.user || authData?.user;
+
+      if (user?.id) {
+        setUser(user);
+        setSnackbarMessage('¡Registro exitoso! Bienvenido.');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+        if (user.is_staff) {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
+        return;
       }
+
+      const detailMessage = authData?.detail || 'Registro completado. Revisa tu correo e inicia sesión para continuar.';
+      setSnackbarMessage(detailMessage);
+      setSnackbarSeverity('info');
+      setSnackbarOpen(true);
+      navigate('/login');
     } catch (error) {
       console.error("Registration failed:", error);
       const errorMessage = typeof error.response?.data === 'string' ? error.response.data : (error.response?.data?.detail || error.message || 'Error desconocido durante el registro.');

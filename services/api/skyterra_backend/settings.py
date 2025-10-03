@@ -35,6 +35,15 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 # This prevents forcing HTTPS on 127.0.0.1/localhost which breaks CORS/cookies in dev
 IS_LOCAL_DEV = DEBUG or any(h in {'localhost', '127.0.0.1'} for h in os.getenv('ALLOWED_HOSTS', '').split(','))
 
+# Determine email verification behaviour upfront so both dj-rest-auth and allauth stay in sync.
+_valid_email_verification_modes = {'none', 'optional', 'mandatory'}
+_email_verification_env = os.getenv('ACCOUNT_EMAIL_VERIFICATION', '').strip().lower()
+if _email_verification_env not in _valid_email_verification_modes:
+    _email_verification_env = None
+
+# Default to no forced verification for local development so first-time signups can log in immediately.
+ACCOUNT_EMAIL_VERIFICATION_MODE = _email_verification_env or ('none' if IS_LOCAL_DEV else 'mandatory')
+
 # Comma-separated list of domains accepted in production, e.g. "skyterra.cl,api.skyterra.cl"
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',') if host.strip()]
 
@@ -113,6 +122,8 @@ if DEBUG:
     CSRF_COOKIE_SECURE = False
     CSRF_COOKIE_SAMESITE = 'Lax'
 
+REST_AUTH_EMAIL_VERIFICATION = 'mandatory' if ACCOUNT_EMAIL_VERIFICATION_MODE == 'mandatory' else 'optional'
+
 REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'jwt-access-token',
@@ -123,6 +134,9 @@ REST_AUTH = {
     'TOKEN_MODEL': None, # Disable default token (use JWT)
     'LOGOUT_ON_PASSWORD_CHANGE': True,
     'OLD_PASSWORD_FIELD_ENABLED': True,
+
+    # Keep dj-rest-auth email policy aligned with allauth
+    'EMAIL_VERIFICATION': REST_AUTH_EMAIL_VERIFICATION,
 
     # Serializers
     'LOGIN_SERIALIZER': 'skyterra_backend.serializers.CustomLoginSerializer',
@@ -136,15 +150,13 @@ REST_AUTH = {
     'VERIFY_EMAIL_SERIALIZER': 'dj_rest_auth.registration.serializers.VerifyEmailSerializer',
 
     # Email and Password Reset
-    'EMAIL_VERIFICATION': 'mandatory', # overridden in DEBUG below
     'PASSWORD_RESET_USE_SITES_DOMAIN': True,
     'PASSWORD_RESET_CONFIRM_URL': CLIENT_URL + '/password-reset-confirm/{uid}/{token}/',
     'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False, # For security reasons    
 }
-# Relax email verification in development to avoid login blockage
-if DEBUG:
-    REST_AUTH['EMAIL_VERIFICATION'] = 'optional'
-    ACCOUNT_EMAIL_VERIFICATION = 'none'
+
+# Allow automatic login after registration whenever email verification is not mandatory.
+REST_AUTH['LOGIN_AFTER_REGISTER'] = ACCOUNT_EMAIL_VERIFICATION_MODE != 'mandatory'
 
 
 # Configuración de Django Rest Framework para usar JWT por defecto
@@ -197,14 +209,14 @@ SIMPLE_JWT = {
 # allauth configuration
 # https://django-allauth.readthedocs.io/en/latest/configuration.html
 ACCOUNT_ADAPTER = 'skyterra_backend.adapters.CustomAccountAdapter'
-ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
-ACCOUNT_EMAIL_REQUIRED = True  # Required when EMAIL_VERIFICATION is 'mandatory'
-ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+ACCOUNT_EMAIL_VERIFICATION = ACCOUNT_EMAIL_VERIFICATION_MODE
+ACCOUNT_EMAIL_REQUIRED = True  # Mantener el correo obligatorio
+ACCOUNT_CONFIRM_EMAIL_ON_GET = ACCOUNT_EMAIL_VERIFICATION_MODE == 'mandatory'
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 3
 ACCOUNT_EMAIL_SUBJECT_PREFIX = '[SkyTerra] '
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 ACCOUNT_CHANGE_EMAIL = True
-ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = ACCOUNT_EMAIL_VERIFICATION_MODE != 'none'
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
 ACCOUNT_LOGIN_METHODS = ['email']  # New recommended setting for login method
 # The ACCOUNT_SIGNUP_FIELDS setting is deprecated and has been removed.

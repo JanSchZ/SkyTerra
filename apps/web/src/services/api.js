@@ -307,30 +307,73 @@ export const authService = {
   // Registrar usuario
   async register(userData) {
     try {
-      console.log('🔄 Intentando registrar usuario:', { 
-        email: userData.email, 
+      console.log('🔄 Intentando registrar usuario:', {
+        email: userData.email,
         username: userData.username,
-        hasPassword: !!(userData.password || userData.password1) 
+        hasPassword: !!(userData.password || userData.password1)
       });
+
+      await this.ensureCsrfCookie();
+      try {
+        if (api.defaults && api.defaults.headers) {
+          delete api.defaults.headers['Authorization'];
+        }
+      } catch (_) {}
 
       const payload = { ...userData };
       if (payload.password && !payload.password1) {
         payload.password1 = payload.password;
       }
-      if (payload.password2 === undefined && payload.password) {
-        payload.password2 = payload.password;
+      if (payload.password2 === undefined && payload.password1 !== undefined) {
+        payload.password2 = payload.password1;
       }
 
-      const response = await api.post('/auth/registration/', payload);
-      console.log('✅ Registro exitoso:', response.data);
-      
-      // El backend manejará el login después del registro y enviará la cookie.
-      // Guardamos los datos del usuario.
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      return response.data;
+      const response = await api.post('/auth/registration/', payload, { skipAuth: true, withCredentials: true });
+      const data = response?.data || {};
+      console.log('✅ Registro exitoso:', data);
+
+      const access = data.access;
+      const refresh = data.refresh;
+      if (access) {
+        localStorage.setItem('accessToken', access);
+        api.defaults.headers = api.defaults.headers || {};
+        api.defaults.headers['Authorization'] = `Bearer ${access}`;
+      }
+      if (refresh) {
+        localStorage.setItem('refreshToken', refresh);
+      }
+
+      let user = data.user;
+      if (!user) {
+        try {
+          const whoami = await api.get('/auth/user/');
+          if (whoami?.data) {
+            user = whoami.data;
+          }
+        } catch (whoamiError) {
+          console.warn('Registro completado pero no se pudo obtener /auth/user/:', whoamiError?.response?.status || whoamiError?.message);
+        }
+      }
+
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+      } else {
+        localStorage.removeItem('user');
+      }
+
+      return { ...data, user };
     } catch (error) {
       console.error('❌ Error during registration:', error);
-      
+
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      try {
+        if (api.defaults && api.defaults.headers) {
+          delete api.defaults.headers['Authorization'];
+        }
+      } catch (_) {}
+
       // Manejo detallado de errores de respuesta
       if (error.response) {
         console.error('Response error details:', {
@@ -338,15 +381,13 @@ export const authService = {
           data: error.response.data,
           headers: error.response.headers
         });
-        
-        // Si hay datos específicos de error
+
         if (error.response.data) {
           if (typeof error.response.data === 'string') {
             throw new Error(error.response.data);
           } else if (error.response.data.error) {
             throw new Error(error.response.data.error);
           } else {
-            // Combinar todos los errores de validación
             const errorMessages = Object.entries(error.response.data)
               .map(([field, messages]) => {
                 if (Array.isArray(messages)) {
@@ -529,7 +570,8 @@ export const authService = {
   async checkAuthStatus() {
     // Primero verificar si hay un usuario en localStorage
     const userStr = localStorage.getItem('user');
-    if (!userStr) {
+    if (!userStr || userStr === 'undefined' || userStr === 'null') {
+      localStorage.removeItem('user');
       // No hay usuario guardado, no hacer llamada al backend
       return null;
     }
@@ -554,14 +596,14 @@ export const authService = {
   // Verificar si hay sesión activa
   isAuthenticated() {
     const userStr = localStorage.getItem('user');
-    return !!userStr;
+    return !!(userStr && userStr !== 'undefined' && userStr !== 'null');
   },
 
   // Obtener usuario del localStorage sin llamada al backend (función helper simple)
   getStoredUser() {
     try {
       const userStr = localStorage.getItem('user');
-      if (!userStr) return null;
+      if (!userStr || userStr === 'undefined' || userStr === 'null') return null;
       return JSON.parse(userStr);
     } catch (error) {
       console.warn('Error parsing stored user:', error);

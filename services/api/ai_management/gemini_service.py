@@ -106,8 +106,8 @@ class SamService:
                 "topP": 0.95,
             }
         }
-        if model.supports_thinking:
-            request_data["generationConfig"]["thinking"] = False
+        # Older Gemini APIs accepted an explicit "thinking" flag. The v1beta endpoint
+        # backing Gemini 2.5 models rejects it, so avoid sending the key altogether.
 
         headers = {"Content-Type": "application/json"}
         params = {"key": self.api_key}
@@ -287,9 +287,7 @@ Instrucciones específicas:
             }
         }
         
-        # Add thinking config if supported
-        if model.supports_thinking:
-            request_data["generationConfig"]["thinking"] = True
+        # Legacy "thinking" flag removed because Gemini 2.5 rejects it; rely on defaults.
         
         headers = {
             "Content-Type": "application/json",
