@@ -27,6 +27,10 @@ RUN pip install -r requirements.txt
 # Copiar código de la aplicación
 COPY . .
 
+# Copiar script de entrada que ejecuta migraciones y crea el superusuario
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Crear directorio para logs
 RUN mkdir -p logs
 
@@ -35,11 +39,14 @@ RUN mkdir -p staticfiles
 
 # Configurar usuario no-root para seguridad
 RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+    chown -R app:app /app && \
+    chown app:app /entrypoint.sh
 USER app
 
 # Exponer puerto por defecto (Railway utilizará una variable PORT distinta si es necesario)
 EXPOSE 8080
+
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Comando por defecto - Gunicorn usa el puerto proporcionado (fallback 8000)
 CMD ["bash", "-lc", "gunicorn skyterra_backend.wsgi:application -b 0.0.0.0:${PORT:-8000} --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} --access-logfile - --error-logfile -"]
