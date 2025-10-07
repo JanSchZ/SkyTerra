@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
@@ -7,14 +7,24 @@ import AppHeader from './AppHeader';
 
 const earthImageUrl = 'https://upload.wikimedia.org/wikipedia/commons/c/cb/The_Blue_Marble_%28remastered%29.jpg';
 
-export default function LandingV2() {
-  const [filters] = useState({});
-  const [appliedFilters] = useState({});
+export default function LandingV2({
+  mapRef,
+  filters: externalFilters,
+  appliedFilters: externalAppliedFilters,
+  initialData,
+  onHeroVisibilityChange,
+}) {
   const [heroVisible, setHeroVisible] = useState(true);
+  const filters = useMemo(() => externalFilters || {}, [externalFilters]);
+  const appliedFilters = useMemo(() => externalAppliedFilters || {}, [externalAppliedFilters]);
 
   const handleRevealMap = () => {
     setHeroVisible(false);
   };
+
+  useEffect(() => {
+    onHeroVisibilityChange?.(heroVisible);
+  }, [heroVisible, onHeroVisibilityChange]);
 
   return (
     <Box
@@ -41,8 +51,10 @@ export default function LandingV2() {
           style={{ width: '100%', height: '100%' }}
         >
           <MapView
+            ref={mapRef}
             filters={filters}
             appliedFilters={appliedFilters}
+            initialData={initialData}
             disableIntroAnimation={false}
             onLoad={() => import.meta.env.MODE === 'development' && console.debug('Map loaded')}
           />

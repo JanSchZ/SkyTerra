@@ -154,6 +154,7 @@ function App() {
 
   const mapRef = React.useRef(null);
   const [initialPropertiesData, setInitialPropertiesData] = useState(null);
+  const [landingHeroVisible, setLandingHeroVisible] = useState(true);
 
   // Estado para el Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -708,8 +709,8 @@ function App() {
   };
 
   // Determine if the top bar should be shown
-  const showTopBar = 
-    location.pathname === '/' || 
+  const showTopBar =
+    (location.pathname === '/' ? !landingHeroVisible : false) ||
     location.pathname.startsWith('/property/');
 
   // Helper function to format ranges (price, size)
@@ -780,21 +781,26 @@ function App() {
 
   const mainContent = (
     <Routes>
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
+            <LandingV2
+              mapRef={mapRef}
+              filters={{}}
+              appliedFilters={aiAppliedFilters}
+              initialData={initialPropertiesData}
+              onHeroVisibilityChange={setLandingHeroVisible}
+            />
           </motion.div>
-        } 
+        }
       />
       {/* Autenticación clásica dentro de un modal */}
       <Route path="/auth" element={<AuthPage onLogin={handleLogin} />} />
-      <Route path="/landing" element={
-        <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-          <LandingV2 />
-        </motion.div>
-      } />
+      <Route
+        path="/landing"
+        element={<Navigate to="/" replace />}
+      />
       <Route path="/map" element={<ProtectedRoute user={user} element={<MapView />} />} />
       <Route path="/property/:id" element={<PropertyDetails user={user?.user || user} />} />
       <Route path="/tour/:tourId" element={<TourViewer />} />
