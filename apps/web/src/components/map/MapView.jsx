@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PropertyPreviewModal from '../property/PropertyPreviewModal';
 import CloseIcon from '@mui/icons-material/Close';
 import PropertySidePreview from '../property/PropertySidePreview';
+import { demoMapProperties } from '../../_mocks/demoMapProperties';
 
 const toFeaturePolygon = (boundary) => {
   if (!boundary) return null;
@@ -158,6 +159,7 @@ const MapView = forwardRef(({
   // Estados
   const [properties, setProperties] = useState([]);
   const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([]));
+  const [usingDemoData, setUsingDemoData] = useState(false);
   const [loading, setLoading] = useState(!initialData);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -254,6 +256,28 @@ const MapView = forwardRef(({
       setTimeout(executeResize, 16);
     }
   }, []);
+
+  const applyDemoFallback = useCallback(() => {
+    setProperties(demoMapProperties);
+    setPropertiesGeoJSON(propertiesToGeoJSON(demoMapProperties));
+    setTotalProperties(demoMapProperties.length);
+    setCurrentPage(1);
+    setHasNextPage(false);
+    setLoading(false);
+    setRefreshing(false);
+    setLoadingMore(false);
+    setError(null);
+    setUsingDemoData((prev) => {
+      if (!prev) {
+        setSnackbar({
+          open: true,
+          severity: 'info',
+          message: 'Mostrando terrenos demo en Chile para que puedas probar la vista.',
+        });
+      }
+      return true;
+    });
+  }, [setSnackbar]);
 
   useEffect(() => {
     const normalized = normalizeBoundary(initialGeoJsonBoundary);
@@ -502,15 +526,18 @@ const MapView = forwardRef(({
 
   // Seed from initialData if provided
   useEffect(() => {
-    if (initialData && Array.isArray(initialData.results)) {
+    if (initialData && Array.isArray(initialData.results) && initialData.results.length > 0) {
       setProperties(initialData.results);
       setPropertiesGeoJSON(propertiesToGeoJSON(initialData.results));
       setTotalProperties(initialData.count || initialData.results.length || 0);
       setCurrentPage(1);
       setHasNextPage(Boolean(initialData.next));
       setLoading(false);
+      setUsingDemoData(false);
+    } else if (initialData && (!Array.isArray(initialData.results) || initialData.results.length === 0)) {
+      applyDemoFallback();
     }
-  }, [initialData]);
+  }, [initialData, applyDemoFallback]);
 
   // Memoized fetchProperties function optimizada con caché
   const fetchProperties = useCallback(async (pageToFetch = 1) => {
@@ -535,8 +562,19 @@ const MapView = forwardRef(({
       // Verificar que data tenga la estructura esperada
       if (!data || !Array.isArray(data.results)) {
         console.error('Datos inválidos recibidos del API:', data);
+        if (pageToFetch === 1) {
+          applyDemoFallback();
+          return;
+        }
         throw new Error('Formato de datos inválido recibido del servidor');
       }
+
+      if (pageToFetch === 1 && data.results.length === 0) {
+        applyDemoFallback();
+        return;
+      }
+
+      setUsingDemoData(false);
 
       setProperties(prev => {
         const prevArray = Array.isArray(prev) ? prev : [];
@@ -571,10 +609,10 @@ const MapView = forwardRef(({
 
     } catch (err) {
         console.error('Error al cargar propiedades:', err?.message || err);
-      setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
       if (pageToFetch === 1) {
-        setProperties([]);
-        setPropertiesGeoJSON(propertiesToGeoJSON([]));
+        applyDemoFallback();
+      } else {
+        setError('No se pudieron cargar las propiedades. Intente nuevamente más tarde.');
       }
     } finally {
       if (pageToFetch === 1) {
@@ -584,7 +622,7 @@ const MapView = forwardRef(({
         setLoadingMore(false);
       }
     }
-  }, [getPropertiesCached, prefetchNextPage, properties]);
+  }, [getPropertiesCached, prefetchNextPage, properties, applyDemoFallback]);
 
   useEffect(() => {
     if (editable || suppressData) {
@@ -1784,7 +1822,9 @@ const MapView = forwardRef(({
   }, [editable, onLocationSelect]);
 
   return (
-    <Box sx={{ 
+    <Box
+      data-using-demo={usingDemoData ? 'true' : 'false'}
+      sx={{ 
       width: '100%', 
       height: embedded ? (embeddedHeight || 420) : '100vh', 
       position: embedded ? 'relative' : 'fixed', 

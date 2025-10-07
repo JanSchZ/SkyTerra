@@ -920,14 +920,16 @@ function App() {
                   onClick={() => navigate('/')}
                   sx={(theme)=>({
                     color: theme.palette.common.white,
-                    fontFamily: '"Helvetica", Arial, sans-serif',
-                    fontWeight: 700,
-                    letterSpacing: '-0.01em',
+                    fontFamily: 'Helvetica, Arial, sans-serif',
+                    fontWeight: 400,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
                     cursor: 'pointer',
                     userSelect: 'none',
                     paddingRight: 2,
                     paddingLeft: isMobile ? 1 : 3,
                     transition: 'color 0.3s ease-in-out',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.35)',
                     '&:hover': {
                       color: '#ffffff',
                     }
