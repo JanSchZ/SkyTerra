@@ -102,8 +102,12 @@ const AISearchBar = ({
   onSearchComplete,
   variant = 'default',
   placeholder,
+  value,
+  onQueryChange,
 }) => {
-  const [query, setQuery] = useState('');
+  const isControlled = value !== undefined && value !== null;
+  const [internalQuery, setInternalQuery] = useState('');
+  const query = isControlled ? value : internalQuery;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showResults, setShowResults] = useState(false);
@@ -115,8 +119,18 @@ const AISearchBar = ({
   // Randomized input name/id to prevent browser autocomplete suggestions from prior entries
   const [inputName] = useState(() => `ai-search-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
+  const updateQuery = (nextValue) => {
+    if (isControlled) {
+      if (onQueryChange) {
+        onQueryChange(nextValue);
+      }
+    } else {
+      setInternalQuery(nextValue);
+    }
+  };
+
   const handleInputChange = (e) => {
-    setQuery(e.target.value);
+    updateQuery(e.target.value);
     if (showResults) setShowResults(false);
     if (error) setError(null);
     setIsInitialLoad(false);

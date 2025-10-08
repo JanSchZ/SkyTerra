@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
-import AISearchBar from './AISearchBar';
-import AppHeader from './AppHeader';
 
 const earthImageUrl = 'https://upload.wikimedia.org/wikipedia/commons/c/cb/The_Blue_Marble_%28remastered%29.jpg';
 
@@ -12,19 +10,12 @@ export default function LandingV2({
   filters: externalFilters,
   appliedFilters: externalAppliedFilters,
   initialData,
-  onHeroVisibilityChange,
+  heroVisible = true,
+  onExplore,
+  onMapReady,
 }) {
-  const [heroVisible, setHeroVisible] = useState(true);
   const filters = useMemo(() => externalFilters || {}, [externalFilters]);
   const appliedFilters = useMemo(() => externalAppliedFilters || {}, [externalAppliedFilters]);
-
-  const handleRevealMap = () => {
-    setHeroVisible(false);
-  };
-
-  useEffect(() => {
-    onHeroVisibilityChange?.(heroVisible);
-  }, [heroVisible, onHeroVisibilityChange]);
 
   return (
     <Box
@@ -56,12 +47,10 @@ export default function LandingV2({
             appliedFilters={appliedFilters}
             initialData={initialData}
             disableIntroAnimation={false}
-            onLoad={() => import.meta.env.MODE === 'development' && console.debug('Map loaded')}
+            onLoad={onMapReady}
           />
         </motion.div>
       </Box>
-
-      {!heroVisible && <AppHeader />}
 
       <AnimatePresence>
         {heroVisible && (
@@ -98,21 +87,6 @@ export default function LandingV2({
                 pt: { xs: 6, md: 10 },
               }}
             >
-              <Box sx={{ position: 'absolute', top: { xs: 24, md: 40 }, left: { xs: 24, md: 64 } }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    fontSize: { xs: '0.85rem', md: '0.95rem' },
-                    letterSpacing: '0.35em',
-                    fontWeight: 500,
-                    textTransform: 'uppercase',
-                    color: 'rgba(15,23,42,0.65)',
-                  }}
-                >
-                  Skyterra
-                </Typography>
-              </Box>
-
               <Box
                 sx={{
                   maxWidth: '1200px',
@@ -151,7 +125,7 @@ export default function LandingV2({
                     </Typography>
 
                     <Button
-                      onClick={handleRevealMap}
+                      onClick={() => onExplore?.()}
                       sx={{
                         alignSelf: 'flex-start',
                         px: { xs: 4, md: 5 },
@@ -211,26 +185,6 @@ export default function LandingV2({
         )}
       </AnimatePresence>
 
-      <Box
-        component={motion.div}
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.45, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        sx={{
-          position: 'absolute',
-          left: '50%',
-          bottom: { xs: 32, sm: 48, md: 64 },
-          transform: 'translateX(-50%)',
-          width: 'min(90vw, 680px)',
-          zIndex: 30,
-        }}
-      >
-        <AISearchBar
-          onSearchStart={handleRevealMap}
-          placeholder="Buscar terrenos..."
-          variant={heroVisible ? 'hero' : 'default'}
-        />
-      </Box>
     </Box>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useContext, useRef, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   CssBaseline,
@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import CloseIcon from '@mui/icons-material/Close';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { liquidGlassTheme } from './theme/liquidGlassTheme';
 import { ThemeProvider as MuiThemeProvider, createTheme as createMuiTheme } from '@mui/material/styles';
 import { api, authService, propertyService } from './services/api';
@@ -65,6 +65,8 @@ export const ThemeModeContext = React.createContext({
 });
 
 export const AuthContext = React.createContext(null);
+
+const DEFAULT_MAP_CENTER = [-71.5430, -35.6751];
 
 const AppWrapper = () => {
   const [mode, setMode] = React.useState('light');
@@ -155,6 +157,9 @@ function App() {
   const mapRef = React.useRef(null);
   const [initialPropertiesData, setInitialPropertiesData] = useState(null);
   const [landingHeroVisible, setLandingHeroVisible] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
+  const [pendingFlyTo, setPendingFlyTo] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Estado para el Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -166,6 +171,76 @@ function App() {
   const [navigationTarget, setNavigationTarget] = useState(null);
 
   const hoverTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (mapReady && pendingFlyTo) {
+      try {
+        mapRef.current?.flyTo?.(pendingFlyTo);
+      } catch (error) {
+        console.error('No se pudo ejecutar la animación pendiente del mapa:', error);
+      }
+      setPendingFlyTo(null);
+    }
+  }, [mapReady, pendingFlyTo]);
+
+  const performMapFlyTo = useCallback(
+    (options) => {
+      if (!options) return;
+      if (mapReady && mapRef.current?.flyTo) {
+        mapRef.current.flyTo(options);
+      } else {
+        setPendingFlyTo(options);
+      }
+    },
+    [mapReady],
+  );
+
+  const handleMapReady = useCallback(() => {
+    setMapReady(true);
+  }, []);
+
+  const animateMapReveal = useCallback(
+    (options = {}) => {
+      const mapInstance = mapRef.current?.getMap?.();
+      let center = options.center;
+
+      if (!center && mapInstance) {
+        try {
+          const { lng, lat } = mapInstance.getCenter();
+          center = [lng, lat];
+        } catch (_) {
+          center = null;
+        }
+      }
+
+      const finalCenter = center || DEFAULT_MAP_CENTER;
+
+      performMapFlyTo({
+        center: finalCenter,
+        zoom: options.zoom ?? 5.4,
+        pitch: options.pitch ?? 52,
+        bearing: options.bearing ?? -6,
+        duration: options.duration ?? 2200,
+        essential: true,
+      });
+    },
+    [performMapFlyTo],
+  );
+
+  const revealMapFromHero = useCallback(
+    (options) => {
+      const wasVisible = landingHeroVisible;
+      setLandingHeroVisible(false);
+      if (wasVisible) {
+        animateMapReveal(options);
+      }
+    },
+    [landingHeroVisible, animateMapReveal],
+  );
+
+  const handleExplore = useCallback(() => {
+    revealMapFromHero();
+  }, [revealMapFromHero]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -267,18 +342,23 @@ function App() {
   };
 
   const handleLocationSearch = (locationData) => {
-    if (!locationData || !mapRef.current) return;
-    // console.log('Flying to location:', locationData); // Debug log
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: locationData.center,
-        zoom: locationData.zoom || 12,
-        pitch: locationData.pitch || 60,
-        bearing: 0,
-        duration: 4500,
-        essential: true,
-      });
-    }
+    if (!locationData) return;
+    const center = locationData.center
+      || (Array.isArray(locationData.coordinates) ? locationData.coordinates : null)
+      || (typeof locationData.longitude === 'number' && typeof locationData.latitude === 'number'
+        ? [locationData.longitude, locationData.latitude]
+        : null);
+
+    if (!center) return;
+
+    performMapFlyTo({
+      center,
+      zoom: locationData.zoom ?? 12,
+      pitch: locationData.pitch ?? 60,
+      bearing: locationData.bearing ?? 0,
+      duration: locationData.duration ?? 4500,
+      essential: true,
+    });
   };
 
   const handleSearchStart = (searchText) => {
@@ -287,6 +367,7 @@ function App() {
     if (typeof searchText === 'string' && searchText.trim()) {
       setConversationHistory(prev => [...prev, { role: 'user', content: searchText.trim() }]);
     }
+    revealMapFromHero();
     // Hide the intro overlay when search starts
     if (mapRef.current?.hideIntroOverlay) {
       mapRef.current.hideIntroOverlay();
@@ -790,7 +871,9 @@ function App() {
               filters={{}}
               appliedFilters={aiAppliedFilters}
               initialData={initialPropertiesData}
-              onHeroVisibilityChange={setLandingHeroVisible}
+              heroVisible={landingHeroVisible}
+              onExplore={handleExplore}
+              onMapReady={handleMapReady}
             />
           </motion.div>
         }
@@ -885,7 +968,8 @@ function App() {
       }}
     >
       <AnimatePresence mode="wait">
-        <Box
+        <LayoutGroup>
+          <Box
           className="App"
           sx={(theme)=>({
             position: 'relative',
@@ -945,13 +1029,21 @@ function App() {
                 </Typography>
 
                 <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
-                  <Box sx={{ width: '100%', maxWidth: '700px' }}> {/* This ensures AISearchBar keeps its width */}
-                    <AISearchBar 
-                      onSearch={handleAISearch} 
-                      onLocationSearch={handleLocationSearch}
-                      onSearchStart={handleSearchStart}
-                      onSearchComplete={handleSearchComplete}
-                    />
+                  <Box sx={{ width: '100%', maxWidth: '700px' }}>
+                    <AnimatePresence initial={false}>
+                      {!landingHeroVisible && (
+                        <motion.div layoutId="global-search-bar" style={{ width: '100%' }}>
+                          <AISearchBar
+                            onSearch={handleAISearch}
+                            onLocationSearch={handleLocationSearch}
+                            onSearchStart={handleSearchStart}
+                            onSearchComplete={handleSearchComplete}
+                            value={searchQuery}
+                            onQueryChange={setSearchQuery}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </Box>
                 </Box>
 
@@ -1142,6 +1234,42 @@ function App() {
             </Box>
           )}
 
+          {location.pathname === '/' && (
+            <AnimatePresence>
+              {landingHeroVisible && (
+                <Box
+                  component={motion.div}
+                  key="landing-hero-search"
+                  layoutId="global-search-bar"
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                  sx={{
+                    position: 'fixed',
+                    left: '50%',
+                    bottom: { xs: 32, sm: 48, md: 64 },
+                    transform: 'translateX(-50%)',
+                    width: 'min(90vw, 680px)',
+                    zIndex: 1600,
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  <AISearchBar
+                    onSearch={handleAISearch}
+                    onLocationSearch={handleLocationSearch}
+                    onSearchStart={handleSearchStart}
+                    onSearchComplete={handleSearchComplete}
+                    placeholder="Buscar terrenos..."
+                    variant="hero"
+                    value={searchQuery}
+                    onQueryChange={setSearchQuery}
+                  />
+                </Box>
+              )}
+            </AnimatePresence>
+          )}
+
           {/* Overlay de transición de navegación */}
           <AnimatePresence>
             {isNavigating && (
@@ -1227,7 +1355,8 @@ function App() {
             />
           )}
           {/* SaveSearchDialog removed per request */}
-        </Box>
+          </Box>
+        </LayoutGroup>
       </AnimatePresence>
     </AuthContext.Provider>
   );
