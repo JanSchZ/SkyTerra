@@ -56,6 +56,10 @@ export default function LandingV2({
     }
   }, [heroVisible, mapLoaded, mapRef]);
 
+  const heroClipPath =
+    'circle(clamp(180px, 28vw, 230px) at calc(100% - clamp(200px, 30vw, 260px)) 52%)';
+  const expandedClipPath = 'circle(160% at 50% 50%)';
+
   return (
     <Box
       sx={{
@@ -76,19 +80,28 @@ export default function LandingV2({
       >
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: heroVisible ? 0.35 : 1, scale: heroVisible ? 1.05 : 1 }}
+          animate={{
+            opacity: 1,
+            clipPath: heroVisible ? heroClipPath : expandedClipPath,
+            WebkitClipPath: heroVisible ? heroClipPath : expandedClipPath,
+            filter: heroVisible
+              ? 'drop-shadow(0 32px 70px rgba(15,23,42,0.28))'
+              : 'none',
+          }}
           transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
           style={{ width: '100%', height: '100%' }}
         >
-          <MapView
-            ref={mapRef}
-            filters={filters}
-            appliedFilters={appliedFilters}
-            initialData={initialData}
-            initialViewState={HERO_ORBIT_VIEW}
-            disableIntroAnimation={false}
-            onLoad={handleMapReady}
-          />
+          <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
+            <MapView
+              ref={mapRef}
+              filters={filters}
+              appliedFilters={appliedFilters}
+              initialData={initialData}
+              initialViewState={HERO_ORBIT_VIEW}
+              disableIntroAnimation={false}
+              onLoad={handleMapReady}
+            />
+          </Box>
         </motion.div>
       </Box>
 
@@ -115,6 +128,40 @@ export default function LandingV2({
                 background: 'linear-gradient(102deg, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.88) 46%, rgba(11,19,35,0.35) 72%, rgba(11,19,35,0.05) 90%, rgba(11,19,35,0) 100%)',
               }}
             />
+
+            {heroVisible && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'none',
+                  display: { xs: 'none', sm: 'block' },
+                  zIndex: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    clipPath: heroClipPath,
+                    WebkitClipPath: heroClipPath,
+                    background: 'radial-gradient(circle at 40% 38%, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.14) 46%, rgba(15,23,42,0) 74%)',
+                    boxShadow: '0 28px 70px rgba(15,23,42,0.24)',
+                  }}
+                />
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    clipPath: heroClipPath,
+                    WebkitClipPath: heroClipPath,
+                    background: 'radial-gradient(circle at 70% 42%, rgba(59,130,246,0.22) 0%, rgba(59,130,246,0) 68%)',
+                    filter: 'blur(18px)',
+                    opacity: 0.75,
+                  }}
+                />
+              </Box>
+            )}
 
             <Box
               sx={{
@@ -189,51 +236,7 @@ export default function LandingV2({
                   </Stack>
                 </Box>
 
-                <Box
-                  sx={{
-                    flex: 1,
-                    display: { xs: 'none', md: 'flex' },
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    position: 'relative',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: { md: 380, lg: 440 },
-                      height: { md: 380, lg: 440 },
-                      borderRadius: '50%',
-                      position: 'relative',
-                      pointerEvents: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        background: 'radial-gradient(circle at 40% 35%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 38%, rgba(15,23,42,0) 70%)',
-                        backdropFilter: 'blur(2px)',
-                        WebkitBackdropFilter: 'blur(2px)',
-                        boxShadow: '0 32px 70px rgba(15,23,42,0.28)',
-                        opacity: 0.95,
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        inset: '-8%',
-                        borderRadius: '50%',
-                        background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 70%)',
-                        filter: 'blur(24px)',
-                        opacity: 0.85,
-                      }}
-                    />
-                  </Box>
-                </Box>
+                <Box sx={{ flex: 1, display: { xs: 'none', md: 'block' } }} />
               </Box>
             </Box>
           </Box>
