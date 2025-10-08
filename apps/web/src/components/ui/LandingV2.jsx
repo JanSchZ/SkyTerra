@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
 
 const HERO_ORBIT_VIEW = {
-  longitude: -32,
-  latitude: -8,
-  zoom: 0.85,
-  pitch: 22,
-  bearing: -24,
+  longitude: 12,
+  latitude: 9,
+  zoom: 0.62,
+  pitch: 18,
+  bearing: -18,
 };
 
 export default function LandingV2({
@@ -56,9 +56,9 @@ export default function LandingV2({
     }
   }, [heroVisible, mapLoaded, mapRef]);
 
-  const heroCircleRadius = 'clamp(180px, 28vw, 230px)';
-  const heroCircleCenterX = 'calc(100% - clamp(200px, 30vw, 260px))';
-  const heroCircleCenterY = '52%';
+  const heroCircleRadius = 'clamp(220px, 32vw, 340px)';
+  const heroCircleCenterX = 'calc(100% - clamp(240px, 36vw, 360px))';
+  const heroCircleCenterY = '55%';
   const heroClipPath = `circle(${heroCircleRadius} at ${heroCircleCenterX} ${heroCircleCenterY})`;
   const expandedClipPath = 'circle(160% at 50% 50%)';
 
@@ -87,7 +87,7 @@ export default function LandingV2({
             clipPath: heroVisible ? heroClipPath : expandedClipPath,
             WebkitClipPath: heroVisible ? heroClipPath : expandedClipPath,
             filter: heroVisible
-              ? 'drop-shadow(0 32px 70px rgba(15,23,42,0.28))'
+              ? 'drop-shadow(0 32px 70px rgba(15,23,42,0.22)) drop-shadow(0 12px 30px rgba(37,99,235,0.18))'
               : 'none',
           }}
           transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
@@ -107,6 +107,13 @@ export default function LandingV2({
               transition: 'all 1.1s cubic-bezier(0.22, 1, 0.36, 1)',
               borderRadius: heroVisible ? '50%' : 0,
               overflow: 'hidden',
+              background: heroVisible
+                ? 'radial-gradient(circle at 35% 35%, rgba(255,255,255,0.22) 0%, rgba(59,130,246,0.08) 38%, rgba(15,23,42,0.08) 100%)'
+                : 'transparent',
+              '& > *': {
+                width: '100%',
+                height: '100%',
+              },
             }}
           >
             <MapView
@@ -145,7 +152,8 @@ export default function LandingV2({
               sx={{
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(102deg, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.88) 46%, rgba(11,19,35,0.35) 72%, rgba(11,19,35,0.05) 90%, rgba(11,19,35,0) 100%)',
+                background:
+                  'linear-gradient(105deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.92) 46%, rgba(226,232,255,0.42) 68%, rgba(30,64,175,0.08) 82%, rgba(30,64,175,0) 100%)',
               }}
             />
 
@@ -165,8 +173,8 @@ export default function LandingV2({
                     inset: 0,
                     clipPath: heroClipPath,
                     WebkitClipPath: heroClipPath,
-                    background: 'radial-gradient(circle at 40% 38%, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0.14) 46%, rgba(15,23,42,0) 74%)',
-                    boxShadow: '0 28px 70px rgba(15,23,42,0.24)',
+                    background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.1) 55%, rgba(15,23,42,0) 100%)',
+                    boxShadow: '0 28px 70px rgba(15,23,42,0.18)',
                   }}
                 />
                 <Box
@@ -175,9 +183,9 @@ export default function LandingV2({
                     inset: 0,
                     clipPath: heroClipPath,
                     WebkitClipPath: heroClipPath,
-                    background: 'radial-gradient(circle at 70% 42%, rgba(59,130,246,0.22) 0%, rgba(59,130,246,0) 68%)',
-                    filter: 'blur(18px)',
-                    opacity: 0.75,
+                    background: 'radial-gradient(circle at 65% 45%, rgba(59,130,246,0.28) 0%, rgba(59,130,246,0) 72%)',
+                    filter: 'blur(22px)',
+                    opacity: 0.7,
                   }}
                 />
               </Box>

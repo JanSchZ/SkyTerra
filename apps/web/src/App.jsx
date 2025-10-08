@@ -199,10 +199,88 @@ function App() {
     setMapReady(true);
   }, []);
 
+  const exploreRevealOptions = useMemo(() => {
+    const results = initialPropertiesData?.results;
+    const coords = Array.isArray(results)
+      ? results
+          .map((property) => {
+            const lon = Number(property?.longitude);
+            const lat = Number(property?.latitude);
+            return Number.isFinite(lon) && Number.isFinite(lat) ? [lon, lat] : null;
+          })
+          .filter(Boolean)
+      : [];
+
+    if (!coords.length) {
+      return null;
+    }
+
+    const [firstLon, firstLat] = coords[0];
+    let minLon = firstLon;
+    let maxLon = firstLon;
+    let minLat = firstLat;
+    let maxLat = firstLat;
+
+    for (let i = 1; i < coords.length; i += 1) {
+      const [lon, lat] = coords[i];
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+
+    const center = [
+      (minLon + maxLon) / 2,
+      (minLat + maxLat) / 2,
+    ];
+
+    const spanLon = Math.abs(maxLon - minLon);
+    const spanLat = Math.abs(maxLat - minLat);
+
+    if (coords.length === 1 || (spanLon < 0.01 && spanLat < 0.01)) {
+      return {
+        center,
+        zoom: 9.2,
+        pitch: 48,
+        bearing: -12,
+        duration: 2400,
+      };
+    }
+
+    const bounds = [
+      [minLon, minLat],
+      [maxLon, maxLat],
+    ];
+
+    return {
+      bounds,
+      center,
+      pitch: 48,
+      bearing: -12,
+      duration: 2600,
+      padding: { top: 160, bottom: 220, left: 220, right: 260 },
+      zoom: 5.8,
+    };
+  }, [initialPropertiesData]);
+
   const animateMapReveal = useCallback(
     (options = {}) => {
-      const mapInstance = mapRef.current?.getMap?.();
+      const mapHandle = mapRef.current;
+      const mapInstance = mapHandle?.getMap?.() || mapHandle?.getMapInstance?.();
+      const bounds = options.bounds;
       let center = options.center;
+
+      if (!center && Array.isArray(bounds) && bounds.length === 2) {
+        const [[minLon, minLat], [maxLon, maxLat]] = bounds;
+        if (
+          Number.isFinite(minLon) &&
+          Number.isFinite(maxLon) &&
+          Number.isFinite(minLat) &&
+          Number.isFinite(maxLat)
+        ) {
+          center = [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
+        }
+      }
 
       if (!center && mapInstance) {
         try {
@@ -214,6 +292,21 @@ function App() {
       }
 
       const finalCenter = center || DEFAULT_MAP_CENTER;
+
+      if (bounds && mapInstance?.fitBounds) {
+        try {
+          mapInstance.fitBounds(bounds, {
+            padding: options.padding ?? 180,
+            duration: options.duration ?? 2200,
+            pitch: options.pitch ?? 48,
+            bearing: options.bearing ?? -8,
+            essential: true,
+          });
+          return;
+        } catch (error) {
+          console.warn('No se pudo ajustar los límites al revelar el mapa:', error);
+        }
+      }
 
       performMapFlyTo({
         center: finalCenter,
@@ -239,8 +332,9 @@ function App() {
   );
 
   const handleExplore = useCallback(() => {
-    revealMapFromHero();
-  }, [revealMapFromHero]);
+    const revealOptions = exploreRevealOptions || { zoom: 5.6, pitch: 50, bearing: -8, duration: 2400 };
+    revealMapFromHero(revealOptions);
+  }, [exploreRevealOptions, revealMapFromHero]);
 
   useEffect(() => {
     const loadUser = async () => {

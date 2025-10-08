@@ -459,8 +459,8 @@ const AISearchBar = ({
               {loading ? (
                 <Box
                   sx={{
-                    width: isHeroVariant ? 48 : 'auto',
-                    height: isHeroVariant ? 48 : 'auto',
+                    width: isHeroVariant ? 56 : 'auto',
+                    height: isHeroVariant ? 56 : 'auto',
                     display: 'grid',
                     placeItems: 'center',
                     backgroundColor: isHeroVariant ? 'rgba(15,23,42,0.04)' : 'transparent',
@@ -477,20 +477,22 @@ const AISearchBar = ({
                   onClick={handleSearch}
                   disabled={!query.trim()}
                   sx={{
-                    backgroundColor: isHeroVariant ? '#111827' : 'transparent',
+                    backgroundColor: isHeroVariant ? '#0f172a' : 'transparent',
                     color: isHeroVariant ? '#f8fafc' : 'rgba(255,255,255,0.7)',
-                    width: isHeroVariant ? 48 : 'auto',
-                    height: isHeroVariant ? 48 : 'auto',
+                    width: isHeroVariant ? 56 : 'auto',
+                    height: isHeroVariant ? 56 : 'auto',
                     borderRadius: isHeroVariant ? '999px' : 1,
                     transition: 'all 0.3s ease',
+                    boxShadow: isHeroVariant ? '0 18px 32px rgba(15,23,42,0.24)' : 'none',
                     '&:hover': {
-                      backgroundColor: isHeroVariant ? '#0b1220' : 'rgba(255,255,255,0.1)',
+                      backgroundColor: isHeroVariant ? '#111c30' : 'rgba(255,255,255,0.1)',
                       color: isHeroVariant ? '#ffffff' : 'rgba(255,255,255,0.9)',
                     },
                     '&:disabled': {
                       backgroundColor: isHeroVariant ? 'rgba(15,23,42,0.08)' : 'transparent',
                       color: isHeroVariant ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.3)',
                       cursor: 'not-allowed',
+                      boxShadow: 'none',
                     },
                   }}
                 >
@@ -504,28 +506,34 @@ const AISearchBar = ({
           isHeroVariant
             ? {
                 '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#ffffff',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.98) 100%)',
                   borderRadius: '999px',
-                  border: '1px solid rgba(15,23,42,0.06)',
-                  boxShadow: '0 22px 46px rgba(15,23,42,0.14)',
+                  border: '1px solid rgba(15,23,42,0.05)',
+                  boxShadow: '0 24px 58px rgba(15,23,42,0.12)',
                   transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                  paddingRight: '4px',
+                  minHeight: 68,
                   '& fieldset': { borderColor: 'transparent' },
                   '&:hover fieldset': { borderColor: 'transparent' },
                   '&.Mui-focused fieldset': { borderColor: 'transparent' },
-                  '&.Mui-focused': {
-                    boxShadow: '0 32px 60px rgba(15,23,42,0.16)',
+                  '&:hover': {
+                    boxShadow: '0 28px 64px rgba(15,23,42,0.14)',
                     transform: 'translateY(-1px)',
+                  },
+                  '&.Mui-focused': {
+                    boxShadow: '0 32px 70px rgba(15,23,42,0.16)',
+                    transform: 'translateY(-2px)',
                   },
                 },
                 '& .MuiOutlinedInput-input': {
                   color: '#0f172a',
-                  fontSize: '1.05rem',
-                  fontWeight: 400,
-                  padding: '18px 20px',
-                  paddingRight: '72px',
+                  fontSize: '1.08rem',
+                  fontWeight: 500,
+                  padding: '20px 26px',
+                  paddingRight: '92px',
                   fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
                   '::placeholder': {
-                    color: 'rgba(15,23,42,0.45)',
+                    color: 'rgba(15,23,42,0.38)',
                     opacity: 1,
                   },
                 },
