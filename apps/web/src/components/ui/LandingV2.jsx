@@ -1,9 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
 
-const earthImageUrl = 'https://upload.wikimedia.org/wikipedia/commons/c/cb/The_Blue_Marble_%28remastered%29.jpg';
+const HERO_ORBIT_VIEW = {
+  longitude: -65,
+  latitude: -18,
+  zoom: 1.65,
+  pitch: 48,
+  bearing: -18,
+};
 
 export default function LandingV2({
   mapRef,
@@ -16,6 +22,39 @@ export default function LandingV2({
 }) {
   const filters = useMemo(() => externalFilters || {}, [externalFilters]);
   const appliedFilters = useMemo(() => externalAppliedFilters || {}, [externalAppliedFilters]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  const handleMapReady = useCallback(() => {
+    setMapLoaded(true);
+    onMapReady?.();
+  }, [onMapReady]);
+
+  useEffect(() => {
+    if (!heroVisible || !mapLoaded) return;
+    const mapHandle = mapRef?.current;
+    if (!mapHandle) return;
+
+    const camera = {
+      center: [HERO_ORBIT_VIEW.longitude, HERO_ORBIT_VIEW.latitude],
+      zoom: HERO_ORBIT_VIEW.zoom,
+      pitch: HERO_ORBIT_VIEW.pitch,
+      bearing: HERO_ORBIT_VIEW.bearing,
+      duration: 1600,
+      essential: true,
+    };
+
+    try {
+      if (typeof mapHandle.flyTo === 'function') {
+        mapHandle.flyTo(camera);
+        return;
+      }
+
+      const internalMap = mapHandle.getMap?.();
+      internalMap?.flyTo(camera);
+    } catch (error) {
+      console.warn('No se pudo animar la vista inicial del héroe:', error);
+    }
+  }, [heroVisible, mapLoaded, mapRef]);
 
   return (
     <Box
@@ -46,8 +85,9 @@ export default function LandingV2({
             filters={filters}
             appliedFilters={appliedFilters}
             initialData={initialData}
+            initialViewState={HERO_ORBIT_VIEW}
             disableIntroAnimation={false}
-            onLoad={onMapReady}
+            onLoad={handleMapReady}
           />
         </motion.div>
       </Box>
@@ -72,7 +112,7 @@ export default function LandingV2({
               sx={{
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(110deg, #ffffff 0%, #ffffff 55%, rgba(8,17,40,0.92) 100%)',
+                background: 'linear-gradient(102deg, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.88) 46%, rgba(11,19,35,0.35) 72%, rgba(11,19,35,0.05) 90%, rgba(11,19,35,0) 100%)',
               }}
             />
 
@@ -155,26 +195,41 @@ export default function LandingV2({
                     display: { xs: 'none', md: 'flex' },
                     justifyContent: 'center',
                     alignItems: 'center',
+                    position: 'relative',
                   }}
                 >
                   <Box
                     sx={{
-                      width: { md: 360, lg: 420 },
-                      height: { md: 360, lg: 420 },
+                      width: { md: 380, lg: 440 },
+                      height: { md: 380, lg: 440 },
                       borderRadius: '50%',
-                      backgroundImage: `url(${earthImageUrl})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      boxShadow: '0 40px 90px rgba(15,23,42,0.45)',
                       position: 'relative',
-                      overflow: 'hidden',
+                      pointerEvents: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
                     <Box
                       sx={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 40% 35%, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 38%, rgba(15,23,42,0) 70%)',
+                        backdropFilter: 'blur(2px)',
+                        WebkitBackdropFilter: 'blur(2px)',
+                        boxShadow: '0 32px 70px rgba(15,23,42,0.28)',
+                        opacity: 0.95,
+                      }}
+                    />
+                    <Box
+                      sx={{
                         position: 'absolute',
-                        inset: 0,
-                        background: 'radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), transparent 60%)',
+                        inset: '-8%',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 70%)',
+                        filter: 'blur(24px)',
+                        opacity: 0.85,
                       }}
                     />
                   </Box>
