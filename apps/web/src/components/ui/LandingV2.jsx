@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
 
 const HERO_ORBIT_VIEW = {
-  longitude: -65,
-  latitude: -18,
-  zoom: 1.65,
-  pitch: 48,
-  bearing: -18,
+  longitude: -32,
+  latitude: -8,
+  zoom: 0.85,
+  pitch: 22,
+  bearing: -24,
 };
 
 export default function LandingV2({
@@ -56,8 +56,10 @@ export default function LandingV2({
     }
   }, [heroVisible, mapLoaded, mapRef]);
 
-  const heroClipPath =
-    'circle(clamp(180px, 28vw, 230px) at calc(100% - clamp(200px, 30vw, 260px)) 52%)';
+  const heroCircleRadius = 'clamp(180px, 28vw, 230px)';
+  const heroCircleCenterX = 'calc(100% - clamp(200px, 30vw, 260px))';
+  const heroCircleCenterY = '52%';
+  const heroClipPath = `circle(${heroCircleRadius} at ${heroCircleCenterX} ${heroCircleCenterY})`;
   const expandedClipPath = 'circle(160% at 50% 50%)';
 
   return (
@@ -89,9 +91,24 @@ export default function LandingV2({
               : 'none',
           }}
           transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: '100%', height: '100%', position: 'relative' }}
         >
-          <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: heroVisible
+                ? `calc(${heroCircleCenterY} - ${heroCircleRadius})`
+                : 0,
+              left: heroVisible
+                ? `calc(${heroCircleCenterX} - ${heroCircleRadius})`
+                : 0,
+              width: heroVisible ? `calc(${heroCircleRadius} * 2)` : '100%',
+              height: heroVisible ? `calc(${heroCircleRadius} * 2)` : '100%',
+              transition: 'all 1.1s cubic-bezier(0.22, 1, 0.36, 1)',
+              borderRadius: heroVisible ? '50%' : 0,
+              overflow: 'hidden',
+            }}
+          >
             <MapView
               ref={mapRef}
               filters={filters}
