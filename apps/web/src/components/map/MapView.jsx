@@ -143,6 +143,7 @@ const MapView = forwardRef(({
   initialGeoJsonBoundary,
   onLoad,
   disableIntroAnimation = false,
+  enableIdleRotation = true,
   embedded = false,
   height: embeddedHeight,
   onLocationSelect,
@@ -211,6 +212,23 @@ const MapView = forwardRef(({
   const recommendationsTourTimeoutRef = useRef(null);
   const idleRotationTimeoutRef = useRef(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (enableIdleRotation) return;
+
+    if (idleRotationTimeoutRef.current) {
+      clearTimeout(idleRotationTimeoutRef.current);
+      idleRotationTimeoutRef.current = null;
+    }
+
+    if (rotationFrameId.current) {
+      cancelAnimationFrame(rotationFrameId.current);
+      rotationFrameId.current = null;
+    }
+
+    rotationPrevTimeRef.current = null;
+    setIsRotating(false);
+  }, [enableIdleRotation]);
 
   const boundaryFeature = useMemo(() => {
     if (!propertyBoundaries) return null;
@@ -962,10 +980,12 @@ const MapView = forwardRef(({
         }
 
         // 5. Iniciar la rotación del globo.
-        setIsRotating(true);
+        if (enableIdleRotation) {
+          setIsRotating(true);
+        }
 
     }, 6600); // 100ms después de la duración del flyTo
-  }, [initialMapViewState, setAutoFlyCompleted, setIsRotating]);
+  }, [initialMapViewState, setAutoFlyCompleted, setIsRotating, enableIdleRotation]);
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
@@ -1247,6 +1267,14 @@ const MapView = forwardRef(({
     if (!isMapLoaded || !mapRef.current) return;
     const map = mapRef.current.getMap();
 
+    if (!enableIdleRotation) {
+      if (idleRotationTimeoutRef.current) {
+        clearTimeout(idleRotationTimeoutRef.current);
+        idleRotationTimeoutRef.current = null;
+      }
+      return;
+    }
+
     const onMoveStart = (e) => {
       if (e && e.originalEvent) {
         setIsRotating(false);
@@ -1263,7 +1291,7 @@ const MapView = forwardRef(({
         if (idleRotationTimeoutRef.current) clearTimeout(idleRotationTimeoutRef.current);
         idleRotationTimeoutRef.current = setTimeout(() => {
           const zoom = map.getZoom();
-          if (zoom <= 3.2 && !activeTourUrlRef.current) {
+          if (zoom <= 3.2 && !activeTourUrlRef.current && enableIdleRotation) {
             map.setPitch(0);
             map.setBearing(0);
             setIsRotating(true);
@@ -1279,10 +1307,18 @@ const MapView = forwardRef(({
       map.off('movestart', onMoveStart);
       map.off('moveend', onMoveEnd);
     };
-  }, [isMapLoaded]);
+  }, [isMapLoaded, enableIdleRotation]);
 
   // Rotación suave del globo a velocidad constante
   useEffect(() => {
+    if (!enableIdleRotation) {
+      if (rotationFrameId.current) {
+        cancelAnimationFrame(rotationFrameId.current);
+        rotationFrameId.current = null;
+      }
+      rotationPrevTimeRef.current = null;
+      return;
+    }
     const ROTATION_DEG_PER_SEC = 40; // velocidad alta para que se note claramente
 
     const step = (timestamp) => {
@@ -1316,7 +1352,7 @@ const MapView = forwardRef(({
       rotationFrameId.current = null;
       rotationPrevTimeRef.current = null;
     };
-  }, [isRotating]);
+  }, [isRotating, enableIdleRotation]);
 
   // Prefetch tours when zoom is moderate
   const prefetchToursInViewport = useCallback(async () => {
@@ -1364,12 +1400,12 @@ const MapView = forwardRef(({
       if (!mapRef.current) return;
       const map = mapRef.current.getMap();
       // Reprogramar rotación por inactividad tras cualquier movimiento
-      if (!activeTourUrlRef.current) {
+      if (enableIdleRotation && !activeTourUrlRef.current) {
         setIsRotating(false);
         if (idleRotationTimeoutRef.current) clearTimeout(idleRotationTimeoutRef.current);
         idleRotationTimeoutRef.current = setTimeout(() => {
           const zoom = map.getZoom();
-          if (zoom <= 3.2) {
+          if (zoom <= 3.2 && enableIdleRotation) {
             map.setPitch(0);
             map.setBearing(0);
             setIsRotating(true);
@@ -1441,7 +1477,7 @@ const MapView = forwardRef(({
         handleLoadMore(); // Call the memoized and stable handleLoadMore
       }
     }, 500);
-  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, prefetchToursInViewport, tourCache]);
+  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, prefetchToursInViewport, tourCache, enableIdleRotation]);
 
   const renderPropertyBoundaries = (property) => {
     const feature = toFeaturePolygon(property?.boundary_polygon);
@@ -1553,6 +1589,13 @@ const MapView = forwardRef(({
   }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted]);
 
   const scheduleIdleRotation = useCallback(() => {
+    if (!enableIdleRotation) {
+      if (idleRotationTimeoutRef.current) {
+        clearTimeout(idleRotationTimeoutRef.current);
+        idleRotationTimeoutRef.current = null;
+      }
+      return;
+    }
     if (idleRotationTimeoutRef.current) {
       clearTimeout(idleRotationTimeoutRef.current);
       idleRotationTimeoutRef.current = null;
@@ -1561,13 +1604,13 @@ const MapView = forwardRef(({
       if (!mapRef.current) return;
       const map = mapRef.current.getMap();
       const zoom = map.getZoom();
-      if (zoom <= 3.2 && !activeTourUrlRef.current) {
+      if (zoom <= 3.2 && !activeTourUrlRef.current && enableIdleRotation) {
         map.setPitch(0);
         map.setBearing(0);
         setIsRotating(true);
       }
     }, 7000);
-  }, []);
+  }, [enableIdleRotation]);
 
   const handleUserInteraction = useCallback((event) => {
     // Detectar si es una interacción genuina del usuario

@@ -98,7 +98,10 @@ export default function LandingV2({
               appliedFilters={appliedFilters}
               initialData={initialData}
               initialViewState={HERO_ORBIT_VIEW}
-              disableIntroAnimation={false}
+              disableIntroAnimation
+              embedded={heroVisible}
+              height={heroVisible ? '100%' : undefined}
+              enableIdleRotation={!heroVisible}
               onLoad={handleMapReady}
             />
           </Box>
