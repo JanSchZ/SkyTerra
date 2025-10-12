@@ -257,8 +257,18 @@ Instrucciones específicas:
 
         # Add conversation history if provided
         if conversation_history:
-            max_history = max(self.sam_config.max_history_messages, 0)
-            trimmed_history = conversation_history[-max_history:] if max_history else []
+            configured_history = getattr(self.sam_config, 'max_history_messages', None)
+            try:
+                configured_history = int(configured_history)
+            except (TypeError, ValueError):
+                configured_history = None
+
+            if not configured_history or configured_history <= 0:
+                # Si la configuración está vacía o se estableció en 0/negativo por error,
+                # mantenemos al menos un pequeño historial para preservar el contexto.
+                configured_history = 10
+
+            trimmed_history = conversation_history[-configured_history:]
             for msg in trimmed_history:
                 content = (msg.get("content") or "").strip()
                 if not content:
