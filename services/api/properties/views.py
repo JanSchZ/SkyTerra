@@ -1248,6 +1248,13 @@ class AISearchView(APIView):
 
             # Optional conversation context provided by the frontend
             conversation_history = request.data.get('conversation_history', [])
+            if isinstance(conversation_history, str):
+                try:
+                    conversation_history = json.loads(conversation_history)
+                except json.JSONDecodeError:
+                    conversation_history = []
+            if not isinstance(conversation_history, list):
+                conversation_history = []
 
             # Use the GeminiService to process the natural-language query and build the response
             gemini_service = GeminiService()
