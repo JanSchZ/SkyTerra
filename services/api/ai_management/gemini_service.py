@@ -36,6 +36,61 @@ class SamService:
         # Cache basic model lookup to minimize DB hits
         self._cached_models = None
         
+    def _extract_user_text(self, candidate, prefer_json=False):
+        """Extract the user-facing text from a Gemini candidate.
+        - If prefer_json=True, try to return the part that looks like JSON (used for tool-like outputs).
+        - Otherwise, pick the most likely final user message, avoiding chain-of-thought style text.
+        """
+        try:
+            parts = (candidate or {}).get('content', {}).get('parts', []) or []
+            texts = []
+            for part in parts:
+                t = part.get('text') if isinstance(part, dict) else None
+                if isinstance(t, str) and t.strip():
+                    texts.append(t.strip())
+
+            if not texts:
+                return ''
+
+            def looks_like_json(s: str) -> bool:
+                s2 = s.strip()
+                # Handle fenced blocks: ```json ... ``` or ``` ... ```
+                if s2.startswith('```') and s2.endswith('```'):
+                    inner = s2.strip('`').strip()
+                    # drop potential language hint at start (e.g., json)
+                    inner = inner.split('\n', 1)[-1] if '\n' in inner else inner
+                    s2 = inner.strip()
+                # Basic JSON detection
+                return (s2.startswith('{') and s2.endswith('}')) or (s2.startswith('[') and s2.endswith(']'))
+
+            if prefer_json:
+                for s in texts:
+                    if looks_like_json(s):
+                        return s
+                # fallback: pick the latest part that contains braces
+                for s in reversed(texts):
+                    if '{' in s and '}' in s:
+                        return s
+
+            # Avoid exposing deliberate/thinking content; prefer later parts
+            cot_markers = (
+                'razonamiento', 'pensamiento', 'chain of thought', 'rationale',
+                '<thinking', 'thinking:', 'analysis:', 'plan:'
+            )
+            for s in reversed(texts):
+                s_l = s.lower().strip()
+                if not any(m in s_l[:64] for m in cot_markers):
+                    return s
+
+            # If everything looks like analysis, return the last part
+            return texts[-1]
+        except Exception:
+            # Conservative fallback: best-effort extraction
+            try:
+                return candidate['content']['parts'][-1]['text']
+            except Exception:
+                return ''
+
     def _get_current_model(self):
         """Get the currently configured model for Sam"""
         if not self.sam_config.current_model:
@@ -126,8 +181,11 @@ class SamService:
             error_msg = f"Formato de respuesta inesperado: {data}"
             self._log_usage(model, 0, 0, 0, response_time_ms, False, error_msg, request_type, user)
             raise GeminiServiceError(error_msg)
-
-        text = data['candidates'][0]['content']['parts'][0]['text']
+        # Prefer JSON-like output for router/search/classification tasks
+        prefer_json = str(request_type).lower() in {
+            'router', 'search', 'ai_property_search', 'ai_property_classification'
+        }
+        text = self._extract_user_text(data['candidates'][0], prefer_json=prefer_json)
 
         # Estimate and log
         tokens_input = int(self._estimate_tokens(' '.join([p['parts'][0]['text'] for p in messages if p.get('parts')])))
@@ -184,6 +242,7 @@ Instrucciones específicas:
 - Proporciona información específica sobre propiedades cuando sea posible
 - Si no encuentras propiedades que coincidan con los criterios, sugiere alternativas
 - Mantén las respuestas concisas pero informativas
+- No muestres tu razonamiento ni pensamientos internos; entrega solo la respuesta final dirigida al usuario
 """
     
     def _get_property_context(self):
@@ -257,8 +316,18 @@ Instrucciones específicas:
 
         # Add conversation history if provided
         if conversation_history:
-            max_history = max(self.sam_config.max_history_messages, 0)
-            trimmed_history = conversation_history[-max_history:] if max_history else []
+            configured_history = getattr(self.sam_config, 'max_history_messages', None)
+            try:
+                configured_history = int(configured_history)
+            except (TypeError, ValueError):
+                configured_history = None
+
+            if not configured_history or configured_history <= 0:
+                # Si la configuración está vacía o se estableció en 0/negativo por error,
+                # mantenemos al menos un pequeño historial para preservar el contexto.
+                configured_history = 10
+
+            trimmed_history = conversation_history[-configured_history:]
             for msg in trimmed_history:
                 content = (msg.get("content") or "").strip()
                 if not content:
@@ -314,7 +383,11 @@ Instrucciones específicas:
                     if 'candidates' in response_data and response_data['candidates']:
                         candidate = response_data['candidates'][0]
                         if 'content' in candidate and 'parts' in candidate['content']:
-                            generated_text = candidate['content']['parts'][0]['text']
+                            # Prefer JSON for search/classification; otherwise user-facing chat text
+                            prefer_json = str(request_type).lower() in {
+                                'search', 'ai_property_search', 'ai_property_classification'
+                            }
+                            generated_text = self._extract_user_text(candidate, prefer_json=prefer_json)
                             
                             # Estimate tokens and calculate cost
                             tokens_input = self._estimate_tokens(system_prompt + user_message_clean)

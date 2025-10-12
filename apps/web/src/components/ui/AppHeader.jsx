@@ -22,21 +22,24 @@ const AppHeader = () => {
           pt: 2, // Padding top for some space from the edge
         }}
       >
-        <Toolbar sx={{ justifyContent: 'space-between', width: '100%', maxWidth: '1400px', mx: 'auto', px: 3 }}>
+        <Toolbar sx={{ justifyContent: 'space-between', width: '100%', maxWidth: '1400px', mx: 'auto', px: { xs: 2, md: 3 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography 
-              variant="h4" 
+            <Typography
+              variant="h5"
               component={RouterLink}
               to="/"
-              sx={{ 
-                color: 'white', 
+              sx={{
                 textDecoration: 'none',
-                fontWeight: 'bold',
-                fontFamily: "'Helvetica', Arial, sans-serif",
-                textShadow: '0 2px 10px rgba(0,0,0,0.4)'
+                fontFamily: 'Helvetica, Arial, sans-serif',
+                fontWeight: 400,
+                letterSpacing: { xs: '0.08em', md: '0.1em' },
+                textTransform: 'uppercase',
+                lineHeight: 1,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.35)'
               }}
             >
-              SkyTerra
+              SKYTERRA
             </Typography>
           </Box>
           <Box>

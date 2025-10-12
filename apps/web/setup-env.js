@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 
 /**
  * Script de configuración de variables de entorno para SkyTerra Frontend

@@ -1,12 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Container, Typography, Paper, TextField, Button, Grid, IconButton, Divider, CircularProgress, Alert } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Divider,
+  Grid,
+  IconButton,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from '@mui/material';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import { api, authService } from '../../services/api';
 import { loadStripe } from '@stripe/stripe-js';
 
-// Make sure to put your publishable key here
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+const UF_TO_USD = Number(import.meta.env.VITE_UF_TO_USD || 33);
+const formatUF = (value) => `${new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)} UF`;
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -19,36 +37,40 @@ const CheckoutPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [user, setUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
 
-  // Verificar autenticación al cargar la página
+  const pricing = plan?.pricing;
+
+  const totalUF = pricing?.totalUF || parseFloat(plan?.priceLabel || '0');
+  const usdAmount = useMemo(() => Number((totalUF * UF_TO_USD).toFixed(2)), [totalUF]);
+
   useEffect(() => {
-    const checkAuth = async () => {
+    const verifyAuth = async () => {
       try {
         setAuthChecking(true);
-        setError(''); // Limpiar errores previos
-        
+        setError('');
         const currentUser = await authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
-          if (import.meta.env.MODE === 'development') console.debug('✅ [Checkout] Usuario autenticado:', currentUser.email);
         } else {
-          if (import.meta.env.MODE === 'development') console.debug('❌ [Checkout] No hay usuario autenticado');
-          setError('Debes iniciar sesión para realizar pagos.');
-          // No redirigir inmediatamente, dejar que el usuario vea el error
+          setError('Debes iniciar sesión para continuar con el pago.');
         }
       } catch (err) {
-        console.error('❌ [Checkout] Error checking authentication:', err);
         setError('Error de autenticación. Por favor, inicia sesión nuevamente.');
-        // No redirigir inmediatamente, dejar que el usuario vea el error
       } finally {
         setAuthChecking(false);
       }
     };
 
-    checkAuth();
-  }, [navigate]);
+    verifyAuth();
+  }, []);
+
+  useEffect(() => {
+    setShowPaymentOptions(false);
+    setError('');
+  }, [plan?.title]);
 
   const handleApplyCoupon = async () => {
     if (!couponCode) {
@@ -75,38 +97,27 @@ const CheckoutPage = () => {
       setError('Debes iniciar sesión para realizar pagos.');
       return;
     }
+    if (!plan?.stripePriceId) {
+      setError('Este plan aún no tiene precio configurado en Stripe. Contáctanos para finalizar la compra.');
+      return;
+    }
 
     setPaymentLoading(true);
     setError('');
 
     try {
-      // Asegurar CSRF antes de enviar POST autenticados
       await authService.ensureCsrfCookie();
-
-      const payload = {};
-      if (plan && plan.priceId) payload.priceId = plan.priceId;
-      
-      if (import.meta.env.MODE === 'development') console.debug('🔐 [Payment] Usuario autenticado:', user.email);
-      if (import.meta.env.MODE === 'development') console.debug('🔐 [Payment] Enviando petición a Stripe...');
-      
-      const response = await api.post('/payments/create-checkout-session/', payload);
-
-      const session = response.data;
+      const response = await api.post('/payments/create-checkout-session/', { priceId: plan.stripePriceId });
       const stripe = await stripePromise;
-      const { error } = await stripe.redirectToCheckout({ sessionId: session.id });
-
-      if (error) {
-        setError(error.message);
+      const { error } = await stripe.redirectToCheckout({ sessionId: response.data.id });
+      if (error) setError(error.message);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      } else {
+        setError(err.response?.data?.error || 'Error al procesar el pago con tarjeta.');
       }
-         } catch (err) {
-       console.error('❌ [Payment Error]', err);
-       if (err.response?.status === 401) {
-         setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
-         // No redirigir automáticamente, dejar que el usuario vea el error
-       } else {
-         setError(err.response?.data?.error || 'Error al procesar el pago.');
-       }
-     } finally {
+    } finally {
       setPaymentLoading(false);
     }
   };
@@ -120,33 +131,21 @@ const CheckoutPage = () => {
     setPaymentLoading(true);
     setError('');
     try {
-      // Asegurar CSRF antes de enviar POST autenticados
       await authService.ensureCsrfCookie();
-
-      // Coinbase Commerce para Bitcoin (empresa establecida con compliance)
-      const usdAmount = 10; // TODO: mapear plan.price -> USD real si corresponde
       const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
-      
-      if (import.meta.env.MODE === 'development') console.debug('🔐 [Bitcoin Payment] Usuario autenticado:', user.email);
-      if (import.meta.env.MODE === 'development') console.debug('🔐 [Bitcoin Payment] Enviando petición a Coinbase...');
-      
       const response = await api.post('/payments/bitcoin/create-charge/', payload);
-      const { hostedUrl } = response.data;
-      window.location.href = hostedUrl;
-         } catch (err) {
-       console.error('❌ [Bitcoin Payment Error]', err);
-       if (err.response?.status === 401) {
-         setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
-         // No redirigir automáticamente, dejar que el usuario vea el error
-       } else {
-         setError(err.response?.data?.error || 'Error al procesar pago con Bitcoin.');
-       }
-     } finally {
+      window.location.href = response.data.hostedUrl;
+    } catch (err) {
+      if (err.response?.status === 401) {
+        setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      } else {
+        setError(err.response?.data?.error || 'Error al procesar el pago con Bitcoin.');
+      }
+    } finally {
       setPaymentLoading(false);
     }
   };
-  
-  // Mostrar loading mientras se verifica la autenticación
+
   if (authChecking) {
     return (
       <Container>
@@ -158,53 +157,6 @@ const CheckoutPage = () => {
     );
   }
 
-  // Mostrar error de autenticación con opción de reintentar
-  if (error && !user) {
-    return (
-      <Container>
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h5" gutterBottom color="error">
-            Error de Autenticación
-          </Typography>
-          <Typography variant="body1" sx={{ mb: 3 }}>
-            {error}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-            <Button 
-              variant="contained" 
-              onClick={() => {
-                setError('');
-                setAuthChecking(true);
-                // Reintentar verificación de autenticación
-                authService.getCurrentUser().then(currentUser => {
-                  if (currentUser) {
-                    setUser(currentUser);
-                  }
-                  setAuthChecking(false);
-                }).catch(err => {
-                  console.error('❌ [Checkout] Reintento fallido:', err);
-                  setError('Error de autenticación. Por favor, inicia sesión nuevamente.');
-                  setAuthChecking(false);
-                });
-              }}
-              sx={{ borderRadius: 2, fontWeight: 'bold' }}
-            >
-              Reintentar
-            </Button>
-            <Button 
-              variant="outlined" 
-              onClick={() => navigate('/login')}
-              sx={{ borderRadius: 2, fontWeight: 'bold' }}
-            >
-              Ir al Login
-            </Button>
-          </Box>
-        </Box>
-      </Container>
-    );
-  }
-
-  // Mostrar error si no hay plan o usuario
   if (!plan || !user) {
     return (
       <Container>
@@ -213,26 +165,17 @@ const CheckoutPage = () => {
             {!plan ? 'No se seleccionó ningún plan' : 'No estás autenticado'}
           </Typography>
           <Typography variant="body1" sx={{ mb: 3 }}>
-            {!plan 
+            {!plan
               ? 'Por favor, regresa a la página de precios y selecciona un plan.'
-              : 'Debes iniciar sesión para continuar con el proceso de pago.'
-            }
+              : 'Debes iniciar sesión para continuar con el proceso de pago.'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-            <Button 
-              variant="contained" 
-              onClick={() => navigate('/pricing')}
-              sx={{ borderRadius: 2, fontWeight: 'bold' }}
-            >
-              {!plan ? 'Ir a Precios' : 'Seleccionar Plan'}
+            <Button variant="contained" onClick={() => navigate('/pricing')} sx={{ borderRadius: 2, fontWeight: 'bold' }}>
+              Ir a planes
             </Button>
             {!user && (
-              <Button 
-                variant="outlined" 
-                onClick={() => navigate('/login')}
-                sx={{ borderRadius: 2, fontWeight: 'bold' }}
-              >
-                Iniciar Sesión
+              <Button variant="outlined" onClick={() => navigate('/login')} sx={{ borderRadius: 2, fontWeight: 'bold' }}>
+                Iniciar sesión
               </Button>
             )}
           </Box>
@@ -240,80 +183,157 @@ const CheckoutPage = () => {
       </Container>
     );
   }
-  
+
   return (
-    <Box sx={{ backgroundColor: 'white', minHeight: '100vh', py: 6 }}>
-      <Container maxWidth="md">
-        <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton onClick={() => navigate(-1)} aria-label="Volver">
-                <ArrowBackIosNewIcon />
-            </IconButton>
-            <Typography variant="body2" color="text.secondary">
-              Volver
-            </Typography>
+    <Box sx={{ backgroundColor: 'white', minHeight: '100vh', py: 8 }}>
+      <Container maxWidth="lg">
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton onClick={() => navigate(-1)} aria-label="Volver" sx={{ color: 'text.primary' }}>
+            <ArrowBackIosNewIcon />
+          </IconButton>
+          <Typography variant="body2" color="text.secondary">Volver</Typography>
         </Box>
-        <Typography variant="h3" component="h1" align="center" gutterBottom sx={{ fontWeight: 'bold' }}>
+
+        <Typography variant="h3" align="center" sx={{ fontWeight: 700, mb: 4 }}>
           Finalizar Compra
         </Typography>
-        <Grid container spacing={4}>
-            <Grid item xs={12} md={6}>
-                <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                    <Typography variant="h5" gutterBottom sx={{fontWeight: 'bold'}}>Resumen del Plan</Typography>
-                    <Divider sx={{ my: 2 }} />
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="h6">{plan.title}</Typography>
-                        <Typography variant="h6" sx={{fontWeight: 'bold'}}>{plan.price}</Typography>
-                    </Box>
-                    <Typography color="text.secondary">{plan.price_period} + IVA (calculado en el checkout)</Typography>
-                    
-                    <Divider sx={{ my: 2 }} />
 
-                    <Typography variant="h6" sx={{fontWeight: 'bold'}}>Total a Pagar</Typography>
-                    <Typography variant="h4" sx={{fontWeight: 'bold'}}>{plan.price}</Typography>
-                    <Typography color="text.secondary">El desglose final con impuestos y descuentos se mostrará en la página de pago.</Typography>
+        <Grid container spacing={4} justifyContent="center">
+          <Grid item xs={12} md={6} lg={5}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: '#E5E8F1', boxShadow: '0 18px 60px rgba(15, 23, 42, 0.08)' }}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>Resumen del plan</Typography>
+              <Divider sx={{ my: 2 }} />
 
-                    <Box component="form" noValidate sx={{ mt: 3 }}>
-                        <Typography variant="body1" sx={{mb: 1}}>¿Tienes un cupón de descuento?</Typography>
-                         <Typography variant="body2" color="text.secondary">Podrás ingresarlo directamente en la página de pago de Stripe.</Typography>
-                    </Box>
-                </Paper>
-            </Grid>
-            <Grid item xs={12} md={6}>
-                <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                    <Typography variant="h5" sx={{fontWeight: 'bold'}} gutterBottom>Información de Pago</Typography>
-                    <Typography>
-                        Serás redirigido a Stripe para completar tu suscripción de forma segura.
-                        Allí podrás usar Tarjeta, Apple Pay o Webpay.
-                    </Typography>
-                    <Button
-                        fullWidth
-                        variant="contained"
-                        color="primary"
-                        size="large"
-                        sx={{ mt: 3, borderRadius: 2, fontWeight: 'bold' }}
-                        onClick={handlePayment}
-                        disabled={paymentLoading}
-                    >
-                        {paymentLoading ? <CircularProgress size={24} color="inherit" /> : `Ir a Pagar`}
-                    </Button>
-                    <Button
-                        fullWidth
-                        variant="outlined"
-                        color="secondary"
-                        size="large"
-                        sx={{ mt: 2, borderRadius: 2, fontWeight: 'bold' }}
-                        onClick={handleBitcoinPayment}
-                        disabled={paymentLoading}
-                    >
-                        {paymentLoading ? <CircularProgress size={24} color="inherit" /> : `Pagar con Bitcoin`}
-                    </Button>
-                    {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-                </Paper>
-            </Grid>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>{plan.title}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{plan.audience}</Typography>
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="subtitle1">Total mensual</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{formatUF(totalUF)}</Typography>
+              </Box>
+
+              {plan.pricing?.originalUF && plan.pricing.originalUF !== plan.pricing.totalUF && (
+                <Typography variant="body2" color="success.main" sx={{ mb: 1 }}>
+                  Incluye {Math.round((1 - (plan.pricing.discountMultiplier || 1)) * 100)}% de descuento sobre el valor de lista.
+                </Typography>
+              )}
+
+              <Typography variant="caption" color="text.secondary">
+                El pago se procesa en UF + IVA. Stripe mostrará la conversión a tu moneda local.
+              </Typography>
+
+              {plan.pricing?.breakdown && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Distribución de publicaciones</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Tipo</TableCell>
+                        <TableCell align="right">Cantidad</TableCell>
+                        <TableCell align="right">UF c/u</TableCell>
+                        <TableCell align="right">Subtotal</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.values(plan.pricing.breakdown).map((item) => (
+                        item.quantity > 0 && (
+                          <TableRow key={item.key}>
+                            <TableCell>{item.label}</TableCell>
+                            <TableCell align="right">{item.quantity}</TableCell>
+                            <TableCell align="right">{formatUF(item.unitPrice)}</TableCell>
+                            <TableCell align="right">{formatUF(item.subtotalWithDiscount)}</TableCell>
+                          </TableRow>
+                        )
+                      ))}
+                      <TableRow>
+                        <TableCell colSpan={3}>Tarifa de plataforma</TableCell>
+                        <TableCell align="right">{formatUF(plan.pricing.platformFee || 0)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </Box>
+              )}
+
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Cupón</Typography>
+                <Typography variant="body2" color="text.secondary">Los cupones se ingresan directamente en Stripe.</Typography>
+                <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Código"
+                    value={couponCode}
+                    onChange={(event) => setCouponCode(event.target.value)}
+                  />
+                  <Button variant="outlined" onClick={handleApplyCoupon} disabled={loading}>Aplicar</Button>
+                </Box>
+                {success && <Alert severity="success" sx={{ mt: 1 }}>{success}</Alert>}
+              </Box>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={5}>
+            <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: '#E5E8F1', boxShadow: '0 18px 60px rgba(15, 23, 42, 0.08)' }}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>Información de pago</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Revisa los detalles y, cuando estés listo, continúa para elegir tu método de pago.
+              </Typography>
+
+              {!showPaymentOptions ? (
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  sx={{ mt: 4, borderRadius: 3, fontWeight: 700 }}
+                  onClick={() => {
+                    setShowPaymentOptions(true);
+                    setError('');
+                  }}
+                >
+                  Continuar a opciones de pago
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    sx={{ mt: 3, borderRadius: 3, fontWeight: 700 }}
+                    onClick={handlePayment}
+                    disabled={paymentLoading}
+                  >
+                    {paymentLoading ? <CircularProgress size={22} color="inherit" /> : 'Pagar con tarjeta (Stripe)'}
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    sx={{
+                      mt: 2,
+                      borderRadius: 3,
+                      fontWeight: 700,
+                      backgroundColor: '#F7931A',
+                      color: '#1a1a1a',
+                      '&:hover': { backgroundColor: '#ff9f28' },
+                    }}
+                    onClick={handleBitcoinPayment}
+                    disabled={paymentLoading}
+                  >
+                    {paymentLoading ? <CircularProgress size={22} color="inherit" /> : 'Pagar con Bitcoin'}
+                  </Button>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Monto estimado en USD: ${usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Typography>
+                </>
+              )}
+
+              {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            </Paper>
+          </Grid>
         </Grid>
       </Container>
     </Box>
   );
 };
 
-export default CheckoutPage; 
+export default CheckoutPage;

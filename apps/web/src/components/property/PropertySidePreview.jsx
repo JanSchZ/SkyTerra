@@ -1,9 +1,11 @@
-import React from 'react';
-import { Box, Typography, Button, IconButton, CardMedia, Paper, Snackbar, Alert } from '@mui/material';
+﻿import React from 'react';
+import { Box, Typography, Button, IconButton, CardMedia, Paper, Snackbar, Alert, Divider, Chip } from '@mui/material';
 import CircularPlusvalia from '../ui/CircularPlusvalia';
 import CloseIcon from '@mui/icons-material/Close';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { motion, AnimatePresence } from 'framer-motion';
 import { favoritesService } from '../../services/api';
 import { AuthContext } from '../../App';
@@ -17,25 +19,31 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
     let mounted = true;
     const checkFav = async () => {
       try {
-        if (!property?.id) { setIsSaved(false); return; }
-        if (!isAuthenticated) { setIsSaved(false); return; }
+        if (!property?.id || !isAuthenticated) {
+          setIsSaved(false);
+          return;
+        }
         const favs = await favoritesService.list();
         if (!mounted) return;
-        setIsSaved(!!favs.find((f) => (f.property === property.id) || (f.property_details && f.property_details.id === property.id)));
-      } catch (_) { setIsSaved(false); }
+        setIsSaved(Boolean(favs.find((f) => (f.property === property.id) || (f.property_details && f.property_details.id === property.id))));
+      } catch (_) {
+        setIsSaved(false);
+      }
     };
     checkFav();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [isAuthenticated, property?.id]);
 
   const toggleSave = async () => {
     if (!property?.id) return;
     if (!isAuthenticated) {
-      setSnackbar({ open: true, message: 'Inicia sesión para guardar propiedades.', severity: 'warning' });
+      setSnackbar({ open: true, message: 'Inicia sesion para guardar propiedades.', severity: 'warning' });
       return;
     }
     const next = !isSaved;
-    setIsSaved(next); // Optimistic update
+    setIsSaved(next);
     try {
       if (next) {
         await favoritesService.add(property.id);
@@ -45,16 +53,44 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
         if (fav) await favoritesService.remove(fav.id);
       }
     } catch (e) {
-      // If unauthorized, keep visual state as pressed; otherwise revert
       const status = e?.response?.status;
       if (status === 401) {
         setIsSaved(!next);
-        setSnackbar({ open: true, message: 'Inicia sesión para guardar propiedades.', severity: 'warning' });
+        setSnackbar({ open: true, message: 'Inicia sesion para guardar propiedades.', severity: 'warning' });
       } else if (status && status !== 401) {
         setIsSaved(!next);
       }
     }
   };
+
+  const priceLabelRaw = getPriceDisplay ? getPriceDisplay(property) : null;
+  const priceLabelClean = priceLabelRaw ? priceLabelRaw.replace(/\s*\/mes\s*$/, '') : 'N/D';
+
+  const locationLabel =
+    property?.location || [property?.municipality, property?.region].filter(Boolean).join(', ') || 'Ubicacion por confirmar';
+
+  const listingFallback =
+    property?.listing_type === 'rent'
+      ? 'Arriendo'
+      : property?.listing_type === 'both'
+        ? 'Venta / Arriendo'
+        : 'Venta';
+
+  const destinationLabel =
+    property?.zoning ||
+    property?.intended_use ||
+    property?.property_type ||
+    property?.type ||
+    listingFallback;
+
+  const typeBadgeLabel = property?.type || property?.property_type || listingFallback;
+
+  const featureSource = Array.isArray(property?.features)
+    ? property.features
+    : Array.isArray(property?.amenities)
+      ? property.amenities
+      : [];
+  const featureTags = featureSource.filter(Boolean).slice(0, 3);
 
   return (
     <AnimatePresence>
@@ -64,134 +100,238 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: -380, opacity: 0 }}
           transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-          style={{ position: 'absolute', top: 120, left: 16, zIndex: 1300 }}
+          style={{ position: 'absolute', top: 116, left: 18, zIndex: 1300 }}
         >
           <Paper
-            variant="glass"
-            elevation={6}
-            sx={{ width: 320, p: 2, backdropFilter:'blur(12px) saturate(120%)', WebkitBackdropFilter:'blur(12px) saturate(120%)', backgroundColor:'rgba(20,20,24,0.28)', border:'1px solid rgba(255,255,255,0.18)', display:'flex', flexDirection:'column', color:'#ffffff', boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }}
+            elevation={10}
+            sx={{
+              width: 360,
+              p: 2.4,
+              borderRadius: 3,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1.8,
+              background: 'radial-gradient(120% 120% at -10% -20%, rgba(25,35,52,0.94) 0%, rgba(12,17,27,0.88) 100%)',
+              color: '#f8fafc',
+              border: '1px solid rgba(148,163,184,0.18)',
+              boxShadow: '0 24px 48px rgba(8,12,20,0.6)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+            }}
           >
-            {/* Preview - 1:1 aspect ratio */}
-            <Box sx={{ position:'relative', width:'100%', height:280, mb:1.5, borderRadius:1, overflow:'hidden' }}>
+            <Box
+              sx={{
+                position: 'relative',
+                width: '100%',
+                height: 230,
+                borderRadius: 2,
+                overflow: 'hidden',
+                backgroundColor: 'rgba(9,13,22,0.6)',
+              }}
+            >
               {previewUrl ? (
                 <iframe
                   src={previewUrl}
                   width="100%"
                   height="100%"
-                  style={{ border: 'none' }}
+                  style={{ border: 'none', display: 'block' }}
                   allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
                   title="Tour Preview"
                 />
+              ) : property?.images?.length > 0 ? (
+                <CardMedia
+                  component="img"
+                  image={property.images[0].url}
+                  alt={property.name}
+                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
               ) : (
-                property?.images?.length > 0 && (
-                  <CardMedia component="img" image={property.images[0].url} alt={property.name} sx={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                )
-              )}
-              {/* Bookmark toggle */}
-              <IconButton 
-                onClick={toggleSave}
-                sx={{ 
-                  position:'absolute',
-                  top:8,
-                  left:10,
-                  padding:0,
-                  minWidth:0,
-                  backgroundColor:'rgba(0,0,0,0.25)',
-                  border:'1px solid rgba(255,255,255,0.18)',
-                  backdropFilter: 'blur(6px)',
-                  WebkitBackdropFilter: 'blur(6px)',
-                  borderRadius: '10px',
-                  color: isSaved ? '#ffffff' : 'rgba(255,255,255,0.85)',
-                  '&:hover':{ color: isSaved ? '#ffffff' : 'rgba(255,255,255,0.95)', backgroundColor: 'rgba(0,0,0,0.32)' },
-                  width: 44,
-                  height: 44,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                aria-label={isSaved ? 'Quitar de guardados' : 'Guardar'}
-              >
-                {isSaved ? (
-                  <BookmarkIcon sx={{ color:'#ffffff', fontSize: 28 }} />
-                ) : (
-                  <BookmarkBorderIcon sx={{ fontSize: 28 }} />
-                )}
-              </IconButton>
-              <IconButton 
-                onClick={onClose} 
-                sx={{ 
-                  position:'absolute',
-                  top:2,
-                  right:2,
-                  width:28,
-                  height:28,
-                  padding:0,
-                  minWidth:0,
-                  backgroundColor:'transparent',
-                  color:'rgba(255,255,255,0.9)',
-                  '&:hover':{ backgroundColor:'rgba(255,255,255,0.06)' }
-                }}
-              >
-                <CloseIcon fontSize="small" sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Box>
-
-            {/* Details in two-column layout */}
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            {/* Left column - Property details */}
-              <Box sx={{ flex: 1 }}>
-              { /* normalize price label to remove "/mes" */ }
-              { /* priceLabelClean computed below in render scope */ }
-              
-                <Box sx={{ display:'inline-block', mb:0.75, px:1, py:0.5, borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight:500, fontSize: '0.95rem', color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.01em' }}>{property.name}</Typography>
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, rgba(14,23,33,0.85), rgba(20,32,48,0.65))',
+                    color: 'rgba(226,232,240,0.75)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  Vista no disponible
                 </Box>
-                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: 'rgba(255,255,255,0.88)' }}>
-                  Precio: {getPriceDisplay ? getPriceDisplay(property).replace(/\s*\/mes\s*$/, '') : 'N/D'}
-                </Typography>
-                <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem', color: 'rgba(255,255,255,0.88)' }}>Tamaño: {Number(property.size).toLocaleString('es-CL')} ha</Typography>
-                {property.bedrooms && (
-                  <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Dormitorios: {property.bedrooms}</Typography>
-                )}
-                {property.bathrooms && (
-                  <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Baños: {property.bathrooms}</Typography>
-                )}
-                {property.parking_spaces && (
-                  <Typography variant="body2" sx={{ mb:0.5, fontSize: '0.8rem' }}>Estacionamientos: {property.parking_spaces}</Typography>
-                )}
+              )}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(180deg, rgba(10,14,22,0.05) 0%, rgba(10,14,22,0.78) 72%, rgba(10,14,22,0.92) 100%)',
+                }}
+              />
+              {typeBadgeLabel && (
+                <Chip
+                  label={typeBadgeLabel}
+                  size="small"
+                  sx={{
+                    position: 'absolute',
+                    top: 14,
+                    left: 14,
+                    backgroundColor: 'rgba(16,185,129,0.2)',
+                    color: '#bbf7d0',
+                    borderRadius: '999px',
+                    fontWeight: 500,
+                    textTransform: 'capitalize',
+                    border: '1px solid rgba(45,212,191,0.35)',
+                    backdropFilter: 'blur(8px)',
+                  }}
+                />
+              )}
+              <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 1 }}>
+                <IconButton
+                  onClick={toggleSave}
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    color: isSaved ? '#f1f5f9' : 'rgba(248,250,252,0.9)',
+                    backgroundColor: 'rgba(6,11,19,0.55)',
+                    border: '1px solid rgba(148,163,184,0.25)',
+                    backdropFilter: 'blur(8px)',
+                    '&:hover': { backgroundColor: 'rgba(12,18,30,0.72)' },
+                  }}
+                  aria-label={isSaved ? 'Quitar de guardados' : 'Guardar'}
+                >
+                  {isSaved ? <BookmarkIcon sx={{ fontSize: 22 }} /> : <BookmarkBorderIcon sx={{ fontSize: 22 }} />}
+                </IconButton>
+                <IconButton
+                  onClick={onClose}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    color: 'rgba(248,250,252,0.88)',
+                    backgroundColor: 'rgba(15,23,42,0.45)',
+                    border: '1px solid rgba(148,163,184,0.2)',
+                    backdropFilter: 'blur(8px)',
+                    '&:hover': { backgroundColor: 'rgba(30,41,59,0.65)' },
+                  }}
+                  aria-label="Cerrar"
+                >
+                  <CloseIcon sx={{ fontSize: 18 }} />
+                </IconButton>
               </Box>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 18,
+                  right: 18,
+                  bottom: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.5,
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontSize: '1.05rem',
+                    fontWeight: 600,
+                    color: 'rgba(248,250,252,0.95)',
+                    letterSpacing: '-0.01em',
+                    lineHeight: 1.22,
+                  }}
+                >
+                  {property.name}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: 'rgba(226,232,240,0.85)' }}>
+                  <PlaceOutlinedIcon sx={{ fontSize: 18 }} />
+                  <Typography variant="body2" sx={{ fontSize: '0.82rem' }}>
+                    {locationLabel}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
 
-              {/* Right column - Plusvalía score */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ fontSize: '1.15rem', fontWeight: 600, color: '#e0f2fe', letterSpacing: '-0.01em' }}
+                >
+                  {priceLabelClean}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(148,163,184,0.88)', fontSize: '0.82rem' }}>
+                  {destinationLabel}
+                </Typography>
+              </Box>
               {property.plusvalia_score !== undefined && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 0.5 }}>
-                  <CircularPlusvalia value={Number(property.plusvalia_score)} size={56} strokeWidth={6} />
-                  <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.8)', mt: 0.5, textAlign: 'center' }}>Plusvalía</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4 }}>
+                  <CircularPlusvalia value={Number(property.plusvalia_score)} size={60} strokeWidth={6} />
+                  <Typography variant="caption" sx={{ color: 'rgba(148,163,184,0.85)' }}>
+                    Plusvalia
+                  </Typography>
                 </Box>
               )}
             </Box>
 
-            {/* Centered button */}
-            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-              <Button 
-                variant="contained" 
-                size="small"
-                onClick={onGo}
-                sx={{ 
-                  minWidth: '80px',
-                  px: 3,
-                  py: 1,
-                  backgroundColor: 'rgba(0,0,0,0.35)',
-                  color: '#ffffff',
-                  border: '1px solid rgba(255,255,255,0.20)',
-                  backdropFilter: 'blur(6px)',
-                  WebkitBackdropFilter: 'blur(6px)',
-                  boxShadow: '0 6px 18px rgba(0,0,0,0.18)',
-                  '&:hover': { backgroundColor: 'rgba(0,0,0,0.5)', boxShadow: '0 8px 24px rgba(0,0,0,0.26)' }
+            <Divider sx={{ borderColor: 'rgba(148,163,184,0.18)' }} />
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1.1 }} />
+
+            {featureTags.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {featureTags.map((tag) => (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    size="small"
+                    sx={{
+                      backgroundColor: 'rgba(59,130,246,0.16)',
+                      color: '#dbeafe',
+                      borderRadius: '999px',
+                      border: '1px solid rgba(96,165,250,0.32)',
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {property?.description && (
+              <Typography
+                variant="body2"
+                sx={{
+                  color: 'rgba(226,232,240,0.85)',
+                  lineHeight: 1.45,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
                 }}
               >
-                Ir
-              </Button>
-            </Box>
+                {property.description}
+              </Typography>
+            )}
+
+            <Button
+              variant="contained"
+              size="large"
+              onClick={onGo}
+              endIcon={<ArrowForwardIcon fontSize="small" />}
+              sx={{
+                mt: 0.6,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+                py: 1.05,
+                background: 'linear-gradient(90deg, #38bdf8 0%, #22d3ee 100%)',
+                color: '#04111f',
+                boxShadow: '0 16px 32px rgba(56,189,248,0.32)',
+                '&:hover': {
+                  background: 'linear-gradient(90deg, #0ea5e9 0%, #14b8a6 100%)',
+                  boxShadow: '0 18px 36px rgba(34,211,238,0.45)',
+                },
+              }}
+            >
+              Explorar terreno
+            </Button>
           </Paper>
           <Snackbar
             open={snackbar.open}
@@ -199,7 +339,12 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
             onClose={() => setSnackbar({ ...snackbar, open: false })}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
           >
-            <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled" sx={{ width: '100%' }}>
+            <Alert
+              onClose={() => setSnackbar({ ...snackbar, open: false })}
+              severity={snackbar.severity}
+              variant="filled"
+              sx={{ width: '100%' }}
+            >
               {snackbar.message}
             </Alert>
           </Snackbar>
@@ -209,4 +354,4 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
   );
 };
 
-export default PropertySidePreview; 
+export default PropertySidePreview;

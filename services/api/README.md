@@ -21,6 +21,14 @@ See `.env.example` for a complete list. Key settings:
 - `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS` → frontend domains (Vercel + custom domain).
 - `USE_S3=True` with the `AWS_*` variables to store media in Cloudflare R2 / AWS S3.
 - `MEDIA_UPLOADS_PREFIX` → base key prefix for presigned uploads.
+- `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` → optional bootstrap superuser. When `CREATE_ADMIN_ON_STARTUP=1`
+  the new Docker entrypoint runs `python manage.py create_default_admin` so production deployments
+  (Railway, Docker Compose, etc.) can provision the admin account without hardcoding secrets.
+  Store these values as environment variables in your hosting provider.
+
+The container entrypoint automatically runs database migrations and `collectstatic` when
+`SKYTERRA_RUN_MIGRATIONS=1` / `SKYTERRA_COLLECTSTATIC=1` (enabled by default in production examples).
+Override those flags to skip steps during development builds.
 
 ## Deployment targets
 - **Railway:** set Monorepo root to `services/api`, build with Nixpacks or the local `Dockerfile`.

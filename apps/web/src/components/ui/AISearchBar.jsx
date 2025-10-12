@@ -244,7 +244,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
           const parsed = stored ? JSON.parse(stored) : [];
           if (Array.isArray(parsed)) conversationHistory = parsed;
         }
-      } catch (_) {}
+      } catch (error) { void error; }
       const response = await api.post('/ai-search/', { query: searchTerm, conversation_history: conversationHistory });
       if (response.data && typeof response.data === 'object') {
         const { assistant_message, suggestedFilters, interpretation, recommendations, flyToLocation, search_mode } = response.data;
@@ -420,7 +420,7 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
           'data-lpignore': 'true',
           'data-form-type': 'other'
         }}
-        onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'off'); e.target.setAttribute('autocorrect','off'); e.target.setAttribute('autocapitalize','none'); } catch(_){} }}
+        onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'off'); e.target.setAttribute('autocorrect','off'); e.target.setAttribute('autocapitalize','none'); } catch (error) { void error; } }}
         InputProps={{
           endAdornment: loading ? (
             <InputAdornment position="end">

@@ -94,8 +94,6 @@ export default function Dashboard({ user }) {
     </Paper>
   );
 
-  const propertyLimitReached = user?.seller_type === 'individual' && myProperties && myProperties.length >= 3;
-
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" sx={{ mb: 3 }}>
@@ -152,24 +150,6 @@ export default function Dashboard({ user }) {
             </Paper>
           </Grid>
 
-          {/* Card: Crear nueva publicación */}
-          <Grid item xs={12} md={6} lg={4}>
-            <Paper variant="glass" sx={{ p: 3, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-              <Typography variant="subtitle1" color="text.secondary">¿Nuevo terreno para publicar?</Typography>
-              <Button
-                variant="contained"
-                sx={{ mt:2 }}
-                disabled={propertyLimitReached}
-                onClick={()=>navigate('/new-publication')}
-              >
-                {propertyLimitReached ? 'Límite alcanzado' : 'Crear nueva publicación'}
-              </Button>
-              {propertyLimitReached && (
-                <Typography variant="caption" sx={{mt:1, color:'warning.main'}}>Límite de 3 publicaciones para cuenta individual.</Typography>
-              )}
-            </Paper>
-          </Grid>
-
           {/* Card: Búsquedas Guardadas */}
           <Grid item xs={12} md={6} lg={4}>
             <Paper variant="glass" sx={{ p: 3 }}>
@@ -183,7 +163,7 @@ export default function Dashboard({ user }) {
 
       {/* Mis Propiedades Panel */}
       {tab === 1 && (
-        <SellerPropertiesManager onCreateNew={()=>navigate('/new-publication')} onError={()=>{}} />
+        <SellerPropertiesManager onError={()=>{}} />
       )}
 
       {/* Saved Searches Panel */}

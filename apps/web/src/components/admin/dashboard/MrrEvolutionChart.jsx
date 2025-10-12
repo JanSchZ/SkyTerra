@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { Box, Typography } from '@mui/material';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -26,14 +25,7 @@ ChartJS.register(
   Filler
 );
 
-const GlassCard = styled(Card)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.2)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    height: '100%',
-}));
+import { glassCard } from '../adminV2Theme';
 
 const MrrEvolutionChart = () => {
     const [dataset, setDataset] = useState({ labels: [], datasets: [] });
@@ -64,7 +56,7 @@ const MrrEvolutionChart = () => {
               tension: 0.4,
             }]
           });
-        } catch (_) {
+        } catch {
           setDataset({ labels: [], datasets: [] });
         }
       })();
@@ -75,7 +67,7 @@ const MrrEvolutionChart = () => {
         legend: {
           position: 'top',
           labels: {
-            color: '#212121',
+            color: 'rgba(248,251,255,0.78)',
             font: {
               weight: 'normal',
             }
@@ -88,7 +80,7 @@ const MrrEvolutionChart = () => {
       scales: {
         x: {
           ticks: {
-            color: '#555555',
+            color: 'rgba(248,251,255,0.6)',
             font: {
               weight: 'normal',
             }
@@ -96,10 +88,13 @@ const MrrEvolutionChart = () => {
         },
         y: {
           ticks: {
-            color: '#555555',
+            color: 'rgba(248,251,255,0.6)',
             font: {
               weight: 'normal',
             }
+          },
+          grid: {
+            color: 'rgba(248,251,255,0.08)',
           }
         }
       }
@@ -108,12 +103,12 @@ const MrrEvolutionChart = () => {
     const data = dataset;
 
     return (
-        <GlassCard>
-            <CardContent>
-                <Typography variant="h6" gutterBottom sx={{color:'text.primary', fontWeight:'bold'}}>Nuevas Propiedades (últimos días)</Typography>
-                <Line options={options} data={data} />
-            </CardContent>
-        </GlassCard>
+      <Box sx={{ ...glassCard({ height: '100%' }), color: '#f8fbff' }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+          Nuevas Propiedades (últimos días)
+        </Typography>
+        <Line options={options} data={data} />
+      </Box>
     );
 };
 

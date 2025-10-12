@@ -1,131 +1,220 @@
 import React from 'react';
-import { Box, Typography, Container, Grid, ToggleButton, ToggleButtonGroup, Paper, IconButton } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Container,
+  Grid,
+  ToggleButton,
+  ToggleButtonGroup,
+  IconButton,
+} from '@mui/material';
 import { motion } from 'framer-motion';
-import PricingCard from './PricingCard';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import { useNavigate } from 'react-router-dom';
+import PricingCard from './PricingCard';
+import PlanDetailDialog from './PlanDetailDialog';
+
+const UF_FORMAT = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+
+const PROPERTY_TYPES = [
+  { key: 'basic', label: 'Publicación Básica', unitPrice: 1.5, description: 'Cobertura esencial: fotos aéreas y ficha optimizada.' },
+  { key: 'advanced', label: 'Publicación Avanzada', unitPrice: 3, description: 'Video 4K y storytelling listo para redes sociales.' },
+  { key: 'pro', label: 'Publicación Pro', unitPrice: 9, description: 'Asset kit completo para campañas, brokers y presentaciones.' },
+];
+
+const computeRanges = ({ maxListings, discountMultiplier = 1, platformFee = 0 }) => {
+  if (!maxListings) return null;
+  const baseMin = PROPERTY_TYPES[0].unitPrice * maxListings;
+  const baseMax = PROPERTY_TYPES[PROPERTY_TYPES.length - 1].unitPrice * maxListings;
+
+  return {
+    original: {
+      min: baseMin + platformFee,
+      max: baseMax + platformFee,
+    },
+    discounted: {
+      min: baseMin * discountMultiplier + platformFee,
+      max: baseMax * discountMultiplier + platformFee,
+    },
+  };
+};
+
+const mapPlansWithRange = (plans) =>
+  plans.map((plan) => {
+    if (!plan.maxListings) return plan;
+    const ranges = computeRanges(plan);
+    return { ...plan, ranges };
+  });
 
 const particularPlans = [
   {
+    id: 'basic',
+    tier: 'particular',
     title: 'Básico',
-    price: '1,5 UF',
-    price_period: '/ mensual',
-    priceId: '',
+    priceLabel: '1.5 UF',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_BASIC || null,
     features: [
-      '1 Aviso activo',
-      'Tour 360 con 2 vistas aéreas',
-      'Estadísticas de publicación',
-      'Alertas E-mail',
+      'Tour 360 + 2 vistas aéreas',
+      'Publicación destacada en SkyTerra',
+      'Seguimiento de leads por correo',
     ],
+    audience: 'Dueños particulares que dan su primer paso digital.',
+    summary: 'Contenido esencial para validar el terreno y compartirlo con tu red.',
+    story: 'Incluye producción aérea básica y ficha optimizada para captar los primeros interesados.',
   },
   {
+    id: 'advanced',
+    tier: 'particular',
     title: 'Avanzado',
-    price: '3 UF',
-    price_period: '/ mensual',
-    priceId: '',
+    priceLabel: '3 UF',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ADVANCED || null,
     features: [
-      '1 Aviso activo',
       'Tour virtual con 5 vistas aéreas',
-      'Video aéreo 4k',
-      'Publicación de loteo',
-      'Estadísticas de publicación',
+      'Video aéreo 4K editado',
+      'Destacado premium dentro del marketplace',
     ],
     isFeatured: true,
+    audience: 'Dueños que buscan acelerar la venta con storytelling completo.',
+    summary: 'Mejor posicionamiento en SkyTerra y contenido listo para redes sociales.',
+    story: 'Creamos un video highlight y guiamos la promoción para captar visitas calificadas.',
   },
   {
+    id: 'pro',
+    tier: 'particular',
     title: 'Pro',
-    price: '9 UF',
-    price_period: '/ mensual',
-    priceId: '',
+    priceLabel: '9 UF',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_PRO || null,
     features: [
-      'Todo lo de Avanzado +',
       '7 vistas aéreas + 10 terrestres',
-      'Publicación de loteo sin límites',
-      'Marketing en RRSS',
-      'Métricas Avanzadas',
-      'Publicación en Newsletter',
+      'Pack de contenido para marketing digital',
+      'Remarketing y newsletter a la comunidad SkyTerra',
     ],
+    audience: 'Propietarios con terrenos premium o proyectos estratégicos.',
+    summary: 'Cobertura total del terreno y distribución omnicanal.',
+    story: 'Recibes un asset kit completo listo para campañas, brokers y presentaciones.',
   },
 ];
 
-const profesionalPlans = [
-    {
-      title: 'Start',
-      price: 'Desde 5 UF',
-      price_period: '/ mensual',
-      priceId: '',
-      features: [
-        'Hasta 3 avisos activos',
-        'Gestión y datos de propiedades',
-        'Tarifa de plataforma: 0.5 UF',
-        'Publicación Simple/Avanzada/Pro',
-      ],
-    },
-    {
-      title: 'Growth',
-      price: 'Desde 13 UF',
-      price_period: '/ mensual',
-      priceId: '',
-      features: [
-        'Hasta 10 avisos activos',
-        'Gestión y datos de propiedades',
-        'Reporte comparativo de precios',
-        'Precios con 20% de descuento',
-        'Tarifa de plataforma: 1 UF'
-      ],
-      isFeatured: true,
-    },
-    {
-      title: 'Enterprise',
-      price: 'Desde 36.5 UF',
-      price_period: '/ mensual',
-      priceId: '',
-      features: [
-        'Hasta 30 avisos activos',
-        'Función TEAMS para equipos',
-        'Reportes de rendimiento',
-        'Soporte en tiempo real',
-        'Precios con 30% de descuento',
-        'Tarifa de plataforma: 5 UF'
-      ],
-    },
+const professionalPlans = [
+  {
+    id: 'start',
+    tier: 'professional',
+    title: 'Start',
+    maxListings: 3,
+    platformFee: 0.5,
+    discountMultiplier: 1,
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_START || null,
+    features: [
+      'Hasta 3 terrenos activos',
+      'Ficha y métricas centralizadas',
+      'Seguimiento simple de clientes y tours',
+    ],
+    audience: 'Brokers independientes o micro oficinas que digitalizan su cartera.',
+    summary: 'Plan flexible para comenzar a escalar tus publicaciones con contenido profesional.',
+    story: 'Crea fichas completas y comparte el material con inversionistas desde un único panel.',
+  },
+  {
+    id: 'growth',
+    tier: 'professional',
+    title: 'Growth',
+    maxListings: 10,
+    platformFee: 1,
+    discountMultiplier: 0.8,
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_GROWTH || null,
+    features: [
+      'Hasta 10 terrenos activos',
+      'Pricing comparativo inteligente',
+      'Integración con CRM y equipo colaborativo',
+    ],
+    isFeatured: true,
+    audience: 'Equipos boutique con stock rotativo que necesitan pricing y velocidad comercial.',
+    summary: '20% de descuento unitario por publicación + herramientas de análisis comparativo.',
+    story: 'Analiza la demanda, optimiza precios y colabora con tu equipo en tiempo real.',
+  },
+  {
+    id: 'enterprise',
+    tier: 'professional',
+    title: 'Enterprise',
+    maxListings: 30,
+    platformFee: 5,
+    discountMultiplier: 0.7,
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE || null,
+    features: [
+      'Hasta 30 terrenos activos con TEAMS',
+      'Forecast y reportes personalizados',
+      'Soporte prioritario y workshops de marketing',
+    ],
+    audience: 'Desarrolladores y captadores corporativos con proyectos complejos.',
+    summary: '30% de descuento unitario, soporte dedicado y herramientas de colaboración a escala.',
+    story: 'Coordina grandes equipos, controla el performance en tiempo real y mantén tu pipeline abastecido.',
+  },
 ];
 
 const PricingPage = () => {
   const navigate = useNavigate();
   const [planType, setPlanType] = React.useState('particular');
+  const [dialogPlan, setDialogPlan] = React.useState(null);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
 
   const handlePlanTypeChange = (event, newPlanType) => {
-    if (newPlanType !== null) {
-      setPlanType(newPlanType);
+    if (newPlanType !== null) setPlanType(newPlanType);
+  };
+
+  const plansRaw = planType === 'particular' ? particularPlans : professionalPlans;
+  const plans = mapPlansWithRange(plansRaw);
+  const title = planType === 'particular' ? 'Para Dueños Particulares' : 'Para Vendedores Profesionales';
+
+  const handleSelectPlan = (plan) => {
+    if (plan.tier === 'professional') {
+      setDialogPlan(plan);
+      setDialogOpen(true);
+    } else {
+      navigate('/checkout', {
+        state: {
+          plan: {
+            ...plan,
+            pricing: {
+              totalUF: parseFloat(plan.priceLabel),
+              breakdown: null,
+              platformFee: 0,
+              discountMultiplier: 1,
+            },
+            propertyTypes: PROPERTY_TYPES,
+          },
+        },
+      });
     }
   };
 
-  const plans = planType === 'particular' ? particularPlans : profesionalPlans;
-  const title = planType === 'particular' ? 'Para Dueños Particulares' : 'Para Vendedores Profesionales';
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+    setDialogPlan(null);
+  };
+
+  const handleDialogConfirm = (payload) => {
+    setDialogOpen(false);
+    setDialogPlan(null);
+    navigate('/checkout', { state: { plan: payload } });
+  };
 
   return (
-<Box sx={{ 
-  backgroundColor: 'white',
-  minHeight: '100vh', 
-  py: 6, 
-  color: 'text.primary',
-}}>
-      <Container maxWidth={false}>
+    <Box sx={{ backgroundColor: 'white', minHeight: '100vh', py: 6 }}>
+      <Container maxWidth="xl">
         <Box sx={{ mb: 2 }}>
           <IconButton onClick={() => navigate(-1)} aria-label="Volver" sx={{ color: 'text.primary' }}>
             <ArrowBackIosNewIcon />
           </IconButton>
         </Box>
+
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <Typography variant="h3" component="h1" align="center" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+          <Typography variant="h3" align="center" sx={{ fontWeight: 700, mb: 1 }}>
             Planes de Suscripción
           </Typography>
-          <Typography variant="h6" align="center" color="text.secondary" paragraph sx={{ mb: 4 }}>
-            Elige el plan que mejor se adapte a tus necesidades.
+          <Typography variant="h6" align="center" color="text.secondary" sx={{ mb: 4, maxWidth: 720, mx: 'auto' }}>
+            Selecciona el plan que mejor se adapte a tu contexto. Calcula cuántos terrenos necesitas publicar y revisa qué incluye cada paquete.
           </Typography>
         </motion.div>
-        
+
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 6 }}>
           <ToggleButtonGroup
             value={planType}
@@ -133,51 +222,78 @@ const PricingPage = () => {
             onChange={handlePlanTypeChange}
             aria-label="tipo de plan"
             sx={{
+              backgroundColor: '#f5f7fb',
+              borderRadius: 999,
               '& .MuiToggleButton-root': {
-                color: 'text.secondary',
-                borderColor: 'rgba(255, 255, 255, 0.23)',
-                textTransform: 'none',
-                fontSize: '1rem',
+                border: 'none',
                 px: 3,
                 py: 1,
+                textTransform: 'none',
+                fontWeight: 600,
+                color: 'text.secondary',
                 '&.Mui-selected': {
-                  color: 'primary.main',
-                  backgroundColor: 'rgba(144, 202, 249, 0.16)',
-                  fontWeight: 'bold',
+                  color: '#0b3d86',
+                  backgroundColor: 'white',
+                  boxShadow: '0px 8px 20px rgba(13, 60, 133, 0.12)',
                 },
               },
             }}
           >
-            <ToggleButton value="particular" aria-label="dueño particular">
-              Dueño Particular
-            </ToggleButton>
-            <ToggleButton value="profesional" aria-label="vendedor profesional">
-              Vendedor Profesional
-            </ToggleButton>
+            <ToggleButton value="particular">Dueño Particular</ToggleButton>
+            <ToggleButton value="professional">Vendedor Profesional</ToggleButton>
           </ToggleButtonGroup>
         </Box>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }}>
-        <Typography variant="h4" component="h2" align="center" gutterBottom sx={{ mb: 4, fontWeight: 600, color: 'text.primary' }}>
+          <Typography variant="h4" align="center" sx={{ fontWeight: 600, mb: 6 }}>
             {title}
           </Typography>
         </motion.div>
 
-        <Grid container spacing={3} alignItems="stretch" justifyContent="center" sx={{ maxWidth: '1300px', margin: '0 auto', flexWrap: 'nowrap' }}>
+        <Grid
+          container
+          spacing={{ xs: 2, md: 3 }}
+          justifyContent="center"
+          sx={{
+            maxWidth: 1040,
+            mx: 'auto',
+            alignItems: 'stretch',
+          }}
+        >
           {plans.map((plan, index) => (
-            <Grid item key={index} xs={12} sm={6} md={4} lg={3} sx={{ display: 'flex', justifyContent: 'center', minWidth: '300px', flex: '1 0 auto' }}>
+            <Grid
+              item
+              key={plan.id ?? plan.title}
+              xs={12}
+              sm={6}
+              md={4}
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                flex: '1 1 0',
+                minWidth: { xs: '100%', sm: 300 },
+              }}
+            >
               <motion.div
-                initial={{ opacity: 0, y: 50 }}
+                initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                style={{ width: '100%', height: '100%' }}
+                transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
+                style={{ width: '100%', display: 'flex', justifyContent: 'center', height: '100%' }}
               >
-                <PricingCard {...plan} />
+                <PricingCard plan={plan} onSelect={() => handleSelectPlan(plan)} />
               </motion.div>
             </Grid>
           ))}
         </Grid>
       </Container>
+
+      <PlanDetailDialog
+        open={dialogOpen}
+        plan={dialogPlan}
+        propertyTypes={PROPERTY_TYPES}
+        onClose={handleDialogClose}
+        onConfirm={handleDialogConfirm}
+      />
     </Box>
   );
 };

@@ -1,6 +1,5 @@
 import React from 'react';
-import { Card, CardContent, Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { Box, Typography } from '@mui/material';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -21,14 +20,7 @@ ChartJS.register(
   Legend
 );
 
-const GlassCard = styled(Card)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.2)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    height: '100%',
-}));
+import { glassCard } from '../adminV2Theme';
 
 const ProfitabilityChart = () => {
     const options = {
@@ -37,7 +29,7 @@ const ProfitabilityChart = () => {
           legend: {
             position: 'top',
             labels: {
-                color: '#212121', // Dark text for legends
+                color: 'rgba(248,251,255,0.78)',
                 font: {
                   weight: 'normal',
                 }
@@ -50,7 +42,7 @@ const ProfitabilityChart = () => {
         scales: {
             x: {
                 ticks: {
-                    color: '#555555',
+                    color: 'rgba(248,251,255,0.6)',
                     font: {
                         weight: 'normal',
                     }
@@ -59,10 +51,13 @@ const ProfitabilityChart = () => {
             y: {
                 beginAtZero: true,
                 ticks: {
-                    color: '#555555',
+                    color: 'rgba(248,251,255,0.6)',
                     font: {
                         weight: 'normal',
                     }
+                },
+                grid: {
+                    color: 'rgba(248,251,255,0.08)',
                 }
             }
         }
@@ -76,23 +71,23 @@ const ProfitabilityChart = () => {
           {
             label: 'LTV',
             data: [2800, 3200, 3100, 3400],
-            backgroundColor: 'rgba(0,0,0,0.7)',
+            backgroundColor: 'rgba(132, 212, 255, 0.6)',
+            borderRadius: 12,
           },
           {
             label: 'CAC',
             data: [450, 500, 480, 420],
-            backgroundColor: 'rgba(0,0,0,0.35)',
+            backgroundColor: 'rgba(255, 167, 196, 0.55)',
+            borderRadius: 12,
           },
         ],
     };
 
     return (
-        <GlassCard>
-            <CardContent>
-                <Typography variant="h6" gutterBottom sx={{color:'text.primary', fontWeight:'bold'}}>Salud de Rentabilidad (LTV vs. CAC)</Typography>
-                <Bar options={options} data={data} />
-            </CardContent>
-        </GlassCard>
+        <Box sx={{ ...glassCard({ height: '100%' }), color: '#f8fbff' }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>Salud de Rentabilidad (LTV vs. CAC)</Typography>
+            <Bar options={options} data={data} />
+        </Box>
     );
 };
 

@@ -5,6 +5,7 @@ set -uo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/services/api"
 FRONTEND_DIR="$PROJECT_ROOT/apps/web"
+OPERATOR_DIR="$PROJECT_ROOT/apps/operator-mobile"
 ENV_FILE="$PROJECT_ROOT/.env"
 VENV_DIR="$BACKEND_DIR/.venv"
 VENV_PY="$VENV_DIR/bin/python"
@@ -145,6 +146,16 @@ if [[ -d "$BACKEND_DIR" ]]; then
         else
             run_step "Aplicar migraciones Django" "${MIGRATE_CMD[@]}"
         fi
+
+        # Semillas minimas: crear un plan por defecto si no existe
+        run_step "Sembrar plan por defecto" "$VENV_PY" "$BACKEND_DIR/manage.py" shell --command "from properties.models import ListingPlan; ListingPlan.objects.get_or_create(key='standard', defaults={'name':'Standard','price':0,'entitlements':{'pilot_payout':0},'sla_hours':{'review':24,'post':72}}); print('Plan seed OK')"
+
+        # Crear superusuario no interactivo si hay variables ADMIN_* definidas
+        if [[ -n "${ADMIN_EMAIL:-}" && -n "${ADMIN_PASSWORD:-}" ]]; then
+            run_step "Crear/actualizar superusuario admin" "$VENV_PY" "$BACKEND_DIR/manage.py" shell --command "import os; from django.contrib.auth import get_user_model; U=get_user_model(); email=os.environ.get('ADMIN_EMAIL'); password=os.environ.get('ADMIN_PASSWORD'); u,created=U.objects.get_or_create(username=email, defaults={'is_staff':True,'is_superuser':True,'email':email}); u.is_staff=True; u.is_superuser=True; u.email=email; u.set_password(password); u.save(); print('Admin listo:', u.username)"
+        else
+            add_manual "(Opcional) Define ADMIN_EMAIL y ADMIN_PASSWORD en el entorno para crear un superusuario automaticamente."
+        fi
     else
         log "[ERROR] No se encontro el interprete de la venv en $VENV_PY"
         add_manual "Revisa la creacion de la venv en $VENV_DIR"
@@ -157,9 +168,25 @@ if [[ -d "$FRONTEND_DIR" ]]; then
         add_manual "Verifica permisos en $FRONTEND_DIR"
     }
     if [[ "$PWD" == "$FRONTEND_DIR" ]]; then
-        run_step "Instalar dependencias frontend" npm install
+        run_step "Instalar dependencias frontend" npm install --legacy-peer-deps
+        # Verificar token de Mapbox para la UI de poligonos
+        if ! grep -q "VITE_MAPBOX_ACCESS_TOKEN" "$FRONTEND_DIR/.env" 2>/dev/null && [[ -z "${VITE_MAPBOX_ACCESS_TOKEN:-}" ]]; then
+            add_manual "Configura VITE_MAPBOX_ACCESS_TOKEN en apps/web/.env para habilitar el dibujo de poligonos (Mapbox)."
+        fi
     fi
     popd >/dev/null 2>&1 || true
+fi
+
+# App Operadores (Expo/React Native)
+if [[ -d "$OPERATOR_DIR" ]]; then
+    pushd "$OPERATOR_DIR" >/dev/null 2>&1 || true
+    if [[ "$PWD" == "$OPERATOR_DIR" ]]; then
+    run_step "Instalar dependencias app Operadores" npm install --legacy-peer-deps
+        add_manual "Define 'apiUrl' en apps/operator-mobile/app.config.ts apuntando a http://localhost:8000 o a tu dominio. Luego ejecuta: npx expo start"
+    fi
+    popd >/dev/null 2>&1 || true
+else
+    add_manual "No se encontro apps/operator-mobile. Si vas a usar la app de operadores, verifica el repo."
 fi
 
 log "\n=== Resumen ==="

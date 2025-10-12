@@ -20,7 +20,7 @@ const SamAdminPage = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      try { await authService.ensureCsrfCookie?.(); } catch (_) {}
+      try { await authService.ensureCsrfCookie?.(); } catch (error) { void error; }
       await Promise.all([loadUsageStats()]);
     } catch (err) {
       setError('Error cargando datos: ' + err.message);

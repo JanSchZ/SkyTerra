@@ -181,7 +181,7 @@ const PropertyDetails = () => {
           const filtered = recentArr.filter((x) => x.id !== newEntry.id);
           const next = [newEntry, ...filtered].slice(0, 20);
           localStorage.setItem('recently_viewed_properties', JSON.stringify(next));
-        } catch(_) {}
+        } catch (error) { void error; }
         
         // Cargar tours reales
         try {

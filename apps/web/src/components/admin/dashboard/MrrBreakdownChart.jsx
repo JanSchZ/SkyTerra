@@ -1,30 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { Box, Typography } from '@mui/material';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { propertyService } from '../../../services/api';
+import { glassCard } from '../adminV2Theme';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const GlassCard = styled(Card)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.2)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    height: '100%',
-}));
-
-const COLORS = ['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.25)'];
+const COLORS = ['#6ba8ff', '#b78bff', '#ffd48a'];
 
   const options = {
     responsive: true,
     plugins: {
-      legend: {
+        legend: {
         position: 'bottom',
         labels: {
-            color: '#212121', // Dark text for legends
+            color: 'rgba(248,251,255,0.78)',
             font: {
               weight: 'normal',
             }
@@ -69,12 +60,10 @@ const MrrBreakdownChart = () => {
     }, []);
 
     return (
-        <GlassCard>
-            <CardContent>
-                <Typography variant="h6" gutterBottom sx={{color:'text.primary', fontWeight:'bold'}}>Estado de Publicaciones</Typography>
-                <Doughnut data={chartData} options={options} />
-            </CardContent>
-        </GlassCard>
+        <Box sx={{ ...glassCard({ height: '100%' }), color: '#f8fbff' }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>Estado de Publicaciones</Typography>
+            <Doughnut data={chartData} options={options} />
+        </Box>
     );
 };
 

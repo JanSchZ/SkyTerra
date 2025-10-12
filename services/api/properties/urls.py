@@ -1,6 +1,22 @@
 from django.urls import path, include, re_path
 from rest_framework.routers import DefaultRouter
-from .views import PropertyViewSet, TourViewSet, ImageViewSet, PropertyDocumentViewSet, PropertyVisitViewSet, PropertyPreviewViewSet, ComparisonSessionViewSet, SavedSearchViewSet, FavoriteViewSet, RecordingOrderViewSet
+from .views import (
+    PropertyViewSet,
+    TourViewSet,
+    ImageViewSet,
+    PropertyDocumentViewSet,
+    PropertyVisitViewSet,
+    PropertyPreviewViewSet,
+    ComparisonSessionViewSet,
+    SavedSearchViewSet,
+    FavoriteViewSet,
+    RecordingOrderViewSet,
+    ListingPlanViewSet,
+    PilotProfileViewSet,
+    PilotDocumentViewSet,
+    JobViewSet,
+    JobOfferViewSet,
+)
 
 # Define router and register viewsets
 router = DefaultRouter()
@@ -14,6 +30,11 @@ router.register(r'compare', ComparisonSessionViewSet, basename='comparisonsessio
 router.register(r'saved-searches', SavedSearchViewSet, basename='savedsearch')
 router.register(r'favorites', FavoriteViewSet, basename='favorite')
 router.register(r'recording-orders', RecordingOrderViewSet, basename='recordingorder')
+router.register(r'plans', ListingPlanViewSet, basename='listingplan')
+router.register(r'pilot-profiles', PilotProfileViewSet, basename='pilotprofile')
+router.register(r'pilot-documents', PilotDocumentViewSet, basename='pilotdocument')
+router.register(r'jobs', JobViewSet, basename='job')
+router.register(r'job-offers', JobOfferViewSet, basename='joboffer')
 
 # urlpatterns will now only contain router URLs for this app
 urlpatterns = [
