@@ -22,7 +22,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
         const favs = await favoritesService.list();
         if (!mounted) return;
         setIsSaved(!!favs.find((f) => (f.property === property.id) || (f.property_details && f.property_details.id === property.id)));
-      } catch (_) { setIsSaved(false); }
+      } catch { setIsSaved(false); }
     };
     checkFav();
     return () => { mounted = false; };

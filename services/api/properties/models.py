@@ -1,9 +1,55 @@
 import uuid
+import json
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.core.exceptions import ValidationError
-import json
+from django.utils import timezone
+
+# ---------------------------------------------------------------------------
+# Publicación & workflow configuration (orden general + metadatos básicos)
+# ---------------------------------------------------------------------------
+
+WORKFLOW_NODE_ORDER = ['review', 'approved', 'pilot', 'post', 'live']
+WORKFLOW_NODE_LABELS = {
+    'review': 'Publicación en revisión',
+    'approved': 'Publicación aprobada',
+    'pilot': 'Piloto de dron asignado',
+    'post': 'Multimedia en postproducción',
+    'live': 'Publicación activa',
+}
+
+WORKFLOW_NODE_DEFAULT_ETAS = {
+    'review': {'label': 'Revisión inicial', 'hours': 24},
+    'approved': {'label': 'Asignación de piloto', 'hours': 12},
+    'pilot': {'label': 'Coordinación de vuelo', 'hours': 48},
+    'post': {'label': 'Postproducción', 'hours': 72},
+    'live': {'label': 'Publicación', 'hours': 0},
+}
+
+WORKFLOW_SUBSTATE_DEFINITIONS = {
+    'draft': {'node': 'review', 'label': 'Borrador', 'percent': 0, 'cta': {'label': 'Completa tu ficha', 'action': 'open_wizard'}},
+    'submitted': {'node': 'review', 'label': 'Enviada', 'percent': 20, 'cta': {'label': 'Ver detalles', 'action': 'view_listing'}},
+    'under_review': {'node': 'review', 'label': 'En revisión', 'percent': 25, 'cta': {'label': 'Aguardar revisión', 'action': 'view_listing'}},
+    'changes_requested': {'node': 'review', 'label': 'Requiere correcciones', 'percent': 15, 'cta': {'label': 'Revisar comentarios', 'action': 'open_feedback'}},
+    'resubmitted': {'node': 'review', 'label': 'Correcciones enviadas', 'percent': 22, 'cta': {'label': 'Ver estado', 'action': 'view_listing'}},
+    'approved_for_shoot': {'node': 'approved', 'label': 'Lista para grabación', 'percent': 45, 'cta': {'label': 'Detalles de producción', 'action': 'open_production'}} ,
+    'inviting': {'node': 'pilot', 'label': 'Buscando piloto', 'percent': 48, 'cta': {'label': 'Seguir progreso', 'action': 'view_listing'}},
+    'assigned': {'node': 'pilot', 'label': 'Piloto asignado', 'percent': 52, 'cta': {'label': 'Ver piloto asignado', 'action': 'view_pilot'}},
+    'scheduling': {'node': 'pilot', 'label': 'Coordinando fecha', 'percent': 55, 'cta': {'label': 'Proponer horario', 'action': 'open_schedule'}},
+    'scheduled': {'node': 'pilot', 'label': 'Agenda confirmada', 'percent': 60, 'cta': {'label': 'Ver agenda', 'action': 'open_schedule'}},
+    'shooting': {'node': 'pilot', 'label': 'En grabación', 'percent': 70, 'cta': {'label': 'Ver estado de vuelo', 'action': 'view_job'}},
+    'finished': {'node': 'pilot', 'label': 'Grabación finalizada', 'percent': 75, 'cta': {'label': 'Esperar material', 'action': 'view_listing'}},
+    'uploading': {'node': 'post', 'label': 'Subiendo material', 'percent': 80, 'cta': {'label': 'Ver entregables', 'action': 'view_assets'}},
+    'received': {'node': 'post', 'label': 'Material recibido', 'percent': 82, 'cta': {'label': 'Esperar edición', 'action': 'view_listing'}},
+    'qc': {'node': 'post', 'label': 'Control de calidad', 'percent': 85, 'cta': {'label': 'Esperar edición', 'action': 'view_listing'}},
+    'editing': {'node': 'post', 'label': 'En postproducción', 'percent': 90, 'cta': {'label': 'Ver avance', 'action': 'view_listing'}},
+    'preview_ready': {'node': 'post', 'label': 'Preview listo', 'percent': 95, 'cta': {'label': 'Revisar preview', 'action': 'review_preview'}},
+    'ready_for_publish': {'node': 'post', 'label': 'Listo para publicar', 'percent': 98, 'cta': {'label': 'Publicar ahora', 'action': 'publish'}},
+    'published': {'node': 'live', 'label': 'Publicación activa', 'percent': 100, 'cta': {'label': 'Ver publicación', 'action': 'view_listing_public'}},
+}
+
 
 # Create your models here.
 
@@ -43,6 +89,8 @@ class Property(models.Model):
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
     ]
+    WORKFLOW_NODE_CHOICES = [(key, WORKFLOW_NODE_LABELS[key]) for key in WORKFLOW_NODE_ORDER]
+    WORKFLOW_SUBSTATE_CHOICES = [(key, data['label']) for key, data in WORKFLOW_SUBSTATE_DEFINITIONS.items()]
     PROPERTY_LISTING_TYPES = [
         ('sale', 'Sale'),
         ('rent', 'Rent'),
@@ -69,6 +117,7 @@ class Property(models.Model):
     # Eliminamos choices para permitir categorías libres/no forzadas por UI
     type = models.CharField(max_length=50, null=True, blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
+    plan = models.ForeignKey('ListingPlan', null=True, blank=True, on_delete=models.SET_NULL, related_name='properties')
     size = models.FloatField(help_text="Tamaño en hectáreas")
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
@@ -87,6 +136,10 @@ class Property(models.Model):
         default='pending',
         help_text='Estado de publicación de la propiedad'
     )
+    workflow_node = models.CharField(max_length=20, choices=WORKFLOW_NODE_CHOICES, default='review')
+    workflow_substate = models.CharField(max_length=32, choices=WORKFLOW_SUBSTATE_CHOICES, default='draft')
+    workflow_progress = models.PositiveIntegerField(default=0, help_text="Progreso porcentual 0-100 del flujo completo")
+    workflow_alerts = models.JSONField(default=list, blank=True, help_text="Alertas visibles para el vendedor (estructura [{'type': 'warning', 'message': '...'}])")
     listing_type = models.CharField(max_length=10, choices=PROPERTY_LISTING_TYPES, default='sale')
     rent_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     rental_terms = models.TextField(blank=True)
@@ -98,6 +151,9 @@ class Property(models.Model):
     access = models.CharField(max_length=50, choices=ACCESS_CHOICES, default='paved', blank=True)
     legal_status = models.CharField(max_length=50, choices=LEGAL_STATUS_CHOICES, default='clear', blank=True)
     utilities = models.JSONField(default=list, blank=True, help_text="Lista de servicios disponibles (ej. ['water', 'electricity'])")
+    preferred_time_windows = models.JSONField(default=list, blank=True, help_text="Ventanas sugeridas por el vendedor para coordinar visita (estructura [{'day':'2024-04-01','range':['09:00','12:00']}, ...])")
+    access_notes = models.TextField(blank=True, help_text="Instrucciones de acceso, seguridad, contacto, etc.")
+    seller_notes = models.TextField(blank=True, help_text="Notas internas para el equipo SkyTerra.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -127,12 +183,227 @@ class Property(models.Model):
             if self.rent_price is None or self.rent_price <= 0:
                 raise ValidationError({'rent_price': 'El precio de arriendo debe ser mayor que 0 para propiedades en arriendo.'})
 
+        # Validar workflow
+        substate_meta = WORKFLOW_SUBSTATE_DEFINITIONS.get(self.workflow_substate)
+        if not substate_meta:
+            raise ValidationError({'workflow_substate': 'Estado de flujo inválido'})
+
+        expected_node = substate_meta['node']
+        if self.workflow_node != expected_node:
+            self.workflow_node = expected_node
+
+        progress = substate_meta.get('percent')
+        if progress is not None:
+            self.workflow_progress = max(0, min(100, int(progress)))
+
+        if self.workflow_progress < 0 or self.workflow_progress > 100:
+            raise ValidationError({'workflow_progress': 'El progreso debe estar entre 0 y 100'})
+
+        if self.workflow_alerts is not None and not isinstance(self.workflow_alerts, list):
+            raise ValidationError({'workflow_alerts': 'Debe ser una lista de alertas.'})
+
     def calculate_plusvalia_score(self):
         """Calcula el puntaje de plusvalía de la propiedad combinando 7 métricas y una evaluación IA.
         El resultado se normaliza en un rango 0-100.
         """
         from .plusvalia_service import PlusvaliaService  # Import aquí para evitar ciclos
         return PlusvaliaService.calculate(self)
+
+    # -----------------------------
+    # Workflow helpers
+    # -----------------------------
+
+    def get_workflow_definition(self):
+        """Estructura completa (nodos y subestados) para uso en frontends."""
+        nodes = []
+        for key in WORKFLOW_NODE_ORDER:
+            nodes.append({
+                'key': key,
+                'label': WORKFLOW_NODE_LABELS.get(key, key.title()),
+                'substates': [
+                    {
+                        'key': sub_key,
+                        'label': meta.get('label'),
+                        'percent': meta.get('percent'),
+                    }
+                    for sub_key, meta in WORKFLOW_SUBSTATE_DEFINITIONS.items()
+                    if meta.get('node') == key
+                ],
+            })
+        return nodes
+
+    def get_current_cta(self):
+        """Devuelve la acción recomendada para el subestado actual."""
+        meta = WORKFLOW_SUBSTATE_DEFINITIONS.get(self.workflow_substate) or {}
+        return meta.get('cta', {'label': 'Ver detalles', 'action': 'view_listing'})
+
+    def get_current_eta(self):
+        """Tiempo estimado restante (placeholders ajustables por plan)."""
+        base_eta = WORKFLOW_NODE_DEFAULT_ETAS.get(self.workflow_node, {'label': 'Siguiente paso', 'hours': 0})
+        plan_eta = None
+        if self.plan:
+            plan_eta = self.plan.get_eta_for_node(self.workflow_node)
+        payload = base_eta.copy()
+        if plan_eta is not None:
+            payload['hours'] = plan_eta
+        return payload
+
+    def transition_to(self, substate, actor=None, message=None, metadata=None, commit=True):
+        """Actualiza el estado del flujo y registra historial."""
+        if substate not in WORKFLOW_SUBSTATE_DEFINITIONS:
+            raise ValidationError({'workflow_substate': f'Estado "{substate}" no es válido.'})
+
+        meta = WORKFLOW_SUBSTATE_DEFINITIONS[substate]
+        self.workflow_substate = substate
+        self.workflow_node = meta['node']
+
+        percent = meta.get('percent')
+        if percent is not None:
+            self.workflow_progress = max(0, min(100, int(percent)))
+
+        if substate == 'approved_for_shoot':
+            try:
+                self.ensure_job(actor=actor, auto_invite=True)
+            except Exception as exc:
+                self.add_alert(
+                    'error',
+                    'Hubo un problema al preparar la orden de producción. Nuestro equipo ya fue notificado.',
+                    payload={'error': str(exc)},
+                    commit=True,
+                )
+
+        metadata = metadata or {}
+        if commit:
+            self.save(
+                update_fields=['workflow_substate', 'workflow_node', 'workflow_progress', 'updated_at'],
+                recalculate_plusvalia=False,
+            )
+            PropertyStatusHistory.objects.create(
+                property=self,
+                node=self.workflow_node,
+                substate=self.workflow_substate,
+                percent=self.workflow_progress,
+                message=message or '',
+                metadata=metadata,
+                actor=actor,
+            )
+        return self
+
+    def add_alert(self, alert_type, message, payload=None, commit=True):
+        """Agrega una alerta visible para el vendedor."""
+        alert = {
+            'type': alert_type,
+            'message': message,
+            'payload': payload or {},
+            'created_at': timezone.now().isoformat(),
+        }
+        current_alerts = list(self.workflow_alerts or [])
+        current_alerts.append(alert)
+        self.workflow_alerts = current_alerts
+        if commit:
+            self.save(update_fields=['workflow_alerts', 'updated_at'], recalculate_plusvalia=False)
+        return alert
+
+    def clear_alerts(self, alert_type=None, commit=True):
+        """Elimina alertas (todas o filtrando por tipo)."""
+        if alert_type is None:
+            self.workflow_alerts = []
+        else:
+            self.workflow_alerts = [
+                item for item in (self.workflow_alerts or []) if item.get('type') != alert_type
+            ]
+        if commit:
+            self.save(update_fields=['workflow_alerts', 'updated_at'], recalculate_plusvalia=False)
+        return self.workflow_alerts
+
+    def build_status_bar_payload(self):
+        """Payload listo para front (barra de status)."""
+        nodes_payload = []
+        current_index = WORKFLOW_NODE_ORDER.index(self.workflow_node) if self.workflow_node in WORKFLOW_NODE_ORDER else 0
+        for idx, node_key in enumerate(WORKFLOW_NODE_ORDER):
+            node_payload = {
+                'key': node_key,
+                'label': WORKFLOW_NODE_LABELS.get(node_key, node_key.title()),
+                'state': 'pending',
+            }
+            if idx < current_index:
+                node_payload['state'] = 'done'
+            elif idx == current_index:
+                node_payload['state'] = 'active'
+                sub_meta = WORKFLOW_SUBSTATE_DEFINITIONS.get(self.workflow_substate, {})
+                node_payload['substate'] = self.workflow_substate
+                node_payload['substate_label'] = sub_meta.get('label')
+            nodes_payload.append(node_payload)
+
+        return {
+            'property_id': self.pk,
+            'node': self.workflow_node,
+            'node_label': WORKFLOW_NODE_LABELS.get(self.workflow_node, self.workflow_node.title()),
+            'substate': self.workflow_substate,
+            'substate_label': WORKFLOW_SUBSTATE_DEFINITIONS.get(self.workflow_substate, {}).get('label', self.workflow_substate),
+            'percent': self.workflow_progress,
+            'cta': self.get_current_cta(),
+            'eta': self.get_current_eta(),
+            'alerts': self.workflow_alerts or [],
+            'nodes': nodes_payload,
+        }
+
+    def ensure_job(self, actor=None, auto_invite=True):
+        """Garantiza que exista un Job operativo asociado."""
+        job = getattr(self, 'job', None)
+        if job:
+            return job
+
+        from decimal import Decimal as _Decimal
+
+        plan = self.plan
+        entitlements = plan.entitlements if plan and isinstance(plan.entitlements, dict) else {}
+        pilot_payout = entitlements.get('pilot_payout') or entitlements.get('pilot_fee') or entitlements.get('pilot_payout_amount')
+        try:
+            pilot_payout_decimal = _Decimal(str(pilot_payout)) if pilot_payout is not None else None
+        except Exception:
+            pilot_payout_decimal = None
+
+        job = Job.objects.create(
+            property=self,
+            plan=plan,
+            status='draft',
+            price_amount=getattr(plan, 'price', None),
+            pilot_payout_amount=pilot_payout_decimal,
+            vendor_instructions=self.access_notes or '',
+            notes=self.seller_notes or '',
+        )
+
+        if auto_invite:
+            from .matching import MATCHING_DEFAULTS  # Lazy import to avoid circular
+            wave_sent = False
+            for wave in range(1, MATCHING_DEFAULTS['max_waves'] + 1):
+                offers = job.send_invite_wave(wave=wave, actor=actor)
+                if offers:
+                    wave_sent = True
+                    break
+            if not wave_sent:
+                self.add_alert(
+                    'warning',
+                    'No encontramos pilotos disponibles. Nuestro equipo será notificado.',
+                    payload={'step': 'matching'},
+                    commit=True,
+                )
+        return job
+
+    def compute_submission_requirements(self):
+        required_docs = {'deed', 'plan', 'proof'}
+        status_map = {}
+        for document in self.documents.all():
+            status_map.setdefault(document.doc_type, document.status)
+        missing = [doc for doc in required_docs if status_map.get(doc) != 'approved']
+        has_boundary = bool(self.boundary_polygon)
+        return {
+            'missing_documents': missing,
+            'has_boundary': has_boundary,
+            'can_submit': not missing and has_boundary,
+            'required_documents': list(required_docs),
+        }
 
     def save(self, *args, **kwargs):
         """Override save para calcular automáticamente el plusvalia_score antes de guardar."""
@@ -293,6 +564,325 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f'Favorite property {self.property_id} by {self.user.username}'
+
+# -----------------------------
+# Planes y workflow de publicación
+# -----------------------------
+
+class ListingPlan(models.Model):
+    """Planes disponibles para los vendedores (definen SLA y entregables)."""
+    key = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    entitlements = models.JSONField(default=dict, blank=True, help_text="Configuración de entregables/beneficios del plan.")
+    sla_hours = models.JSONField(default=dict, blank=True, help_text="Horas estimadas por nodo. Ej: {'review': 24, 'post': 72}")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['price', 'name']
+
+    def __str__(self):
+        return self.name
+
+    def get_eta_for_node(self, node_key):
+        if not self.sla_hours:
+            return None
+        return self.sla_hours.get(node_key)
+
+
+class PropertyStatusHistory(models.Model):
+    """Traza historial de cambios de estado para la barra de status."""
+    property = models.ForeignKey(Property, related_name='status_history', on_delete=models.CASCADE)
+    node = models.CharField(max_length=20, choices=Property.WORKFLOW_NODE_CHOICES)
+    substate = models.CharField(max_length=32, choices=Property.WORKFLOW_SUBSTATE_CHOICES)
+    percent = models.PositiveIntegerField(default=0)
+    message = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='property_status_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.property_id} -> {self.substate} ({self.percent}%)"
+
+
+class PilotProfile(models.Model):
+    """Perfil operativo para la red de pilotos."""
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('approved', 'Aprobado'),
+        ('rejected', 'Rechazado'),
+        ('suspended', 'Suspendido'),
+    ]
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pilot_profile')
+    display_name = models.CharField(max_length=120, blank=True)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=Decimal('5.00'))
+    score = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    completed_jobs = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    is_available = models.BooleanField(default=False)
+    location_latitude = models.FloatField(null=True, blank=True)
+    location_longitude = models.FloatField(null=True, blank=True)
+    last_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return self.display_name or self.user.get_full_name() or self.user.username
+
+
+class PilotDocument(models.Model):
+    """Documentos que debe tener un piloto para operar."""
+    DOCUMENT_TYPES = [
+        ('id', 'Identificación'),
+        ('license', 'Licencia de piloto'),
+        ('drone_registration', 'Registro de dron'),
+        ('insurance', 'Seguro'),
+        ('other', 'Otro'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('approved', 'Aprobado'),
+        ('rejected', 'Rechazado'),
+        ('expired', 'Vencido'),
+    ]
+
+    pilot = models.ForeignKey(PilotProfile, related_name='documents', on_delete=models.CASCADE)
+    doc_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES)
+    file = models.FileField(upload_to='pilot_documents/')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    notes = models.TextField(blank=True)
+    expires_at = models.DateField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_pilot_documents')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+        unique_together = ('pilot', 'doc_type')
+
+    def __str__(self):
+        return f"{self.pilot} - {self.doc_type} ({self.status})"
+
+
+JOB_STATUS_TO_PROPERTY_SUBSTATE = {
+    'draft': 'approved_for_shoot',
+    'inviting': 'inviting',
+    'assigned': 'assigned',
+    'scheduling': 'scheduling',
+    'scheduled': 'scheduled',
+    'shooting': 'shooting',
+    'finished': 'finished',
+    'uploading': 'uploading',
+    'received': 'received',
+    'qc': 'qc',
+    'editing': 'editing',
+    'preview_ready': 'preview_ready',
+    'ready_for_publish': 'ready_for_publish',
+    'published': 'published',
+}
+
+
+class Job(models.Model):
+    """Trabajo operacional que conecta propiedad con piloto."""
+    STATUS_CHOICES = [
+        ('draft', 'En preparación'),
+        ('inviting', 'Buscando piloto'),
+        ('assigned', 'Piloto asignado'),
+        ('scheduling', 'Coordinando agenda'),
+        ('scheduled', 'Agenda confirmada'),
+        ('shooting', 'En grabación'),
+        ('finished', 'Grabación finalizada'),
+        ('uploading', 'Subiendo material'),
+        ('received', 'Material recibido'),
+        ('qc', 'Control de calidad'),
+        ('editing', 'En edición'),
+        ('preview_ready', 'Preview listo'),
+        ('ready_for_publish', 'Listo para publicar'),
+        ('published', 'Publicado'),
+        ('canceled', 'Cancelado'),
+    ]
+
+    property = models.OneToOneField(Property, related_name='job', on_delete=models.CASCADE)
+    plan = models.ForeignKey(ListingPlan, null=True, blank=True, on_delete=models.SET_NULL)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default='draft')
+    price_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    pilot_payout_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    assigned_pilot = models.ForeignKey(PilotProfile, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_jobs')
+    scheduled_start = models.DateTimeField(null=True, blank=True)
+    scheduled_end = models.DateTimeField(null=True, blank=True)
+    invite_wave = models.PositiveIntegerField(default=0)
+    last_status_change_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True)
+    vendor_instructions = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Job {self.id} for property {self.property_id} ({self.status})"
+
+    def send_invite_wave(self, wave=None, actor=None):
+        """Envía una nueva ola de invitaciones."""
+        from .matching import send_wave
+
+        if wave is None or wave <= 0:
+            wave = self.invite_wave + 1 if self.invite_wave else 1
+
+        offers = send_wave(self, wave, actor=actor)
+        if not offers and wave > self.invite_wave:
+            # No se encontraron pilotos; mantener estado y alertar.
+            self.property.add_alert(
+                'warning',
+                'No hay pilotos disponibles en este radio. Nuestro equipo revisará alternativas.',
+                payload={'wave': wave},
+                commit=True,
+            )
+        return offers
+
+    def expire_pending_offers(self, auto=True):
+        """Marca ofertas vencidas y opcionalmente envía la siguiente ola."""
+        from .matching import MATCHING_DEFAULTS
+
+        now = timezone.now()
+        pending = self.offers.filter(status='pending', expires_at__lt=now)
+        count = pending.update(status='expired', responded_at=now) if pending.exists() else 0
+
+        if auto and count:
+            next_wave = self.invite_wave + 1 if self.invite_wave else 1
+            if next_wave <= MATCHING_DEFAULTS['max_waves']:
+                offers = self.send_invite_wave(wave=next_wave, actor=None)
+                if not offers:
+                    self.property.add_alert(
+                        'warning',
+                        'Seguimos sin pilotos disponibles. Nuestro equipo coordinará manualmente.',
+                        payload={'wave': next_wave},
+                        commit=True,
+                    )
+            else:
+                self.property.add_alert(
+                    'warning',
+                    'Se agotaron las invitaciones automáticas. Contactaremos contigo en breve.',
+                    payload={'wave': next_wave},
+                    commit=True,
+                )
+        return count
+
+    def transition(self, status, actor=None, message=None, metadata=None, commit=True):
+        if status not in dict(self.STATUS_CHOICES):
+            raise ValidationError({'status': f'Estado "{status}" inválido.'})
+        self.status = status
+        if commit:
+            actor_user = actor.user if isinstance(actor, PilotProfile) else actor
+            update_fields = ['status', 'last_status_change_at', 'updated_at']
+            if status == 'scheduled' and self.scheduled_start and self.scheduled_end:
+                update_fields.extend(['scheduled_start', 'scheduled_end'])
+            if status == 'assigned' and self.assigned_pilot_id:
+                update_fields.append('assigned_pilot')
+            self.save(update_fields=update_fields)
+            JobTimelineEvent.objects.create(
+                job=self,
+                kind=status,
+                message=message or '',
+                metadata=metadata or {},
+                actor=actor_user,
+            )
+        substate = JOB_STATUS_TO_PROPERTY_SUBSTATE.get(status)
+        if substate:
+            self.property.transition_to(
+                substate,
+                actor=actor.user if isinstance(actor, PilotProfile) else actor,
+                message=message,
+                metadata=metadata,
+                commit=commit,
+            )
+        return self
+
+
+class JobTimelineEvent(models.Model):
+    """Eventos visibles en la línea de tiempo operacional."""
+    job = models.ForeignKey(Job, related_name='timeline', on_delete=models.CASCADE)
+    kind = models.CharField(max_length=50)
+    message = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='job_timeline_events')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.job_id} - {self.kind}"
+
+
+class JobOffer(models.Model):
+    """Invitaciones enviadas a pilotos elegibles."""
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('accepted', 'Aceptada'),
+        ('declined', 'Rechazada'),
+        ('expired', 'Expirada'),
+        ('canceled', 'Cancelada'),
+    ]
+
+    job = models.ForeignKey(Job, related_name='offers', on_delete=models.CASCADE)
+    pilot = models.ForeignKey(PilotProfile, related_name='offers', on_delete=models.CASCADE)
+    wave = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    score = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    radius_km = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
+    ttl_seconds = models.PositiveIntegerField(default=20)
+    sent_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-sent_at']
+        unique_together = ('job', 'pilot')
+
+    def __str__(self):
+        return f"Offer {self.id} job {self.job_id} -> {self.pilot_id} ({self.status})"
+
+    def accept(self, actor_user=None):
+        if self.status != 'pending':
+            raise ValidationError("La invitación ya no está disponible.")
+        self.status = 'accepted'
+        self.responded_at = timezone.now()
+        self.save(update_fields=['status', 'responded_at'])
+
+        self.job.assigned_pilot = self.pilot
+        self.job.transition(status='assigned', actor=actor_user, message='Piloto aceptó el trabajo.')
+        # Expirar otras ofertas pendientes del mismo trabajo
+        self.job.offers.exclude(pk=self.pk).filter(status='pending').update(
+            status='expired',
+            responded_at=timezone.now()
+        )
+        return self
+
+    def decline(self):
+        if self.status != 'pending':
+            return self
+        self.status = 'declined'
+        self.responded_at = timezone.now()
+        self.save(update_fields=['status', 'responded_at'])
+        if not self.job.offers.filter(status='pending').exists():
+            next_wave = self.job.invite_wave + 1 if self.job.invite_wave else 1
+            if next_wave != self.job.invite_wave:
+                self.job.send_invite_wave(wave=next_wave, actor=None)
+        return self
 
 # -----------------------------
 # Órdenes de Grabación (workflow)

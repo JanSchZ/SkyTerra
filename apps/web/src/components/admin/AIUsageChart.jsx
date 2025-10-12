@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { api } from '../../services/api';
-import { Paper, Typography, CircularProgress, Box } from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
+import { glassCard } from './adminV2Theme';
 
 const AIUsageChart = () => {
     const [data, setData] = useState([]);
@@ -16,7 +17,7 @@ const AIUsageChart = () => {
                 try {
                     const stats = await api.get('/ai/logs/usage_stats/?days=30');
                     daily = stats.data?.daily || [];
-                } catch (_) {
+                } catch {
                     const response = await api.get('/ai/logs/');
                     const processed = response.data.reduce((acc, log) => {
                         const date = new Date(log.timestamp).toLocaleDateString();
@@ -38,19 +39,19 @@ const AIUsageChart = () => {
     }, []);
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress /></Box>;
-    if (error) return <Paper sx={{ p:2 }}><Typography color="error">{error}</Typography></Paper>;
+    if (error) return <Box sx={{ ...glassCard(), color: '#f8fbff' }}><Typography color="#ff9a9e">{error}</Typography></Box>;
 
     return (
-        <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>Uso de IA (30 días)</Typography>
+        <Box sx={{ ...glassCard(), color: '#f8fbff' }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>Uso de IA (30 días)</Typography>
             <Box sx={{ height: 360 }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(248,251,255,0.08)" />
+                        <XAxis dataKey="date" stroke="#f8fbff" tick={{ fill: 'rgba(248,251,255,0.75)', fontSize: 12 }} />
+                        <YAxis stroke="#f8fbff" tick={{ fill: 'rgba(248,251,255,0.75)', fontSize: 12 }} />
                         <Tooltip />
-                        <Legend />
+                        <Legend wrapperStyle={{ color: '#f8fbff' }} formatter={(value) => <span style={{ color: 'rgba(248,251,255,0.78)' }}>{value}</span>} />
                         <Bar dataKey="total_tokens_input" fill="#8884d8" name="Tokens de Entrada" />
                         <Bar dataKey="total_tokens_output" fill="#82ca9d" name="Tokens de Salida" />
                         {/* Fallback para clave anterior si viene del procesado local */}
@@ -59,7 +60,7 @@ const AIUsageChart = () => {
                     </BarChart>
                 </ResponsiveContainer>
             </Box>
-        </Paper>
+        </Box>
     );
 };
 

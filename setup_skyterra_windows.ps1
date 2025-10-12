@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BackendDir = Join-Path $ProjectRoot 'services\api'
 $FrontendDir = Join-Path $ProjectRoot 'apps\web'
+$OperatorDir = Join-Path $ProjectRoot 'apps\operator-mobile'
 $EnvFile = Join-Path $ProjectRoot '.env'
 $EnvExample = Join-Path $ProjectRoot 'env.example'
 $VenvDir = Join-Path $BackendDir '.venv'
@@ -176,6 +177,18 @@ if ($pythonOk -and (Test-Path $BackendDir)) {
         } else {
             Run-Step "Aplicar migraciones Django" $migrationBlock
         }
+
+        Run-Step "Sembrar plan por defecto" {
+            & $VenvPython (Join-Path $BackendDir 'manage.py') shell --command "from properties.models import ListingPlan; ListingPlan.objects.get_or_create(key='standard', defaults={'name':'Standard','price':0,'entitlements':{'pilot_payout':0},'sla_hours':{'review':24,'post':72}}); print('Plan seed OK')"
+        }
+
+        if ($env:ADMIN_EMAIL -and $env:ADMIN_PASSWORD) {
+            Run-Step "Crear/actualizar superusuario admin" {
+                & $VenvPython (Join-Path $BackendDir 'manage.py') shell --command "import os; from django.contrib.auth import get_user_model; U=get_user_model(); email=os.environ.get('ADMIN_EMAIL'); password=os.environ.get('ADMIN_PASSWORD'); u,created=U.objects.get_or_create(username=email, defaults={'is_staff':True,'is_superuser':True,'email':email}); u.is_staff=True; u.is_superuser=True; u.email=email; u.set_password(password); u.save(); print('Admin listo:', u.username)"
+            }
+        } else {
+            Add-Manual "(Opcional) Define las variables de entorno ADMIN_EMAIL y ADMIN_PASSWORD antes de ejecutar este script para crear un superusuario automaticamente."
+        }
     } else {
         Write-Host "[ERROR] No se encontro el interprete de la venv en $VenvPython"
         Add-Manual "Revisa la creacion de la venv en $VenvDir"
@@ -186,7 +199,7 @@ if ((Test-Path $FrontendDir) -and $npmAvailable) {
     Run-Step "Instalar dependencias frontend" {
         Push-Location $FrontendDir
         try {
-            npm install
+            npm install --legacy-peer-deps
             if ($LASTEXITCODE -ne 0) {
                 throw "Codigo de salida $LASTEXITCODE"
             }
@@ -194,8 +207,36 @@ if ((Test-Path $FrontendDir) -and $npmAvailable) {
             Pop-Location
         }
     }
+
+    $frontEnv = Join-Path $FrontendDir '.env'
+    $mapboxConfigured = $false
+    if (Test-Path $frontEnv) {
+        $mapboxConfigured = Select-String -Path $frontEnv -Pattern '^VITE_MAPBOX_ACCESS_TOKEN=' -Quiet
+    }
+    if (-not $mapboxConfigured -and -not $env:VITE_MAPBOX_ACCESS_TOKEN) {
+        Add-Manual "Configura VITE_MAPBOX_ACCESS_TOKEN en apps\\web\\.env (token de Mapbox requerido para dibujar poligonos)."
+    }
 } elseif (Test-Path $FrontendDir) {
     Add-Manual "No se pudieron instalar dependencias frontend porque npm no esta disponible."
+}
+
+if ((Test-Path $OperatorDir) -and $npmAvailable) {
+    Run-Step "Instalar dependencias app Operadores" {
+        Push-Location $OperatorDir
+        try {
+            npm install --legacy-peer-deps
+            if ($LASTEXITCODE -ne 0) {
+                throw "Codigo de salida $LASTEXITCODE"
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+    Add-Manual "Define 'apiUrl' en apps\\operator-mobile\\app.config.ts para apuntar al backend (por ejemplo http://localhost:8000) y ejecuta 'npx expo start' para probar la app."
+} elseif (Test-Path $OperatorDir) {
+    Add-Manual "No se pudieron instalar dependencias de operadores porque npm no esta disponible."
+} else {
+    Add-Manual "No se encontro apps\\operator-mobile. Si necesitas la app de operadores, clona la carpeta correspondiente."
 }
 
 Write-Host "`n=== Resumen ==="
@@ -209,4 +250,4 @@ if (($ManualActions.Count -eq 0) -and ($FailedSteps -eq 0)) {
     Write-Host "Revisa los mensajes anteriores para mas detalles."
 }
 
-Write-Host 'Listo. Usa start_skyterra.bat para iniciar backend y frontend en Windows.'
+Write-Host 'Listo. Usa start_skyterra.bat para iniciar backend, frontend y (si corresponde) la app de operadores en Windows.'

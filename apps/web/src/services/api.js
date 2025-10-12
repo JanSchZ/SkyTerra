@@ -100,7 +100,7 @@ api.interceptors.request.use(
         config.headers = config.headers || {};
         config.headers['X-CSRFToken'] = csrfPersisted;
       }
-    } catch (_) {}
+    } catch (error) { void error; }
 
     // Debug: verificar cookies JWT antes de cada request
     const cookies = document.cookie.split(';').reduce((acc, cookie) => {
@@ -193,13 +193,13 @@ api.interceptors.response.use(
           originalRequest.skipAuth = true;
           return api(originalRequest);
         }
-      } catch (_) {}
+      } catch (error) { void error; }
 
       // Si la verificación explícita de sesión falla, limpiamos el usuario en caché.
       if (isAuthCheck) {
         localStorage.removeItem('user');
         // Notificar al resto de la app que la sesión ya no es válida
-        try { window.dispatchEvent(new CustomEvent('auth:invalid')); } catch (_) {}
+        try { window.dispatchEvent(new CustomEvent('auth:invalid')); } catch (error) { void error; }
       }
 
       // No redirigimos automáticamente. Dejamos que las rutas protegidas gestionen la navegación.
@@ -224,7 +224,7 @@ export const authService = {
       authService._csrfToken = token;
       api.defaults.headers['X-CSRFToken'] = token;
       localStorage.setItem('csrfToken', token);
-      } catch (_) {}
+      } catch (error) { void error; }
       }
     } catch (e) {
       // Silencioso: en desarrollo puede no ser crítico si ya existe
@@ -235,7 +235,7 @@ export const authService = {
       authService._csrfToken = token;
       api.defaults.headers['X-CSRFToken'] = token;
       }
-      } catch (_) {}
+      } catch (error) { void error; }
     }
   },
   // Iniciar sesión
@@ -243,7 +243,7 @@ export const authService = {
     try {
       await this.ensureCsrfCookie();
       // Asegurar que no se envíe ningún Authorization previo en el login
-      try { if (api.defaults && api.defaults.headers) { delete api.defaults.headers['Authorization']; } } catch(_) {}
+      try { if (api.defaults && api.defaults.headers) { delete api.defaults.headers['Authorization']; } } catch (error) { void error; }
       // Necesitamos cookies para CSRF, pero omitimos Authorization
       const response = await api.post('/auth/login/', credentials, { skipAuth: true, withCredentials: true });
       // Guardar tokens JWT si vienen en el cuerpo (además de cookies)
@@ -257,7 +257,7 @@ export const authService = {
         if (refresh) {
           localStorage.setItem('refreshToken', refresh);
         }
-      } catch(_) {}
+      } catch (error) { void error; }
 
       // Tras login, pide el usuario para confirmar que las cookies se guardaron
       try {
@@ -318,7 +318,7 @@ export const authService = {
         if (api.defaults && api.defaults.headers) {
           delete api.defaults.headers['Authorization'];
         }
-      } catch (_) {}
+      } catch (error) { void error; }
 
       const payload = { ...userData };
       if (payload.password && !payload.password1) {
@@ -372,7 +372,7 @@ export const authService = {
         if (api.defaults && api.defaults.headers) {
           delete api.defaults.headers['Authorization'];
         }
-      } catch (_) {}
+      } catch (error) { void error; }
 
       // Manejo detallado de errores de respuesta
       if (error.response) {
@@ -439,7 +439,7 @@ export const authService = {
           localStorage.setItem('user', JSON.stringify(whoami.data));
           return { user: whoami.data };
         }
-      } catch (_) {}
+      } catch (error) { void error; }
       if (response.data?.user) localStorage.setItem('user', JSON.stringify(response.data.user));
       return response.data;
     } catch (error) {
@@ -470,7 +470,7 @@ export const authService = {
           localStorage.setItem('user', JSON.stringify(whoami.data));
           return { user: whoami.data };
         }
-      } catch (_) {}
+      } catch (error) { void error; }
       const fallbackUser = response.data.user || response.data;
       localStorage.setItem('user', JSON.stringify(fallbackUser));
       return response.data;
@@ -500,7 +500,7 @@ export const authService = {
         if (whoami?.data) {
           localStorage.setItem('user', JSON.stringify(whoami.data));
         }
-      } catch (_) {}
+      } catch (error) { void error; }
       const user = response.data.user || response.data;
       if (user) localStorage.setItem('user', JSON.stringify(user));
 
@@ -532,7 +532,7 @@ export const authService = {
       localStorage.removeItem('user');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
-      try { delete api.defaults.headers['Authorization']; } catch(_){}
+      try { delete api.defaults.headers['Authorization']; } catch (error) { void error; }
       // No necesitamos quitar 'auth_token' porque ya no lo usamos.
     }
   },
@@ -777,60 +777,6 @@ export const propertyService = {
     }
   },
 
-  // Crear nueva propiedad
-  async createProperty(propertyData) {
-    try {
-      const dataToSend = this.preparePropertyData(propertyData);
-      console.log('Enviando datos de propiedad para creación:', dataToSend);
-
-      const response = await api.post('/properties/', dataToSend, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      console.log('Propiedad creada exitosamente:', response.data);
-      return response.data;
-      
-    } catch (error) {
-      console.error('Error creating property:', error);
-      
-      // Manejo detallado de errores
-      if (error.response) {
-        const errorData = error.response.data;
-        let errorMessage = 'Error al crear la propiedad';
-        
-        // Si hay errores de validación específicos
-        if (errorData && typeof errorData === 'object') {
-          const fieldErrors = [];
-          
-          // Recopilar errores por campo
-          Object.keys(errorData).forEach(field => {
-            if (Array.isArray(errorData[field])) {
-              fieldErrors.push(`${field}: ${errorData[field].join(', ')}`);
-            } else if (typeof errorData[field] === 'string') {
-              fieldErrors.push(`${field}: ${errorData[field]}`);
-            }
-          });
-          
-          if (fieldErrors.length > 0) {
-            errorMessage = `Errores de validación: ${fieldErrors.join('; ')}`;
-          } else if (errorData.error) {
-            errorMessage = errorData.error;
-          } else if (errorData.details) {
-            errorMessage = errorData.details;
-          }
-        }
-        
-        // Crear error con mensaje detallado
-        const detailedError = new Error(errorMessage);
-        detailedError.response = error.response;
-        throw detailedError;
-      }
-      
-      // Si no es un error de respuesta HTTP (ej. error de red), relanzar el original
-      throw error;
-    }
-  },
-
   // Actualizar datos y/o imágenes de una propiedad
   async updateProperty(id, propertyData) {
     try {
@@ -1031,7 +977,7 @@ export const tourService = {
       try {
         const csrfResp = await api.get('/auth/csrf/', { skipAuth: true });
         csrfToken = csrfResp?.data?.csrfToken;
-      } catch (_) {}
+      } catch (error) { void error; }
       const response = await api.post(`/tours/`, tourData, {
         headers: { 
           'Content-Type': 'multipart/form-data',

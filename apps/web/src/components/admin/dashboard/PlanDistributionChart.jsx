@@ -1,17 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Typography, Box, CircularProgress } from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { propertyService } from "../../../services/api";
+import { glassCard } from '../adminV2Theme';
 
-const COLORS = ['#111111', '#6B7280', '#9CA3AF', '#D1D5DB', '#4B5563', '#E5E7EB'];
+const COLORS = ['#6ba8ff', '#84fab0', '#ffa6e7', '#ffd48a', '#a5b6ff', '#ff9a9e'];
 
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
-      <Paper elevation={3} sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid #ddd' }}>
-        <Typography variant="subtitle1">{`${payload[0].name}`}</Typography>
-        <Typography variant="body2" color="text.secondary">{`Usuarios: ${payload[0].value}`}</Typography>
-      </Paper>
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          borderRadius: 2,
+          background: 'rgba(15,27,42,0.72)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          color: '#f8fbff',
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{payload[0].name}</Typography>
+        <Typography variant="body2" sx={{ opacity: 0.75 }}>{`Usuarios: ${payload[0].value}`}</Typography>
+      </Box>
     );
   }
   return null;
@@ -47,23 +57,23 @@ const PlanDistributionChart = () => {
 
   if (loading) {
     return (
-      <Paper sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <Box sx={{ ...glassCard({ height: '100%' }), display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <CircularProgress />
-      </Paper>
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <Paper sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <Box sx={{ ...glassCard({ height: '100%' }), display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <Typography color="error">{error}</Typography>
-      </Paper>
+      </Box>
     );
   }
 
   return (
-    <Paper sx={{ p: 2, height: '100%' }}>
-      <Typography variant="h6" gutterBottom>
+    <Box sx={{ ...glassCard({ height: '100%' }), color: '#f8fbff' }}>
+      <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
         Distribución de Usuarios por Plan
       </Typography>
       <Box sx={{ height: 300 }}>
@@ -83,11 +93,14 @@ const PlanDistributionChart = () => {
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Legend
+              wrapperStyle={{ color: '#f8fbff' }}
+              formatter={(value) => <span style={{ color: 'rgba(248,251,255,0.78)' }}>{value}</span>}
+            />
           </PieChart>
         </ResponsiveContainer>
       </Box>
-    </Paper>
+    </Box>
   );
 };
 

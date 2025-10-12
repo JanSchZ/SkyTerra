@@ -35,11 +35,9 @@ import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import LandingV2 from './components/ui/LandingV2';
-import CreatePublicationWizard from './components/property/CreatePublicationWizard';
 
 import CompareView from './components/property/CompareView';
 import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
-import SavedSearchesPage from './components/ui/SavedSearchesPage';
 import AdminLayout from './components/admin/AdminLayout.jsx';
 import AdminDashboardPage from './components/admin/AdminDashboardPage.jsx';
 import AdminTicketsPage from './components/admin/AdminTicketsPage.jsx';
@@ -47,9 +45,10 @@ import AdminUsersListPage from './components/admin/AdminUsersListPage.jsx';
 import AdminSettingsPage from './components/admin/AdminSettingsPage.jsx';
 import AdminDetailedPropertiesPage from './components/admin/AdminDetailedPropertiesPage.jsx';
 import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
-import AdminAIPage from './components/admin/AdminAIPage.jsx';
 import SamAdminPage from './components/admin/SamAdminPage.jsx';
+import AdminAnalyticsPage from './components/admin/AdminAnalyticsPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
+import SellerListingWizardPage from './components/seller/SellerListingWizardPage.jsx';
 import PricingPage from './components/pricing/PricingPage.jsx';
 import CheckoutPage from './components/checkout/CheckoutPage.jsx';
 import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
@@ -139,10 +138,10 @@ function App() {
       const stored = localStorage.getItem('skyterra.sam.history');
       const parsed = stored ? JSON.parse(stored) : [];
       if (Array.isArray(parsed)) {
-        try { window.__skyterraConversationHistory = parsed; } catch (_) {}
+        try { window.__skyterraConversationHistory = parsed; } catch (error) { void error; }
         return parsed;
       }
-    } catch (_) {}
+    } catch (error) { void error; }
     return [];
   });
   // Removed top-bar save search dialog/button per request
@@ -170,7 +169,7 @@ function App() {
     const loadUser = async () => {
       try {
         // Inicializa CSRF para que POST/PUT autenticados funcionen sin 403/401
-        try { await authService.ensureCsrfCookie(); } catch (_) {}
+        try { await authService.ensureCsrfCookie(); } catch (error) { void error; }
 
         // Primero verificar si hay indicios de sesión antes de hacer llamada al backend
         const localUser = localStorage.getItem('user');
@@ -225,7 +224,8 @@ function App() {
       try {
         const data = await propertyService.getPaginatedProperties(1, {}, 20);
         if (!cancelled) setInitialPropertiesData(data);
-      } catch (_) {
+      } catch (error) {
+        void error;
         // Silencio: el MapView hará su propio fetch si falla este prefetch
       }
     })();
@@ -236,8 +236,8 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem('skyterra.sam.history', JSON.stringify(conversationHistory));
-      try { window.__skyterraConversationHistory = conversationHistory; } catch (_) {}
-    } catch (_) {}
+      try { window.__skyterraConversationHistory = conversationHistory; } catch (error) { void error; }
+    } catch (error) { void error; }
   }, [conversationHistory]);
   
   const handleAISearch = (aiGeneratedFilters) => {
@@ -445,7 +445,7 @@ function App() {
     await authService.logout();
     setUser(null);
     // Clear Sam conversation history on logout
-    try { localStorage.removeItem('skyterra.sam.history'); } catch (_) {}
+    try { localStorage.removeItem('skyterra.sam.history'); } catch (error) { void error; }
     setConversationHistory([]);
     setSnackbarMessage('Has cerrado sesión.');
     setSnackbarSeverity('info');
@@ -521,7 +521,7 @@ function App() {
     }
 
     const newHistory = [...conversationHistory, { role: 'user', content: text }];
-    try { window.__skyterraConversationHistory = newHistory; } catch (_) {}
+    try { window.__skyterraConversationHistory = newHistory; } catch (error) { void error; }
     setConversationHistory(newHistory);
     try {
       setAiSearchLoading(true);
@@ -579,7 +579,7 @@ function App() {
             updatedHistory.push(propertyEntry);
           }
           setConversationHistory(updatedHistory);
-          try { window.__skyterraConversationHistory = updatedHistory; } catch (_) {}
+          try { window.__skyterraConversationHistory = updatedHistory; } catch (error) { void error; }
         }
       }
     } catch (err) { console.error(err); }
@@ -800,9 +800,9 @@ function App() {
       <Route path="/tour/:tourId" element={<TourViewer />} />
       <Route path="/compare" element={<ProtectedRoute user={user} element={<CompareView />} />} />
       <Route path="/saved" element={<ProtectedRoute user={user} element={<SavedAndRecent />} />} />
-      <Route path="/new-publication" element={<ProtectedRoute user={user} element={<CreatePublicationWizard />} />} />
-      <Route path="/my-searches" element={<ProtectedRoute user={user} element={<SavedSearchesPage />} />} />
       <Route path="/dashboard" element={<ProtectedRoute user={user} element={<SellerDashboardPage />} />} />
+      <Route path="/seller/listings/new" element={<ProtectedRoute user={user} element={<SellerListingWizardPage />} />} />
+      <Route path="/seller/listings/:listingId" element={<ProtectedRoute user={user} element={<SellerListingWizardPage />} />} />
       <Route path="/pricing" element={<ProtectedRoute user={user} element={<PricingPage />} />} />
 
       {/* Admin Routes */}
@@ -810,6 +810,7 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="properties" element={<AdminDetailedPropertiesPage />} />
+        <Route path="analytics" element={<AdminAnalyticsPage />} />
         {/** Eliminado: Gestión de tours ahora vive dentro de Propiedades */}
         <Route path="tickets" element={<AdminTicketsPage />} />
         <Route path="ai-management" element={<SamAdminPage />} />
@@ -990,62 +991,56 @@ function App() {
                       >
                         <AccountCircleIcon />
                       </IconButton>
-                      <Menu
-                        id="user-menu"
-                        anchorEl={userMenuAnchorEl}
-                        open={Boolean(userMenuAnchorEl)}
-                        onClose={closeUserMenu}
-                        onMouseEnter={handleMenuMouseEnter}
-                        onMouseLeave={handleMenuMouseLeave}
-                        TransitionComponent={Grow}
-                        PaperProps={{
-                          sx: {
-                            backgroundColor: 'rgba(255,255,255,0.18)',
-                            borderRadius: '12px',
-                            backdropFilter: 'blur(14px)',
-                            WebkitBackdropFilter: 'blur(14px)',
-                            border: '1px solid rgba(255, 255, 255, 0.25)',
-                            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-                            color: 'white',
-                            '& .MuiMenuItem-root': {
+                        <Menu
+                          id="user-menu"
+                          anchorEl={userMenuAnchorEl}
+                          open={Boolean(userMenuAnchorEl)}
+                          onClose={closeUserMenu}
+                          onMouseEnter={handleMenuMouseEnter}
+                          onMouseLeave={handleMenuMouseLeave}
+                          TransitionComponent={Grow}
+                          PaperProps={{
+                            sx: {
+                              backgroundColor: 'rgba(255,255,255,0.18)',
+                              borderRadius: '12px',
+                              backdropFilter: 'blur(14px)',
+                              WebkitBackdropFilter: 'blur(14px)',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
                               color: 'white',
-                              borderBottom: '1px solid rgba(255,255,255,0.08)',
-                              '&:last-child': {
-                                borderBottom: 'none',
-                              },
+                              '& .MuiMenuItem-root': {
+                                color: 'white',
+                                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                                '&:last-child': { borderBottom: 'none' },
+                              }
                             }
-                          }
-                        }}
-                      >
-                        {user && (
-                          <MenuItem sx={{ color: 'text.primary', pt: 1.5, pb: 0.5, opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{user.username}</Typography>
-                          </MenuItem>
-                        )}
-                        {user && user.groups && user.groups.length > 0 && (
-                          <MenuItem sx={{ color: 'text.secondary', pb: 1.5, pt: 0.5, borderBottom: '1px solid rgba(255,255,255,0.15)', opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
-                            <Typography variant="caption">{user.groups[0]}</Typography>
-                          </MenuItem>
-                        )}
-                        {user?.is_staff ? (
-                          <>
-                            <MenuItem onClick={() => { navigate('/admin/dashboard'); closeUserMenu(); }} sx={{ color: 'white' }}>Admin Dashboard</MenuItem>
-                            <MenuItem onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Aprobar Propiedades</MenuItem>
-                            <MenuItem onClick={() => { navigate('/admin/tickets'); closeUserMenu(); }} sx={{ color: 'white' }}>Tickets de Soporte</MenuItem>
-                            <MenuItem onClick={() => { navigate('/admin/users'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Usuarios</MenuItem>
-                            <MenuItem onClick={() => { navigate('/admin/ai-management'); closeUserMenu(); }} sx={{ color: 'white' }}>Sam</MenuItem>
-                          </>
-                        ) : (
-                          <>
-                            <MenuItem onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white' }}>Dashboard</MenuItem>
-                            <MenuItem onClick={() => { navigate('/saved'); closeUserMenu(); }} sx={{ color: 'white' }}>Guardados y recientes</MenuItem>
-                            <MenuItem onClick={() => { navigate('/new-publication'); closeUserMenu(); }} sx={{ color: 'white' }}>Crear Propiedad</MenuItem>
-                            <MenuItem onClick={() => { navigate('/my-searches'); closeUserMenu(); }} sx={{ color: 'white' }}>Búsquedas Guardadas</MenuItem>
-                            <MenuItem onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Planes</MenuItem>
-                          </>
-                        )}
-                        <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: '1px solid rgba(255,255,255,0.15)', mt: 1 }}>Logout</MenuItem>
-                      </Menu>
+                          }}
+                        >
+                          {user && (
+                            <MenuItem sx={{ color: 'text.primary', pt: 1.5, pb: 0.5, opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{user.username}</Typography>
+                            </MenuItem>
+                          )}
+                          {user && user.groups && user.groups.length > 0 && (
+                            <MenuItem sx={{ color: 'text.secondary', pb: 1.5, pt: 0.5, borderBottom: '1px solid rgba(255,255,255,0.15)', opacity: 0.8, cursor: 'default', '&:hover': { backgroundColor: 'transparent' } }}>
+                              <Typography variant="caption">{user.groups[0]}</Typography>
+                            </MenuItem>
+                          )}
+                          {(user?.is_staff
+                            ? [
+                                <MenuItem key="admin-dashboard" onClick={() => { navigate('/admin/dashboard'); closeUserMenu(); }} sx={{ color: 'white' }}>Admin Dashboard</MenuItem>,
+                                <MenuItem key="admin-properties" onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Aprobar Propiedades</MenuItem>,
+                                <MenuItem key="admin-tickets" onClick={() => { navigate('/admin/tickets'); closeUserMenu(); }} sx={{ color: 'white' }}>Tickets de Soporte</MenuItem>,
+                                <MenuItem key="admin-users" onClick={() => { navigate('/admin/users'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Usuarios</MenuItem>,
+                                <MenuItem key="admin-sam" onClick={() => { navigate('/admin/ai-management'); closeUserMenu(); }} sx={{ color: 'white' }}>Sam</MenuItem>,
+                              ]
+                            : [
+                                <MenuItem key="dashboard" onClick={() => { navigate('/dashboard'); closeUserMenu(); }} sx={{ color: 'white' }}>Dashboard</MenuItem>,
+                                <MenuItem key="saved" onClick={() => { navigate('/saved'); closeUserMenu(); }} sx={{ color: 'white' }}>Guardados y recientes</MenuItem>,
+                                <MenuItem key="pricing" onClick={() => { navigate('/pricing'); closeUserMenu(); }} sx={{ color: 'white' }}>Publicar</MenuItem>,
+                              ])}
+                          <MenuItem onClick={() => { handleLogout(); closeUserMenu(); }} sx={{ color: 'white', borderTop: '1px solid rgba(255,255,255,0.15)', mt: 1 }}>Cerrar sesión</MenuItem>
+                        </Menu>
                     </>
                   ) : (
                     <motion.div

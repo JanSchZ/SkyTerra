@@ -1,15 +1,6 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box, List, ListItem, ListItemText, Divider, Chip } from '@mui/material';
-import { styled } from '@mui/material/styles';
-
-const GlassCard = styled(Card)(({ theme }) => ({
-    background: 'rgba(255, 255, 255, 0.2)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '15px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-    height: '100%',
-}));
+import { Box, Divider, List, ListItem, ListItemText, Typography } from '@mui/material';
+import { glassCard } from '../adminV2Theme';
 
 const productionData = {
     'Plan Pro': ['Fundo El Carmen', 'Hacienda Las Mercedes'],
@@ -24,20 +15,19 @@ const marketingData = [
 
 const ProductionQueue = () => {
     return (
-        <GlassCard>
-            <CardContent>
-                <Typography variant="h6" gutterBottom sx={{color: 'text.primary', fontWeight:'bold'}}>Cola de Producción y Marketing</Typography>
+        <Box sx={{ ...glassCard({ height: '100%' }), color: '#f8fbff', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>Cola de Producción y Marketing</Typography>
                 <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'text.primary' }} gutterBottom>Producciones Pendientes</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }} gutterBottom>Producciones Pendientes</Typography>
                     <List dense>
                         {Object.entries(productionData).map(([plan, properties]) => (
                             <React.Fragment key={plan}>
                                 <ListItem>
-                                    <ListItemText primary={<Typography sx={{ fontWeight: 'bold', color: 'text.primary' }}>{plan}</Typography>} />
+                                    <ListItemText primary={<Typography sx={{ fontWeight: 600 }}>{plan}</Typography>} />
                                 </ListItem>
                                 {properties.map(prop => (
                                     <ListItem key={prop} sx={{ pl: 4 }}>
-                                        <ListItemText primary={prop} primaryTypographyProps={{color:'text.primary'}} />
+                                        <ListItemText primary={prop} primaryTypographyProps={{ color: 'rgba(248,251,255,0.82)' }} />
                                     </ListItem>
                                 ))}
                             </React.Fragment>
@@ -46,17 +36,21 @@ const ProductionQueue = () => {
                 </Box>
                 <Divider sx={{ my: 2 }} />
                 <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'text.primary' }} gutterBottom>Compromisos de Marketing</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }} gutterBottom>Compromisos de Marketing</Typography>
                     <List dense>
                         {marketingData.map((item, index) => (
                              <ListItem key={index}>
-                                <ListItemText primary={item.task} secondary={item.property} primaryTypographyProps={{color:'text.primary'}} secondaryTypographyProps={{color:'text.secondary'}} />
+                                <ListItemText
+                                  primary={item.task}
+                                  secondary={item.property}
+                                  primaryTypographyProps={{ color: '#f8fbff', fontWeight: 500 }}
+                                  secondaryTypographyProps={{ color: 'rgba(248,251,255,0.6)' }}
+                                />
                              </ListItem>
                         ))}
                     </List>
                 </Box>
-            </CardContent>
-        </GlassCard>
+        </Box>
     );
 };
 

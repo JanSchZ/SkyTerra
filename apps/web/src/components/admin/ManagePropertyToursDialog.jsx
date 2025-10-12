@@ -66,7 +66,7 @@ export default function ManagePropertyToursDialog({ open, onClose, propertyId, p
         const csrfResp = await api.get('/auth/csrf/', { skipAuth: true });
         const csrfToken = csrfResp?.data?.csrfToken;
         if (csrfToken) headers['X-CSRFToken'] = csrfToken;
-      } catch (_) {}
+      } catch (error) { void error; }
       await api.delete(`/tours/${activeTour.id}/`, { headers });
       await loadTours();
       onChange?.();

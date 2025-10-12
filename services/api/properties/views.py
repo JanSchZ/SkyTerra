@@ -30,11 +30,47 @@ import uuid
 import zipfile
 import shutil
 
-from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite, RecordingOrder
+from .models import (
+    Property,
+    Tour,
+    Image,
+    PropertyDocument,
+    PropertyVisit,
+    ComparisonSession,
+    SavedSearch,
+    Favorite,
+    RecordingOrder,
+    ListingPlan,
+    PropertyStatusHistory,
+    PilotProfile,
+    PilotDocument,
+    Job,
+    JobOffer,
+    JobTimelineEvent,
+    WORKFLOW_NODE_ORDER,
+    WORKFLOW_NODE_LABELS,
+    WORKFLOW_SUBSTATE_DEFINITIONS,
+)
 from .serializers import (
-    PropertySerializer, PropertyListSerializer,
-    TourSerializer, ImageSerializer, PropertyDocumentSerializer, PropertyVisitSerializer,
-    PropertyPreviewSerializer, ComparisonSessionSerializer, TourPackageCreateSerializer, SavedSearchSerializer, FavoriteSerializer, RecordingOrderSerializer
+    PropertySerializer,
+    PropertyListSerializer,
+    TourSerializer,
+    ImageSerializer,
+    PropertyDocumentSerializer,
+    PropertyVisitSerializer,
+    PropertyPreviewSerializer,
+    ComparisonSessionSerializer,
+    TourPackageCreateSerializer,
+    SavedSearchSerializer,
+    FavoriteSerializer,
+    RecordingOrderSerializer,
+    ListingPlanSerializer,
+    PropertyStatusHistorySerializer,
+    PropertyStatusBarSerializer,
+    PilotProfileSerializer,
+    PilotDocumentSerializer,
+    JobSerializer,
+    JobOfferSerializer,
 )
 from skyterra_backend.permissions import IsOwnerOrAdmin
 from .services import GeminiService, GeminiServiceError, categorize_property_with_ai, create_fallback_response_simple
@@ -259,11 +295,22 @@ class PropertyViewSet(viewsets.ModelViewSet):
         # Optimizaciones de base de datos para evitar N+1 queries
         # Prefetch todas las relaciones necesarias en una sola consulta
         queryset = queryset.select_related(
-            'owner'  # Join eficiente para el owner
+            'owner',  # Join eficiente para el owner
+            'plan',
+            'job',
+            'job__assigned_pilot',
+            'job__assigned_pilot__user',
         ).prefetch_related(
             'images',  # Prefetch todas las imágenes relacionadas
             'tours',   # Prefetch todos los tours relacionados
             'documents',  # Prefetch documentos relacionados
+            'documents__reviewed_by',
+            'status_history',
+            'job__offers',
+            'job__offers__pilot',
+            'job__offers__pilot__user',
+            'job__timeline',
+            'job__timeline__actor',
             'tours__property',  # Para evitar queries adicionales en el serializer de tours
             'images__property',  # Para evitar queries adicionales en el serializer de images
             'documents__property',  # Para evitar queries adicionales en el serializer de documents
@@ -312,82 +359,6 @@ class PropertyViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
-    def perform_create(self, serializer):
-        """Crear propiedad asignando el owner al usuario autenticado y enviar email de notificación."""
-        try:
-            if not self.request.user.is_authenticated:
-                logger.error("Intento de crear propiedad sin autenticación")
-                from rest_framework.exceptions import NotAuthenticated
-                raise NotAuthenticated("Debe estar autenticado para crear propiedades.")
-
-            logger.info(f"Creando propiedad para usuario: {self.request.user.username}")
-            logger.info(f"Datos recibidos: {serializer.validated_data}")
-
-            property_instance = serializer.save(owner=self.request.user, publication_status='pending')
-            logger.info(f"Propiedad creada exitosamente con ID: {property_instance.id}, Estado: {property_instance.publication_status}")
-
-            # Invalidar caché después de crear propiedad
-            invalidate_property_cache()
-
-            # Enviar email de notificación si la propiedad está pendiente de revisión
-            if property_instance.publication_status == 'pending':
-                try:
-                    subject = f"Nueva Propiedad Enviada para Revisión: {property_instance.name}"
-                    message_body = f"""
-                    Una nueva propiedad ha sido enviada para revisión:
-
-                    Nombre: {property_instance.name}
-                    Tipo: {property_instance.type or '-'}
-                    Precio: {property_instance.price}
-                    Tamaño: {property_instance.size} ha
-                    Enviada por: {self.request.user.username} (ID: {self.request.user.id})
-
-                    ID de Propiedad: {property_instance.id}
-
-                    Por favor, revísala en el panel de administración.
-                    (Enlace al detalle en API: /api/properties/{property_instance.id}/ )
-                    """
-                    # Asegúrate que DEFAULT_FROM_EMAIL está configurado en settings.py
-                    from_email = settings.DEFAULT_FROM_EMAIL
-                    recipient_list = getattr(settings, 'ADMIN_NOTIFICATION_EMAILS', ['admin@example.com'])
-
-                    send_mail(subject, message_body, from_email, recipient_list, fail_silently=False)
-                    logger.info(f"Email de notificación enviado a {recipient_list} para propiedad ID: {property_instance.id}")
-                except Exception as email_error:
-                    logger.error(f"Error al enviar email de notificación para propiedad ID: {property_instance.id}: {str(email_error)}", exc_info=True)
-                    # No relanzar el error para no impedir la creación de la propiedad, solo loggearlo.
-
-            # Enriquecer con IA (mejora de clasificación/summary)
-            try:
-                ai_data = categorize_property_with_ai(property_instance)
-                updates = {}
-                if ai_data.get('ai_category') and not property_instance.ai_category:
-                    updates['ai_category'] = ai_data['ai_category']
-                if ai_data.get('ai_summary') and not property_instance.ai_summary:
-                    updates['ai_summary'] = ai_data['ai_summary']
-                if updates:
-                    for k,v in updates.items():
-                        setattr(property_instance, k, v)
-                    property_instance.save(update_fields=list(updates.keys()))
-            except Exception as _:
-                logger.warning(f"No se pudo enriquecer por IA la propiedad {property_instance.id} en creación")
-
-            # Procesar documentos subidos (campo 'new_documents')
-            new_docs = self.request.FILES.getlist('new_documents')
-            if new_docs:
-                for doc_file in new_docs:
-                    PropertyDocument.objects.create(
-                        property=property_instance,
-                        file=doc_file,
-                        doc_type='other'
-                    )
-                logger.info(f"{len(new_docs)} documento(s) asociados a la propiedad {property_instance.id}")
-
-        except Exception as e:
-            logger.error(f"Error al crear propiedad: {str(e)}", exc_info=True)
-            # El error ya se maneja en el método create, aquí solo relanzamos para que create lo capture
-            raise
-
     def perform_update(self, serializer):
         """Actualizar propiedad con validaciones adicionales"""
         try:
@@ -429,18 +400,28 @@ class PropertyViewSet(viewsets.ModelViewSet):
             raise
 
     def create(self, request, *args, **kwargs):
-        """Override create para manejo personalizado de errores"""
-        try:
-            return super().create(request, *args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error en create: {str(e)}", exc_info=True)
-            return Response(
-                {'error': 'Error al crear la propiedad', 'details': str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        """Permite a un vendedor crear su publicación inicial."""
+        if not request.user.is_authenticated:
+            return Response({'detail': 'Autenticación requerida'}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        property_instance = serializer.save(owner=request.user)
+        # Registrar historial inicial
+        property_instance.transition_to(
+            property_instance.workflow_substate or 'draft',
+            actor=request.user,
+            message='Publicación creada',
+            metadata={'source': 'seller_create'},
+            commit=True,
+        )
+        headers = self.get_success_headers(serializer.data)
+        return Response(self.get_serializer(property_instance).data, status=status.HTTP_201_CREATED, headers=headers)
 
     def update(self, request, *args, **kwargs):
-        """Override update para manejo personalizado de errores"""
+        """Permitir edición a staff y propietarios."""
+        property_instance = self.get_object()
+        if not request.user.is_staff and property_instance.owner_id != request.user.id:
+            raise PermissionDenied("No tienes permisos para editar esta propiedad.")
         try:
             return super().update(request, *args, **kwargs)
         except Exception as e:
@@ -450,22 +431,118 @@ class PropertyViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+    def partial_update(self, request, *args, **kwargs):
+        """Permitir edición parcial a staff y propietarios."""
+        property_instance = self.get_object()
+        if not request.user.is_staff and property_instance.owner_id != request.user.id:
+            raise PermissionDenied("No tienes permisos para editar esta propiedad.")
+        return super().partial_update(request, *args, **kwargs)
+
     @action(detail=False, methods=['get'], url_path='my-properties', permission_classes=[permissions.IsAuthenticated])
     def my_properties(self, request):
         """Devuelve las propiedades del usuario autenticado."""
-        tour_exists = Tour.objects.filter(property_id=OuterRef('pk'), status='active').exclude(url__isnull=True).exclude(url='')
-        user_properties = Property.objects.filter(owner=request.user).annotate(
-            image_count_annotation=Count('images'),
-            has_tour_annotation=Exists(tour_exists)
-        ).order_by('-created_at')
-        
-        page = self.paginate_queryset(user_properties)
+        queryset = self.get_queryset().filter(owner=request.user)
+
+        page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(user_properties, many=True)
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='submit', permission_classes=[permissions.IsAuthenticated])
+    def submit_for_review(self, request, pk=None):
+        """Permite al vendedor enviar su publicación a revisión."""
+        property_instance = self.get_object()
+        if not (request.user.is_staff or property_instance.owner_id == request.user.id):
+            raise PermissionDenied("No tienes permisos para esta acción.")
+        requirements = property_instance.compute_submission_requirements()
+        if not requirements.get('can_submit'):
+            return Response(
+                {
+                    'error': 'La publicación aún no cumple los requisitos para revisión.',
+                    'missing_documents': requirements.get('missing_documents', []),
+                    'has_boundary': requirements.get('has_boundary'),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        message = request.data.get('message', 'Publicación enviada a revisión.')
+        metadata = request.data.get('metadata', {})
+        property_instance.transition_to('submitted', actor=request.user, message=message, metadata=metadata, commit=True)
+        serializer = self.get_serializer(property_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='workflow-structure', permission_classes=[permissions.AllowAny])
+    def workflow_structure(self, request):
+        """Devuelve la estructura completa (nodos y subestados) para construir la UI."""
+        payload = []
+        for node_key in WORKFLOW_NODE_ORDER:
+            payload.append({
+                'key': node_key,
+                'label': WORKFLOW_NODE_LABELS.get(node_key, node_key.title()),
+                'substates': [
+                    {
+                        'key': sub_key,
+                        'label': meta.get('label'),
+                        'percent': meta.get('percent'),
+                    }
+                    for sub_key, meta in WORKFLOW_SUBSTATE_DEFINITIONS.items()
+                    if meta.get('node') == node_key
+                ],
+            })
+        return Response(payload)
+
+    @action(detail=True, methods=['get'], url_path='status-bar', permission_classes=[permissions.IsAuthenticated])
+    def status_bar(self, request, pk=None):
+        """Retorna payload de la barra de status para el vendedor."""
+        property_instance = self.get_object()
+        payload = property_instance.build_status_bar_payload()
+        serializer = PropertyStatusBarSerializer(payload)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='status-history', permission_classes=[permissions.IsAuthenticated])
+    def status_history(self, request, pk=None):
+        """Devuelve el historial de transiciones."""
+        property_instance = self.get_object()
+        serializer = PropertyStatusHistorySerializer(property_instance.status_history.all(), many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='transition', permission_classes=[permissions.IsAdminUser])
+    def transition_workflow(self, request, pk=None):
+        """Permite a un admin mover una publicación a un subestado específico."""
+        property_instance = self.get_object()
+        substate = request.data.get('substate')
+        message = request.data.get('message', '')
+        metadata = request.data.get('metadata', {})
+        if not substate:
+            return Response({'error': 'El campo "substate" es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            property_instance.transition_to(substate, actor=request.user, message=message, metadata=metadata, commit=True)
+        except ValidationError as exc:
+            return Response({'error': exc.message_dict if hasattr(exc, 'message_dict') else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(property_instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='alerts', permission_classes=[permissions.IsAdminUser])
+    def add_alert(self, request, pk=None):
+        """Agrega una alerta para el vendedor (ej. documentos vencidos)."""
+        property_instance = self.get_object()
+        alert_type = request.data.get('type', 'info')
+        message = request.data.get('message')
+        payload = request.data.get('payload')
+        if not message:
+            return Response({'error': 'Se requiere un mensaje'}, status=status.HTTP_400_BAD_REQUEST)
+        alert = property_instance.add_alert(alert_type, message, payload, commit=True)
+        return Response(alert, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='clear-alerts', permission_classes=[permissions.IsAdminUser])
+    def clear_alerts(self, request, pk=None):
+        """Permite limpiar alertas (todas o por tipo)."""
+        property_instance = self.get_object()
+        alert_type = request.data.get('type')
+        alerts = property_instance.clear_alerts(alert_type, commit=True)
+        return Response({'alerts': alerts})
 
     @action(detail=True, methods=['post'], url_path='set-status', permission_classes=[permissions.IsAdminUser])
     def set_publication_status(self, request, pk=None):
@@ -523,20 +600,14 @@ class PropertyViewSet(viewsets.ModelViewSet):
         return Response({'detail': 'Propiedad enriquecida', **data}, status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
-        """Eliminar propiedad con validaciones adicionales y invalidación de caché"""
+        """Restringir eliminación a staff; bloquear para clientes."""
+        if not self.request.user.is_staff:
+            raise PermissionDenied("Eliminación deshabilitada para clientes.")
         try:
-            # Verificar permisos adicionales si es necesario
-            if not self.request.user.is_staff and instance.owner != self.request.user:
-                raise PermissionDenied("No tienes permisos para eliminar esta propiedad.")
-
             logger.info(f"Eliminando propiedad {instance.id} por usuario {self.request.user.username}")
             instance.delete()
-
-            # Invalidar caché después de eliminar propiedad
             invalidate_property_cache()
-
             logger.info(f"Propiedad {instance.id} eliminada exitosamente")
-
         except Exception as e:
             logger.error(f"Error al eliminar propiedad {instance.id}: {str(e)}", exc_info=True)
             raise
@@ -1287,6 +1358,272 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
         send_property_status_email(document.property)
 
         return Response({'detail': 'Documento rechazado.'}, status=status.HTTP_200_OK)
+
+
+class ListingPlanViewSet(viewsets.ReadOnlyModelViewSet):
+    """Planes y entitlements disponibles para vendedores."""
+    queryset = ListingPlan.objects.all().order_by('price', 'name')
+    serializer_class = ListingPlanSerializer
+    permission_classes = [permissions.AllowAny]
+
+
+class PilotProfileViewSet(viewsets.ModelViewSet):
+    """Gestión del perfil operativo de pilotos."""
+    queryset = PilotProfile.objects.select_related('user').prefetch_related('documents')
+    serializer_class = PilotProfileSerializer
+
+    def get_permissions(self):
+        if self.action == 'list':
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_staff:
+            return qs
+        if not user.is_authenticated:
+            return qs.none()
+        return qs.filter(user=user)
+
+    def create(self, request, *args, **kwargs):
+        profile, created = PilotProfile.objects.get_or_create(user=request.user)
+        serializer = self.get_serializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(serializer.data, status=status_code)
+
+    @action(detail=False, methods=['get', 'patch'], url_path='me', permission_classes=[permissions.IsAuthenticated])
+    def me(self, request):
+        profile, _ = PilotProfile.objects.get_or_create(user=request.user)
+        if request.method.lower() == 'patch':
+            serializer = self.get_serializer(profile, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='availability', permission_classes=[permissions.IsAuthenticated])
+    def set_availability(self, request):
+        profile, _ = PilotProfile.objects.get_or_create(user=request.user)
+        is_available = bool(request.data.get('is_available', True))
+        profile.is_available = is_available
+        profile.last_heartbeat_at = timezone.now()
+        profile.save(update_fields=['is_available', 'last_heartbeat_at', 'updated_at'])
+        return Response({'is_available': profile.is_available})
+
+    @action(detail=False, methods=['post'], url_path='heartbeat', permission_classes=[permissions.IsAuthenticated])
+    def heartbeat(self, request):
+        profile, _ = PilotProfile.objects.get_or_create(user=request.user)
+        profile.last_heartbeat_at = timezone.now()
+        profile.location_latitude = request.data.get('latitude', profile.location_latitude)
+        profile.location_longitude = request.data.get('longitude', profile.location_longitude)
+        profile.save(update_fields=['last_heartbeat_at', 'location_latitude', 'location_longitude', 'updated_at'])
+        return Response({'status': 'ok'})
+
+
+class PilotDocumentViewSet(viewsets.ModelViewSet):
+    """Carga y revisión de documentos de pilotos."""
+    serializer_class = PilotDocumentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = PilotDocument.objects.select_related('pilot', 'pilot__user')
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_staff:
+            return qs
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        if not pilot_profile:
+            return qs.none()
+        return qs.filter(pilot=pilot_profile)
+
+    def perform_create(self, serializer):
+        pilot_profile = getattr(self.request.user, 'pilot_profile', None)
+        if not pilot_profile:
+            raise PermissionDenied('Solo operadores pueden subir documentos.')
+        serializer.save(pilot=pilot_profile, status='pending', reviewed_by=None, reviewed_at=None)
+
+    def perform_update(self, serializer):
+        pilot_profile = getattr(self.request.user, 'pilot_profile', None)
+        if not (self.request.user.is_staff or pilot_profile):
+            raise PermissionDenied('No autorizado.')
+        serializer.save(status='pending', reviewed_by=None, reviewed_at=None)
+
+
+class JobViewSet(viewsets.ModelViewSet):
+    """Gestión de trabajos operativos."""
+    serializer_class = JobSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Job.objects.select_related(
+        'property',
+        'property__owner',
+        'plan',
+        'assigned_pilot',
+        'assigned_pilot__user',
+    ).prefetch_related(
+        'offers',
+        'offers__pilot',
+        'offers__pilot__user',
+        'timeline',
+        'timeline__actor',
+    )
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'set_status', 'invite_next_wave']:
+            return [permissions.IsAdminUser()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_authenticated:
+            return qs.none()
+        if user.is_staff:
+            return qs
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        if pilot_profile:
+            return qs.filter(Q(assigned_pilot=pilot_profile) | Q(offers__pilot=pilot_profile)).distinct()
+        return qs.filter(property__owner=user)
+
+    @action(detail=False, methods=['get'], url_path='available', permission_classes=[permissions.IsAuthenticated])
+    def available(self, request):
+        pilot_profile = getattr(request.user, 'pilot_profile', None)
+        if not pilot_profile:
+            return Response([], status=status.HTTP_200_OK)
+        qs = Job.objects.select_related(
+            'property',
+            'plan',
+        ).prefetch_related(
+            'offers',
+            'offers__pilot',
+        ).filter(
+            offers__pilot=pilot_profile,
+            offers__status='pending'
+        ).distinct()
+        job_list = list(qs)
+        for job in job_list:
+            job.expire_pending_offers(auto=True)
+        serializer = self.get_serializer(job_list, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        job = self.get_object()
+        job.expire_pending_offers(auto=True)
+        serializer = self.get_serializer(job)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='schedule', permission_classes=[permissions.IsAuthenticated])
+    def schedule(self, request, pk=None):
+        job = self.get_object()
+        user = request.user
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        is_owner = job.property.owner_id == user.id
+        is_pilot = pilot_profile and job.assigned_pilot_id == pilot_profile.id
+        if not (user.is_staff or is_owner or is_pilot):
+            raise PermissionDenied('No autorizado para agendar este trabajo.')
+
+        from django.utils.dateparse import parse_datetime
+
+        start_raw = request.data.get('scheduled_start')
+        end_raw = request.data.get('scheduled_end')
+        if not start_raw or not end_raw:
+            return Response({'error': 'scheduled_start y scheduled_end son requeridos.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        start_dt = parse_datetime(start_raw)
+        end_dt = parse_datetime(end_raw)
+        if not start_dt or not end_dt:
+            return Response({'error': 'Formato de fecha inválido. Use ISO8601.'}, status=status.HTTP_400_BAD_REQUEST)
+        if end_dt <= start_dt:
+            return Response({'error': 'La hora de término debe ser posterior al inicio.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        job.scheduled_start = start_dt
+        job.scheduled_end = end_dt
+        job.transition('scheduled', actor=user, message=request.data.get('message', 'Agenda confirmada'), metadata={'source': 'schedule_action'})
+        serializer = self.get_serializer(job)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='set-status', permission_classes=[permissions.IsAdminUser])
+    def set_status(self, request, pk=None):
+        job = self.get_object()
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'error': 'status es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+        message = request.data.get('message', '')
+        metadata = request.data.get('metadata', {})
+        try:
+            job.transition(new_status, actor=request.user, message=message, metadata=metadata)
+        except ValidationError as exc:
+            return Response({'error': exc.message_dict if hasattr(exc, 'message_dict') else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(job)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='start-flight', permission_classes=[permissions.IsAuthenticated])
+    def start_flight(self, request, pk=None):
+        job = self.get_object()
+        user = request.user
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        if not (user.is_staff or (pilot_profile and job.assigned_pilot_id == pilot_profile.id)):
+            raise PermissionDenied('Solo el piloto asignado puede iniciar la grabación.')
+        job.transition('shooting', actor=user, message=request.data.get('message', 'Vuelo iniciado'), metadata={'source': 'pilot_app'})
+        serializer = self.get_serializer(job)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='complete-flight', permission_classes=[permissions.IsAuthenticated])
+    def complete_flight(self, request, pk=None):
+        job = self.get_object()
+        user = request.user
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        if not (user.is_staff or (pilot_profile and job.assigned_pilot_id == pilot_profile.id)):
+            raise PermissionDenied('Solo el piloto asignado puede finalizar la grabación.')
+        job.transition('finished', actor=user, message=request.data.get('message', 'Grabación finalizada'), metadata={'source': 'pilot_app'})
+        serializer = self.get_serializer(job)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='invite-next-wave', permission_classes=[permissions.IsAdminUser])
+    def invite_next_wave(self, request, pk=None):
+        job = self.get_object()
+        next_wave = job.invite_wave + 1 if job.invite_wave else 1
+        offers = job.send_invite_wave(wave=next_wave, actor=request.user)
+        serializer = JobOfferSerializer(offers, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED if offers else status.HTTP_200_OK)
+
+
+class JobOfferViewSet(viewsets.ModelViewSet):
+    """Invitaciones enviadas a operadores."""
+    serializer_class = JobOfferSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = JobOffer.objects.select_related('job', 'job__property', 'pilot', 'pilot__user')
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_staff:
+            return qs
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        if not pilot_profile:
+            return qs.none()
+        return qs.filter(pilot=pilot_profile)
+
+    @action(detail=True, methods=['post'], url_path='accept', permission_classes=[permissions.IsAuthenticated])
+    def accept_offer(self, request, pk=None):
+        offer = self.get_object()
+        if not (request.user.is_staff or offer.pilot.user_id == request.user.id):
+            raise PermissionDenied('No puedes aceptar esta invitación.')
+        offer.accept(actor_user=request.user)
+        serializer = self.get_serializer(offer)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='decline', permission_classes=[permissions.IsAuthenticated])
+    def decline_offer(self, request, pk=None):
+        offer = self.get_object()
+        if not (request.user.is_staff or offer.pilot.user_id == request.user.id):
+            raise PermissionDenied('No puedes rechazar esta invitación.')
+        offer.decline()
+        serializer = self.get_serializer(offer)
+        return Response(serializer.data)
 
 class RecordingOrderViewSet(viewsets.ModelViewSet):
     """Gestiona las órdenes de grabación de tours 360."""

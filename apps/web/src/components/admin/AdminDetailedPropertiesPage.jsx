@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Chip, Avatar, IconButton, Menu, MenuItem, LinearProgress, Dialog, DialogTitle, DialogContent, Button, TextField, List, ListItem, ListItemText, ListItemAvatar, Paper, InputBase, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Chip, Avatar, IconButton, Menu, MenuItem, LinearProgress, Dialog, DialogTitle, DialogContent, Button, TextField, List, ListItem, ListItemText, ListItemAvatar, Paper, InputBase, CircularProgress, Alert, FormControl, InputLabel, Select } from '@mui/material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { styled } from '@mui/material/styles';
 import { propertyService, authService } from '../../services/api';
@@ -72,6 +72,8 @@ const AdminDetailedPropertiesPage = () => {
     const [selectedProperty, setSelectedProperty] = useState(null);
     const [manageToursOpen, setManageToursOpen] = useState(false);
     const [docsModalOpen, setDocsModalOpen] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('');
+    const [selectionModel, setSelectionModel] = useState([]);
     
     // Estados para datos y búsqueda
     const [properties, setProperties] = useState([]);
@@ -108,7 +110,7 @@ const AdminDetailedPropertiesPage = () => {
     };
 
     // Función para cargar propiedades
-    const loadProperties = useCallback(async (search = '', page = 0, pageSize = 10) => {
+    const loadProperties = useCallback(async (search = '', page = 0, pageSize = 10, status = '') => {
         try {
             if (search) {
                 setSearchLoading(true);
@@ -119,6 +121,9 @@ const AdminDetailedPropertiesPage = () => {
             const filters = {};
             if (search) {
                 filters.search = search;
+            }
+            if (status) {
+                filters.publication_status = status;
             }
             
             const response = await propertyService.getPaginatedProperties(page + 1, filters, pageSize);
@@ -141,20 +146,20 @@ const AdminDetailedPropertiesPage = () => {
     useEffect(() => {
         // Como las propiedades funcionan (según logs), cargamos directamente
         // StaffRoute ya valida que solo admins puedan acceder
-        loadProperties('', paginationModel.page, paginationModel.pageSize);
-    }, [paginationModel.page, paginationModel.pageSize, loadProperties]);
+        loadProperties('', paginationModel.page, paginationModel.pageSize, statusFilter);
+    }, [paginationModel.page, paginationModel.pageSize, statusFilter, loadProperties]);
 
     // Debounce para búsqueda
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (searchTerm !== undefined) {
-                loadProperties(searchTerm, 0, paginationModel.pageSize);
+                loadProperties(searchTerm, 0, paginationModel.pageSize, statusFilter);
                 setPaginationModel(prev => ({ ...prev, page: 0 }));
             }
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [searchTerm, paginationModel.pageSize, loadProperties]);
+    }, [searchTerm, statusFilter, paginationModel.pageSize, loadProperties]);
 
     const handleSearchChange = (event) => {
         setSearchTerm(event.target.value);
@@ -163,6 +168,8 @@ const AdminDetailedPropertiesPage = () => {
     const handlePaginationModelChange = (newModel) => {
         setPaginationModel(newModel);
     };
+
+    const GRID_MIN_WIDTH = 1100;
 
     const columns = [
         { 
@@ -184,13 +191,27 @@ const AdminDetailedPropertiesPage = () => {
         {
             field: 'has_tour',
             headerName: 'Tour 360°',
-            minWidth: 140,
+            minWidth: 180,
             renderCell: (params) => (
-              params?.value ? (
-                <Chip label="Activo" color="success" size="small" />
-              ) : (
-                <Chip label="Sin tour" size="small" />
-              )
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {params?.value ? (
+                        <Chip label="Activo" color="success" size="small" />
+                    ) : (
+                        <Chip label="Sin tour" size="small" />
+                    )}
+                    <IconButton
+                        size="small"
+                        aria-label="Gestionar tour 360"
+                        title="Gestionar tour 360"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedProperty(params.row);
+                            setManageToursOpen(true);
+                        }}
+                    >
+                        <TourIcon fontSize="inherit" />
+                    </IconButton>
+                </Box>
             )
         },
         { 
@@ -277,34 +298,80 @@ const AdminDetailedPropertiesPage = () => {
     }
 
     return (
-    <Box sx={{ p: 3, minHeight: '100vh' }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
-            Gestión de Propiedades
-        </Typography>
-        
-        {/* Barra de búsqueda */}
-        <SearchContainer elevation={0}>
-            <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
-            <InputBase
-                placeholder="Buscar propiedades por nombre..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                autoComplete="off"
-                sx={{ flex: 1 }}
-            />
-            {searchLoading && (
-                <CircularProgress size={20} sx={{ ml: 1 }} />
-            )}
-        </SearchContainer>
-        
-        <Box sx={{ 
-          height: 'calc(100vh - 200px)', 
-          width: '100%',
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: '4px',
-          p: 1
-        }}>
+    <Box sx={{ p: { xs: 2, md: 3 }, display: 'flex', flexDirection: 'column', gap: 2, minHeight: 'calc(100vh - 140px)' }}>
+        <Box>
+          <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Gestión de Propiedades
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+              Busca, filtra y gestiona tours y documentos desde un único lugar.
+          </Typography>
+        </Box>
+
+        {/* Filtros y acciones */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <SearchContainer elevation={0} sx={{ flex: 1, minWidth: 260 }}>
+              <SearchIcon sx={{ color: 'action.active', mr: 1 }} />
+              <InputBase
+                  placeholder="Buscar propiedades por nombre..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  autoComplete="off"
+                  sx={{ flex: 1 }}
+              />
+              {searchLoading && (
+                  <CircularProgress size={20} sx={{ ml: 1 }} />
+              )}
+          </SearchContainer>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="status-filter-label">Estado</InputLabel>
+            <Select
+              labelId="status-filter-label"
+              label="Estado"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="">Todos</MenuItem>
+              <MenuItem value="pending">Pendiente</MenuItem>
+              <MenuItem value="approved">Aprobado</MenuItem>
+              <MenuItem value="rejected">Rechazado</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={() => {
+              const selectedId = selectionModel?.[0];
+              const row = properties.find((p) => p.id === selectedId);
+              if (row) {
+                setSelectedProperty(row);
+                setManageToursOpen(true);
+              }
+            }}
+            disabled={!selectionModel?.length}
+          >
+            Gestionar Tour 360°
+          </Button>
+        </Box>
+
+        <Box
+          className="scroll-container"
+          sx={{
+            flex: 1,
+            minHeight: 320,
+            width: '100%',
+            border: '1px solid rgba(0,0,0,0.08)',
+            borderRadius: '12px',
+            p: { xs: 0.5, md: 1.5 },
+            backgroundColor: '#ffffff',
+            overflow: 'hidden',
+            boxShadow: '0 12px 24px rgba(16,16,16,0.04)',
+          }}
+        >
             <DataGrid
+                getRowId={(row) => row.id}
                 rows={properties}
                 columns={columns}
                 paginationModel={paginationModel}
@@ -314,11 +381,16 @@ const AdminDetailedPropertiesPage = () => {
                 paginationMode="server"
                 loading={loading || searchLoading}
                 checkboxSelection
+                onRowSelectionModelChange={(m) => setSelectionModel(m)}
                 disableSelectionOnClick
+                disableColumnMenu
+                density="compact"
                 components={{
                     Toolbar: GridToolbar,
                 }}
                 sx={{
+                    height: '100%',
+                    width: '100%',
                     border: 'none',
                     '& .MuiDataGrid-cell': {
                         borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
@@ -329,7 +401,19 @@ const AdminDetailedPropertiesPage = () => {
                     },
                     '& .MuiDataGrid-toolbarContainer': {
                         padding: 1,
-                    }
+                    },
+                    '& .MuiDataGrid-main, & .MuiDataGrid-columnHeaders, & .MuiDataGrid-virtualScroller': {
+                        minWidth: GRID_MIN_WIDTH,
+                    },
+                    '& .MuiDataGrid-virtualScroller': {
+                        overflowX: 'auto',
+                    },
+                    '& .MuiDataGrid-columnSeparator': {
+                        color: 'rgba(0,0,0,0.08)',
+                    },
+                    '& .MuiDataGrid-footerContainer': {
+                        minWidth: GRID_MIN_WIDTH,
+                    },
                 }}
             />
         </Box>

@@ -1,7 +1,25 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model # Import get_user_model
 from django.conf import settings # Alternative for AUTH_USER_MODEL
-from .models import Property, Tour, Image, PropertyDocument, PropertyVisit, ComparisonSession, SavedSearch, Favorite, RecordingOrder
+from django.utils import timezone
+from .models import (
+    Property,
+    Tour,
+    Image,
+    PropertyDocument,
+    PropertyVisit,
+    ComparisonSession,
+    SavedSearch,
+    Favorite,
+    RecordingOrder,
+    ListingPlan,
+    PropertyStatusHistory,
+    PilotProfile,
+    PilotDocument,
+    Job,
+    JobOffer,
+    JobTimelineEvent,
+)
 import json
 from payments.models import Subscription
 
@@ -18,14 +36,44 @@ class ImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'url', 'type', 'order', 'created_at']
 
 class PropertyDocumentSerializer(serializers.ModelSerializer):
+    reviewed_by_details = BasicUserSerializer(source='reviewed_by', read_only=True)
+
     class Meta:
         model = PropertyDocument
-        fields = ['id', 'file', 'doc_type', 'description', 'uploaded_at', 'status', 'reviewed_by', 'reviewed_at']
+        fields = ['id', 'file', 'doc_type', 'description', 'uploaded_at', 'status', 'reviewed_by', 'reviewed_by_details', 'reviewed_at']
         extra_kwargs = {
             'status': {'read_only': True},
             'reviewed_by': {'read_only': True},
             'reviewed_at': {'read_only': True},
         }
+
+
+class ListingPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingPlan
+        fields = ['id', 'key', 'name', 'description', 'price', 'entitlements', 'sla_hours']
+
+
+class PropertyStatusHistorySerializer(serializers.ModelSerializer):
+    actor = BasicUserSerializer(read_only=True)
+
+    class Meta:
+        model = PropertyStatusHistory
+        fields = ['id', 'node', 'substate', 'percent', 'message', 'metadata', 'actor', 'created_at']
+        read_only_fields = fields
+
+
+class PropertyStatusBarSerializer(serializers.Serializer):
+    property_id = serializers.IntegerField()
+    node = serializers.CharField()
+    node_label = serializers.CharField()
+    substate = serializers.CharField()
+    substate_label = serializers.CharField(required=False, allow_blank=True)
+    percent = serializers.IntegerField()
+    cta = serializers.JSONField(required=False)
+    eta = serializers.JSONField(required=False)
+    alerts = serializers.ListField(child=serializers.DictField(), allow_empty=True)
+    nodes = serializers.ListField(child=serializers.DictField(), allow_empty=True)
 
 class TourSerializer(serializers.ModelSerializer):
     # Renaming created_at to uploaded_at for clarity in the API response,
@@ -125,6 +173,158 @@ class TourPackageCreateSerializer(serializers.ModelSerializer):
             'description': {'required': False, 'allow_blank': True},
         }
 
+
+class PilotDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PilotDocument
+        fields = ['id', 'pilot', 'doc_type', 'file', 'status', 'notes', 'expires_at', 'uploaded_at', 'reviewed_by', 'reviewed_at']
+        read_only_fields = ['status', 'uploaded_at', 'reviewed_by', 'reviewed_at', 'pilot']
+
+
+class PilotProfileSerializer(serializers.ModelSerializer):
+    user = BasicUserSerializer(read_only=True)
+    documents = PilotDocumentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PilotProfile
+        fields = [
+            'id',
+            'user',
+            'display_name',
+            'rating',
+            'score',
+            'completed_jobs',
+            'status',
+            'is_available',
+            'location_latitude',
+            'location_longitude',
+            'last_heartbeat_at',
+            'notes',
+            'documents',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['rating', 'score', 'completed_jobs', 'last_heartbeat_at', 'created_at', 'updated_at']
+
+
+class JobTimelineEventSerializer(serializers.ModelSerializer):
+    actor = BasicUserSerializer(read_only=True)
+
+    class Meta:
+        model = JobTimelineEvent
+        fields = ['id', 'kind', 'message', 'metadata', 'actor', 'created_at']
+        read_only_fields = fields
+
+
+class JobOfferSerializer(serializers.ModelSerializer):
+    pilot_id = serializers.IntegerField(source='pilot.id', read_only=True)
+    pilot_profile = PilotProfileSerializer(source='pilot', read_only=True)
+    remaining_seconds = serializers.SerializerMethodField()
+    status_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = JobOffer
+        fields = [
+            'id',
+            'job',
+            'pilot_id',
+            'pilot_profile',
+            'status',
+            'wave',
+            'score',
+            'radius_km',
+            'ttl_seconds',
+            'sent_at',
+            'expires_at',
+            'responded_at',
+            'metadata',
+            'remaining_seconds',
+            'status_label',
+        ]
+        read_only_fields = [
+            'status',
+            'sent_at',
+            'expires_at',
+            'responded_at',
+            'metadata',
+            'pilot_id',
+            'pilot_profile',
+            'remaining_seconds',
+            'status_label',
+        ]
+
+    def get_remaining_seconds(self, obj):
+        if not obj.expires_at or obj.status != 'pending':
+            return 0
+        delta = (obj.expires_at - timezone.now()).total_seconds()
+        return max(int(delta), 0)
+
+    def get_status_label(self, obj):
+        return dict(JobOffer.STATUS_CHOICES).get(obj.status, obj.status)
+
+
+class JobSerializer(serializers.ModelSerializer):
+    property_id = serializers.IntegerField(source='property.id', read_only=True)
+    property_details = serializers.SerializerMethodField()
+    plan_id = serializers.IntegerField(source='plan.id', read_only=True)
+    plan_details = ListingPlanSerializer(source='plan', read_only=True)
+    assigned_pilot = PilotProfileSerializer(read_only=True)
+    timeline = JobTimelineEventSerializer(many=True, read_only=True)
+    offers = JobOfferSerializer(many=True, read_only=True)
+    status_label = serializers.SerializerMethodField()
+    status_bar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Job
+        fields = [
+            'id',
+            'status',
+            'status_label',
+            'property_id',
+            'property_details',
+            'plan_id',
+            'plan_details',
+            'price_amount',
+            'pilot_payout_amount',
+            'assigned_pilot',
+            'scheduled_start',
+            'scheduled_end',
+            'invite_wave',
+            'last_status_change_at',
+            'notes',
+            'vendor_instructions',
+            'timeline',
+            'offers',
+            'status_bar',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'status_label',
+            'plan_id',
+            'plan_details',
+            'timeline',
+            'offers',
+            'status_bar',
+            'created_at',
+            'updated_at',
+            'property_id',
+            'property_details',
+        ]
+
+    def get_status_label(self, obj):
+        return obj.get_status_display()
+
+    def get_status_bar(self, obj):
+        if not obj.property_id:
+            return None
+        return obj.property.build_status_bar_payload()
+
+    def get_property_details(self, obj):
+        if not obj.property_id:
+            return None
+        return PropertyPreviewSerializer(obj.property, context=self.context).data
+
 class PropertySerializer(serializers.ModelSerializer):
     images = ImageSerializer(many=True, read_only=True)
     tours = TourSerializer(many=True, read_only=True)
@@ -133,6 +333,11 @@ class PropertySerializer(serializers.ModelSerializer):
     documents = PropertyDocumentSerializer(many=True, read_only=True)
     plusvalia_score = serializers.SerializerMethodField()
     plusvalia_breakdown = serializers.SerializerMethodField()
+    plan = serializers.PrimaryKeyRelatedField(queryset=ListingPlan.objects.all(), allow_null=True, required=False)
+    plan_details = ListingPlanSerializer(source='plan', read_only=True)
+    status_history = PropertyStatusHistorySerializer(many=True, read_only=True)
+    status_bar = serializers.SerializerMethodField()
+    submission_requirements = serializers.SerializerMethodField()
     # TODO: add documents serializer when backend model ready
 
     class Meta:
@@ -141,7 +346,20 @@ class PropertySerializer(serializers.ModelSerializer):
                  'boundary_polygon', 'description', 'has_water', 'has_views', 
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
                   'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score', 'plusvalia_breakdown',
-                 'terrain', 'access', 'legal_status', 'utilities', 'ai_category', 'ai_summary']
+                 'terrain', 'access', 'legal_status', 'utilities',
+                 'workflow_node', 'workflow_substate', 'workflow_progress', 'workflow_alerts',
+                 'plan', 'plan_details', 'preferred_time_windows', 'access_notes', 'seller_notes',
+                 'status_history', 'status_bar', 'submission_requirements',
+                 'ai_category', 'ai_summary']
+        extra_kwargs = {
+            'workflow_node': {'read_only': True},
+            'workflow_substate': {'read_only': True},
+            'workflow_progress': {'read_only': True},
+            'workflow_alerts': {'read_only': True},
+            'plan_details': {'read_only': True},
+            'status_history': {'read_only': True},
+            'status_bar': {'read_only': True},
+        }
         
     def validate_boundary_polygon(self, value):
         """Validar que boundary_polygon sea un GeoJSON válido"""
@@ -199,6 +417,12 @@ class PropertySerializer(serializers.ModelSerializer):
                 return None
         return None
 
+    def get_status_bar(self, obj):
+        return obj.build_status_bar_payload()
+
+    def get_submission_requirements(self, obj):
+        return obj.compute_submission_requirements()
+
 class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer para listar propiedades con menos detalles"""
     image_count = serializers.IntegerField(source='image_count_annotation', read_only=True)
@@ -210,7 +434,8 @@ class PropertyListSerializer(serializers.ModelSerializer):
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
                  'has_water', 'has_views', 'image_count', 'has_tour',
-                 'publication_status', 'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms', 'plusvalia_score']
+                 'publication_status', 'workflow_node', 'workflow_substate', 'workflow_progress',
+                 'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms', 'plusvalia_score']
 
     def get_plusvalia_score(self, obj):
         # Beta/prelanzamiento: visible para todos

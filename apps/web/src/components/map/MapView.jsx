@@ -1087,25 +1087,8 @@ const MapView = forwardRef(({
 
     if (isMapUIReady && isMapLoaded && !loading) {
       autoFlightAttemptedRef.current = true;
-      
-      let userCountry = 'default';
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            // console.log(`🌍 Ubicación detectada: ${getCountryFromCoords(latitude, longitude)} (${latitude}, ${longitude})`);
-            userCountry = getCountryFromCoords(latitude, longitude);
-            performAutoFlight(userCountry);
-          },
-          () => {
-            // No se pudo obtener ubicación: por defecto usamos tour de Chile
-            performAutoFlight('chile'); 
-          }
-        );
-      } else {
-        // Geolocalización no soportada: por defecto Chile
-        performAutoFlight('chile');
-      }
+      // Default to Chile without solicitar ubicación del usuario al cargar
+      performAutoFlight('chile');
     } 
   }, [isMapUIReady, isMapLoaded, loading, properties, editable, autoFlyCompleted, getCountryFromCoords, performAutoFlight, disableIntroAnimation]);
 
