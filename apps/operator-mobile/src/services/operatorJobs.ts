@@ -111,7 +111,7 @@ export interface OperatorJob {
 
 export interface PilotDocument {
   id: number;
-  type: 'id' | 'license' | 'insurance' | 'drone_registration' | string;
+  type: 'id' | 'license' | 'insurance' | 'drone_registration' | 'background_check' | string;
   status?: 'pending' | 'approved' | 'rejected' | 'expired';
   uploaded_at?: string | null;
   expires_at?: string | null;

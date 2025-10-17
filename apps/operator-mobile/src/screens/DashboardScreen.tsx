@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { RootStackParamList } from '@navigation/RootNavigator';
 import { MainTabParamList } from '@navigation/MainTabsNavigator';
@@ -29,6 +30,8 @@ import {
   setAvailability,
 } from '@services/operatorJobs';
 import { useTheme, ThemeColors } from '@theme';
+import { DOCUMENT_TOTAL } from '@content/documents';
+import GuidedTourOverlay from '@components/GuidedTourOverlay';
 
 type DashboardNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Dashboard'>,
@@ -58,7 +61,7 @@ const DashboardScreen = () => {
   const navigation = useNavigation<DashboardNavigation>();
   const { user } = useAuth();
   const [profile, setProfile] = useState<PilotProfile | null>(null);
-  const [availableJobs, setAvailableJobs] = useState<OperatorJob[]>([]);
+  const [availableOffers, setAvailableOffers] = useState<OperatorJob[]>([]);
   const [pilotJobs, setPilotJobs] = useState<OperatorJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,6 +79,7 @@ const DashboardScreen = () => {
     true: colors.primary,
   };
   const [pendingAvailability, setPendingAvailability] = useState<boolean | null>(null);
+  const [showTour, setShowTour] = useState(false);
 
   const load = useCallback(async (refreshOnly = false) => {
     if (!refreshOnly) {
@@ -95,7 +99,7 @@ const DashboardScreen = () => {
       } else {
         setProfile({ ...profileData, is_available: pendingAvailability });
       }
-      setAvailableJobs(invites);
+      setAvailableOffers(invites);
       setPilotJobs(jobs);
     } catch (err) {
       console.error('Dashboard load error', err);
@@ -109,6 +113,30 @@ const DashboardScreen = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    const checkTour = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('skyterra-operator-tour');
+        if (!stored) {
+          setShowTour(true);
+        }
+      } catch (err) {
+        console.warn('Tour storage error', err);
+      }
+    };
+    checkTour();
+  }, []);
+
+  const finishTour = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem('skyterra-operator-tour', 'done');
+    } catch (err) {
+      console.warn('Tour dismiss error', err);
+    } finally {
+      setShowTour(false);
+    }
+  }, []);
 
   const toggleAvailability = async (value: boolean) => {
     setPendingAvailability(value);
@@ -161,28 +189,27 @@ const DashboardScreen = () => {
     [pilotJobs]
   );
 
-  const invitesCount = availableJobs.length;
+  const invitesCount = availableOffers.length;
   const pendingDocuments = profile?.documents?.filter((doc) => doc.status !== 'approved') ?? [];
   const summaryMetrics = useMemo(() => {
     const approvedDocs =
       profile?.documents?.filter((doc) => doc.status === 'approved').length ?? 0;
-    const totalDocs = profile?.documents?.length ?? 0;
     return [
-      { key: 'invites', label: 'Invitaciones', value: String(invitesCount) },
+      { key: 'invites', label: 'Ofertas', value: String(invitesCount) },
       { key: 'completed', label: 'Completados', value: String(completedCount) },
       {
         key: 'score',
-        label: 'Score',
+        label: 'Calificación',
         value: typeof profile?.score === 'number' ? profile.score.toFixed(1) : '—',
       },
       {
         key: 'documents',
         label: 'Docs al día',
-        value: totalDocs ? `${approvedDocs}/${totalDocs}` : `${approvedDocs}/0`,
+        value: `${approvedDocs}/${DOCUMENT_TOTAL}`,
       },
     ];
   }, [completedCount, invitesCount, profile?.documents, profile?.score]);
-  const invitesShowcase = useMemo(() => availableJobs.slice(0, 6), [availableJobs]);
+  const offersShowcase = useMemo(() => availableOffers.slice(0, 6), [availableOffers]);
 
   const ongoingSummaryMessage = useMemo(() => {
     if (!activeJob && !nextScheduledJob) {
@@ -200,19 +227,16 @@ const DashboardScreen = () => {
     navigation.navigate('JobDetail', { jobId: String(jobId) });
   };
 
-  const handleViewInvites = () => {
+  const handleViewOffers = () => {
     navigation.navigate('Jobs');
   };
 
   const greetingName = useMemo(() => {
-    if (profile?.display_name) {
-      return profile.display_name.split(' ')[0];
-    }
-    if (user?.first_name) {
-      return user.first_name;
-    }
-    return 'Operador';
-  }, [profile?.display_name, user?.first_name]);
+    const fromProfile = profile?.display_name?.trim();
+    const fromUser = user?.first_name?.trim();
+    const fallback = user?.email?.split('@')?.[0] || 'Piloto';
+    return fromProfile || fromUser || fallback;
+  }, [profile?.display_name, user?.first_name, user?.email]);
 
   const refreshControl = (
     <RefreshControl
@@ -283,9 +307,9 @@ const DashboardScreen = () => {
               </View>
 
               <View style={styles.heroActions}>
-                <TouchableOpacity style={styles.secondaryAction} onPress={handleViewInvites}>
+                <TouchableOpacity style={styles.secondaryAction} onPress={handleViewOffers}>
                   <Ionicons name="briefcase-outline" size={16} color={colors.textPrimary} />
-                  <Text style={styles.secondaryActionLabel}>Ver invitaciones</Text>
+                  <Text style={styles.secondaryActionLabel}>Ver ofertas</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryAction}
@@ -386,18 +410,18 @@ const DashboardScreen = () => {
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Invitaciones disponibles</Text>
-                <TouchableOpacity onPress={handleViewInvites}>
+                <Text style={styles.sectionTitle}>Ofertas disponibles</Text>
+                <TouchableOpacity onPress={handleViewOffers}>
                   <Text style={styles.sectionLink}>Ver todas</Text>
                 </TouchableOpacity>
               </View>
-              {invitesShowcase.length ? (
+              {offersShowcase.length ? (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.inviteCarousel}
                 >
-                  {invitesShowcase.map((job) => {
+                  {offersShowcase.map((job) => {
                     const price = job.pilot_payout_amount ?? job.price_amount ?? null;
                     const distanceLabel = formatDistance(job.travel_estimate?.distance_km);
                     return (
@@ -431,7 +455,7 @@ const DashboardScreen = () => {
               ) : (
                 <View style={styles.emptyCard}>
                   <Ionicons name="sparkles-outline" size={20} color={colors.textSecondary} />
-                  <Text style={styles.emptyTitle}>Sin invitaciones por ahora</Text>
+                  <Text style={styles.emptyTitle}>Sin ofertas por ahora</Text>
                   <Text style={styles.emptySubtitle}>
                     Mantén tu disponibilidad activa y te avisaremos cuando llegue la próxima misión.
                   </Text>
@@ -440,6 +464,7 @@ const DashboardScreen = () => {
             </View>
           </ScrollView>
         )}
+        {showTour ? <GuidedTourOverlay visible={showTour} onFinish={finishTour} /> : null}
       </SafeAreaView>
     </LinearGradient>
   );

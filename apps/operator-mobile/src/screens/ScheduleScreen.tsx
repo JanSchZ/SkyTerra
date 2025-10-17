@@ -108,7 +108,7 @@ const ScheduleScreen = () => {
               </View>
               <TouchableOpacity style={styles.allInvites} onPress={() => navigation.navigate('Jobs')}>
                 <Ionicons name="briefcase-outline" size={16} color={colors.primary} />
-                <Text style={styles.allInvitesText}>Invitaciones</Text>
+                <Text style={styles.allInvitesText}>Ofertas</Text>
               </TouchableOpacity>
             </View>
 
@@ -160,7 +160,7 @@ const ScheduleScreen = () => {
                 <Ionicons name="sparkles-outline" size={22} color={colors.textSecondary} />
                 <Text style={styles.emptyHeroTitle}>Aún no tienes visitas agendadas</Text>
                 <Text style={styles.emptyHeroSubtitle}>
-                  Acepta invitaciones desde la pestaña Órdenes para completar tu calendario.
+                  Acepta ofertas desde la pestaña Órdenes para completar tu calendario.
                 </Text>
               </View>
             )}

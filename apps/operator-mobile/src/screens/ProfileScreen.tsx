@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,40 +24,9 @@ import {
   updatePilotProfile,
   uploadPilotDocument,
 } from '@services/operatorJobs';
+import { documentBlueprints, DOCUMENT_TOTAL } from '@content/documents';
 import { getErrorMessage } from '@utils/errorMessages';
 import { useTheme, ThemeColors, ThemeMode } from '@theme';
-
-const documentBlueprints: Array<{
-  type: PilotDocument['type'];
-  title: string;
-  description: string;
-  acceptedTypes: string[];
-}> = [
-  {
-    type: 'id',
-    title: 'Documento de identidad',
-    description: 'Cédula o pasaporte vigente en formato PDF, JPG o PNG.',
-    acceptedTypes: ['application/pdf', 'image/jpeg', 'image/png'],
-  },
-  {
-    type: 'license',
-    title: 'Licencia de operador',
-    description: 'Licencia DGAC o equivalente, incluye reverso si aplica.',
-    acceptedTypes: ['application/pdf', 'image/jpeg', 'image/png'],
-  },
-  {
-    type: 'insurance',
-    title: 'Seguro de responsabilidad',
-    description: 'Certificado de cobertura actualizado para operaciones RPAS.',
-    acceptedTypes: ['application/pdf', 'image/jpeg'],
-  },
-  {
-    type: 'drone_registration',
-    title: 'Registro de aeronave',
-    description: 'Documento de inscripción del dron principal y número de serie.',
-    acceptedTypes: ['application/pdf', 'image/jpeg', 'image/png'],
-  },
-];
 
 const statusCopy: Record<NonNullable<PilotDocument['status']>, { label: string; tone: string }> = {
   pending: { label: 'En revisión', tone: '#FBBF24' },
@@ -102,13 +71,13 @@ const ProfileScreen = () => {
     portfolio_url: '',
   });
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchPilotProfile();
       setProfile(data);
       setForm({
-        display_name: data.display_name ?? '',
+        display_name: data.display_name ?? user?.first_name ?? '',
         phone_number: data.phone_number ?? '',
         base_city: data.base_city ?? '',
         coverage_radius_km:
@@ -130,11 +99,11 @@ const ProfileScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [loadProfile]);
 
   const getDocument = (type: PilotDocument['type']) =>
     profile?.documents?.find((item) => item.type === type) ?? null;
@@ -266,8 +235,7 @@ const ProfileScreen = () => {
 
   const documentsSummary = useMemo(() => {
     const approved = profile?.documents?.filter((doc) => doc.status === 'approved').length ?? 0;
-    const total = documentBlueprints.length;
-    return `${approved}/${total} documentos aprobados`;
+    return `${approved}/${DOCUMENT_TOTAL} documentos aprobados`;
   }, [profile?.documents]);
 
   return (
@@ -284,7 +252,7 @@ const ProfileScreen = () => {
             <View style={styles.headerCard}>
               <View style={styles.headerRow}>
                 <View>
-                  <Text style={styles.headerTitle}>{form.display_name || 'Tu perfil'}</Text>
+                  <Text style={styles.headerTitle}>{form.display_name || user?.first_name || 'Tu perfil'}</Text>
                   <Text style={styles.headerSubtitle}>{user?.email}</Text>
                 </View>
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -294,7 +262,7 @@ const ProfileScreen = () => {
               </View>
               <View style={styles.headerMeta}>
                 <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Score</Text>
+                  <Text style={styles.metaLabel}>Calificación</Text>
                   <Text style={styles.metaValue}>
                     {typeof profile?.score === 'number' ? profile.score.toFixed(1) : '—'}
                   </Text>

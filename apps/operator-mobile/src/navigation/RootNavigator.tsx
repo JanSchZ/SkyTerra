@@ -5,6 +5,7 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import SignInScreen from '@screens/SignInScreen';
 import SignUpScreen from '@screens/SignUpScreen';
 import JobDetailScreen from '@screens/JobDetailScreen';
+import GuideScreen from '@screens/GuideScreen';
 import MainTabsNavigator from './MainTabsNavigator';
 import { useAuth } from '@context/AuthContext';
 import { useTheme, ThemeColors } from '@theme';
@@ -15,6 +16,7 @@ export type RootStackParamList = {
   SignUp: undefined;
   MainTabs: undefined;
   JobDetail: { jobId: string };
+  Guide: { guideId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -58,6 +60,7 @@ const RootNavigator = () => {
           <>
             <Stack.Screen name="MainTabs" component={MainTabsNavigator} />
             <Stack.Screen name="JobDetail" component={JobDetailScreen} />
+            <Stack.Screen name="Guide" component={GuideScreen} />
           </>
         ) : (
           <>

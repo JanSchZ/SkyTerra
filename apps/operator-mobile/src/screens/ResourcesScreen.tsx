@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,21 +23,24 @@ const resources = [
     title: 'Checklist de pre-vuelo',
     description: 'Guía rápida para revisar clima, perímetro y permisos antes de despegar.',
     icon: 'checkbox-outline' as const,
-    url: 'https://skyterra.cl/recursos/checklist-preflight',
   },
   {
     id: 'safety',
     title: 'Protocolos de seguridad',
     description: 'Actualizaciones sobre normativa DGAC, zonas restringidas y contactos de emergencia.',
     icon: 'shield-checkmark-outline' as const,
-    url: 'https://skyterra.cl/recursos/seguridad',
   },
   {
     id: 'billing',
     title: 'Facturación y pagos',
     description: 'Pasos para cargar boletas, plazos de pago y resolución de incidencias.',
     icon: 'document-text-outline' as const,
-    url: 'https://skyterra.cl/recursos/pagos',
+  },
+  {
+    id: 'shooting',
+    title: 'Instructivo de grabación',
+    description: 'Ajustes de cámara, modos de dron y flujo de captura para foto y video.',
+    icon: 'camera-outline' as const,
   },
 ];
 
@@ -50,10 +53,8 @@ const ResourcesScreen = () => {
     [colors.background, colors.backgroundAlt, isDark]
   );
 
-  const handleOpenLink = (url: string) => {
-    Linking.openURL(url).catch(() => {
-      /* noop */
-    });
+  const handleOpenGuide = (id: string) => {
+    navigation.navigate('Guide', { guideId: id });
   };
 
   return (
@@ -102,7 +103,7 @@ const ResourcesScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Guías operativas</Text>
             {resources.map((item) => (
-              <TouchableOpacity key={item.id} onPress={() => handleOpenLink(item.url)}>
+              <TouchableOpacity key={item.id} onPress={() => handleOpenGuide(item.id)}>
                 <View style={styles.resourceCard}>
                   <View style={styles.resourceIcon}>
                     <Ionicons name={item.icon} size={18} color={colors.primary} />

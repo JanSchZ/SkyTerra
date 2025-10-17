@@ -93,7 +93,7 @@ const JobListScreen = () => {
     true: colors.primary,
   };
 
-  const pendingInvites = useMemo(() => jobs.length, [jobs]);
+  const pendingOffers = useMemo(() => jobs.length, [jobs]);
 
   const loadJobs = async (refreshOnly = false) => {
     if (!refreshOnly) setLoading(true);
@@ -149,7 +149,7 @@ const JobListScreen = () => {
       await loadJobs(true);
       navigation.navigate('JobDetail', { jobId: String(job.id) });
     } catch (err) {
-      console.error('Error al aceptar la invitación', err);
+      console.error('Error al aceptar la oferta', err);
     }
   };
 
@@ -160,7 +160,7 @@ const JobListScreen = () => {
       await declineOffer(offer.id);
       await loadJobs(true);
     } catch (err) {
-      console.error('Error al declinar la invitación', err);
+      console.error('Error al declinar la oferta', err);
     }
   };
 
@@ -251,7 +251,7 @@ const JobListScreen = () => {
         <SafeAreaView style={styles.safe}>
           <View style={styles.loading}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Buscando invitaciones…</Text>
+            <Text style={styles.loadingText}>Buscando ofertas…</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -295,7 +295,7 @@ const JobListScreen = () => {
                       {pilotProfile?.display_name ? `Hola, ${pilotProfile.display_name.split(' ')[0]}` : 'Hola, operador'}
                     </Text>
                     <Text style={styles.profileMetaText}>
-                      {pilotProfile?.status === 'active' ? 'Activo' : 'Pendiente'} · Score {scoreLabel}
+                      {pilotProfile?.status === 'active' ? 'Activo' : 'Pendiente'} · Calificación {scoreLabel}
                     </Text>
                   </View>
                   <View style={styles.availabilityCluster}>
@@ -310,8 +310,8 @@ const JobListScreen = () => {
                 </View>
                 <View style={styles.statsRow}>
                   <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>Invitaciones</Text>
-                    <Text style={styles.metricValue}>{pendingInvites}</Text>
+                    <Text style={styles.metricLabel}>Ofertas</Text>
+                    <Text style={styles.metricValue}>{pendingOffers}</Text>
                   </View>
                   <View style={styles.metric}>
                     <Text style={styles.metricLabel}>Activa</Text>
@@ -342,7 +342,7 @@ const JobListScreen = () => {
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <Ionicons name="sparkles-outline" size={22} color={colors.textSecondary} />
-              <Text style={styles.emptyTitle}>Sin invitaciones nuevas</Text>
+              <Text style={styles.emptyTitle}>Sin ofertas nuevas</Text>
               <Text style={styles.emptySubtitle}>Mantén la disponibilidad activa para recibir vuelos cercanos.</Text>
             </View>
           }
