@@ -34,7 +34,7 @@ import AuthPage from './components/ui/AuthForms';
 import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
-import LandingV2 from './components/ui/LandingV2';
+import LandingExperience from './components/ui/LandingExperience';
 
 import CompareView from './components/property/CompareView';
 import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
@@ -153,6 +153,14 @@ function App() {
 
   const mapRef = React.useRef(null);
   const [initialPropertiesData, setInitialPropertiesData] = useState(null);
+  const [hasCompletedLanding, setHasCompletedLanding] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && sessionStorage.getItem('skyterra.landingComplete') === 'true';
+    } catch (error) {
+      void error;
+      return false;
+    }
+  });
 
   // Estado para el Snackbar
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -708,9 +716,18 @@ function App() {
   };
 
   // Determine if the top bar should be shown
-  const showTopBar = 
-    location.pathname === '/' || 
+  const showTopBar =
+    (location.pathname === '/' && hasCompletedLanding) ||
     location.pathname.startsWith('/property/');
+
+  const markLandingComplete = React.useCallback(() => {
+    setHasCompletedLanding(true);
+    try {
+      sessionStorage.setItem('skyterra.landingComplete', 'true');
+    } catch (error) {
+      void error;
+    }
+  }, []);
 
   // Helper function to format ranges (price, size)
   const formatRange = (range, unit = '', prefix = '') => {
@@ -780,21 +797,38 @@ function App() {
 
   const mainContent = (
     <Routes>
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-            <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
+            <LandingExperience
+              mapRef={mapRef}
+              filters={{}}
+              appliedFilters={aiAppliedFilters}
+              initialData={initialPropertiesData}
+              hasCompletedLanding={hasCompletedLanding}
+              onExperienceComplete={markLandingComplete}
+            />
           </motion.div>
-        } 
+        }
       />
       {/* Autenticación clásica dentro de un modal */}
       <Route path="/auth" element={<AuthPage onLogin={handleLogin} />} />
-      <Route path="/landing" element={
-        <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-          <LandingV2 />
-        </motion.div>
-      } />
+      <Route
+        path="/landing"
+        element={
+          <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+            <LandingExperience
+              mapRef={mapRef}
+              filters={{}}
+              appliedFilters={aiAppliedFilters}
+              initialData={initialPropertiesData}
+              hasCompletedLanding={false}
+              onExperienceComplete={markLandingComplete}
+            />
+          </motion.div>
+        }
+      />
       <Route path="/map" element={<ProtectedRoute user={user} element={<MapView />} />} />
       <Route path="/property/:id" element={<PropertyDetails user={user?.user || user} />} />
       <Route path="/tour/:tourId" element={<TourViewer />} />
@@ -893,20 +927,27 @@ function App() {
         >
           {/* UI principal siempre visible (Header Minimalista, etc.) */}
           {/* Condición para no mostrar en property, tour, o dashboard */}
-          {showTopBar && (
-            <Box // This Box is the main container for the top bar elements
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                p: isMobile ? 1 : 2,
-                zIndex: 1200,
-                display: 'flex', // Changed to flex to allow vertical stacking of AISearchBar and FiltersDisplay
-                flexDirection: 'column', // Stack vertically
-                alignItems: 'center', // Center items horizontally in the column
-              }}
-            >
+          <AnimatePresence>
+            {showTopBar && (
+              <Box // This Box is the main container for the top bar elements
+                component={motion.div}
+                key={`top-bar-${location.pathname.startsWith('/property/') ? 'property' : 'map'}`}
+                initial={{ opacity: 0, y: -40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -40 }}
+                transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  p: isMobile ? 1 : 2,
+                  zIndex: 1200,
+                  display: 'flex', // Changed to flex to allow vertical stacking of AISearchBar and FiltersDisplay
+                  flexDirection: 'column', // Stack vertically
+                  alignItems: 'center', // Center items horizontally in the column
+                }}
+              >
               <Box // This Box wraps the original top bar content (Logo, Search, UserMenu)
                 sx={{
                   display: 'flex',
@@ -1128,8 +1169,9 @@ function App() {
                 </Box>
               </Box>
               {/* Removed AppliedFiltersDisplay to keep filters internal and invisible to user */}
-            </Box>
-          )}
+              </Box>
+            )}
+          </AnimatePresence>
 
           {/* Overlay de transición de navegación */}
           <AnimatePresence>
@@ -1201,8 +1243,8 @@ function App() {
           </AnimatePresence>
 
           {/* Render AI suggestion panel only on main map route */}
-          {location.pathname === '/' && (
-            <AISuggestionPanel 
+          {location.pathname === '/' && hasCompletedLanding && (
+            <AISuggestionPanel
                isLoading={aiSearchLoading}
                assistantMessage={aiSearchResult?.assistant_message}
                recommendations={aiSearchResult?.recommendations}
