@@ -19,6 +19,8 @@ import PropertyPreviewModal from '../property/PropertyPreviewModal';
 import CloseIcon from '@mui/icons-material/Close';
 import PropertySidePreview from '../property/PropertySidePreview';
 import { demoMapProperties } from '../../_mocks/demoMapProperties';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 const toFeaturePolygon = (boundary) => {
   if (!boundary) return null;
@@ -151,7 +153,7 @@ const MapView = forwardRef(({
   initialData = null,
 }, ref) => {
   const navigate = useNavigate();
-  const { mode, theme } = useContext(ThemeModeContext);
+  const { mode } = useContext(ThemeModeContext);
 
   // Hook optimizado para gestión de propiedades
   const { getPropertiesCached, prefetchNextPage } = usePropertyService();
@@ -211,6 +213,19 @@ const MapView = forwardRef(({
   const recommendationsTourTimeoutRef = useRef(null);
   const idleRotationTimeoutRef = useRef(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const skipNextClickRef = useRef(false);
+  const attemptedBoundaryFetchRef = useRef(new Set());
+
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTouchDevice = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      'ontouchstart' in window ||
+      (typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0))
+    );
+  }, []);
+  const disableOverlayForMobile = isSmallScreen || isTouchDevice;
 
   const boundaryFeature = useMemo(() => {
     if (!propertyBoundaries) return null;
@@ -328,6 +343,60 @@ const MapView = forwardRef(({
   // Side preview panel state
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [sidePanelProperty, setSidePanelProperty] = useState(null);
+
+  useEffect(() => {
+    if (!sidePanelProperty) return;
+    const normalized = normalizeBoundary(sidePanelProperty.boundary_polygon);
+    if (normalized) {
+      setPropertyBoundaries((prev) => {
+        if (prev && prev.geojson === normalized.geojson) {
+          return prev;
+        }
+        return normalized;
+      });
+      return;
+    }
+    if (sidePanelProperty?.has_boundary === false) {
+      setPropertyBoundaries(null);
+    }
+  }, [sidePanelProperty?.boundary_polygon, sidePanelProperty?.has_boundary, sidePanelProperty]);
+
+  useEffect(() => {
+    const propertyId = sidePanelProperty?.id;
+    if (!propertyId) return;
+    if (sidePanelProperty?.boundary_polygon || sidePanelProperty?.has_boundary === false) return;
+    if (attemptedBoundaryFetchRef.current.has(propertyId)) return;
+
+    attemptedBoundaryFetchRef.current.add(propertyId);
+    let cancelled = false;
+    let completed = false;
+
+    propertyService.getProperty(propertyId)
+      .then((data) => {
+        if (cancelled) return;
+        const normalized = normalizeBoundary(data?.boundary_polygon);
+        if (normalized) {
+          completed = true;
+          setPropertyBoundaries((prev) => {
+            if (prev && prev.geojson === normalized.geojson) {
+              return prev;
+            }
+            return normalized;
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Error refetching property boundary:', err);
+        attemptedBoundaryFetchRef.current.delete(propertyId);
+      });
+
+    return () => {
+      cancelled = true;
+      if (!completed) {
+        attemptedBoundaryFetchRef.current.delete(propertyId);
+      }
+    };
+  }, [sidePanelProperty?.id, sidePanelProperty?.boundary_polygon, sidePanelProperty?.has_boundary]);
 
   // Helper setters to keep React state and refs in sync (needed for tour overlay)
   const setActiveTourUrl = (url) => {
@@ -499,9 +568,9 @@ const MapView = forwardRef(({
       flightTimeoutIdRef.current = null;
       // console.log('🚁 Futuros vuelos de animación cancelados por usuario.');
     }
-    
-    userInteractedRef.current = true; 
-    setAutoFlyCompleted(true); 
+
+    userInteractedRef.current = true;
+    setAutoFlyCompleted(true);
     setShowOverlay(false); // Ocultar overlay inmediatamente
     setIsRotating(false); // Detener la rotación del globo
 
@@ -510,6 +579,13 @@ const MapView = forwardRef(({
     // se encargarán de detener el movimiento.
 
   }, [setAutoFlyCompleted, setShowOverlay, setIsRotating]);
+
+  useEffect(() => {
+    if (disableIntroAnimation) return;
+    if (disableOverlayForMobile && showOverlay) {
+      stopAndSkipAnimation();
+    }
+  }, [disableOverlayForMobile, showOverlay, stopAndSkipAnimation, disableIntroAnimation]);
 
   const mapStyle = config.mapbox.style;
   
@@ -766,7 +842,15 @@ const MapView = forwardRef(({
 
       if (!editable) {
         const normalizedBoundary = normalizeBoundary(property.boundary_polygon);
-        setPropertyBoundaries(normalizedBoundary || null);
+        setPropertyBoundaries((prev) => {
+          if (normalizedBoundary) {
+            return normalizedBoundary;
+          }
+          if (property?.has_boundary === false) {
+            return null;
+          }
+          return prev;
+        });
         if (normalizedBoundary) {
           forceMapResize();
         }
@@ -1458,6 +1542,16 @@ const MapView = forwardRef(({
     );
   };
 
+  const touchOptimizedCircleSizes = {
+    base: isTouchDevice ? 8 : 6,
+    mid: isTouchDevice ? 12 : 10,
+    high: isTouchDevice ? 18 : 14,
+  };
+  const touchOptimizedStroke = {
+    base: isTouchDevice ? 1.5 : 1,
+    mid: isTouchDevice ? 2.5 : 2,
+    high: isTouchDevice ? 3.5 : 3,
+  };
   const unclusteredPointLayer = {
     id: 'unclustered-point',
     type: 'circle',
@@ -1468,17 +1562,17 @@ const MapView = forwardRef(({
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 6,   // Zoom bajo = puntos pequeños (aumentado para mejor puntería)
-        12, 10, // Zoom medio = puntos medianos (aumentado)
-        16, 14  // Zoom alto = puntos grandes (aumentado)
+        8, touchOptimizedCircleSizes.base,
+        12, touchOptimizedCircleSizes.mid,
+        16, touchOptimizedCircleSizes.high
       ],
       'circle-stroke-width': [
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 1,   // Borde fino en zoom bajo
-        12, 2,  // Borde medio en zoom medio
-        16, 3   // Borde grueso en zoom alto
+        8, touchOptimizedStroke.base,
+        12, touchOptimizedStroke.mid,
+        16, touchOptimizedStroke.high
       ],
       'circle-stroke-color': '#ffffff',
       'circle-stroke-opacity': 0.9,
@@ -1486,9 +1580,11 @@ const MapView = forwardRef(({
         'interpolate',
         ['linear'],
         ['zoom'],
-        8, 0.7,   // Menos opaco de lejos
-        12, 0.9,  // Más opaco cerca
-        16, 1     // Completamente opaco muy cerca
+        8, isTouchDevice ? 0.82 : 0.7,
+        12, 0.95,
+        14.4, 0.6,
+        15, 0.25,
+        15.5, 0
       ]
     }
   };
@@ -1520,7 +1616,7 @@ const MapView = forwardRef(({
     const queryLayers = [unclusteredPointLayer.id];
 
     // Aumentar el radio de búsqueda alrededor del click para facilitar selección
-    const pad = 12; // píxeles alrededor del punto de click
+    const pad = isTouchDevice ? 24 : 12; // píxeles alrededor del punto de click
     const bbox = [
       [event.point.x - pad, event.point.y - pad],
       [event.point.x + pad, event.point.y + pad]
@@ -1533,7 +1629,7 @@ const MapView = forwardRef(({
         handleMarkerClick(feature.properties);
       }
     }
-  }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted]);
+  }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted, isTouchDevice]);
 
   const scheduleIdleRotation = useCallback(() => {
     if (idleRotationTimeoutRef.current) {
@@ -1862,6 +1958,10 @@ const MapView = forwardRef(({
           projection={{ name: 'globe' }}
           onMoveEnd={handleMapMoveEnd}
           onClick={(e) => {
+            if (skipNextClickRef.current) {
+              skipNextClickRef.current = false;
+              return;
+            }
             if (editable) {
               // Location pick for embedded/edit mode
               const { lng, lat } = e.lngLat || {};
@@ -1878,7 +1978,16 @@ const MapView = forwardRef(({
                 }
             }
           }}
-          interactiveLayerIds={!editable ? [unclusteredPointLayer.id] : []} 
+          onTouchStart={(e) => {
+            handleUserInteraction(e);
+          }}
+          onTouchEnd={(e) => {
+            if (!editable) {
+              skipNextClickRef.current = true;
+              onMapClick(e);
+            }
+          }}
+          interactiveLayerIds={!editable ? [unclusteredPointLayer.id] : []}
           onMouseMove={onMapMouseMove} 
           onMouseLeave={onMapMouseLeave} 
            preserveDrawingBuffer={false}

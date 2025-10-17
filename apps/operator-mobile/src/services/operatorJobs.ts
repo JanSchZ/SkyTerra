@@ -5,7 +5,7 @@ const ensureArray = <T>(input: unknown): T[] => {
     return input as T[];
   }
   if (input && typeof input === 'object') {
-    const candidate = (input as { results?: unknown; data?: unknown; items?: unknown });
+    const candidate = input as { results?: unknown; data?: unknown; items?: unknown };
     if (Array.isArray(candidate.results)) return candidate.results as T[];
     if (Array.isArray(candidate.data)) return candidate.data as T[];
     if (Array.isArray(candidate.items)) return candidate.items as T[];
@@ -21,6 +21,53 @@ export interface OperatorJobOffer {
   metadata?: Record<string, unknown>;
   remaining_seconds?: number;
   status_label?: string;
+}
+
+export interface OperatorJobLocation {
+  address_line?: string;
+  formatted_address?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  reference_point?: string;
+}
+
+export interface OperatorJobTravelEstimate {
+  distance_km?: number;
+  duration_minutes?: number;
+  eta_text?: string;
+}
+
+export interface OperatorJobRequirement {
+  id: number;
+  title: string;
+  description?: string;
+  is_complete?: boolean;
+  completed_at?: string | null;
+}
+
+export interface OperatorJobPayoutBreakdown {
+  currency?: string;
+  base_amount?: number;
+  travel_bonus?: number;
+  extras?: number;
+  total?: number;
+  notes?: string;
+}
+
+export interface OperatorJobDeliverables {
+  status: 'pending' | 'processing' | 'submitted' | 'approved' | 'rejected';
+  last_uploaded_at?: string | null;
+  download_url?: string | null;
+  notes?: string | null;
+}
+
+export interface OperatorJobContact {
+  name?: string;
+  phone?: string;
+  email?: string;
 }
 
 export interface OperatorJob {
@@ -54,6 +101,12 @@ export interface OperatorJob {
     message: string;
     created_at: string;
   }>;
+  location?: OperatorJobLocation;
+  travel_estimate?: OperatorJobTravelEstimate;
+  requirements?: OperatorJobRequirement[];
+  payout_breakdown?: OperatorJobPayoutBreakdown;
+  deliverables?: OperatorJobDeliverables;
+  contact?: OperatorJobContact;
 }
 
 export interface PilotProfile {
@@ -86,7 +139,7 @@ export const listPilotJobs = async (): Promise<OperatorJob[]> => {
 
 export const fetchJob = async (jobId: number | string): Promise<OperatorJob> => {
   const { data } = await api.get(`/api/jobs/${jobId}/`);
-  return data;
+  return data as OperatorJob;
 };
 
 export const acceptOffer = async (offerId: number) => {
@@ -97,7 +150,10 @@ export const declineOffer = async (offerId: number) => {
   await api.post(`/api/job-offers/${offerId}/decline/`);
 };
 
-export const scheduleJob = async (jobId: number | string, payload: { scheduled_start: string; scheduled_end: string }) => {
+export const scheduleJob = async (
+  jobId: number | string,
+  payload: { scheduled_start: string; scheduled_end: string }
+) => {
   await api.post(`/api/jobs/${jobId}/schedule/`, payload);
 };
 
@@ -107,4 +163,43 @@ export const startFlight = async (jobId: number | string) => {
 
 export const completeFlight = async (jobId: number | string) => {
   await api.post(`/api/jobs/${jobId}/complete-flight/`);
+};
+
+export const updateRequirementStatus = async (
+  jobId: number | string,
+  requirementId: number,
+  isComplete: boolean
+) => {
+  const { data } = await api.patch(`/api/jobs/${jobId}/requirements/${requirementId}/`, {
+    is_complete: isComplete,
+  });
+  return data as OperatorJobRequirement;
+};
+
+export interface DeliverableUploadPayload {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  notes?: string;
+}
+
+export const uploadJobDeliverables = async (
+  jobId: number | string,
+  file: DeliverableUploadPayload
+) => {
+  const form = new FormData();
+  form.append('file', {
+    uri: file.uri,
+    name: file.name,
+    type: file.mimeType ?? 'application/zip',
+  } as unknown as Blob);
+  if (file.notes) {
+    form.append('notes', file.notes);
+  }
+  const { data } = await api.post(`/api/jobs/${jobId}/deliverables/`, form, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data as OperatorJobDeliverables;
 };
