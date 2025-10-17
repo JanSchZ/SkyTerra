@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,7 @@ import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { MainTabParamList } from '@navigation/MainTabsNavigator';
 import { useAuth } from '@context/AuthContext';
 import {
   OperatorJob,
@@ -30,7 +32,10 @@ import {
   setAvailability,
 } from '@services/operatorJobs';
 
-type JobsScreenNav = NativeStackNavigationProp<RootStackParamList, 'Jobs'>;
+type JobsScreenNav = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Jobs'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 const currencyFormatter = new Intl.NumberFormat('es-CL', {
   style: 'currency',

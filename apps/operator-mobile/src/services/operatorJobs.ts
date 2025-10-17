@@ -109,6 +109,15 @@ export interface OperatorJob {
   contact?: OperatorJobContact;
 }
 
+export interface PilotDocument {
+  id: number;
+  type: 'id' | 'license' | 'insurance' | 'drone_registration' | string;
+  status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  uploaded_at?: string | null;
+  expires_at?: string | null;
+  file_url?: string | null;
+}
+
 export interface PilotProfile {
   id: number;
   display_name: string;
@@ -116,6 +125,15 @@ export interface PilotProfile {
   is_available: boolean;
   rating: number;
   score: number;
+  phone_number?: string | null;
+  base_city?: string | null;
+  coverage_radius_km?: number | null;
+  drone_model?: string | null;
+  experience_years?: number | null;
+  website?: string | null;
+  portfolio_url?: string | null;
+  documents?: PilotDocument[];
+  pending_requirements?: string[];
 }
 
 export const fetchPilotProfile = async (): Promise<PilotProfile> => {
@@ -202,4 +220,37 @@ export const uploadJobDeliverables = async (
     },
   });
   return data as OperatorJobDeliverables;
+};
+
+export const updatePilotProfile = async (payload: Partial<PilotProfile>): Promise<PilotProfile> => {
+  const body = Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  );
+  const { data } = await api.patch('/api/pilot-profiles/me/', body);
+  return data as PilotProfile;
+};
+
+export interface PilotDocumentUploadPayload {
+  type: PilotDocument['type'];
+  file: DeliverableUploadPayload;
+}
+
+export const uploadPilotDocument = async (
+  payload: PilotDocumentUploadPayload
+): Promise<PilotDocument> => {
+  const form = new FormData();
+  form.append('type', payload.type);
+  form.append('file', {
+    uri: payload.file.uri,
+    name: payload.file.name,
+    type: payload.file.mimeType ?? 'application/pdf',
+  } as unknown as Blob);
+
+  const { data } = await api.post('/api/pilot-profiles/documents/', form, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return data as PilotDocument;
 };

@@ -10,7 +10,9 @@ module.exports = function (api) {
           '@screens': './src/screens',
           '@services': './src/services',
           '@context': './src/context',
-          '@theme': './src/theme'
+          '@theme': './src/theme',
+          '@navigation': './src/navigation',
+          '@utils': './src/utils'
         }
       }]
     ]
