@@ -266,7 +266,7 @@ const JobListScreen = () => {
                 <View style={styles.profileHeader}>
                   <View>
                     <Text style={styles.profileWelcome}>
-                      {pilotProfile ? `Hola, ${pilotProfile.display_name.split(' ')[0]}` : 'Hola, operador'}
+                      {pilotProfile?.display_name ? `Hola, ${pilotProfile.display_name.split(' ')[0]}` : 'Hola, operador'}
                     </Text>
                     <Text style={styles.profileMetaText}>
                       {pilotProfile?.status === 'active' ? 'Activo' : 'Pendiente'} · Score {scoreLabel}

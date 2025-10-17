@@ -153,7 +153,7 @@ const MapView = forwardRef(({
   initialData = null,
 }, ref) => {
   const navigate = useNavigate();
-  const { mode, theme } = useContext(ThemeModeContext);
+  const { mode } = useContext(ThemeModeContext);
 
   // Hook optimizado para gestión de propiedades
   const { getPropertiesCached, prefetchNextPage } = usePropertyService();
