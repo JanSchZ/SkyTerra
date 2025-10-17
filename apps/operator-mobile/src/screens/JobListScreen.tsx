@@ -38,6 +38,34 @@ const currencyFormatter = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 0,
 });
 
+const formatDistance = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  if (value >= 100) {
+    return `${value.toFixed(0)} km`;
+  }
+  if (value >= 10) {
+    return `${value.toFixed(1)} km`;
+  }
+  return `${value.toFixed(2)} km`;
+};
+
+const formatDuration = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) {
+    return null;
+  }
+  if (value < 60) {
+    return `${Math.max(1, Math.round(value))} min`;
+  }
+  const hours = Math.floor(value / 60);
+  const minutes = Math.round(value % 60);
+  if (minutes === 0) {
+    return `${hours} h`;
+  }
+  return `${hours} h ${minutes} min`;
+};
+
 const JobListScreen = () => {
   const navigation = useNavigation<JobsScreenNav>();
   const { signOut } = useAuth();
@@ -120,10 +148,18 @@ const JobListScreen = () => {
   const renderJobCard = ({ item }: { item: OperatorJob }) => {
     const offer = item.offers?.find((o) => o.status === 'pending');
     const distance = typeof offer?.metadata?.distance_km === 'number' ? offer.metadata.distance_km : null;
+    const travelDistance = item.travel_estimate?.distance_km ?? distance;
+    const travelDuration = item.travel_estimate?.duration_minutes ?? null;
     const countdown = typeof offer?.remaining_seconds === 'number' ? offer.remaining_seconds : null;
     const price = item.pilot_payout_amount ?? item.price_amount ?? null;
     const formattedPrice = price ? currencyFormatter.format(price) : '$—';
     const propertyType = item.property_details?.type ?? 'Tipo por confirmar';
+    const formattedAddress =
+      item.location?.formatted_address ||
+      [item.location?.address_line, item.location?.city, item.location?.region].filter(Boolean).join(', ') ||
+      null;
+    const etaLabel = formatDuration(travelDuration);
+    const distanceLabel = formatDistance(travelDistance);
 
     return (
       <Pressable
@@ -147,10 +183,24 @@ const JobListScreen = () => {
             <Ionicons name="map-outline" size={16} color="#CBD5F5" />
             <Text style={styles.jobMetaText}>{item.plan_details?.name ?? 'Plan estándar'}</Text>
           </View>
-          {distance !== null ? (
+          {formattedAddress ? (
+            <View style={styles.jobMetaRow}>
+              <Ionicons name="location-outline" size={16} color="#CBD5F5" />
+              <Text style={styles.jobMetaText} numberOfLines={1}>
+                {formattedAddress}
+              </Text>
+            </View>
+          ) : null}
+          {distanceLabel ? (
             <View style={styles.jobMetaRow}>
               <Ionicons name="navigate-outline" size={16} color="#CBD5F5" />
-              <Text style={styles.jobMetaText}>{distance.toFixed(1)} km desde tu radio</Text>
+              <Text style={styles.jobMetaText}>{distanceLabel} desde tu radio</Text>
+            </View>
+          ) : null}
+          {etaLabel ? (
+            <View style={styles.jobMetaRow}>
+              <Ionicons name="time-outline" size={16} color="#CBD5F5" />
+              <Text style={styles.jobMetaText}>{etaLabel} de traslado estimado</Text>
             </View>
           ) : null}
           {item.property_details?.size ? (
@@ -280,12 +330,23 @@ const ActiveJobCard: React.FC<{ job: OperatorJob; onPress: () => void }> = ({ jo
   const statusLabel = job.status_bar?.substate_label || job.status_label || job.status;
   const startAt = job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : 'Agendar';
   const payout = job.pilot_payout_amount ?? job.price_amount ?? null;
+  const formattedAddress =
+    job.location?.formatted_address ||
+    [job.location?.address_line, job.location?.city].filter(Boolean).join(', ');
 
   return (
     <Pressable onPress={onPress} style={styles.activeWrapper}>
       <LinearGradient colors={['#F9FAFB', '#D1D5DB']} style={styles.activeGradient}>
         <Text style={styles.activeTitle}>Trabajo en progreso</Text>
         <Text style={styles.activeProperty}>{job.property_details?.name ?? `Trabajo #${job.id}`}</Text>
+        {formattedAddress ? (
+          <View style={styles.activeMetaRow}>
+            <Ionicons name="location-outline" size={14} color="#111827" />
+            <Text style={styles.activeMeta} numberOfLines={1}>
+              {formattedAddress}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.activeMetaRow}>
           <Ionicons name="flash-outline" size={14} color="#111827" />
           <Text style={styles.activeMeta}>{statusLabel}</Text>
@@ -454,6 +515,7 @@ const styles = StyleSheet.create({
   },
   jobMetaText: {
     color: '#CBD5F5',
+    flex: 1,
   },
   jobActions: {
     flexDirection: 'row',
