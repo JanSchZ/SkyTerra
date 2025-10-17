@@ -1,9 +1,8 @@
-import React from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
@@ -11,6 +10,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { RootStackParamList } from '@navigation/RootNavigator';
 import { MainTabParamList } from '@navigation/MainTabsNavigator';
+import { useTheme, ThemeColors } from '@theme';
 
 type ResourcesNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Resources'>,
@@ -43,6 +43,12 @@ const resources = [
 
 const ResourcesScreen = () => {
   const navigation = useNavigation<ResourcesNavigation>();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const backgroundGradient = useMemo(
+    () => (isDark ? ['#050608', '#0b0d11'] : [colors.background, colors.backgroundAlt]),
+    [colors.background, colors.backgroundAlt, isDark]
+  );
 
   const handleOpenLink = (url: string) => {
     Linking.openURL(url).catch(() => {
@@ -51,10 +57,10 @@ const ResourcesScreen = () => {
   };
 
   return (
-    <LinearGradient colors={['#050608', '#0b0d11']} style={styles.gradient}>
-      <StatusBar style="light" />
+    <LinearGradient colors={backgroundGradient} style={styles.gradient}>
+      <StatusBar style={colors.statusBarStyle} backgroundColor={backgroundGradient[0]} />
       <SafeAreaView style={styles.safe}>
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <Text style={styles.title}>Centro de recursos</Text>
             <Text style={styles.subtitle}>
@@ -62,9 +68,9 @@ const ResourcesScreen = () => {
             </Text>
           </View>
 
-          <BlurView intensity={85} tint="dark" style={styles.callout}>
+          <View style={styles.callout}>
             <View style={styles.calloutIcon}>
-              <Ionicons name="cloud-upload-outline" size={20} color="#0F172A" />
+              <Ionicons name="cloud-upload-outline" size={20} color={colors.primaryOn} />
             </View>
             <View style={styles.calloutText}>
               <Text style={styles.calloutTitle}>Entrega tu material</Text>
@@ -73,13 +79,13 @@ const ResourcesScreen = () => {
               </Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('Jobs')}>
-              <Ionicons name="chevron-forward" size={18} color="#F9FAFB" />
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
-          </BlurView>
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Documentos destacados</Text>
-            <BlurView intensity={85} tint="dark" style={styles.documentCard}>
+            <View style={styles.documentCard}>
               <Text style={styles.documentText}>
                 Descarga el kit de estilo, logos y plantillas para compartir tu trabajo con los clientes.
               </Text>
@@ -87,48 +93,48 @@ const ResourcesScreen = () => {
                 style={styles.documentButton}
                 onPress={() => handleOpenLink('https://skyterra.cl/recursos/brand-kit.zip')}
               >
-                <Ionicons name="download-outline" size={18} color="#0F172A" />
+                <Ionicons name="download-outline" size={18} color={colors.primaryOn} />
                 <Text style={styles.documentButtonLabel}>Descargar kit</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Guías operativas</Text>
             {resources.map((item) => (
               <TouchableOpacity key={item.id} onPress={() => handleOpenLink(item.url)}>
-                <BlurView intensity={80} tint="dark" style={styles.resourceCard}>
+                <View style={styles.resourceCard}>
                   <View style={styles.resourceIcon}>
-                    <Ionicons name={item.icon} size={18} color="#0F172A" />
+                    <Ionicons name={item.icon} size={18} color={colors.primary} />
                   </View>
                   <View style={styles.resourceText}>
                     <Text style={styles.resourceTitle}>{item.title}</Text>
                     <Text style={styles.resourceSubtitle}>{item.description}</Text>
                   </View>
-                  <Ionicons name="open-outline" size={18} color="#E5E7EB" />
-                </BlurView>
+                  <Ionicons name="open-outline" size={18} color={colors.textSecondary} />
+                </View>
               </TouchableOpacity>
             ))}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>¿Necesitas ayuda?</Text>
-            <BlurView intensity={85} tint="dark" style={styles.supportCard}>
+            <View style={styles.supportCard}>
               <View style={styles.supportRow}>
-                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#38BDF8" />
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
                 <Text style={styles.supportText}>Soporte operaciones: operaciones@skyterra.cl</Text>
               </View>
               <View style={styles.supportRow}>
-                <Ionicons name="call-outline" size={18} color="#38BDF8" />
+                <Ionicons name="call-outline" size={18} color={colors.primary} />
                 <Text style={styles.supportText}>Emergencias vuelo: +56 9 7654 3210</Text>
               </View>
               <TouchableOpacity style={styles.supportButton} onPress={() => navigation.navigate('Profile')}>
-                <Ionicons name="person-circle-outline" size={18} color="#0F172A" />
+                <Ionicons name="person-circle-outline" size={18} color={colors.primaryOn} />
                 <Text style={styles.supportButtonLabel}>Actualizar documentación</Text>
               </TouchableOpacity>
-            </BlurView>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -136,155 +142,157 @@ const ResourcesScreen = () => {
 
 export default ResourcesScreen;
 
-const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  safe: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-    gap: 28,
-    paddingBottom: 120,
-  },
-  header: {
-    gap: 12,
-  },
-  title: {
-    color: '#F9FAFB',
-    fontSize: 26,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: '#CBD5F5',
-    lineHeight: 20,
-  },
-  callout: {
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    flexDirection: 'row',
-    gap: 16,
-    alignItems: 'center',
-  },
-  calloutIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calloutText: {
-    flex: 1,
-    gap: 4,
-  },
-  calloutTitle: {
-    color: '#F9FAFB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  calloutSubtitle: {
-    color: '#CBD5F5',
-  },
-  section: {
-    gap: 14,
-  },
-  sectionTitle: {
-    color: '#F9FAFB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  documentCard: {
-    borderRadius: 24,
-    padding: 20,
-    backgroundColor: 'rgba(15,17,23,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 16,
-  },
-  documentText: {
-    color: '#E5E7EB',
-    lineHeight: 20,
-  },
-  documentButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  documentButtonLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  resourceCard: {
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    flexDirection: 'row',
-    gap: 16,
-    alignItems: 'center',
-  },
-  resourceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  resourceText: {
-    flex: 1,
-    gap: 4,
-  },
-  resourceTitle: {
-    color: '#F9FAFB',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  resourceSubtitle: {
-    color: '#CBD5F5',
-    lineHeight: 20,
-  },
-  supportCard: {
-    borderRadius: 26,
-    padding: 20,
-    backgroundColor: 'rgba(15,17,23,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 12,
-  },
-  supportRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  supportText: {
-    color: '#F9FAFB',
-    flex: 1,
-  },
-  supportButton: {
-    marginTop: 6,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 18,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  supportButtonLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    gradient: {
+      flex: 1,
+    },
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: 20,
+      gap: 28,
+      paddingBottom: 120,
+    },
+    header: {
+      gap: 12,
+    },
+    title: {
+      color: colors.heading,
+      fontSize: 26,
+      fontWeight: '700',
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    callout: {
+      borderRadius: 28,
+      padding: 20,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      flexDirection: 'row',
+      gap: 16,
+      alignItems: 'center',
+    },
+    calloutIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+    },
+    calloutText: {
+      flex: 1,
+      gap: 4,
+    },
+    calloutTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    calloutSubtitle: {
+      color: colors.textSecondary,
+    },
+    section: {
+      gap: 14,
+    },
+    sectionTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    documentCard: {
+      borderRadius: 26,
+      padding: 18,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 12,
+    },
+    documentText: {
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    documentButton: {
+      marginTop: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      alignSelf: 'flex-start',
+    },
+    documentButtonLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+    resourceCard: {
+      borderRadius: 24,
+      padding: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    resourceIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.primarySoft,
+    },
+    resourceText: {
+      flex: 1,
+      gap: 4,
+    },
+    resourceTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    resourceSubtitle: {
+      color: colors.textSecondary,
+      lineHeight: 18,
+    },
+    supportCard: {
+      borderRadius: 26,
+      padding: 20,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 12,
+    },
+    supportRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    supportText: {
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    supportButton: {
+      marginTop: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    supportButtonLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+  });

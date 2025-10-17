@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import { useTheme, ThemeColors } from '@theme';
 
 interface AuthLayoutProps {
   title: string;
@@ -12,9 +12,21 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ title, subtitle, footer, children }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const gradientColors = isDark
+    ? ['#050608', '#0d0f13', '#050608']
+    : [colors.background, colors.backgroundAlt, colors.background];
+  const accentBlob = isDark
+    ? ['rgba(148,163,184,0.18)', 'rgba(148,163,184,0)']
+    : ['rgba(14, 116, 144, 0.12)', 'rgba(14, 116, 144, 0)'];
+  const secondaryBlob = isDark
+    ? ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0)']
+    : ['rgba(2,132,199,0.16)', 'rgba(255,255,255,0)'];
+
   return (
-    <LinearGradient colors={['#050608', '#0d0f13', '#050608']} style={styles.gradient}>
-      <StatusBar style="light" />
+    <LinearGradient colors={gradientColors} style={styles.gradient}>
+      <StatusBar style={colors.statusBarStyle} backgroundColor={gradientColors[0]} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -26,20 +38,14 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ title, subtitle, footer, childr
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.decorations}>
-            <LinearGradient
-              colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0)']}
-              style={[styles.blob, styles.blobOne]}
-            />
-            <LinearGradient
-              colors={['rgba(148,163,184,0.18)', 'rgba(148,163,184,0)']}
-              style={[styles.blob, styles.blobTwo]}
-            />
+            <LinearGradient colors={secondaryBlob} style={[styles.blob, styles.blobOne]} />
+            <LinearGradient colors={accentBlob} style={[styles.blob, styles.blobTwo]} />
           </View>
-          <BlurView intensity={90} tint="dark" style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.title}>{title}</Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             <View style={styles.body}>{children}</View>
-          </BlurView>
+          </View>
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -47,64 +53,70 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ title, subtitle, footer, childr
   );
 };
 
-const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    gap: 24,
-  },
-  decorations: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  blob: {
-    position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 240,
-    transform: [{ rotate: '15deg' }],
-  },
-  blobOne: {
-    top: -120,
-    right: -80,
-  },
-  blobTwo: {
-    bottom: -90,
-    left: -90,
-  },
-  card: {
-    borderRadius: 32,
-    padding: 32,
-    backgroundColor: 'rgba(15, 17, 23, 0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    textAlign: 'center',
-  },
-  subtitle: {
-    marginTop: 8,
-    marginBottom: 24,
-    color: '#E5E7EB',
-    textAlign: 'center',
-  },
-  body: {
-    gap: 16,
-  },
-  footer: {
-    alignItems: 'center',
-    gap: 12,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    gradient: {
+      flex: 1,
+    },
+    flex: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 24,
+      gap: 24,
+    },
+    decorations: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    blob: {
+      position: 'absolute',
+      width: 260,
+      height: 260,
+      borderRadius: 240,
+      transform: [{ rotate: '15deg' }],
+    },
+    blobOne: {
+      top: -120,
+      right: -80,
+    },
+    blobTwo: {
+      bottom: -90,
+      left: -90,
+    },
+    card: {
+      borderRadius: 32,
+      padding: 32,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      shadowColor: colors.cardShadow,
+      shadowOffset: { width: 0, height: 22 },
+      shadowOpacity: 0.18,
+      shadowRadius: 38,
+      elevation: 10,
+      gap: 0,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: '700',
+      color: colors.heading,
+      textAlign: 'center',
+    },
+    subtitle: {
+      marginTop: 8,
+      marginBottom: 24,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    body: {
+      gap: 16,
+    },
+    footer: {
+      alignItems: 'center',
+      gap: 12,
+    },
+  });
 
 export default AuthLayout;

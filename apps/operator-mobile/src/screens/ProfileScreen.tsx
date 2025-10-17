@@ -12,10 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import Slider from '@react-native-community/slider';
 import { useAuth } from '@context/AuthContext';
+import LocationSelector from '@components/LocationSelector';
 import {
   PilotDocument,
   PilotProfile,
@@ -24,6 +25,7 @@ import {
   uploadPilotDocument,
 } from '@services/operatorJobs';
 import { getErrorMessage } from '@utils/errorMessages';
+import { useTheme, ThemeColors, ThemeMode } from '@theme';
 
 const documentBlueprints: Array<{
   type: PilotDocument['type'];
@@ -64,6 +66,12 @@ const statusCopy: Record<NonNullable<PilotDocument['status']>, { label: string; 
   expired: { label: 'Vencido', tone: '#FB7185' },
 };
 
+const themeModeOptions: Array<{ value: ThemeMode; label: string; description: string }> = [
+  { value: 'light', label: 'Claro', description: 'Fondo claro y tarjetas luminosas.' },
+  { value: 'dark', label: 'Oscuro', description: 'Ideal para operar en ambientes con poca luz.' },
+  { value: 'auto', label: 'Automático', description: 'Se adapta a la configuración del sistema.' },
+];
+
 const ProfileScreen = () => {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<PilotProfile | null>(null);
@@ -71,7 +79,17 @@ const ProfileScreen = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const { colors, isDark, mode, setMode } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const backgroundGradient = useMemo(
+    () => (isDark ? ['#050608', '#0b0d11'] : [colors.background, colors.backgroundAlt]),
+    [colors.background, colors.backgroundAlt, isDark]
+  );
+  const [themeSaving, setThemeSaving] = useState<ThemeMode | null>(null);
+
   const [uploadingType, setUploadingType] = useState<PilotDocument['type'] | null>(null);
+
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const [form, setForm] = useState({
     display_name: '',
@@ -101,6 +119,11 @@ const ProfileScreen = () => {
         website: data.website ?? '',
         portfolio_url: data.portfolio_url ?? data.website ?? '',
       });
+      setLocation(
+        typeof data.location_latitude === 'number' && typeof data.location_longitude === 'number'
+          ? { latitude: data.location_latitude, longitude: data.location_longitude }
+          : null
+      );
     } catch (err) {
       console.error('Profile load error', err);
       setError('No pudimos cargar tu perfil. Intenta nuevamente.');
@@ -122,6 +145,35 @@ const ProfileScreen = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const coverageRadiusValue = useMemo(() => {
+    const numeric = Number(form.coverage_radius_km);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return 50;
+    }
+    return Math.min(Math.max(Math.round(numeric), 5), 200);
+  }, [form.coverage_radius_km]);
+
+  const handleThemeChange = async (nextMode: ThemeMode) => {
+    if (mode === nextMode) {
+      return;
+    }
+    setThemeSaving(nextMode);
+    try {
+      await setMode(nextMode);
+      setError(null);
+      setSuccess('Preferencias de tema actualizadas.');
+    } catch (err) {
+      console.warn('Theme change failed', err);
+      setError('No pudimos actualizar el tema. Intenta nuevamente.');
+    } finally {
+      setThemeSaving(null);
+    }
+  };
+
+  const placeholderColor = isDark ? 'rgba(148,163,184,0.65)' : 'rgba(100,116,139,0.55)';
+
+  const sliderBounds = { min: 5, max: 200 };
+
   const handleSave = async () => {
     setError(null);
     setSuccess(null);
@@ -136,10 +188,17 @@ const ProfileScreen = () => {
         experience_years: form.experience_years ? Number(form.experience_years) : null,
         website: form.website.trim() || null,
         portfolio_url: form.portfolio_url.trim() || null,
+        location_latitude: location?.latitude ?? null,
+        location_longitude: location?.longitude ?? null,
       };
 
       const updated = await updatePilotProfile(payload);
       setProfile(updated);
+      setLocation(
+        typeof updated.location_latitude === 'number' && typeof updated.location_longitude === 'number'
+          ? { latitude: updated.location_latitude, longitude: updated.location_longitude }
+          : null
+      );
       setSuccess('Perfil actualizado correctamente.');
     } catch (err) {
       const message = getErrorMessage(err, 'No pudimos guardar los cambios. Intenta nuevamente.');
@@ -212,24 +271,24 @@ const ProfileScreen = () => {
   }, [profile?.documents]);
 
   return (
-    <LinearGradient colors={['#050608', '#0b0d11']} style={styles.gradient}>
-      <StatusBar style="light" />
+    <LinearGradient colors={backgroundGradient} style={styles.gradient}>
+      <StatusBar style={colors.statusBarStyle} backgroundColor={backgroundGradient[0]} />
       <SafeAreaView style={styles.safe}>
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Preparando tu perfil…</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
-            <BlurView intensity={90} tint="dark" style={styles.headerCard}>
+            <View style={styles.headerCard}>
               <View style={styles.headerRow}>
                 <View>
                   <Text style={styles.headerTitle}>{form.display_name || 'Tu perfil'}</Text>
                   <Text style={styles.headerSubtitle}>{user?.email}</Text>
                 </View>
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-                  <Ionicons name="log-out-outline" size={18} color="#F9FAFB" />
+                  <Ionicons name="log-out-outline" size={18} color={colors.textPrimary} />
                   <Text style={styles.signOutLabel}>Salir</Text>
                 </TouchableOpacity>
               </View>
@@ -253,7 +312,7 @@ const ProfileScreen = () => {
               </View>
               {pendingRequirements.length ? (
                 <View style={styles.requirementsBox}>
-                  <Ionicons name="warning-outline" size={18} color="#FBBF24" />
+                  <Ionicons name="warning-outline" size={18} color={colors.warning} />
                   <View style={styles.requirementsText}>
                     <Text style={styles.requirementsTitle}>Requisitos pendientes</Text>
                     {pendingRequirements.map((item) => (
@@ -264,9 +323,9 @@ const ProfileScreen = () => {
                   </View>
                 </View>
               ) : null}
-            </BlurView>
+            </View>
 
-            <BlurView intensity={85} tint="dark" style={styles.formCard}>
+            <View style={styles.formCard}>
               <Text style={styles.sectionTitle}>Datos personales</Text>
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Nombre para clientes</Text>
@@ -274,7 +333,7 @@ const ProfileScreen = () => {
                   value={form.display_name}
                   onChangeText={(value) => handleChange('display_name', value)}
                   placeholder="Ej: Juan Pérez"
-                  placeholderTextColor="rgba(148,163,184,0.65)"
+                  placeholderTextColor={placeholderColor}
                   style={styles.input}
                 />
               </View>
@@ -285,7 +344,7 @@ const ProfileScreen = () => {
                     value={form.phone_number}
                     onChangeText={(value) => handleChange('phone_number', value)}
                     placeholder="+56 9 1234 5678"
-                    placeholderTextColor="rgba(148,163,184,0.65)"
+                    placeholderTextColor={placeholderColor}
                     style={styles.input}
                     keyboardType="phone-pad"
                   />
@@ -296,7 +355,7 @@ const ProfileScreen = () => {
                     value={form.base_city}
                     onChangeText={(value) => handleChange('base_city', value)}
                     placeholder="Santiago, Valparaíso…"
-                    placeholderTextColor="rgba(148,163,184,0.65)"
+                    placeholderTextColor={placeholderColor}
                     style={styles.input}
                   />
                 </View>
@@ -306,12 +365,28 @@ const ProfileScreen = () => {
                   <Text style={styles.label}>Radio de cobertura (km)</Text>
                   <TextInput
                     value={form.coverage_radius_km}
-                    onChangeText={(value) => handleChange('coverage_radius_km', value.replace(/[^0-9.]/g, ''))}
+                    onChangeText={(value) => handleChange('coverage_radius_km', value.replace(/[^0-9]/g, ''))}
                     placeholder="50"
-                    placeholderTextColor="rgba(148,163,184,0.65)"
+                    placeholderTextColor={placeholderColor}
                     style={styles.input}
-                    keyboardType="numeric"
+                    keyboardType="number-pad"
                   />
+                  <View style={styles.sliderContainer}>
+                    <Slider
+                      value={coverageRadiusValue}
+                      onValueChange={(value) => handleChange('coverage_radius_km', String(Math.round(value)))}
+                      minimumValue={sliderBounds.min}
+                      maximumValue={sliderBounds.max}
+                      step={5}
+                      thumbTintColor={isDark ? colors.surface : colors.primary}
+                      minimumTrackTintColor={colors.primary}
+                      maximumTrackTintColor={colors.cardBorder}
+                    />
+                    <View style={styles.sliderLabels}>
+                      <Text style={styles.sliderValue}>{coverageRadiusValue} km</Text>
+                      <Text style={styles.sliderAssist}>Rango {sliderBounds.min}–{sliderBounds.max} km</Text>
+                    </View>
+                  </View>
                 </View>
                 <View style={styles.fieldGroupHalf}>
                   <Text style={styles.label}>Años de experiencia</Text>
@@ -319,11 +394,22 @@ const ProfileScreen = () => {
                     value={form.experience_years}
                     onChangeText={(value) => handleChange('experience_years', value.replace(/[^0-9]/g, ''))}
                     placeholder="5"
-                    placeholderTextColor="rgba(148,163,184,0.65)"
+                    placeholderTextColor={placeholderColor}
                     style={styles.input}
                     keyboardType="number-pad"
                   />
                 </View>
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Ubicación base</Text>
+                <Text style={styles.helperText}>Selecciona tu punto de partida para calcular distancias.</Text>
+                <LocationSelector value={location} radiusKm={coverageRadiusValue} onChange={setLocation} />
+                <Text style={styles.locationHint}>
+                  {location
+                    ? `Coordenadas: ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+                    : 'Toca el mapa para guardar tu ubicación de referencia.'}
+                </Text>
               </View>
 
               <View style={styles.fieldGroup}>
@@ -332,7 +418,7 @@ const ProfileScreen = () => {
                   value={form.drone_model}
                   onChangeText={(value) => handleChange('drone_model', value)}
                   placeholder="DJI Mavic 3 Cine"
-                  placeholderTextColor="rgba(148,163,184,0.65)"
+                  placeholderTextColor={placeholderColor}
                   style={styles.input}
                 />
               </View>
@@ -343,7 +429,7 @@ const ProfileScreen = () => {
                   value={form.website}
                   onChangeText={(value) => handleChange('website', value)}
                   placeholder="https://portafolio.com"
-                  placeholderTextColor="rgba(148,163,184,0.65)"
+                  placeholderTextColor={placeholderColor}
                   style={styles.input}
                   autoCapitalize="none"
                 />
@@ -355,7 +441,7 @@ const ProfileScreen = () => {
                   value={form.portfolio_url}
                   onChangeText={(value) => handleChange('portfolio_url', value)}
                   placeholder="https://instagram.com/tuestudio"
-                  placeholderTextColor="rgba(148,163,184,0.65)"
+                  placeholderTextColor={placeholderColor}
                   style={styles.input}
                   autoCapitalize="none"
                 />
@@ -370,17 +456,45 @@ const ProfileScreen = () => {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator color="#0F172A" />
+                  <ActivityIndicator color={colors.primaryOn} />
                 ) : (
                   <>
-                    <Ionicons name="save-outline" size={18} color="#0F172A" />
+                    <Ionicons name="save-outline" size={18} color={colors.primaryOn} />
                     <Text style={styles.saveButtonLabel}>Guardar cambios</Text>
                   </>
                 )}
               </TouchableOpacity>
-            </BlurView>
+            </View>
 
-            <BlurView intensity={85} tint="dark" style={styles.documentsCard}>
+            <View style={styles.preferencesCard}>
+              <Text style={styles.sectionTitle}>Preferencias de la app</Text>
+              <View style={styles.themeOptions}>
+                {themeModeOptions.map((option) => {
+                  const isSelected = mode === option.value;
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[styles.themeOption, isSelected && styles.themeOptionActive]}
+                      onPress={() => handleThemeChange(option.value)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={[styles.radioOuter, isSelected && styles.radioOuterActive]}>
+                        {isSelected ? <View style={styles.radioInner} /> : null}
+                      </View>
+                      <View style={styles.themeTexts}>
+                        <Text style={styles.themeLabel}>{option.label}</Text>
+                        <Text style={styles.themeDescription}>{option.description}</Text>
+                      </View>
+                      {themeSaving === option.value ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.documentsCard}>
               <Text style={styles.sectionTitle}>Documentos y certificaciones</Text>
               <Text style={styles.sectionSubtitle}>
                 Asegúrate de mantener cada documento actualizado para acelerar la aprobación de nuevas misiones.
@@ -394,7 +508,7 @@ const ProfileScreen = () => {
                       <Text style={styles.documentTitle}>{doc.title}</Text>
                       <Text style={styles.documentDescription}>{doc.description}</Text>
                       <View style={styles.documentMeta}>
-                        <Ionicons name="time-outline" size={14} color="#CBD5F5" />
+                        <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
                         <Text style={styles.documentMetaText}>
                           {current?.uploaded_at
                             ? `Última carga: ${new Date(current.uploaded_at).toLocaleDateString()}`
@@ -403,8 +517,8 @@ const ProfileScreen = () => {
                       </View>
                       {current?.status ? (
                         <View style={styles.documentStatus}>
-                          <Ionicons name="ellipse" size={10} color={statusInfo?.tone ?? '#FBBF24'} />
-                          <Text style={[styles.documentStatusText, { color: statusInfo?.tone ?? '#FBBF24' }]}>
+                          <Ionicons name="ellipse" size={10} color={statusInfo?.tone ?? colors.warning} />
+                          <Text style={[styles.documentStatusText, { color: statusInfo?.tone ?? colors.warning }]}>
                             {statusInfo?.label ?? 'En revisión'}
                           </Text>
                         </View>
@@ -416,10 +530,10 @@ const ProfileScreen = () => {
                       disabled={uploadingType === doc.type}
                     >
                       {uploadingType === doc.type ? (
-                        <ActivityIndicator color="#0F172A" />
+                        <ActivityIndicator color={colors.primaryOn} />
                       ) : (
                         <>
-                          <Ionicons name="arrow-up-circle-outline" size={18} color="#0F172A" />
+                          <Ionicons name="arrow-up-circle-outline" size={18} color={colors.primaryOn} />
                           <Text style={styles.uploadButtonLabel}>
                             {current ? 'Actualizar documento' : 'Subir documento'}
                           </Text>
@@ -429,7 +543,7 @@ const ProfileScreen = () => {
                   </View>
                 );
               })}
-            </BlurView>
+            </View>
           </ScrollView>
         )}
       </SafeAreaView>
@@ -439,235 +553,321 @@ const ProfileScreen = () => {
 
 export default ProfileScreen;
 
-const baseInput = {
-  backgroundColor: 'rgba(255,255,255,0.06)',
-  borderRadius: 18,
-  paddingHorizontal: 18,
-  paddingVertical: 16,
-  borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.14)',
-  color: '#F8FAFC',
-};
-
-const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  safe: {
-    flex: 1,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#E5E7EB',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
-    gap: 24,
-  },
-  headerCard: {
-    borderRadius: 32,
-    padding: 24,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: '#F9FAFB',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    color: '#CBD5F5',
-    marginTop: 4,
-  },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+const createStyles = (colors: ThemeColors) => {
+  const baseInput = {
+    backgroundColor: colors.surfaceMuted,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  signOutLabel: {
-    color: '#F9FAFB',
-    fontWeight: '600',
-  },
-  headerMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metaItem: {
-    flex: 1,
-    gap: 4,
-  },
-  metaLabel: {
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontSize: 12,
-  },
-  metaValue: {
-    color: '#F9FAFB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  requirementsBox: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: 'rgba(251,191,36,0.14)',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.3)',
-  },
-  requirementsText: {
-    gap: 4,
-    flex: 1,
-  },
-  requirementsTitle: {
-    color: '#FBBF24',
-    fontWeight: '700',
-  },
-  requirementsItem: {
-    color: '#FBBF24',
-  },
-  formCard: {
-    borderRadius: 30,
-    padding: 24,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 18,
-  },
-  sectionTitle: {
-    color: '#F9FAFB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  sectionSubtitle: {
-    color: '#CBD5F5',
-  },
-  fieldGroup: {
-    gap: 8,
-  },
-  rowFields: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  fieldGroupHalf: {
-    flex: 1,
-    gap: 8,
-  },
-  label: {
-    color: '#E5E7EB',
-    fontWeight: '600',
-  },
-  input: {
-    ...baseInput,
-  },
-  error: {
-    color: '#FCA5A5',
-    textAlign: 'center',
-  },
-  success: {
-    color: '#BBF7D0',
-    textAlign: 'center',
-  },
-  saveButton: {
-    marginTop: 4,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 20,
+    paddingHorizontal: 18,
     paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  saveButtonLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  documentsCard: {
-    borderRadius: 30,
-    padding: 24,
-    backgroundColor: 'rgba(15,17,23,0.55)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 18,
-  },
-  documentRow: {
-    flexDirection: 'row',
-    gap: 16,
-    alignItems: 'flex-start',
-    borderRadius: 24,
-    padding: 20,
-    backgroundColor: 'rgba(15,23,42,0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.14)',
-  },
-  documentInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  documentTitle: {
-    color: '#F9FAFB',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  documentDescription: {
-    color: '#CBD5F5',
-    lineHeight: 20,
-  },
-  documentMeta: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  documentMetaText: {
-    color: '#94A3B8',
-    fontSize: 12,
-  },
-  documentStatus: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  documentStatusText: {
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  uploadButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  uploadButtonLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-});
+    borderColor: colors.cardBorder,
+    color: colors.textPrimary,
+  };
+
+  return StyleSheet.create({
+    gradient: {
+      flex: 1,
+    },
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+    },
+    content: {
+      padding: 20,
+      paddingBottom: 120,
+      gap: 24,
+    },
+    headerCard: {
+      borderRadius: 32,
+      padding: 24,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 18,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: colors.heading,
+      fontSize: 22,
+      fontWeight: '700',
+    },
+    headerSubtitle: {
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    signOutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surfaceMuted,
+    },
+    signOutLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    headerMeta: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    metaItem: {
+      flex: 1,
+      gap: 4,
+    },
+    metaLabel: {
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      fontSize: 12,
+    },
+    metaValue: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    requirementsBox: {
+      flexDirection: 'row',
+      gap: 12,
+      backgroundColor: colors.surfaceHighlight,
+      borderRadius: 18,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorderStrong,
+      alignItems: 'center',
+    },
+    requirementsText: {
+      gap: 4,
+      flex: 1,
+    },
+    requirementsTitle: {
+      color: colors.warning,
+      fontWeight: '700',
+    },
+    requirementsItem: {
+      color: colors.warning,
+    },
+    formCard: {
+      borderRadius: 30,
+      padding: 24,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 18,
+    },
+    sectionTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    sectionSubtitle: {
+      color: colors.textSecondary,
+    },
+    fieldGroup: {
+      gap: 8,
+    },
+    helperText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    locationHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: 8,
+    },
+    rowFields: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    fieldGroupHalf: {
+      flex: 1,
+      gap: 8,
+    },
+    label: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    input: baseInput,
+    sliderContainer: {
+      marginTop: 12,
+      gap: 8,
+    },
+    sliderLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sliderValue: {
+      color: colors.heading,
+      fontWeight: '700',
+    },
+    sliderAssist: {
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    error: {
+      color: colors.danger,
+      textAlign: 'center',
+    },
+    success: {
+      color: colors.success,
+      textAlign: 'center',
+    },
+    saveButton: {
+      marginTop: 4,
+      backgroundColor: colors.primary,
+      borderRadius: 20,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    saveButtonLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+    preferencesCard: {
+      borderRadius: 30,
+      padding: 24,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 16,
+    },
+    themeOptions: {
+      gap: 12,
+    },
+    themeOption: {
+      borderRadius: 20,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+    },
+    themeOptionActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    radioOuter: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: colors.cardBorder,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    radioOuterActive: {
+      borderColor: colors.primary,
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    },
+    themeTexts: {
+      flex: 1,
+      gap: 4,
+    },
+    themeLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    themeDescription: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    documentsCard: {
+      borderRadius: 30,
+      padding: 24,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 18,
+    },
+    documentRow: {
+      flexDirection: 'column',
+      gap: 18,
+      alignItems: 'stretch',
+      borderRadius: 24,
+      padding: 20,
+      backgroundColor: colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    documentInfo: {
+      gap: 8,
+    },
+    documentTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    documentDescription: {
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    documentMeta: {
+      flexDirection: 'row',
+      gap: 6,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    documentMetaText: {
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    documentStatus: {
+      flexDirection: 'row',
+      gap: 6,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    documentStatusText: {
+      fontWeight: '600',
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    uploadButton: {
+      alignSelf: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      minWidth: 200,
+    },
+    uploadButtonLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+  });
+};

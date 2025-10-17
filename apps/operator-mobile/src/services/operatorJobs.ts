@@ -132,6 +132,8 @@ export interface PilotProfile {
   experience_years?: number | null;
   website?: string | null;
   portfolio_url?: string | null;
+  location_latitude?: number | null;
+  location_longitude?: number | null;
   documents?: PilotDocument[];
   pending_requirements?: string[];
 }
@@ -141,8 +143,12 @@ export const fetchPilotProfile = async (): Promise<PilotProfile> => {
   return data;
 };
 
-export const setAvailability = async (isAvailable: boolean) => {
-  await api.post('/api/pilot-profiles/availability/', { is_available: isAvailable });
+export const setAvailability = async (isAvailable: boolean): Promise<boolean> => {
+  const { data } = await api.post('/api/pilot-profiles/availability/', { is_available: isAvailable });
+  if (data && typeof data.is_available === 'boolean') {
+    return data.is_available;
+  }
+  return isAvailable;
 };
 
 export const listAvailableJobs = async (): Promise<OperatorJob[]> => {

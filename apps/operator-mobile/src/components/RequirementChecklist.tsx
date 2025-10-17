@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { OperatorJobRequirement } from '@services/operatorJobs';
+import { useTheme, ThemeColors } from '@theme';
 
 interface RequirementChecklistProps {
   requirements?: OperatorJobRequirement[];
@@ -15,12 +15,15 @@ const RequirementChecklist: React.FC<RequirementChecklistProps> = ({
   onToggle,
   loadingId,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   if (!requirements || requirements.length === 0) {
     return (
-      <BlurView intensity={80} tint="dark" style={styles.emptyCard}>
-        <Ionicons name="checkmark-done-outline" size={20} color="#E5E7EB" />
+      <View style={styles.emptyCard}>
+        <Ionicons name="checkmark-done-outline" size={20} color={colors.textSecondary} />
         <Text style={styles.emptyText}>No hay requisitos pendientes para este vuelo.</Text>
-      </BlurView>
+      </View>
     );
   }
 
@@ -30,10 +33,8 @@ const RequirementChecklist: React.FC<RequirementChecklistProps> = ({
         const isComplete = Boolean(requirement.is_complete);
         const isLoading = loadingId === requirement.id;
         return (
-          <BlurView
+          <View
             key={requirement.id}
-            intensity={90}
-            tint="dark"
             style={[styles.card, isComplete && styles.cardComplete]}
           >
             <TouchableOpacity
@@ -42,7 +43,7 @@ const RequirementChecklist: React.FC<RequirementChecklistProps> = ({
               disabled={isLoading}
             >
               <View style={[styles.checkboxInner, isComplete && styles.checkboxInnerActive]}>
-                {isComplete ? <Ionicons name="checkmark" size={16} color="#0F172A" /> : null}
+                {isComplete ? <Ionicons name="checkmark" size={16} color={colors.textInverse} /> : null}
               </View>
             </TouchableOpacity>
             <View style={styles.texts}>
@@ -54,82 +55,83 @@ const RequirementChecklist: React.FC<RequirementChecklistProps> = ({
                 <Text style={styles.meta}>Marcado el {new Date(requirement.completed_at).toLocaleString()}</Text>
               ) : null}
             </View>
-            {isLoading ? <Ionicons name="reload-outline" size={18} color="#F8FAFC" /> : null}
-          </BlurView>
+            {isLoading ? <Ionicons name="reload-outline" size={18} color={colors.textSecondary} /> : null}
+          </View>
         );
       })}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    gap: 12,
-  },
-  card: {
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: 'rgba(15,17,23,0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  cardComplete: {
-    borderColor: 'rgba(134,239,172,0.35)',
-    backgroundColor: 'rgba(22,101,52,0.25)',
-  },
-  checkbox: {
-    paddingTop: 2,
-  },
-  checkboxInner: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(248,250,252,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  checkboxInnerActive: {
-    backgroundColor: '#BBF7D0',
-    borderColor: '#22C55E',
-  },
-  texts: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    color: '#F8FAFC',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  description: {
-    color: '#CBD5F5',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  meta: {
-    color: '#A5B4FC',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  emptyCard: {
-    borderRadius: 22,
-    padding: 18,
-    backgroundColor: 'rgba(15,17,23,0.45)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  emptyText: {
-    color: '#E5E7EB',
-    flex: 1,
-  },
-});
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      gap: 12,
+    },
+    card: {
+      borderRadius: 22,
+      padding: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 14,
+    },
+    cardComplete: {
+      borderColor: isDark ? 'rgba(34,197,94,0.55)' : 'rgba(34,197,94,0.45)',
+      backgroundColor: isDark ? 'rgba(34,197,94,0.22)' : 'rgba(34,197,94,0.12)',
+    },
+    checkbox: {
+      paddingTop: 2,
+    },
+    checkboxInner: {
+      width: 24,
+      height: 24,
+      borderRadius: 8,
+      borderWidth: 2,
+      borderColor: colors.cardBorderStrong,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+    },
+    checkboxInnerActive: {
+      backgroundColor: colors.success,
+      borderColor: colors.success,
+    },
+    texts: {
+      flex: 1,
+      gap: 4,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+      fontSize: 15,
+    },
+    description: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    meta: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: 6,
+    },
+    emptyCard: {
+      borderRadius: 22,
+      padding: 18,
+      backgroundColor: colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    emptyText: {
+      color: colors.textSecondary,
+      flex: 1,
+    },
+  });
 
 export default RequirementChecklist;

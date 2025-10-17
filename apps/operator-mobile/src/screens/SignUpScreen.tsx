@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,10 +7,15 @@ import { RootStackParamList } from '@navigation/RootNavigator';
 import { signUp } from '@services/apiClient';
 import { useAuth } from '@context/AuthContext';
 import { getErrorMessage } from '@utils/errorMessages';
+import { useTheme, ThemeColors } from '@theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
 const SignUpScreen: React.FC<Props> = ({ navigation }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const placeholderColor = isDark ? 'rgba(148,163,184,0.75)' : 'rgba(71,85,105,0.6)';
+  const iconColor = isDark ? 'rgba(226,232,240,0.85)' : colors.textMuted;
   const { signInWithCredentials } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -92,11 +97,11 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Nombre</Text>
           <View style={styles.inputWrapper}>
-            <Ionicons name="person-outline" size={18} color="#D1D5DB" />
+            <Ionicons name="person-outline" size={18} color={iconColor} />
             <TextInput
               style={styles.input}
               placeholder="Nombre"
-              placeholderTextColor="rgba(148, 163, 184, 0.75)"
+              placeholderTextColor={placeholderColor}
               value={firstName}
               onChangeText={setFirstName}
               editable={!loading}
@@ -106,11 +111,11 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Apellido</Text>
           <View style={styles.inputWrapper}>
-            <Ionicons name="person-circle-outline" size={18} color="#D1D5DB" />
+            <Ionicons name="person-circle-outline" size={18} color={iconColor} />
             <TextInput
               style={styles.input}
               placeholder="Apellido"
-              placeholderTextColor="rgba(148, 163, 184, 0.75)"
+              placeholderTextColor={placeholderColor}
               value={lastName}
               onChangeText={setLastName}
               editable={!loading}
@@ -122,11 +127,11 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>Correo electrónico</Text>
         <View style={styles.inputWrapper}>
-          <Ionicons name="mail-outline" size={18} color="#D1D5DB" />
+          <Ionicons name="mail-outline" size={18} color={iconColor} />
           <TextInput
             style={styles.input}
             placeholder="nombre@skyterra.cl"
-            placeholderTextColor="rgba(148, 163, 184, 0.75)"
+            placeholderTextColor={placeholderColor}
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
@@ -144,11 +149,11 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         <View style={styles.inputWrapper}>
-          <Ionicons name="lock-closed-outline" size={18} color="#D1D5DB" />
+          <Ionicons name="lock-closed-outline" size={18} color={iconColor} />
           <TextInput
             style={styles.input}
             placeholder="••••••••"
-            placeholderTextColor="rgba(148, 163, 184, 0.75)"
+            placeholderTextColor={placeholderColor}
             secureTextEntry={!showPassword}
             value={password}
             onChangeText={setPassword}
@@ -165,11 +170,11 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         <View style={styles.inputWrapper}>
-          <Ionicons name="shield-checkmark-outline" size={18} color="#D1D5DB" />
+          <Ionicons name="shield-checkmark-outline" size={18} color={iconColor} />
           <TextInput
             style={styles.input}
             placeholder="••••••••"
-            placeholderTextColor="rgba(148, 163, 184, 0.75)"
+            placeholderTextColor={placeholderColor}
             secureTextEntry={!showConfirmPassword}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
@@ -187,7 +192,7 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
         disabled={loading}
         activeOpacity={0.9}
       >
-        {loading ? <ActivityIndicator color="#111827" /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
+        {loading ? <ActivityIndicator color={colors.primaryOn} /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
       </TouchableOpacity>
 
       <Text style={styles.terms}>
@@ -198,92 +203,94 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  fieldGroup: {
-    gap: 8,
-    flex: 1,
-    minWidth: '48%',
-  },
-  doubleField: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  label: {
-    color: '#F3F4F6',
-    fontWeight: '600',
-  },
-  toggleSecure: {
-    color: '#E5E7EB',
-    fontSize: 13,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    color: '#F8FAFC',
-    fontSize: 16,
-  },
-  button: {
-    marginTop: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingVertical: 18,
-    borderRadius: 22,
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#111827',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  error: {
-    color: '#F87171',
-    textAlign: 'center',
-  },
-  success: {
-    color: '#A7F3D0',
-    textAlign: 'center',
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  footerText: {
-    color: '#E5E7EB',
-  },
-  footerLink: {
-    color: '#F9FAFB',
-    fontWeight: '600',
-  },
-  terms: {
-    marginTop: 4,
-    color: '#D1D5DB',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    fieldGroup: {
+      gap: 8,
+      flex: 1,
+      minWidth: '48%',
+    },
+    doubleField: {
+      flexDirection: 'row',
+      gap: 12,
+      flexWrap: 'wrap',
+    },
+    labelRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    label: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    toggleSecure: {
+      color: colors.primary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 12,
+    },
+    input: {
+      flex: 1,
+      color: colors.textPrimary,
+      fontSize: 16,
+    },
+    button: {
+      marginTop: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 18,
+      borderRadius: 22,
+      alignItems: 'center',
+      shadowColor: colors.cardShadow,
+      shadowOffset: { width: 0, height: 14 },
+      shadowOpacity: 0.18,
+      shadowRadius: 26,
+      elevation: 6,
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    buttonText: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+    error: {
+      color: colors.danger,
+      textAlign: 'center',
+    },
+    success: {
+      color: colors.success,
+      textAlign: 'center',
+    },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    footerText: {
+      color: colors.textSecondary,
+    },
+    footerLink: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    terms: {
+      marginTop: 4,
+      color: colors.textMuted,
+      fontSize: 12,
+      textAlign: 'center',
+    },
+  });
 
 export default SignUpScreen;

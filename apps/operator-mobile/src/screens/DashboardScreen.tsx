@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
@@ -29,6 +28,7 @@ import {
   listPilotJobs,
   setAvailability,
 } from '@services/operatorJobs';
+import { useTheme, ThemeColors } from '@theme';
 
 type DashboardNavigation = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Dashboard'>,
@@ -41,6 +41,19 @@ const currencyFormatter = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 0,
 });
 
+const formatDistance = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  if (value >= 100) {
+    return `${value.toFixed(0)} km`;
+  }
+  if (value >= 10) {
+    return `${value.toFixed(1)} km`;
+  }
+  return `${value.toFixed(2)} km`;
+};
+
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardNavigation>();
   const { user } = useAuth();
@@ -51,8 +64,20 @@ const DashboardScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const backgroundGradient = useMemo(
+    () => (isDark ? ['#050608', '#0b0d11'] : [colors.background, colors.backgroundAlt]),
+    [colors.background, colors.backgroundAlt, isDark]
+  );
+  const availabilityThumbColor = isAvailable ? (isDark ? colors.surface : colors.primaryOn) : colors.surface;
+  const availabilityTrackColor = {
+    false: isDark ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.45)',
+    true: colors.primary,
+  };
+  const [pendingAvailability, setPendingAvailability] = useState<boolean | null>(null);
 
-  const load = async (refreshOnly = false) => {
+  const load = useCallback(async (refreshOnly = false) => {
     if (!refreshOnly) {
       setLoading(true);
     }
@@ -64,8 +89,12 @@ const DashboardScreen = () => {
         listAvailableJobs(),
         listPilotJobs(),
       ]);
-      setProfile(profileData);
-      setIsAvailable(profileData.is_available);
+      if (pendingAvailability === null) {
+        setProfile(profileData);
+        setIsAvailable(profileData.is_available);
+      } else {
+        setProfile({ ...profileData, is_available: pendingAvailability });
+      }
       setAvailableJobs(invites);
       setPilotJobs(jobs);
     } catch (err) {
@@ -75,21 +104,37 @@ const DashboardScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [pendingAvailability]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const toggleAvailability = async (value: boolean) => {
-    const previous = isAvailable;
+    setPendingAvailability(value);
     setIsAvailable(value);
+    setProfile((prev) => (prev ? { ...prev, is_available: value } : prev));
     try {
-      await setAvailability(value);
+      const confirmed = await setAvailability(value);
+      if (confirmed !== value) {
+        setIsAvailable(confirmed);
+        setProfile((prev) => (prev ? { ...prev, is_available: confirmed } : prev));
+        setError(
+          value
+            ? 'Tu perfil sigue en pausa. Completa los requisitos pendientes para activarte.'
+            : null
+        );
+      } else {
+        setIsAvailable(confirmed);
+        setProfile((prev) => (prev ? { ...prev, is_available: confirmed } : prev));
+        setError(null);
+      }
+      setPendingAvailability(null);
       await load(true);
     } catch (err) {
       console.warn('Toggle availability failed', err);
-      setIsAvailable(previous);
+      setError('No pudimos sincronizar la disponibilidad. Verifica tu conexión o intenta más tarde.');
+      setPendingAvailability(null);
     }
   };
 
@@ -118,7 +163,39 @@ const DashboardScreen = () => {
 
   const invitesCount = availableJobs.length;
   const pendingDocuments = profile?.documents?.filter((doc) => doc.status !== 'approved') ?? [];
+  const summaryMetrics = useMemo(() => {
+    const approvedDocs =
+      profile?.documents?.filter((doc) => doc.status === 'approved').length ?? 0;
+    const totalDocs = profile?.documents?.length ?? 0;
+    return [
+      { key: 'invites', label: 'Invitaciones', value: String(invitesCount) },
+      { key: 'completed', label: 'Completados', value: String(completedCount) },
+      {
+        key: 'score',
+        label: 'Score',
+        value: typeof profile?.score === 'number' ? profile.score.toFixed(1) : '—',
+      },
+      {
+        key: 'documents',
+        label: 'Docs al día',
+        value: totalDocs ? `${approvedDocs}/${totalDocs}` : `${approvedDocs}/0`,
+      },
+    ];
+  }, [completedCount, invitesCount, profile?.documents, profile?.score]);
+  const invitesShowcase = useMemo(() => availableJobs.slice(0, 6), [availableJobs]);
 
+  const ongoingSummaryMessage = useMemo(() => {
+    if (!activeJob && !nextScheduledJob) {
+      return 'Mantén tu disponibilidad activa mientras coordinamos nuevos vuelos.';
+    }
+    if (activeJob) {
+      return 'Revisa la misión en curso y confirma instrucciones antes de despegar.';
+    }
+    if (nextScheduledJob) {
+      return 'Prepárate para la próxima visita y confirma el horario con el cliente.';
+    }
+    return 'Mantente atento a nuevas asignaciones.';
+  }, [activeJob, nextScheduledJob]);
   const handleOpenJob = (jobId: number) => {
     navigation.navigate('JobDetail', { jobId: String(jobId) });
   };
@@ -141,23 +218,23 @@ const DashboardScreen = () => {
     <RefreshControl
       refreshing={refreshing}
       onRefresh={() => load(true)}
-      tintColor="#FFFFFF"
-      progressBackgroundColor="#111827"
+      tintColor={colors.primary}
+      progressBackgroundColor={colors.surfaceMuted}
     />
   );
 
   return (
-    <LinearGradient colors={['#050608', '#0b0d11']} style={styles.gradient}>
-      <StatusBar style="light" />
+    <LinearGradient colors={backgroundGradient} style={styles.gradient}>
+      <StatusBar style={colors.statusBarStyle} backgroundColor={backgroundGradient[0]} />
       <SafeAreaView style={styles.safe}>
         {loading && !refreshing ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>Cargando tu panel…</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content} refreshControl={refreshControl}>
-            <BlurView intensity={90} tint="dark" style={styles.heroCard}>
+            <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
                 <View>
                   <Text style={styles.greeting}>Hola, {greetingName}</Text>
@@ -168,166 +245,198 @@ const DashboardScreen = () => {
                   <Switch
                     value={isAvailable}
                     onValueChange={toggleAvailability}
-                    thumbColor={isAvailable ? '#0F172A' : '#1F2937'}
-                    trackColor={{ false: 'rgba(148,163,184,0.4)', true: '#F9FAFB' }}
+                    thumbColor={availabilityThumbColor}
+                    trackColor={availabilityTrackColor}
                   />
                 </View>
               </View>
 
-              <View style={styles.metricsRow}>
-                <View style={styles.metric}>
-                  <Text style={styles.metricLabel}>Invitaciones</Text>
-                  <Text style={styles.metricValue}>{invitesCount}</Text>
-                </View>
-                <View style={styles.metric}>
-                  <Text style={styles.metricLabel}>Completados</Text>
-                  <Text style={styles.metricValue}>{completedCount}</Text>
-                </View>
-                <View style={styles.metric}>
-                  <Text style={styles.metricLabel}>Score</Text>
-                  <Text style={styles.metricValue}>
-                    {typeof profile?.score === 'number' ? profile.score.toFixed(1) : '—'}
-                  </Text>
-                </View>
+              <View style={styles.metricsGrid}>
+                {summaryMetrics.map((metric) => (
+                  <View key={metric.key} style={styles.metricItem}>
+                    <Text style={styles.metricValue}>{metric.value}</Text>
+                    <Text style={styles.metricLabel}>{metric.label}</Text>
+                  </View>
+                ))}
               </View>
 
               {pendingDocuments.length ? (
-                <View style={styles.alertBox}>
-                  <Ionicons name="alert-circle-outline" size={18} color="#FBBF24" />
-                  <Text style={styles.alertText}>
-                    {pendingDocuments.length === 1
-                      ? 'Tienes un documento pendiente por validar.'
-                      : `Tienes ${pendingDocuments.length} documentos pendientes.`}
-                  </Text>
+                <View style={styles.inlineAlert}>
+                  <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+                  <View style={styles.inlineAlertTexts}>
+                    <Text style={styles.inlineAlertTitle}>Documentos pendientes</Text>
+                    <Text style={styles.inlineAlertSubtitle}>
+                      {pendingDocuments.length === 1
+                        ? 'Tienes un documento por validar.'
+                        : `Tienes ${pendingDocuments.length} documentos pendientes.`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+                    <Text style={styles.inlineAlertAction}>Revisar</Text>
+                  </TouchableOpacity>
                 </View>
               ) : null}
 
+              <View style={styles.nextStepBox}>
+                <Ionicons name="compass-outline" size={18} color={colors.primary} />
+                <Text style={styles.nextStepText}>{ongoingSummaryMessage}</Text>
+              </View>
+
               <View style={styles.heroActions}>
                 <TouchableOpacity style={styles.secondaryAction} onPress={handleViewInvites}>
-                  <Ionicons name="briefcase-outline" size={16} color="#F9FAFB" />
+                  <Ionicons name="briefcase-outline" size={16} color={colors.textPrimary} />
                   <Text style={styles.secondaryActionLabel}>Ver invitaciones</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryAction}
                   onPress={() => navigation.navigate('Profile')}
                 >
-                  <Ionicons name="person-circle-outline" size={18} color="#0F172A" />
+                  <Ionicons name="person-circle-outline" size={18} color={colors.primaryOn} />
                   <Text style={styles.primaryActionLabel}>Actualizar perfil</Text>
                 </TouchableOpacity>
               </View>
-            </BlurView>
+            </View>
 
             {error ? (
-              <BlurView intensity={80} tint="dark" style={styles.errorCard}>
-                <Ionicons name="warning-outline" size={18} color="#FEE2E2" />
+              <View style={styles.errorCard}>
+                <Ionicons name="warning-outline" size={18} color={colors.danger} />
                 <Text style={styles.errorText}>{error}</Text>
-              </BlurView>
-            ) : null}
-
-            {activeJob ? (
-              <TouchableOpacity style={styles.cardWrapper} onPress={() => handleOpenJob(activeJob.id)}>
-                <LinearGradient colors={['#F9FAFB', '#D1D5DB']} style={styles.activeCard}>
-                  <Text style={styles.sectionBadge}>Trabajo en progreso</Text>
-                  <Text style={styles.activeTitle}>{activeJob.property_details?.name ?? `Trabajo #${activeJob.id}`}</Text>
-                  <View style={styles.row}>
-                    <Ionicons name="flash-outline" size={16} color="#111827" />
-                    <Text style={styles.rowText}>
-                      {activeJob.status_bar?.substate_label || activeJob.status_label || activeJob.status}
-                    </Text>
-                  </View>
-                  <View style={styles.row}>
-                    <Ionicons name="calendar-outline" size={16} color="#111827" />
-                    <Text style={styles.rowText}>
-                      {activeJob.scheduled_start
-                        ? new Date(activeJob.scheduled_start).toLocaleString()
-                        : 'Agenda por confirmar'}
-                    </Text>
-                  </View>
-                  <Text style={styles.linkCta}>Ver instrucciones</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : null}
-
-            {nextScheduledJob ? (
-              <BlurView intensity={85} tint="dark" style={styles.infoCard}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.badgeIcon}>
-                    <Ionicons name="calendar" size={18} color="#0F172A" />
-                  </View>
-                  <View style={styles.headerText}>
-                    <Text style={styles.cardTitle}>Próxima visita</Text>
-                    <Text style={styles.cardSubtitle}>
-                      {nextScheduledJob.scheduled_start
-                        ? new Date(nextScheduledJob.scheduled_start).toLocaleString()
-                        : 'Agenda por definir'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={() => handleOpenJob(nextScheduledJob.id)}>
-                    <Ionicons name="chevron-forward" size={18} color="#E5E7EB" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.cardProperty}>
-                  {nextScheduledJob.property_details?.name ?? `Trabajo #${nextScheduledJob.id}`}
-                </Text>
-                {nextScheduledJob.location?.formatted_address ? (
-                  <View style={styles.row}>
-                    <Ionicons name="location-outline" size={16} color="#CBD5F5" />
-                    <Text style={styles.rowText}>{nextScheduledJob.location.formatted_address}</Text>
-                  </View>
-                ) : null}
-                <View style={styles.row}>
-                  <Ionicons name="cash-outline" size={16} color="#CBD5F5" />
-                  <Text style={styles.rowText}>
-                    {nextScheduledJob.pilot_payout_amount
-                      ? currencyFormatter.format(nextScheduledJob.pilot_payout_amount)
-                      : 'Pago a confirmar'}
-                  </Text>
-                </View>
-              </BlurView>
+              </View>
             ) : null}
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Invitaciones cerca tuyo</Text>
+                <Text style={styles.sectionTitle}>Agenda inmediata</Text>
+                {activeJob ? (
+                  <TouchableOpacity onPress={() => handleOpenJob(activeJob.id)}>
+                    <Text style={styles.sectionLink}>Ver trabajo</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <View style={styles.summaryStack}>
+                <TouchableOpacity
+                  style={[styles.summaryCard, !activeJob && styles.summaryCardMuted]}
+                  onPress={() => activeJob && handleOpenJob(activeJob.id)}
+                  disabled={!activeJob}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.summaryTitle}>Trabajo activo</Text>
+                  {activeJob ? (
+                    <>
+                      <Text style={styles.summaryPrimary}>
+                        {activeJob.property_details?.name ?? `Trabajo #${activeJob.id}`}
+                      </Text>
+                      <Text style={styles.summaryMeta}>
+                        {activeJob.scheduled_start
+                          ? new Date(activeJob.scheduled_start).toLocaleString()
+                          : 'Horario por confirmar'}
+                      </Text>
+                      <Text style={styles.summaryMeta}>
+                        {activeJob.status_bar?.substate_label ||
+                          activeJob.status_label ||
+                          activeJob.status}
+                      </Text>
+                      <Text style={styles.summaryFoot}>
+                        {activeJob.pilot_payout_amount
+                          ? currencyFormatter.format(activeJob.pilot_payout_amount)
+                          : 'Pago por confirmar'}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.summaryPlaceholder}>
+                      No tienes trabajos en progreso en este momento.
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.summaryCard, !nextScheduledJob && styles.summaryCardMuted]}
+                  onPress={() => nextScheduledJob && handleOpenJob(nextScheduledJob.id)}
+                  disabled={!nextScheduledJob}
+                  activeOpacity={0.9}
+                >
+                  <Text style={styles.summaryTitle}>Próxima visita</Text>
+                  {nextScheduledJob ? (
+                    <>
+                      <Text style={styles.summaryPrimary}>
+                        {nextScheduledJob.property_details?.name ?? `Trabajo #${nextScheduledJob.id}`}
+                      </Text>
+                      <Text style={styles.summaryMeta}>
+                        {nextScheduledJob.scheduled_start
+                          ? new Date(nextScheduledJob.scheduled_start).toLocaleString()
+                          : 'Agenda por confirmar'}
+                      </Text>
+                      <Text style={styles.summaryMeta}>
+                        {nextScheduledJob.location?.formatted_address ?? 'Dirección pendiente'}
+                      </Text>
+                      <Text style={styles.summaryFoot}>
+                        {nextScheduledJob.pilot_payout_amount
+                          ? currencyFormatter.format(nextScheduledJob.pilot_payout_amount)
+                          : 'Pago por confirmar'}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.summaryPlaceholder}>
+                      Aún no hay visitas confirmadas en la agenda.
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Invitaciones disponibles</Text>
                 <TouchableOpacity onPress={handleViewInvites}>
                   <Text style={styles.sectionLink}>Ver todas</Text>
                 </TouchableOpacity>
               </View>
-              {availableJobs.slice(0, 2).map((job) => (
-                <TouchableOpacity
-                  key={job.id}
-                  style={styles.inviteCard}
-                  onPress={() => handleOpenJob(job.id)}
+              {invitesShowcase.length ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.inviteCarousel}
                 >
-                  <BlurView intensity={85} tint="dark" style={styles.inviteInner}>
-                    <View style={styles.inviteHeader}>
-                      <Text style={styles.invitePrice}>
-                        {job.pilot_payout_amount
-                          ? currencyFormatter.format(job.pilot_payout_amount)
-                          : job.price_amount
-                          ? currencyFormatter.format(job.price_amount)
-                          : '$—'}
-                      </Text>
-                      <Ionicons name="chevron-forward" size={16} color="#E5E7EB" />
-                    </View>
-                    <Text style={styles.inviteTitle} numberOfLines={1}>
-                      {job.property_details?.name ?? `Trabajo #${job.id}`}
-                    </Text>
-                    <Text style={styles.inviteSubtitle} numberOfLines={1}>
-                      {job.location?.formatted_address ?? 'Dirección por confirmar'}
-                    </Text>
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-              {availableJobs.length === 0 ? (
-                <BlurView intensity={80} tint="dark" style={styles.emptyCard}>
-                  <Ionicons name="sparkles-outline" size={20} color="#E5E7EB" />
+                  {invitesShowcase.map((job) => {
+                    const price = job.pilot_payout_amount ?? job.price_amount ?? null;
+                    const distanceLabel = formatDistance(job.travel_estimate?.distance_km);
+                    return (
+                      <TouchableOpacity
+                        key={job.id}
+                        style={styles.inviteCard}
+                        onPress={() => handleOpenJob(job.id)}
+                        activeOpacity={0.88}
+                      >
+                        <Text style={styles.invitePrice}>
+                          {price ? currencyFormatter.format(price) : '$—'}
+                        </Text>
+                        <Text style={styles.inviteName} numberOfLines={1}>
+                          {job.property_details?.name ?? `Trabajo #${job.id}`}
+                        </Text>
+                        <Text style={styles.inviteLocation} numberOfLines={1}>
+                          {job.location?.formatted_address ?? 'Dirección por confirmar'}
+                        </Text>
+                        <View style={styles.inviteMetaRow}>
+                          <Text style={styles.inviteMetaBadge}>
+                            {job.plan_details?.name ?? 'Plan estándar'}
+                          </Text>
+                          {distanceLabel ? (
+                            <Text style={styles.inviteMetaBadge}>{distanceLabel}</Text>
+                          ) : null}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="sparkles-outline" size={20} color={colors.textSecondary} />
                   <Text style={styles.emptyTitle}>Sin invitaciones por ahora</Text>
                   <Text style={styles.emptySubtitle}>
                     Mantén tu disponibilidad activa y te avisaremos cuando llegue la próxima misión.
                   </Text>
-                </BlurView>
-              ) : null}
+                </View>
+              )}
             </View>
           </ScrollView>
         )}
@@ -337,274 +446,288 @@ const DashboardScreen = () => {
 };
 
 export default DashboardScreen;
-
-const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  safe: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
-    gap: 24,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#E5E7EB',
-  },
-  heroCard: {
-    borderRadius: 32,
-    padding: 24,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 22,
-  },
-  heroHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 16,
-  },
-  greeting: {
-    color: '#F9FAFB',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  greetingSubtitle: {
-    color: '#CBD5F5',
-    marginTop: 6,
-  },
-  availabilityBox: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  availabilityLabel: {
-    color: '#F9FAFB',
-    fontWeight: '600',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metric: {
-    flex: 1,
-    gap: 6,
-  },
-  metricLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  metricValue: {
-    color: '#F9FAFB',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  alertBox: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: 'rgba(251,191,36,0.12)',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.25)',
-    alignItems: 'center',
-  },
-  alertText: {
-    color: '#FBBF24',
-    flex: 1,
-  },
-  heroActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  primaryAction: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 18,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  primaryActionLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  secondaryAction: {
-    flex: 1,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(248,250,252,0.35)',
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryActionLabel: {
-    color: '#F9FAFB',
-    fontWeight: '600',
-  },
-  errorCard: {
-    borderRadius: 24,
-    padding: 18,
-    backgroundColor: 'rgba(127,29,29,0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(248,113,113,0.35)',
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#FEE2E2',
-    flex: 1,
-  },
-  cardWrapper: {
-    borderRadius: 30,
-    overflow: 'hidden',
-  },
-  activeCard: {
-    padding: 24,
-    borderRadius: 30,
-    gap: 14,
-  },
-  sectionBadge: {
-    color: '#111827',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  activeTitle: {
-    color: '#111827',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  rowText: {
-    color: '#111827',
-    flex: 1,
-  },
-  linkCta: {
-    color: '#111827',
-    fontWeight: '700',
-    marginTop: 6,
-  },
-  infoCard: {
-    borderRadius: 28,
-    padding: 24,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 16,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  badgeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerText: {
-    flex: 1,
-    gap: 4,
-  },
-  cardTitle: {
-    color: '#F9FAFB',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  cardSubtitle: {
-    color: '#CBD5F5',
-  },
-  cardProperty: {
-    color: '#F9FAFB',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  section: {
-    gap: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    color: '#F9FAFB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  sectionLink: {
-    color: '#E5E7EB',
-    fontWeight: '600',
-  },
-  inviteCard: {
-    borderRadius: 26,
-    overflow: 'hidden',
-  },
-  inviteInner: {
-    padding: 20,
-    gap: 10,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  inviteHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  invitePrice: {
-    color: '#F9FAFB',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  inviteTitle: {
-    color: '#F9FAFB',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  inviteSubtitle: {
-    color: '#CBD5F5',
-  },
-  emptyCard: {
-    borderRadius: 26,
-    padding: 24,
-    gap: 10,
-    backgroundColor: 'rgba(15,17,23,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    color: '#F9FAFB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  emptySubtitle: {
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    gradient: {
+      flex: 1,
+    },
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: 20,
+      paddingBottom: 120,
+      gap: 24,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+    },
+    heroCard: {
+      borderRadius: 32,
+      padding: 24,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 22,
+    },
+    heroHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 16,
+    },
+    greeting: {
+      color: colors.heading,
+      fontSize: 24,
+      fontWeight: '700',
+    },
+    greetingSubtitle: {
+      color: colors.textSecondary,
+      marginTop: 6,
+    },
+    availabilityBox: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    availabilityLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    metricsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    metricItem: {
+      width: '47%',
+      borderRadius: 18,
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 6,
+    },
+    metricValue: {
+      color: colors.heading,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    metricLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
+    inlineAlert: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: colors.surfaceHighlight,
+      borderWidth: 1,
+      borderColor: colors.cardBorderStrong,
+    },
+    inlineAlertTexts: {
+      flex: 1,
+      gap: 2,
+    },
+    inlineAlertTitle: {
+      color: colors.warning,
+      fontWeight: '700',
+    },
+    inlineAlertSubtitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    inlineAlertAction: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    nextStepBox: {
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 18,
+      padding: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    nextStepText: {
+      color: colors.textSecondary,
+      flex: 1,
+      lineHeight: 20,
+    },
+    heroActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    primaryAction: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      paddingVertical: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    primaryActionLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+    secondaryAction: {
+      flex: 1,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingVertical: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.surfaceMuted,
+    },
+    secondaryActionLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    errorCard: {
+      borderRadius: 24,
+      padding: 18,
+      backgroundColor: colors.surfaceHighlight,
+      borderWidth: 1,
+      borderColor: colors.danger,
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'center',
+    },
+    errorText: {
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    section: {
+      gap: 16,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sectionTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    sectionLink: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    summaryStack: {
+      gap: 16,
+    },
+    summaryCard: {
+      borderRadius: 26,
+      padding: 20,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 10,
+    },
+    summaryCardMuted: {
+      backgroundColor: colors.surfaceMuted,
+      borderColor: colors.cardBorder,
+    },
+    summaryTitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      fontWeight: '600',
+    },
+    summaryPrimary: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    summaryMeta: {
+      color: colors.textSecondary,
+    },
+    summaryFoot: {
+      color: colors.textMuted,
+      fontSize: 13,
+    },
+    summaryPlaceholder: {
+      color: colors.textSecondary,
+    },
+    inviteCarousel: {
+      gap: 16,
+      paddingRight: 8,
+    },
+    inviteCard: {
+      width: 240,
+      borderRadius: 24,
+      padding: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 10,
+    },
+    invitePrice: {
+      color: colors.heading,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    inviteName: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    inviteLocation: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    inviteMetaRow: {
+      flexDirection: 'row',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    inviteMetaBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceMuted,
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    emptyCard: {
+      borderRadius: 26,
+      padding: 24,
+      gap: 10,
+      backgroundColor: colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      alignItems: 'center',
+    },
+    emptyTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    emptySubtitle: {
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  });
