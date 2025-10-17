@@ -1341,10 +1341,10 @@ function App() {
                   transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                   sx={{
                     position: 'fixed',
-                    left: '50%',
-                    bottom: { xs: 32, sm: 48, md: 64 },
-                    transform: 'translateX(-50%)',
-                    width: 'min(90vw, 680px)',
+                    bottom: { xs: 32, sm: 48, md: 68 },
+                    right: { xs: '50%', md: 'clamp(72px, 12vw, 180px)' },
+                    transform: { xs: 'translateX(50%)', md: 'none' },
+                    width: { xs: 'min(92vw, 660px)', md: 'clamp(340px, 28vw, 420px)' },
                     zIndex: 1600,
                     pointerEvents: 'auto',
                   }}
