@@ -4,7 +4,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -27,7 +26,6 @@ import {
   fetchPilotProfile,
   listAvailableJobs,
   listPilotJobs,
-  setAvailability,
 } from '@services/operatorJobs';
 import { useTheme, ThemeColors } from '@theme';
 import { DOCUMENT_TOTAL } from '@content/documents';
@@ -73,12 +71,6 @@ const DashboardScreen = () => {
     () => (isDark ? ['#050608', '#0b0d11'] : [colors.background, colors.backgroundAlt]),
     [colors.background, colors.backgroundAlt, isDark]
   );
-  const availabilityThumbColor = isAvailable ? (isDark ? colors.surface : colors.primaryOn) : colors.surface;
-  const availabilityTrackColor = {
-    false: isDark ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.45)',
-    true: colors.primary,
-  };
-  const [pendingAvailability, setPendingAvailability] = useState<boolean | null>(null);
   const [showTour, setShowTour] = useState(false);
 
   const load = useCallback(async (refreshOnly = false) => {
@@ -93,12 +85,8 @@ const DashboardScreen = () => {
         listAvailableJobs(),
         listPilotJobs(),
       ]);
-      if (pendingAvailability === null) {
-        setProfile(profileData);
-        setIsAvailable(profileData.is_available);
-      } else {
-        setProfile({ ...profileData, is_available: pendingAvailability });
-      }
+      setProfile(profileData);
+      setIsAvailable(profileData.is_available);
       setAvailableOffers(invites);
       setPilotJobs(jobs);
     } catch (err) {
@@ -108,7 +96,7 @@ const DashboardScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [pendingAvailability]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -137,34 +125,6 @@ const DashboardScreen = () => {
       setShowTour(false);
     }
   }, []);
-
-  const toggleAvailability = async (value: boolean) => {
-    setPendingAvailability(value);
-    setIsAvailable(value);
-    setProfile((prev) => (prev ? { ...prev, is_available: value } : prev));
-    try {
-      const confirmed = await setAvailability(value);
-      if (confirmed !== value) {
-        setIsAvailable(confirmed);
-        setProfile((prev) => (prev ? { ...prev, is_available: confirmed } : prev));
-        setError(
-          value
-            ? 'Tu perfil sigue en pausa. Completa los requisitos pendientes para activarte.'
-            : null
-        );
-      } else {
-        setIsAvailable(confirmed);
-        setProfile((prev) => (prev ? { ...prev, is_available: confirmed } : prev));
-        setError(null);
-      }
-      setPendingAvailability(null);
-      await load(true);
-    } catch (err) {
-      console.warn('Toggle availability failed', err);
-      setError('No pudimos sincronizar la disponibilidad. Verifica tu conexión o intenta más tarde.');
-      setPendingAvailability(null);
-    }
-  };
 
   const activeJob = useMemo(
     () =>
@@ -264,14 +224,22 @@ const DashboardScreen = () => {
                   <Text style={styles.greeting}>Hola, {greetingName}</Text>
                   <Text style={styles.greetingSubtitle}>Tu centro de operaciones está listo</Text>
                 </View>
-                <View style={styles.availabilityBox}>
-                  <Text style={styles.availabilityLabel}>{isAvailable ? 'Disponible' : 'Pausado'}</Text>
-                  <Switch
-                    value={isAvailable}
-                    onValueChange={toggleAvailability}
-                    thumbColor={availabilityThumbColor}
-                    trackColor={availabilityTrackColor}
-                  />
+                <View style={styles.statusContainer}>
+                  <Text style={styles.statusLabel}>Estado</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      isAvailable ? styles.statusBadgeActive : styles.statusBadgePaused,
+                    ]}
+                  >
+                    <Ionicons
+                      name={isAvailable ? 'play-circle' : 'pause-circle'}
+                      size={18}
+                      color={isAvailable ? colors.success : colors.warning}
+                    />
+                    <Text style={styles.statusBadgeText}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
+                  </View>
+                  <Text style={styles.statusHelper}>Gestiona tu disponibilidad desde Ofertas</Text>
                 </View>
               </View>
 
@@ -518,13 +486,39 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.textSecondary,
       marginTop: 6,
     },
-    availabilityBox: {
-      alignItems: 'center',
+    statusContainer: {
+      alignItems: 'flex-end',
       gap: 6,
     },
-    availabilityLabel: {
-      color: colors.textPrimary,
-      fontWeight: '600',
+    statusLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: colors.pillBackground,
+    },
+    statusBadgeActive: {
+      backgroundColor: colors.primarySoft,
+    },
+    statusBadgePaused: {
+      backgroundColor: colors.surfaceMuted,
+    },
+    statusBadgeText: {
+      color: colors.heading,
+      fontWeight: '700',
+    },
+    statusHelper: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textAlign: 'right',
     },
     metricsGrid: {
       flexDirection: 'row',

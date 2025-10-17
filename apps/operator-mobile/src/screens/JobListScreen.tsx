@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +30,7 @@ import {
   listAvailableJobs,
   listPilotJobs,
   setAvailability,
+  updatePilotProfile,
 } from '@services/operatorJobs';
 import { useTheme, ThemeColors } from '@theme';
 
@@ -71,6 +73,19 @@ const formatDuration = (value?: number | null) => {
   return `${hours} h ${minutes} min`;
 };
 
+const RADIUS_BOUNDS = { min: 5, max: 200, step: 5 };
+const DEFAULT_RADIUS = 50;
+
+const clampRadius = (value: number) => {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_RADIUS;
+  }
+  const rounded = Math.round(value);
+  if (rounded < RADIUS_BOUNDS.min) return RADIUS_BOUNDS.min;
+  if (rounded > RADIUS_BOUNDS.max) return RADIUS_BOUNDS.max;
+  return rounded;
+};
+
 const JobListScreen = () => {
   const navigation = useNavigation<JobsScreenNav>();
   const { signOut } = useAuth();
@@ -81,6 +96,10 @@ const JobListScreen = () => {
   const [pilotProfile, setPilotProfile] = useState<PilotProfile | null>(null);
   const [activeJob, setActiveJob] = useState<OperatorJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [radiusDraft, setRadiusDraft] = useState<number>(DEFAULT_RADIUS);
+  const [radiusCommitted, setRadiusCommitted] = useState<number>(DEFAULT_RADIUS);
+  const [radiusSaving, setRadiusSaving] = useState(false);
+  const [radiusError, setRadiusError] = useState<string | null>(null);
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const backgroundGradient = useMemo(
@@ -99,6 +118,7 @@ const JobListScreen = () => {
     if (!refreshOnly) setLoading(true);
     setRefreshing(refreshOnly);
     setError(null);
+    setRadiusError(null);
     try {
       const [profileData, availableJobs, pilotJobs] = await Promise.all([
         fetchPilotProfile(),
@@ -108,6 +128,12 @@ const JobListScreen = () => {
 
       setPilotProfile(profileData);
       setIsAvailable(profileData.is_available);
+      const radiusValue =
+        typeof profileData.coverage_radius_km === 'number'
+          ? clampRadius(profileData.coverage_radius_km)
+          : DEFAULT_RADIUS;
+      setRadiusDraft(radiusValue);
+      setRadiusCommitted(radiusValue);
       setJobs(availableJobs);
       const nextActive = pilotJobs.find((item) =>
         ['assigned', 'scheduling', 'scheduled', 'shooting'].includes(item.status)
@@ -139,6 +165,39 @@ const JobListScreen = () => {
       setIsAvailable(previous);
       setError('No pudimos actualizar tu disponibilidad. Intenta nuevamente.');
     }
+  };
+
+  const commitRadius = async (value: number) => {
+    const normalized = clampRadius(value);
+    setRadiusDraft(normalized);
+    if (normalized === radiusCommitted && radiusError === null) {
+      return;
+    }
+    setRadiusError(null);
+    setRadiusSaving(true);
+    try {
+      await updatePilotProfile({ coverage_radius_km: normalized });
+      setRadiusCommitted(normalized);
+      setPilotProfile((prev) => (prev ? { ...prev, coverage_radius_km: normalized } : prev));
+      await loadJobs(true);
+    } catch (err) {
+      console.warn('No se pudo actualizar el radio de cobertura', err);
+      setRadiusError('No pudimos actualizar el radio de trabajo. Intenta nuevamente.');
+      setRadiusDraft(radiusCommitted);
+    } finally {
+      setRadiusSaving(false);
+    }
+  };
+
+  const adjustRadius = (delta: number) => {
+    if (radiusSaving) {
+      return;
+    }
+    const next = clampRadius(radiusDraft + delta);
+    if (next === radiusDraft) {
+      return;
+    }
+    commitRadius(next);
   };
 
   const handleAccept = async (job: OperatorJob) => {
@@ -243,6 +302,8 @@ const JobListScreen = () => {
   };
 
   const scoreLabel = typeof pilotProfile?.score === 'number' ? pilotProfile.score.toFixed(1) : '—';
+  const decreaseDisabled = radiusSaving || radiusDraft <= RADIUS_BOUNDS.min;
+  const increaseDisabled = radiusSaving || radiusDraft >= RADIUS_BOUNDS.max;
 
   if (loading && !refreshing) {
     return (
@@ -264,8 +325,8 @@ const JobListScreen = () => {
       <SafeAreaView style={styles.safe}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.brand}>SkyTerra Operators</Text>
-            <Text style={styles.brandSubtitle}>Despachos en tiempo real</Text>
+            <Text style={styles.brand}>Ofertas</Text>
+            <Text style={styles.brandSubtitle}>Ajusta tu radio para ver misiones cercanas</Text>
           </View>
           <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
             <Ionicons name="log-out-outline" size={18} color={colors.textPrimary} />
@@ -291,15 +352,13 @@ const JobListScreen = () => {
               <View style={styles.profileCard}>
                 <View style={styles.profileHeader}>
                   <View>
-                    <Text style={styles.profileWelcome}>
-                      {pilotProfile?.display_name ? `Hola, ${pilotProfile.display_name.split(' ')[0]}` : 'Hola, operador'}
-                    </Text>
+                    <Text style={styles.profileHeading}>Ofertas disponibles</Text>
                     <Text style={styles.profileMetaText}>
-                      {pilotProfile?.status === 'active' ? 'Activo' : 'Pendiente'} · Calificación {scoreLabel}
+                      {pilotProfile?.display_name ?? 'Completa tu perfil'} · Calificación {scoreLabel}
                     </Text>
                   </View>
                   <View style={styles.availabilityCluster}>
-                    <Text style={styles.availabilityText}>{isAvailable ? 'Recibiendo trabajos' : 'Pausado'}</Text>
+                    <Text style={styles.availabilityText}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
                     <Switch
                       value={isAvailable}
                       onValueChange={toggleAvailability}
@@ -319,8 +378,64 @@ const JobListScreen = () => {
                   </View>
                   <View style={styles.metric}>
                     <Text style={styles.metricLabel}>Disponibilidad</Text>
-                    <Text style={styles.metricValue}>{isAvailable ? 'ON' : 'OFF'}</Text>
+                    <Text style={styles.metricValue}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
                   </View>
+                </View>
+                <View style={styles.radiusBlock}>
+                  <View style={styles.radiusHeader}>
+                    <Text style={styles.radiusTitle}>Radio de trabajo</Text>
+                    <View style={styles.radiusValueGroup}>
+                      {radiusSaving ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : null}
+                      <Text style={styles.radiusValue}>{radiusDraft} km</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.radiusHint}>
+                    Ajusta tu radio para recibir ofertas cercanas en tiempo real.
+                  </Text>
+                  <Slider
+                    value={radiusDraft}
+                    onValueChange={(value) => setRadiusDraft(clampRadius(value))}
+                    onSlidingComplete={commitRadius}
+                    minimumValue={RADIUS_BOUNDS.min}
+                    maximumValue={RADIUS_BOUNDS.max}
+                    step={RADIUS_BOUNDS.step}
+                    thumbTintColor={isDark ? colors.surface : colors.primary}
+                    minimumTrackTintColor={colors.primary}
+                    maximumTrackTintColor={colors.cardBorder}
+                    disabled={radiusSaving}
+                  />
+                  <View style={styles.radiusActions}>
+                    <TouchableOpacity
+                      style={[styles.radiusButton, decreaseDisabled && styles.radiusButtonDisabled]}
+                      onPress={() => adjustRadius(-RADIUS_BOUNDS.step)}
+                      disabled={decreaseDisabled}
+                    >
+                      <Ionicons
+                        name="remove-outline"
+                        size={16}
+                        color={decreaseDisabled ? colors.textMuted : colors.textPrimary}
+                      />
+                      <Text style={styles.radiusButtonText}>-5 km</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.radiusButton, increaseDisabled && styles.radiusButtonDisabled]}
+                      onPress={() => adjustRadius(RADIUS_BOUNDS.step)}
+                      disabled={increaseDisabled}
+                    >
+                      <Ionicons
+                        name="add-outline"
+                        size={16}
+                        color={increaseDisabled ? colors.textMuted : colors.textPrimary}
+                      />
+                      <Text style={styles.radiusButtonText}>+5 km</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.radiusAssist}>
+                    Rango {RADIUS_BOUNDS.min}–{RADIUS_BOUNDS.max} km
+                  </Text>
+                  {radiusError ? <Text style={styles.radiusError}>{radiusError}</Text> : null}
                 </View>
               </View>
 
@@ -460,7 +575,7 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: 'space-between',
       alignItems: 'center',
     },
-    profileWelcome: {
+    profileHeading: {
       color: colors.heading,
       fontSize: 18,
       fontWeight: '700',
@@ -495,6 +610,66 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.heading,
       fontSize: 18,
       fontWeight: '700',
+    },
+    radiusBlock: {
+      marginTop: 16,
+      gap: 12,
+    },
+    radiusHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    radiusTitle: {
+      color: colors.heading,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    radiusValueGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    radiusValue: {
+      color: colors.heading,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    radiusHint: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    radiusActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    radiusButton: {
+      flex: 1,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingVertical: 12,
+      backgroundColor: colors.surfaceMuted,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 6,
+    },
+    radiusButtonDisabled: {
+      opacity: 0.6,
+    },
+    radiusButtonText: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    radiusAssist: {
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    radiusError: {
+      color: colors.danger,
+      fontSize: 13,
+      fontWeight: '600',
     },
     jobCardWrapper: {
       borderRadius: 26,

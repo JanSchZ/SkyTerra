@@ -49,7 +49,7 @@ export const guides: Record<GuideId, Guide> = {
         bullets: [
           'Waypoints y alturas revisados; geocercas configuradas.',
           'Checklist de tomas (panorámicas, detalles, fachadas, puntos clave).',
-          'Formato y perfil de color definidos (RAW/JPEG, D‑Log/Normal).',
+          'Formato y perfil definidos: fotos en RAW/DNG; video en LOG (D‑Log/D‑Log‑M).',
         ],
       },
     ],
@@ -124,7 +124,7 @@ export const guides: Record<GuideId, Guide> = {
         bullets: [
           'Actualiza firmware de dron y control. Calibra IMU y brújula si el equipo lo solicita.',
           'Limpia lente y sensores. Verifica hélices y ajuste del gimbal.',
-          'Selecciona perfil de color estándar si no dominas flujos LOG. Ajusta el histograma y sobreexpón levemente (+0.3 EV) si la escena es muy contrastada.',
+          'Perfil de color: siempre LOG (D‑Log/D‑Log‑M o equivalente). Captura en 10‑bit si está disponible. Ajusta el histograma y sobreexpón levemente (+0.3 EV) si la escena es muy contrastada para preservar altas luces.',
         ],
       },
       {
@@ -140,6 +140,7 @@ export const guides: Record<GuideId, Guide> = {
       {
         title: 'Video — ajustes recomendados',
         bullets: [
+          'Perfil de color: LOG (D‑Log/D‑Log‑M). 10‑bit si es posible; planifica una gradación básica (contraste/saturación) en post.',
           'Resolución: mínimo 4K; tasa: 30 fps.',
           'Regla 180°: usa shutter ≈ 1/60 para 30 fps (usa ND si es necesario para mantener el obturador).',
           'ISO: Automático con límite bajo; preferir ISO nativo si tu dron lo ofrece.',

@@ -27,7 +27,7 @@ const steps: TourStep[] = [
   },
   {
     title: 'Ofertas',
-    description: 'Explora y acepta ofertas desde el carrusel o visita la pestaña de Órdenes.',
+    description: 'Explora y acepta ofertas desde el carrusel o visita la pestaña de Ofertas.',
     icon: 'briefcase-outline',
   },
   {
@@ -84,7 +84,6 @@ const GuidedTourOverlay: React.FC<GuidedTourOverlayProps> = ({ visible, onFinish
     if (isLast) {
       onFinish();
     } else {
-      opacity.setValue(0);
       setIndex((prev) => prev + 1);
     }
   };
@@ -93,8 +92,8 @@ const GuidedTourOverlay: React.FC<GuidedTourOverlayProps> = ({ visible, onFinish
   const cardOpacity = cardProgress;
 
   return (
-    <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>      
-      <Animated.View style={[styles.tourCard, { opacity: cardOpacity, transform: [{ translateY }] }]}>        
+    <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+      <Animated.View style={[styles.tourCard, { opacity: cardOpacity, transform: [{ translateY }] }]}>
         <View style={styles.iconBadge}>
           <Ionicons name={step.icon} size={24} color={colors.primaryOn} />
         </View>

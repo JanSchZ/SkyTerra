@@ -25,6 +25,12 @@ const resources = [
     icon: 'checkbox-outline' as const,
   },
   {
+    id: 'shooting',
+    title: 'Instructivo de grabación',
+    description: 'Ajustes de cámara, modos de dron y flujo de captura para foto y video.',
+    icon: 'camera-outline' as const,
+  },
+  {
     id: 'safety',
     title: 'Protocolos de seguridad',
     description: 'Actualizaciones sobre normativa DGAC, zonas restringidas y contactos de emergencia.',
@@ -35,12 +41,6 @@ const resources = [
     title: 'Facturación y pagos',
     description: 'Pasos para cargar boletas, plazos de pago y resolución de incidencias.',
     icon: 'document-text-outline' as const,
-  },
-  {
-    id: 'shooting',
-    title: 'Instructivo de grabación',
-    description: 'Ajustes de cámara, modos de dron y flujo de captura para foto y video.',
-    icon: 'camera-outline' as const,
   },
 ];
 

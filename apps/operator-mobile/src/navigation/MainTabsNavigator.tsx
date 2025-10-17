@@ -52,7 +52,7 @@ const MainTabsNavigator = () => {
       sceneContainerStyle={styles.scene}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Inicio' }} />
-      <Tab.Screen name="Jobs" component={JobListScreen} options={{ title: 'Órdenes' }} />
+      <Tab.Screen name="Jobs" component={JobListScreen} options={{ title: 'Ofertas' }} />
       <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ title: 'Agenda' }} />
       <Tab.Screen name="Resources" component={ResourcesScreen} options={{ title: 'Recursos' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Menú' }} />
