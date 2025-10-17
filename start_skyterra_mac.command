@@ -22,7 +22,7 @@ command -v osascript >/dev/null 2>&1 || err "Este script requiere 'osascript', q
 BACKEND_CMD=$(printf "cd %q && source .venv/bin/activate && export DEBUG=True CLIENT_URL=http://localhost:3000 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 JWT_COOKIE_SECURE=False && python manage.py runserver 0.0.0.0:8000" "$BACKEND_DIR")
 FRONTEND_CMD=$(printf "cd %q && npm run dev -- --port 3000" "$FRONTEND_DIR")
 if [ -d "$OPERATOR_DIR" ]; then
-    OPERATOR_CMD=$(printf "cd %q && npx expo start --env-file .env.development" "$OPERATOR_DIR")
+    OPERATOR_CMD=$(printf "cd %q && APP_ENV=development npx expo start" "$OPERATOR_DIR")
 else
     OPERATOR_CMD=""
 fi

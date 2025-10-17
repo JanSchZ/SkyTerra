@@ -38,6 +38,19 @@ if (-not (Test-Path $EnvPath)) {
     Fail "No existe '$EnvFile' en apps/operator-mobile. Crea el archivo con API_URL de producción."
 }
 
+if (-not $Env:ANDROID_HOME) {
+    $defaultSdk = Join-Path $Env:USERPROFILE "AppData\Local\Android\Sdk"
+    if (Test-Path $defaultSdk) {
+        $Env:ANDROID_HOME = $defaultSdk
+    }
+}
+
+if (-not (Test-Path $Env:ANDROID_HOME)) {
+    Fail "No se encontró el SDK de Android. Instala Android Studio y asegúrate de que ANDROID_HOME apunte al SDK."
+}
+
+$sdkPath = (Get-Item $Env:ANDROID_HOME).FullName
+
 Write-Host "📦 Preparando dependencias en $AppDir ..." -ForegroundColor Cyan
 Push-Location $AppDir
 try {
@@ -51,18 +64,43 @@ try {
     Write-Host "📱 Verifica que tu dispositivo/emulador Android esté disponible y ANDROID_HOME configurado." -ForegroundColor Yellow
     Write-Host "🚀 Compilando APK release..." -ForegroundColor Green
 
-    $env:DOTENV_CONFIG_PATH = $EnvFile
+    $env:APP_ENV = "production"
     try {
-        npx expo run:android --variant release
+        Write-Host "🧹 Limpiando proyecto nativo..." -ForegroundColor Cyan
+        npx expo prebuild --clean --platform android --no-install
+
+        $localProperties = @(
+            "sdk.dir=$sdkPath"
+        )
+        $localProperties | Out-File -FilePath "android\local.properties" -Encoding ascii
+
+        Write-Host "🏗  Ejecutando Gradle assembleRelease..." -ForegroundColor Green
+        Push-Location (Join-Path $AppDir "android")
+        try {
+            .\gradlew.bat clean assembleRelease
+        }
+        finally {
+            Pop-Location
+        }
     }
     finally {
-        Remove-Item Env:DOTENV_CONFIG_PATH -ErrorAction SilentlyContinue
+        Remove-Item Env:APP_ENV -ErrorAction SilentlyContinue
     }
 }
 finally {
     Pop-Location
 }
 
-Write-Host "`n✅ Build finalizado. El APK se encuentra normalmente en:"
-Write-Host "   apps/operator-mobile/android/app/build/outputs/apk/release/app-release.apk"
-Write-Host "   Si necesitas firmar con tu keystore, ajusta android/app/build.gradle." -ForegroundColor Yellow
+$apkPath = Join-Path $AppDir "android\app\build\outputs\apk\release\app-release.apk"
+Write-Host ""
+if (Test-Path $apkPath) {
+    Write-Host "✅ Build finalizado: $apkPath"
+    Write-Host ""
+    Write-Host "📂 Contenido de la carpeta de salida:" -ForegroundColor Cyan
+    Get-ChildItem (Split-Path $apkPath) | Format-Table Name, Length, LastWriteTime
+    Write-Host ""
+    Write-Host "👀 Abriendo la carpeta en el Explorador..."
+    Invoke-Item (Split-Path $apkPath) 2>$null
+} else {
+    Write-Host "⚠️  Build finalizado pero no se encontró el APK en $apkPath. Revisa los logs." -ForegroundColor Yellow
+}
