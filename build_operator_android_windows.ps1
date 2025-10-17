@@ -51,7 +51,13 @@ try {
     Write-Host "📱 Verifica que tu dispositivo/emulador Android esté disponible y ANDROID_HOME configurado." -ForegroundColor Yellow
     Write-Host "🚀 Compilando APK release..." -ForegroundColor Green
 
-    npx expo run:android --variant release --env-file $EnvFile
+    $env:DOTENV_CONFIG_PATH = $EnvFile
+    try {
+        npx expo run:android --variant release
+    }
+    finally {
+        Remove-Item Env:DOTENV_CONFIG_PATH -ErrorAction SilentlyContinue
+    }
 }
 finally {
     Pop-Location

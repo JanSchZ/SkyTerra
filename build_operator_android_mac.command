@@ -31,7 +31,7 @@ echo "🔐 Usando variables de $ENV_FILE (API_URL=$(grep '^API_URL' "$ENV_FILE" 
 echo "📱 Asegúrate de tener un dispositivo/emulador Android conectado y ANDROID_HOME configurado."
 
 echo "🚀 Compilando APK release..."
-npx expo run:android --variant release --env-file "$ENV_FILE"
+DOTENV_CONFIG_PATH="$ENV_FILE" npx expo run:android --variant release
 
 echo ""
 echo "✅ Build finalizado. El APK se encuentra normalmente en:"
