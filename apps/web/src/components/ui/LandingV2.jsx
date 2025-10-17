@@ -4,11 +4,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
 
 const HERO_ORBIT_VIEW = {
-  longitude: 8,
-  latitude: 11,
-  zoom: 0.58,
-  pitch: 22,
-  bearing: -20,
+  longitude: -70,
+  latitude: -30,
+  zoom: 2,
+  pitch: 0,
+  bearing: 0,
 };
 
 export default function LandingV2({
