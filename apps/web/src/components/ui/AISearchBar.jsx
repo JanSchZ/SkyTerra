@@ -17,6 +17,7 @@ import {
   alpha
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloseIcon from '@mui/icons-material/Close';
@@ -93,20 +94,43 @@ const PREDEFINED_LOCATIONS = {
   'india': { center: [78.9629, 20.5937], zoom: 5, name: 'India' },
 };
 
-const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart, onSearchComplete }) => {
-  const [query, setQuery] = useState('');
+const AISearchBar = ({
+  onSearch,
+  onLocationSearch,
+  onQuerySubmit,
+  onSearchStart,
+  onSearchComplete,
+  variant = 'default',
+  placeholder,
+  value,
+  onQueryChange,
+}) => {
+  const isControlled = value !== undefined && value !== null;
+  const [internalQuery, setInternalQuery] = useState('');
+  const query = isControlled ? value : internalQuery;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [searchResult, setSearchResult] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const theme = useTheme();
+  const isHeroVariant = variant === 'hero';
 
   // Randomized input name/id to prevent browser autocomplete suggestions from prior entries
   const [inputName] = useState(() => `ai-search-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
+  const updateQuery = (nextValue) => {
+    if (isControlled) {
+      if (onQueryChange) {
+        onQueryChange(nextValue);
+      }
+    } else {
+      setInternalQuery(nextValue);
+    }
+  };
+
   const handleInputChange = (e) => {
-    setQuery(e.target.value);
+    updateQuery(e.target.value);
     if (showResults) setShowResults(false);
     if (error) setError(null);
     setIsInitialLoad(false);
@@ -399,12 +423,14 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
     setShowResults(false);
   };
 
+  const resolvedPlaceholder = placeholder || (isHeroVariant ? 'Buscar terrenos...' : 'Buscar ubicación o propiedades...');
+
   return (
     <Box sx={{ width: '100%', position: 'relative' }}>
       <TextField
         fullWidth
         variant="outlined"
-        placeholder="Buscar ubicación o propiedades..."
+        placeholder={resolvedPlaceholder}
         value={query}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
@@ -422,50 +448,121 @@ const AISearchBar = ({ onSearch, onLocationSearch, onQuerySubmit, onSearchStart,
         }}
         onFocus={(e) => { try { e.target.setAttribute('autocomplete', 'off'); e.target.setAttribute('autocorrect','off'); e.target.setAttribute('autocapitalize','none'); } catch (error) { void error; } }}
         InputProps={{
-          endAdornment: loading ? (
-            <InputAdornment position="end">
-              <CircularProgress size={20} sx={{ color: 'rgba(255,255,255,0.7)' }} />
+          sx: isHeroVariant
+            ? {
+                pr: 1,
+                '& .MuiInputAdornment-root': { alignItems: 'center' },
+              }
+            : undefined,
+          endAdornment: (
+            <InputAdornment position="end" sx={{ pl: isHeroVariant ? 1 : 0 }}>
+              {loading ? (
+                <Box
+                  sx={{
+                    width: isHeroVariant ? 56 : 'auto',
+                    height: isHeroVariant ? 56 : 'auto',
+                    display: 'grid',
+                    placeItems: 'center',
+                    backgroundColor: isHeroVariant ? 'rgba(15,23,42,0.04)' : 'transparent',
+                    borderRadius: isHeroVariant ? '999px' : 1,
+                  }}
+                >
+                  <CircularProgress
+                    size={isHeroVariant ? 22 : 20}
+                    sx={{ color: isHeroVariant ? '#0f172a' : 'rgba(255,255,255,0.7)' }}
+                  />
+                </Box>
+              ) : (
+                <IconButton
+                  onClick={handleSearch}
+                  disabled={!query.trim()}
+                  sx={{
+                    backgroundColor: isHeroVariant ? '#0f172a' : 'transparent',
+                    color: isHeroVariant ? '#f8fafc' : 'rgba(255,255,255,0.7)',
+                    width: isHeroVariant ? 56 : 'auto',
+                    height: isHeroVariant ? 56 : 'auto',
+                    borderRadius: isHeroVariant ? '999px' : 1,
+                    transition: 'all 0.3s ease',
+                    boxShadow: isHeroVariant ? '0 18px 32px rgba(15,23,42,0.24)' : 'none',
+                    '&:hover': {
+                      backgroundColor: isHeroVariant ? '#111c30' : 'rgba(255,255,255,0.1)',
+                      color: isHeroVariant ? '#ffffff' : 'rgba(255,255,255,0.9)',
+                    },
+                    '&:disabled': {
+                      backgroundColor: isHeroVariant ? 'rgba(15,23,42,0.08)' : 'transparent',
+                      color: isHeroVariant ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.3)',
+                      cursor: 'not-allowed',
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  {isHeroVariant ? <ArrowForwardRoundedIcon /> : <SearchIcon />}
+                </IconButton>
+              )}
             </InputAdornment>
-          ) : (
-            <InputAdornment position="end">
-              <IconButton
-                onClick={handleSearch}
-                disabled={!query.trim()}
-                sx={{ 
-                  color: 'rgba(255,255,255,0.7)',
-                  '&:hover': { color: 'rgba(255,255,255,0.9)' },
-                  '&:disabled': { color: 'rgba(255,255,255,0.3)' }
-                }}
-              >
-                <SearchIcon />
-              </IconButton>
-            </InputAdornment>
-          )
+          ),
         }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.25)',
-            color: '#ffffff',
-            transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-            '& fieldset': { borderColor: 'transparent' },
-            '&:hover fieldset': { borderColor: 'transparent' },
-            '&.Mui-focused fieldset': { borderColor: 'transparent' },
-            '&.Mui-focused': {
-              backgroundColor: 'rgba(255,255,255,0.22)',
-              boxShadow: '0 0 12px rgba(255,255,255,0.4)',
-              transform: 'translateY(-1px)',
-            },
-            '&:hover': {
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              transform: 'translateY(-0.5px)',
-            }
-          },
-          input: { color: '#ffffff', '::placeholder': { color: 'rgba(255,255,255,0.75)' } },
-        }}
+        sx={
+          isHeroVariant
+            ? {
+                '& .MuiOutlinedInput-root': {
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.98) 100%)',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(15,23,42,0.05)',
+                  boxShadow: '0 24px 58px rgba(15,23,42,0.12)',
+                  transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                  paddingRight: '4px',
+                  minHeight: 68,
+                  '& fieldset': { borderColor: 'transparent' },
+                  '&:hover fieldset': { borderColor: 'transparent' },
+                  '&.Mui-focused fieldset': { borderColor: 'transparent' },
+                  '&:hover': {
+                    boxShadow: '0 28px 64px rgba(15,23,42,0.14)',
+                    transform: 'translateY(-1px)',
+                  },
+                  '&.Mui-focused': {
+                    boxShadow: '0 32px 70px rgba(15,23,42,0.16)',
+                    transform: 'translateY(-2px)',
+                  },
+                },
+                '& .MuiOutlinedInput-input': {
+                  color: '#0f172a',
+                  fontSize: '1.08rem',
+                  fontWeight: 500,
+                  padding: '20px 26px',
+                  paddingRight: '92px',
+                  fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+                  '::placeholder': {
+                    color: 'rgba(15,23,42,0.38)',
+                    opacity: 1,
+                  },
+                },
+              }
+            : {
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  color: '#ffffff',
+                  transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '& fieldset': { borderColor: 'transparent' },
+                  '&:hover fieldset': { borderColor: 'transparent' },
+                  '&.Mui-focused fieldset': { borderColor: 'transparent' },
+                  '&.Mui-focused': {
+                    backgroundColor: 'rgba(255,255,255,0.22)',
+                    boxShadow: '0 0 12px rgba(255,255,255,0.4)',
+                    transform: 'translateY(-1px)',
+                  },
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    transform: 'translateY(-0.5px)',
+                  },
+                },
+                input: { color: '#ffffff', '::placeholder': { color: 'rgba(255,255,255,0.75)' } },
+              }
+        }
       />
       
       {error && !showResults && (
