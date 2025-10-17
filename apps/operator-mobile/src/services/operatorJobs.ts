@@ -5,7 +5,7 @@ export interface OperatorJobOffer {
   status: 'pending' | 'accepted' | 'declined' | 'expired' | 'canceled';
   ttl_seconds: number;
   wave: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   remaining_seconds?: number;
   status_label?: string;
 }
@@ -63,6 +63,11 @@ export const setAvailability = async (isAvailable: boolean) => {
 
 export const listAvailableJobs = async (): Promise<OperatorJob[]> => {
   const { data } = await api.get('/api/jobs/available/');
+  return data ?? [];
+};
+
+export const listPilotJobs = async (): Promise<OperatorJob[]> => {
+  const { data } = await api.get('/api/jobs/');
   return data ?? [];
 };
 

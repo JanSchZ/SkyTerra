@@ -9,4 +9,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     apiUrl: process.env.API_URL,
   },
+  plugins: [...(config.plugins ?? []), 'expo-font'],
 });

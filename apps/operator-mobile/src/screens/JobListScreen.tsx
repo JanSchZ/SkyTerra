@@ -1,16 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, Text, TouchableOpacity, Switch } from 'react-native';
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  Switch,
+  ActivityIndicator,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useAuth } from '@context/AuthContext';
 import {
   listAvailableJobs,
+  listPilotJobs,
   OperatorJob,
   acceptOffer,
   declineOffer,
   fetchPilotProfile,
   setAvailability,
+  PilotProfile,
 } from '@services/operatorJobs';
 
 type JobsScreenNav = NativeStackNavigationProp<RootStackParamList, 'Jobs'>;
@@ -22,14 +33,25 @@ const JobListScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [pilotProfile, setPilotProfile] = useState<PilotProfile | null>(null);
+  const [activeJob, setActiveJob] = useState<OperatorJob | null>(null);
 
   const loadJobs = async (refreshOnly = false) => {
     if (!refreshOnly) setLoading(true);
     setRefreshing(refreshOnly);
     try {
-      const [profileData, jobData] = await Promise.all([fetchPilotProfile(), listAvailableJobs()]);
+      const [profileData, jobData, myJobs] = await Promise.all([
+        fetchPilotProfile(),
+        listAvailableJobs(),
+        listPilotJobs(),
+      ]);
+      setPilotProfile(profileData);
       setIsAvailable(profileData.is_available);
       setJobs(jobData);
+      const nextActive = myJobs.find((item) =>
+        ['assigned', 'scheduling', 'scheduled', 'shooting'].includes(item.status)
+      );
+      setActiveJob(nextActive ?? null);
     } catch (error) {
       console.error('Error fetching jobs', error);
     } finally {
@@ -109,12 +131,32 @@ const JobListScreen = () => {
     );
   };
 
+  const scoreLabel =
+    typeof pilotProfile?.score === 'number' ? pilotProfile.score.toFixed(1) : '—';
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#38BDF8" />
+        <Text style={styles.loadingText}>Buscando invitaciones...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Trabajos disponibles</Text>
           <Text style={styles.headerSubtitle}>Responde rápido para asegurar el vuelo</Text>
+          {pilotProfile ? (
+            <View style={styles.profileMeta}>
+              <Text style={styles.profileName}>{pilotProfile.display_name}</Text>
+              <Text style={styles.profileScore}>
+                {pilotProfile.status === 'active' ? 'Operador activo' : 'Perfil pendiente'} · Score {scoreLabel}
+              </Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.headerActions}>
           <View style={styles.availabilityToggle}>
@@ -132,9 +174,31 @@ const JobListScreen = () => {
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadJobs(true)} />}
         renderItem={renderJobCard}
+        ListHeaderComponent={
+          activeJob ? (
+            <ActiveJobBanner job={activeJob} onPress={() => navigation.navigate('JobDetail', { jobId: String(activeJob.id) })} />
+          ) : null
+        }
         ListEmptyComponent={!loading ? <Text style={styles.empty}>No hay invitaciones disponibles.</Text> : null}
       />
     </View>
+  );
+};
+
+const ActiveJobBanner: React.FC<{ job: OperatorJob; onPress: () => void }> = ({ job, onPress }) => {
+  const statusLabel = job.status_bar?.substate_label || job.status_label || job.status;
+  return (
+    <TouchableOpacity style={styles.activeBanner} onPress={onPress}>
+      <View style={styles.activeHeader}>
+        <Text style={styles.activeTitle}>Trabajo en progreso</Text>
+        <Text style={styles.activeStatus}>{statusLabel}</Text>
+      </View>
+      <Text style={styles.activeProperty}>{job.property_details?.name ?? `ID ${job.id}`}</Text>
+      <Text style={styles.activeMeta}>
+        Agenda: {job.scheduled_start ? new Date(job.scheduled_start).toLocaleString() : 'Sin confirmar'}
+      </Text>
+      <Text style={styles.activeCta}>Ir al detalle</Text>
+    </TouchableOpacity>
   );
 };
 
@@ -161,6 +225,16 @@ const styles = StyleSheet.create({
     color: '#CBD5F5',
     marginTop: 4,
   },
+  profileMeta: {
+    marginTop: 8,
+  },
+  profileName: {
+    color: '#F8FAFC',
+    fontWeight: '600',
+  },
+  profileScore: {
+    color: '#94A3B8',
+  },
   headerActions: {
     alignItems: 'flex-end',
   },
@@ -171,6 +245,43 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 24,
     gap: 16,
+  },
+  activeBanner: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#38BDF833',
+  },
+  activeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  activeTitle: {
+    color: '#38BDF8',
+    fontWeight: '700',
+  },
+  activeStatus: {
+    color: '#FACC15',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    fontSize: 12,
+  },
+  activeProperty: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  activeMeta: {
+    color: '#94A3B8',
+    marginTop: 6,
+  },
+  activeCta: {
+    color: '#38BDF8',
+    marginTop: 12,
+    fontWeight: '600',
   },
   empty: {
     color: '#94A3B8',
@@ -250,6 +361,16 @@ const styles = StyleSheet.create({
   secondaryText: {
     color: '#38BDF8',
     fontWeight: '600',
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#020617',
+    gap: 16,
+  },
+  loadingText: {
+    color: '#94A3B8',
   },
 });
 

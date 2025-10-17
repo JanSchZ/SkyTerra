@@ -903,6 +903,95 @@ export const propertyService = {
   },
 };
 
+export const adminService = {
+  async fetchTickets(options = {}) {
+    const {
+      status,
+      priority,
+      assignedTo,
+      search,
+      page = 1,
+      pageSize = 200,
+    } = options;
+
+    const params = {
+      page,
+      page_size: pageSize,
+      ordering: '-created_at',
+    };
+
+    if (status && status !== 'all') {
+      params.status = status;
+    }
+    if (priority && priority !== 'all') {
+      params.priority = priority;
+    }
+    if (typeof assignedTo !== 'undefined') {
+      params.assigned_to = assignedTo === null ? 'null' : assignedTo;
+    }
+    if (search) {
+      params.search = search;
+    }
+
+    const response = await api.get('/admin/tickets/', { params });
+    const list = Array.isArray(response.data?.results)
+      ? response.data.results
+      : Array.isArray(response.data)
+      ? response.data
+      : [];
+    const count = response.data?.count ?? list.length;
+    return { results: list, count };
+  },
+
+  async fetchTicket(ticketId) {
+    const response = await api.get(`/admin/tickets/${ticketId}/`);
+    return response.data;
+  },
+
+  async updateTicket(ticketId, payload) {
+    const response = await api.patch(`/admin/tickets/${ticketId}/`, payload);
+    return response.data;
+  },
+
+  async respondTicket(ticketId, message) {
+    const response = await api.post('/admin/ticket-responses/', {
+      ticket: ticketId,
+      message,
+    });
+    return response.data;
+  },
+
+  async fetchTicketResponses(ticketId) {
+    const response = await api.get('/admin/ticket-responses/', {
+      params: { ticket: ticketId, ordering: 'created_at' },
+    });
+    return Array.isArray(response.data?.results)
+      ? response.data.results
+      : Array.isArray(response.data)
+      ? response.data
+      : [];
+  },
+
+  async fetchUsers(options = {}) {
+    const { page = 1, pageSize = 200 } = options;
+    const response = await api.get('/admin/users/', {
+      params: { page, page_size: pageSize },
+    });
+    const list = Array.isArray(response.data?.results)
+      ? response.data.results
+      : Array.isArray(response.data)
+      ? response.data
+      : [];
+    const count = response.data?.count ?? list.length;
+    return { results: list, count };
+  },
+
+  async fetchStaffUsers() {
+    const { results } = await this.fetchUsers({ pageSize: 200 });
+    return results.filter((user) => user.is_staff);
+  },
+};
+
 // Servicio para la administración de Sam (IA)
 export const aiManagementService = {
   // Obtener el estado y los logs de Sam
@@ -1226,6 +1315,7 @@ const makeAbsoluteUrl = (partialUrl) => {
 export default {
   property: propertyService,
   auth: authService,
+  admin: adminService,
   tour: tourService,
   image: imageService,
   recordingOrder: recordingOrderService,

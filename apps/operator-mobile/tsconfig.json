@@ -10,14 +10,27 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["expo"],
+    "types": [
+      "expo"
+    ],
     "baseUrl": "./src",
     "paths": {
-      "@components/*": ["components/*"],
-      "@screens/*": ["screens/*"],
-      "@services/*": ["services/*"],
-      "@context/*": ["context/*"],
-      "@theme/*": ["theme/*"]
+      "@components/*": [
+        "components/*"
+      ],
+      "@screens/*": [
+        "screens/*"
+      ],
+      "@services/*": [
+        "services/*"
+      ],
+      "@context/*": [
+        "context/*"
+      ],
+      "@theme/*": [
+        "theme/*"
+      ]
     }
-  }
+  },
+  "extends": "expo/tsconfig.base"
 }

@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { signIn, fetchCurrentUser, SignInPayload, OperatorUser } from '@services/apiClient';
+import {
+  signIn,
+  fetchCurrentUser,
+  SignInPayload,
+  OperatorUser,
+  loadStoredTokens,
+  clearStoredTokens,
+  setUnauthorizedHandler,
+} from '@services/apiClient';
 
 interface AuthContextValue {
   user: OperatorUser | null;
@@ -16,15 +23,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await clearStoredTokens();
+      setUser(null);
+      setLoading(false);
+    });
+    return () => {
+      setUnauthorizedHandler(undefined);
+    };
+  }, []);
+
+  useEffect(() => {
     const bootstrap = async () => {
       try {
-        const refreshToken = await SecureStore.getItemAsync('refreshToken');
-        if (refreshToken) {
+        const tokens = await loadStoredTokens();
+        if (tokens.refreshToken) {
           const me = await fetchCurrentUser();
           setUser(me);
+        } else {
+          setUser(null);
         }
       } catch (error) {
         console.warn('Auth bootstrap error', error);
+        await clearStoredTokens();
         setUser(null);
       } finally {
         setLoading(false);
@@ -37,17 +58,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithCredentials = async (payload: SignInPayload) => {
     setLoading(true);
     try {
-      const { refreshToken } = await signIn(payload);
-      await SecureStore.setItemAsync('refreshToken', refreshToken);
+      await signIn(payload);
       const me = await fetchCurrentUser();
       setUser(me);
+    } catch (error) {
+      await clearStoredTokens();
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   const signOut = async () => {
-    await SecureStore.deleteItemAsync('refreshToken');
+    await clearStoredTokens();
     setUser(null);
   };
 

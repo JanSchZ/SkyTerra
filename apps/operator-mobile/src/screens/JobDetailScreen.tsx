@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -11,7 +11,7 @@ const JobDetailScreen = () => {
   const [job, setJob] = useState<OperatorJob | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadJob = async () => {
+  const loadJob = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchJob(jobId);
@@ -22,11 +22,11 @@ const JobDetailScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId]);
 
   useEffect(() => {
     loadJob();
-  }, [jobId]);
+  }, [loadJob]);
 
   const handleSchedule = async () => {
     if (!job) return;
