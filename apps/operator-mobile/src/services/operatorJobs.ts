@@ -1,5 +1,18 @@
 import { api } from './apiClient';
 
+const ensureArray = <T>(input: unknown): T[] => {
+  if (Array.isArray(input)) {
+    return input as T[];
+  }
+  if (input && typeof input === 'object') {
+    const candidate = (input as { results?: unknown; data?: unknown; items?: unknown });
+    if (Array.isArray(candidate.results)) return candidate.results as T[];
+    if (Array.isArray(candidate.data)) return candidate.data as T[];
+    if (Array.isArray(candidate.items)) return candidate.items as T[];
+  }
+  return [];
+};
+
 export interface OperatorJobOffer {
   id: number;
   status: 'pending' | 'accepted' | 'declined' | 'expired' | 'canceled';
@@ -63,12 +76,12 @@ export const setAvailability = async (isAvailable: boolean) => {
 
 export const listAvailableJobs = async (): Promise<OperatorJob[]> => {
   const { data } = await api.get('/api/jobs/available/');
-  return data ?? [];
+  return ensureArray<OperatorJob>(data);
 };
 
 export const listPilotJobs = async (): Promise<OperatorJob[]> => {
   const { data } = await api.get('/api/jobs/');
-  return data ?? [];
+  return ensureArray<OperatorJob>(data);
 };
 
 export const fetchJob = async (jobId: number | string): Promise<OperatorJob> => {

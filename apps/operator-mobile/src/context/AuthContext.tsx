@@ -58,7 +58,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithCredentials = async (payload: SignInPayload) => {
     setLoading(true);
     try {
-      await signIn(payload);
+      const result = await signIn(payload);
+      if (result.user) {
+        setUser(result.user);
+        return;
+      }
       const me = await fetchCurrentUser();
       setUser(me);
     } catch (error) {

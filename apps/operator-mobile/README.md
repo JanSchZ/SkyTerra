@@ -47,6 +47,34 @@ npm run start               # Expo start (web dashboard)
 npm run android / ios / web
 ```
 
+## Builds nativas (APK/AAB) con EAS
+
+1. **Preparar configuración**
+   - Ajusta `API_URL` en `.env` para desarrollo local si necesitas un backend distinto al productivo. Si no defines nada, la app usará por defecto `https://skyterra.cl`.
+   - Para builds cloud define `API_URL` desde [expo.dev](https://expo.dev/) → tu proyecto → **Build → Environment variables** (perfiles `preview`/`production`).
+   - Revisa `app.json` y `app.config.ts` para mantener `version`, `android.package` y `versionCode` actualizados antes de cada release.
+2. **Instalar dependencias**
+   ```bash
+   cd apps/operator-mobile
+   npm install
+   ```
+3. **Autenticarse en Expo/EAS**
+   ```bash
+   npx expo login
+   npx eas login
+   ```
+4. **Generar APK de prueba**
+   ```bash
+   npx eas build -p android --profile preview
+   ```
+   - Acepta crear/reutilizar el keystore cuando te lo pida (Expo lo almacena por ti; descarga el backup).
+   - Al finalizar, descarga el APK desde el enlace que imprime la CLI y distribúyelo manualmente (`adb install` o copia al dispositivo).
+5. **Build para Play Store**
+   ```bash
+   npx eas build -p android --profile production
+   ```
+   Esto produce un `.aab` listo para subir a Google Play. Recuerda incrementar `versionCode` y `version` antes de cada subida.
+
 ## Próximos pasos
 
 1. **Autenticación**: conectar con `/api/auth/login/` y `profile/` del backend (cookies -> tokens). El `AuthContext` ya espera endpoints.

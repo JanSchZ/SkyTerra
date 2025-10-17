@@ -3,12 +3,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import SignInScreen from '@screens/SignInScreen';
+import SignUpScreen from '@screens/SignUpScreen';
 import JobListScreen from '@screens/JobListScreen';
 import JobDetailScreen from '@screens/JobDetailScreen';
 import { useAuth } from '@context/AuthContext';
 
 export type RootStackParamList = {
-  SignIn: undefined;
+  SignIn: { email?: string } | undefined;
+  SignUp: undefined;
   Jobs: undefined;
   JobDetail: { jobId: string };
 };
@@ -36,7 +38,10 @@ const RootNavigator = () => {
             <Stack.Screen name="JobDetail" component={JobDetailScreen} />
           </>
         ) : (
-          <Stack.Screen name="SignIn" component={SignInScreen} />
+          <>
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

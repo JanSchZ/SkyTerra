@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { extractMessageFromData, getErrorMessage } from '@utils/errorMessages';
 
 const apiBaseUrl = Constants?.expoConfig?.extra?.apiUrl || process.env.API_URL;
 
@@ -70,6 +71,7 @@ export const clearStoredTokens = async () => {
 const rawClient = axios.create({
   baseURL: apiBaseUrl,
   timeout: 15000,
+  withCredentials: true,
 });
 
 const refreshAccessToken = async (): Promise<string | null> => {
@@ -108,7 +110,7 @@ const queueRefresh = () => {
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
-  withCredentials: false,
+  withCredentials: true,
   timeout: 15000,
 });
 
@@ -149,6 +151,25 @@ export interface SignInTokens {
   refresh: string;
 }
 
+export interface SignInResult {
+  tokens: SignInTokens | null;
+  user: OperatorUser | null;
+}
+
+export interface SignUpPayload {
+  email: string;
+  password1: string;
+  password2: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+export interface SignUpResult {
+  detail?: string;
+  requiresVerification?: boolean;
+  tokens?: SignInTokens | null;
+}
+
 export interface OperatorUser {
   id: number;
   email: string;
@@ -158,27 +179,101 @@ export interface OperatorUser {
   is_staff?: boolean;
 }
 
-export const signIn = async (payload: SignInPayload): Promise<SignInTokens> => {
-  const { data } = await rawClient.post('/api/auth/login/', payload);
+interface RawUser {
+  id?: number;
+  pk?: number;
+  email?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  is_staff?: boolean;
+}
+
+const mapUser = (data: RawUser | null | undefined): OperatorUser => ({
+  id: data?.id ?? data?.pk ?? 0,
+  email: data?.email ?? '',
+  username: data?.username,
+  first_name: data?.first_name,
+  last_name: data?.last_name,
+  is_staff: data?.is_staff,
+});
+
+export const signIn = async (payload: SignInPayload): Promise<SignInResult> => {
+  try {
+    const { data } = await rawClient.post('/api/auth/login/', payload);
+    const tokens: SignInTokens = {
+      access: data?.access ?? data?.access_token,
+      refresh: data?.refresh ?? data?.refresh_token,
+    };
+    const hasTokens = Boolean(tokens.access && tokens.refresh);
+    const responseUser = data?.user ? mapUser(data.user) : null;
+
+    if (hasTokens) {
+      await persistTokens(tokens);
+      return { tokens, user: responseUser };
+    }
+
+    if (responseUser) {
+      return { tokens: null, user: responseUser };
+    }
+
+    try {
+      const profileResponse = await rawClient.get('/api/auth/profile/');
+      return { tokens: null, user: mapUser(profileResponse.data) };
+    } catch {
+      await clearStoredTokens();
+      const detail =
+        extractMessageFromData(data) ??
+        'No recibimos credenciales de acceso. Verifica tu cuenta o intenta nuevamente.';
+      const error = new Error(detail);
+      error.name = 'AuthError';
+      throw error;
+    }
+  } catch (error) {
+    await clearStoredTokens();
+    const message = getErrorMessage(
+      error,
+      'No pudimos iniciar sesión. Verifica tus credenciales o intenta nuevamente.'
+    );
+    const authError = new Error(message);
+    authError.name = 'AuthError';
+    throw authError;
+  }
+};
+
+export const signUp = async (payload: SignUpPayload): Promise<SignUpResult> => {
+  const submission = {
+    email: payload.email?.trim(),
+    password1: payload.password1,
+    password2: payload.password2,
+    first_name: payload.first_name?.trim() || undefined,
+    last_name: payload.last_name?.trim() || undefined,
+  };
+
+  const body = Object.fromEntries(
+    Object.entries(submission).filter(([, value]) => value !== undefined && value !== '')
+  );
+
+  const { data } = await rawClient.post('/api/auth/registration/', body);
+
   const tokens: SignInTokens = {
     access: data?.access ?? data?.access_token,
     refresh: data?.refresh ?? data?.refresh_token,
   };
-  if (!tokens.access || !tokens.refresh) {
-    throw new Error('La respuesta de autenticacion no contiene tokens JWT.');
-  }
-  await persistTokens(tokens);
-  return tokens;
+
+  const hasTokens = Boolean(tokens.access && tokens.refresh);
+  const detail: string | undefined = data?.detail;
+  const requiresVerification =
+    typeof detail === 'string' && detail.toLowerCase().includes('verification');
+
+  return {
+    detail,
+    requiresVerification,
+    tokens: hasTokens ? tokens : null,
+  };
 };
 
 export const fetchCurrentUser = async (): Promise<OperatorUser> => {
   const { data } = await api.get('/api/auth/profile/');
-  return {
-    id: data?.id ?? data?.pk ?? 0,
-    email: data?.email ?? '',
-    username: data?.username,
-    first_name: data?.first_name,
-    last_name: data?.last_name,
-    is_staff: data?.is_staff,
-  };
+  return mapUser(data);
 };
