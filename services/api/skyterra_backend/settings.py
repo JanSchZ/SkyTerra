@@ -44,7 +44,7 @@ if _email_verification_env not in _valid_email_verification_modes:
 # Default to no forced verification for local development so first-time signups can log in immediately.
 ACCOUNT_EMAIL_VERIFICATION_MODE = _email_verification_env or ('none' if IS_LOCAL_DEV else 'mandatory')
 
-# Comma-separated list of domains accepted in production, e.g. "skyterra.cl,api.skyterra.cl"
+# Comma-separated list of domains accepted in production, e.g. "skyterra.cl"
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',') if host.strip()]
 
 # Ensure at least localhost is allowed in development mode

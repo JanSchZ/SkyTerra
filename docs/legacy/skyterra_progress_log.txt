@@ -183,7 +183,7 @@ This log tracks the systematic audit and improvement of the SkyTerra platform. E
 ### Production Rollout Plan (2025-08-09)
 
 - [ ] Domains and TLS
-  - Acquire/confirm domains: `app.skyterra.cl` (frontend), `api.skyterra.cl` (backend).
+  - Acquire/confirm domains: servir frontend y API bajo `skyterra.cl` (principal) y reservar `app.skyterra.cl` si se requiere separar tráfico web.
   - CloudFront distribution for frontend (S3 origin) with TLS (ACM cert) and HTTP/2.
   - Nginx reverse proxy for backend with Let’s Encrypt certificates; enable HSTS.
 
@@ -203,8 +203,8 @@ This log tracks the systematic audit and improvement of the SkyTerra platform. E
   - Configure `django-storages` (`USE_S3=True`) y `AWS_*` envs; invalidate CloudFront upon deploy.
 
 - [ ] Payments
-  - Stripe: set live keys, set webhook to `https://api.skyterra.cl/api/payments/webhook/`.
-  - Coinbase Commerce: set live API key + webhook `https://api.skyterra.cl/api/payments/bitcoin/webhook/`.
+  - Stripe: set live keys, set webhook a `https://skyterra.cl/api/payments/webhook/`.
+  - Coinbase Commerce: set live API key + webhook `https://skyterra.cl/api/payments/bitcoin/webhook/`.
   - Rotate and store secrets in AWS SSM Parameter Store.
 
 - [ ] Security Hardening

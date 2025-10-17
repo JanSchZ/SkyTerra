@@ -1,0 +1,23 @@
+{
+  "cli": {
+    "version": ">= 3.17.1"
+  },
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "API_URL": "https://skyterra.cl"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "API_URL": "https://skyterra.cl"
+      }
+    }
+  }
+}

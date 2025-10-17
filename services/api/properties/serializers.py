@@ -79,8 +79,8 @@ class TourSerializer(serializers.ModelSerializer):
     # Renaming created_at to uploaded_at for clarity in the API response,
     # as it represents the upload time for packages or creation time for other tour types.
     uploaded_at = serializers.DateTimeField(source='created_at', read_only=True)
-    # Build an absolute URL so that the frontend can always load the tour correctly, even when
-    # it runs on a different sub-domain (e.g. app.skyterra.cl vs api.skyterra.cl).
+    # Build an absolute URL so the frontend/mobile app can load the tour regardless of host,
+    # e.g. when consuming it from skyterra.cl while media lives on a separate origin.
     url = serializers.SerializerMethodField()
     # Maintain backward-compatibility: expose the property as an id, and also
     # provide lightweight details under property_details.

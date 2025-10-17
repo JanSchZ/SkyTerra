@@ -2,7 +2,7 @@
   "expo": {
     "name": "SkyTerra Operators",
     "slug": "skyterra-operators",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,6 +18,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.skyterra.operators",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -26,6 +28,11 @@
     "web": {
       "bundler": "metro",
       "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f4cad779-aae6-414c-bc47-d568f9d0cfd3"
+      }
     }
   }
 }
