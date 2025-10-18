@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Circle, MapPressEvent, Marker, Region } from 'react-native-maps';
+import type { MapPressEvent, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '@theme';
@@ -29,6 +29,20 @@ const computeDelta = (radiusKm: number) => {
   const delta = km / 111;
   return Math.min(Math.max(delta * 1.8, 0.05), 2);
 };
+
+const shouldDisableMap = Platform.OS === 'android' && Constants.appOwnership === 'standalone';
+type MapsModule = typeof import('react-native-maps');
+let MapViewComponent: MapsModule['default'] | null = null;
+let MarkerComponent: MapsModule['Marker'] | null = null;
+let CircleComponent: MapsModule['Circle'] | null = null;
+
+if (!shouldDisableMap) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const maps: MapsModule = require('react-native-maps');
+  MapViewComponent = maps.default;
+  MarkerComponent = maps.Marker;
+  CircleComponent = maps.Circle;
+}
 
 const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, onChange }) => {
   const { colors } = useTheme();
@@ -109,7 +123,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, on
 
   return (
     <View style={[styles.wrapper, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-      {Platform.OS === 'android' && Constants.appOwnership === 'standalone' ? (
+      {shouldDisableMap || !MapViewComponent ? (
         <View style={styles.mapFallback}>
           <Ionicons name="map-outline" size={32} color={colors.textSecondary} />
           <Text style={[styles.fallbackTitle, { color: colors.textPrimary }]}>Mapa no disponible en esta build</Text>
@@ -119,7 +133,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, on
           </Text>
         </View>
       ) : (
-        <MapView
+        <MapViewComponent
           style={styles.map}
           region={region}
           onRegionChangeComplete={setRegion}
@@ -127,17 +141,19 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, on
         >
           {value ? (
             <>
-              <Marker coordinate={value} />
-              <Circle
-                key={`${radiusMeters}-${value.latitude}-${value.longitude}`}
-                center={value}
-                radius={radiusMeters}
-                strokeColor={colors.map.radiusStroke}
-                fillColor={colors.map.radiusFill}
-              />
+              {MarkerComponent ? <MarkerComponent coordinate={value} /> : null}
+              {CircleComponent ? (
+                <CircleComponent
+                  key={`${radiusMeters}-${value.latitude}-${value.longitude}`}
+                  center={value}
+                  radius={radiusMeters}
+                  strokeColor={colors.map.radiusStroke}
+                  fillColor={colors.map.radiusFill}
+                />
+              ) : null}
             </>
           ) : null}
-        </MapView>
+        </MapViewComponent>
       )}
       <View style={[styles.controls, { backgroundColor: colors.surface }]}>
         <TouchableOpacity

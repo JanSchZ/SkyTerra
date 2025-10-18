@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +26,7 @@ import {
   updatePilotProfile,
   uploadPilotDocument,
 } from '@services/operatorJobs';
+import { persistPreferredName } from '@services/apiClient';
 import { documentBlueprints, DOCUMENT_TOTAL } from '@content/documents';
 import { getErrorMessage } from '@utils/errorMessages';
 import { useTheme, ThemeColors, ThemeMode } from '@theme';
@@ -41,6 +44,33 @@ const themeModeOptions: Array<{ value: ThemeMode; label: string; description: st
   { value: 'auto', label: 'Automático', description: 'Se adapta a la configuración del sistema.' },
 ];
 
+const DRONE_MODELS = [
+  'DJI Mini 3 Pro',
+  'DJI Mini 4 Pro',
+  'DJI Air 3',
+  'DJI Mavic 3 Classic',
+  'DJI Mavic 3 Pro',
+  'DJI Mavic 3 Pro Cine',
+  'DJI Mavic 4',
+  'DJI Mavic 4 Pro',
+  'DJI Inspire 2',
+  'DJI Inspire 3',
+  'DJI Matrice 30',
+  'DJI Matrice 300 RTK',
+  'DJI Matrice 350 RTK',
+];
+
+const extractFileName = (url?: string | null) => {
+  if (!url) return null;
+  try {
+    const decoded = decodeURIComponent(url.split('?')[0] ?? url);
+    const segments = decoded.split('/');
+    return segments[segments.length - 1] || decoded;
+  } catch {
+    return url;
+  }
+};
+
 const ProfileScreen = () => {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<PilotProfile | null>(null);
@@ -55,8 +85,12 @@ const ProfileScreen = () => {
     [colors.background, colors.backgroundAlt, isDark]
   );
   const [themeSaving, setThemeSaving] = useState<ThemeMode | null>(null);
+  const [droneSelectorVisible, setDroneSelectorVisible] = useState(false);
 
   const [uploadingType, setUploadingType] = useState<PilotDocument['type'] | null>(null);
+  const [documentStates, setDocumentStates] = useState<
+    Record<PilotDocument['type'], { status: 'idle' | 'uploading' | 'success' | 'error'; message?: string }>
+  >({});
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -77,7 +111,7 @@ const ProfileScreen = () => {
       const data = await fetchPilotProfile();
       setProfile(data);
       setForm({
-        display_name: data.display_name ?? user?.first_name ?? '',
+        display_name: data.display_name ?? '',
         phone_number: data.phone_number ?? '',
         base_city: data.base_city ?? '',
         coverage_radius_km:
@@ -99,7 +133,7 @@ const ProfileScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     loadProfile();
@@ -163,6 +197,7 @@ const ProfileScreen = () => {
 
       const updated = await updatePilotProfile(payload);
       setProfile(updated);
+      await persistPreferredName(updated.display_name ?? form.display_name.trim());
       setLocation(
         typeof updated.location_latitude === 'number' && typeof updated.location_longitude === 'number'
           ? { latitude: updated.location_latitude, longitude: updated.location_longitude }
@@ -181,6 +216,10 @@ const ProfileScreen = () => {
     setError(null);
     setSuccess(null);
     setUploadingType(type);
+    setDocumentStates((prev) => ({
+      ...prev,
+      [type]: { status: 'uploading', message: 'Subiendo documento…' },
+    }));
     try {
       const picker = await DocumentPicker.getDocumentAsync({
         type: acceptedTypes,
@@ -190,6 +229,10 @@ const ProfileScreen = () => {
 
       if (picker.type !== 'success' || !picker.assets || !picker.assets.length) {
         setUploadingType(null);
+        setDocumentStates((prev) => {
+          const { [type]: _discard, ...rest } = prev;
+          return rest;
+        });
         return;
       }
 
@@ -211,10 +254,19 @@ const ProfileScreen = () => {
           documents: [...otherDocs, response],
         };
       });
-      setSuccess('Documento subido correctamente.');
+      const successMessage = `Documento actualizado el ${new Date().toLocaleString()}.`;
+      setSuccess(successMessage);
+      setDocumentStates((prev) => ({
+        ...prev,
+        [type]: { status: 'success', message: successMessage },
+      }));
     } catch (err) {
       const message = getErrorMessage(err, 'No pudimos subir el documento. Intenta nuevamente.');
       setError(message);
+      setDocumentStates((prev) => ({
+        ...prev,
+        [type]: { status: 'error', message },
+      }));
     } finally {
       setUploadingType(null);
     }
@@ -296,7 +348,7 @@ const ProfileScreen = () => {
             <View style={styles.formCard}>
               <Text style={styles.sectionTitle}>Datos personales</Text>
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Nombre para clientes</Text>
+                <Text style={styles.label}>Nombre</Text>
                 <TextInput
                   value={form.display_name}
                   onChangeText={(value) => handleChange('display_name', value)}
@@ -382,13 +434,16 @@ const ProfileScreen = () => {
 
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Modelo de dron principal</Text>
-                <TextInput
-                  value={form.drone_model}
-                  onChangeText={(value) => handleChange('drone_model', value)}
-                  placeholder="DJI Mavic 3 Cine"
-                  placeholderTextColor={placeholderColor}
-                  style={styles.input}
-                />
+                <TouchableOpacity
+                  style={styles.selectInput}
+                  onPress={() => setDroneSelectorVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={form.drone_model ? styles.selectValue : styles.selectPlaceholder}>
+                    {form.drone_model || 'Selecciona tu dron principal'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.fieldGroup}>
@@ -470,6 +525,8 @@ const ProfileScreen = () => {
               {documentBlueprints.map((doc) => {
                 const current = getDocument(doc.type);
                 const statusInfo = current?.status ? statusCopy[current.status] : null;
+                const docState = documentStates[doc.type];
+                const fileName = extractFileName(current?.file_url);
                 return (
                   <View key={doc.type} style={styles.documentRow}>
                     <View style={styles.documentInfo}>
@@ -490,6 +547,38 @@ const ProfileScreen = () => {
                             {statusInfo?.label ?? 'En revisión'}
                           </Text>
                         </View>
+                      ) : null}
+                      {current?.file_url ? (
+                        <TouchableOpacity
+                          style={styles.documentFile}
+                          onPress={() =>
+                            Linking.openURL(current.file_url!)
+                              .catch(() =>
+                                setError('No pudimos abrir el documento. Intenta nuevamente.')
+                              )
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <Ionicons name="document-outline" size={16} color={colors.primary} />
+                          <View style={styles.documentFileTexts}>
+                            <Text style={styles.documentFileName} numberOfLines={1}>
+                              {fileName ?? 'Documento actual'}
+                            </Text>
+                            <Text style={styles.documentFileHint}>Toca para abrir</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ) : null}
+                      {docState?.status === 'uploading' ? (
+                        <View style={styles.documentFeedbackRow}>
+                          <ActivityIndicator size="small" color={colors.primary} />
+                          <Text style={styles.documentFeedbackText}>{docState.message}</Text>
+                        </View>
+                      ) : null}
+                      {docState?.status === 'success' ? (
+                        <Text style={styles.documentFeedbackSuccess}>{docState.message}</Text>
+                      ) : null}
+                      {docState?.status === 'error' ? (
+                        <Text style={styles.documentFeedbackError}>{docState.message}</Text>
                       ) : null}
                     </View>
                     <TouchableOpacity
@@ -514,6 +603,58 @@ const ProfileScreen = () => {
             </View>
           </ScrollView>
         )}
+        <Modal
+          transparent
+          animationType="fade"
+          visible={droneSelectorVisible}
+          onRequestClose={() => setDroneSelectorVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalBackdrop}
+              activeOpacity={1}
+              onPress={() => setDroneSelectorVisible(false)}
+            />
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Selecciona tu dron</Text>
+              <Text style={styles.modalSubtitle}>
+                Solo mostramos equipos certificados para las misiones de SkyTerra.
+              </Text>
+              <ScrollView
+                style={styles.modalOptions}
+                contentContainerStyle={styles.modalOptionsContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {DRONE_MODELS.map((model) => {
+                  const selected = form.drone_model === model;
+                  return (
+                    <TouchableOpacity
+                      key={model}
+                      style={[styles.modalOption, selected && styles.modalOptionSelected]}
+                      onPress={() => {
+                        handleChange('drone_model', model);
+                        setDroneSelectorVisible(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.modalOptionLabel}>{model}</Text>
+                      {selected ? (
+                        <Ionicons name="checkmark" size={18} color={colors.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setDroneSelectorVisible(false)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalCloseLabel}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -592,6 +733,75 @@ const createStyles = (colors: ThemeColors) => {
       color: colors.textPrimary,
       fontWeight: '600',
     },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+      position: 'relative',
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    modalCard: {
+      width: '100%',
+      borderRadius: 24,
+      padding: 20,
+      gap: 16,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      zIndex: 1,
+    },
+    modalTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    modalSubtitle: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    modalOptions: {
+      maxHeight: 320,
+    },
+    modalOptionsContent: {
+      gap: 10,
+    },
+    modalOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+    },
+    modalOptionSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    modalOptionLabel: {
+      flex: 1,
+      marginRight: 12,
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    modalCloseButton: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surfaceMuted,
+    },
+    modalCloseLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
     headerMeta: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -601,15 +811,16 @@ const createStyles = (colors: ThemeColors) => {
       gap: 4,
     },
     metaLabel: {
-      color: colors.textMuted,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      fontSize: 12,
+      color: colors.textSecondary,
+      textTransform: 'none',
+      letterSpacing: 0.4,
+      fontSize: 11,
+      fontWeight: '500',
     },
     metaValue: {
       color: colors.heading,
-      fontSize: 18,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '600',
     },
     requirementsBox: {
       flexDirection: 'row',
@@ -673,6 +884,25 @@ const createStyles = (colors: ThemeColors) => {
       fontWeight: '600',
     },
     input: baseInput,
+    selectInput: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: colors.surface,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    selectValue: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    selectPlaceholder: {
+      color: colors.textMuted,
+    },
     sliderContainer: {
       marginTop: 12,
       gap: 8,
@@ -820,6 +1050,51 @@ const createStyles = (colors: ThemeColors) => {
       fontWeight: '600',
       fontSize: 13,
       color: colors.textSecondary,
+    },
+    documentFile: {
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surface,
+    },
+    documentFileTexts: {
+      flex: 1,
+      gap: 2,
+    },
+    documentFileName: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    documentFileHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    documentFeedbackRow: {
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    documentFeedbackText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    documentFeedbackSuccess: {
+      marginTop: 8,
+      color: colors.success,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    documentFeedbackError: {
+      marginTop: 8,
+      color: colors.danger,
+      fontSize: 13,
+      fontWeight: '600',
     },
     uploadButton: {
       alignSelf: 'center',

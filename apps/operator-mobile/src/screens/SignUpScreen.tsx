@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthLayout from '@components/AuthLayout';
 import { RootStackParamList } from '@navigation/RootNavigator';
-import { signUp, updateAccountProfile } from '@services/apiClient';
+import { signUp, updateAccountProfile, persistPreferredName } from '@services/apiClient';
 import { useAuth } from '@context/AuthContext';
 import { getErrorMessage } from '@utils/errorMessages';
 import { useTheme, ThemeColors } from '@theme';
@@ -57,6 +57,7 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
 
     if (promises.length) {
       await Promise.all(promises);
+      await persistPreferredName(displayName);
       try {
         await refreshUser();
       } catch (err) {

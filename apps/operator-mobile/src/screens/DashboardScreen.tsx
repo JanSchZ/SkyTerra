@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -57,7 +57,7 @@ const formatDistance = (value?: number | null) => {
 
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardNavigation>();
-  const { user } = useAuth();
+  const { user, preferredName, refreshUser, initializing } = useAuth();
   const [profile, setProfile] = useState<PilotProfile | null>(null);
   const [availableOffers, setAvailableOffers] = useState<OperatorJob[]>([]);
   const [pilotJobs, setPilotJobs] = useState<OperatorJob[]>([]);
@@ -72,6 +72,7 @@ const DashboardScreen = () => {
     [colors.background, colors.backgroundAlt, isDark]
   );
   const [showTour, setShowTour] = useState(false);
+  const hasRequestedProfileName = useRef(false);
 
   const load = useCallback(async (refreshOnly = false) => {
     if (!refreshOnly) {
@@ -101,6 +102,15 @@ const DashboardScreen = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!initializing && !preferredName && !hasRequestedProfileName.current) {
+      hasRequestedProfileName.current = true;
+      refreshUser().catch((err) => {
+        console.warn('Dashboard refresh user failed', err);
+      });
+    }
+  }, [initializing, preferredName, refreshUser]);
 
   useEffect(() => {
     const checkTour = async () => {
@@ -173,7 +183,7 @@ const DashboardScreen = () => {
 
   const ongoingSummaryMessage = useMemo(() => {
     if (!activeJob && !nextScheduledJob) {
-      return 'Mantén tu disponibilidad activa mientras coordinamos nuevos vuelos.';
+      return 'Estamos coordinando nuevas misiones para ti. Te avisaremos en cuanto haya novedades.';
     }
     if (activeJob) {
       return 'Revisa la misión en curso y confirma instrucciones antes de despegar.';
@@ -192,11 +202,46 @@ const DashboardScreen = () => {
   };
 
   const greetingName = useMemo(() => {
-    const fromProfile = profile?.display_name?.trim();
-    const fromUser = user?.first_name?.trim();
-    const fallback = user?.email?.split('@')?.[0] || 'Piloto';
-    return fromProfile || fromUser || fallback;
-  }, [profile?.display_name, user?.first_name, user?.email]);
+    const sanitize = (value?: string | null) => {
+      if (!value) return null;
+      const trimmed = value.trim();
+      if (!trimmed || trimmed.includes('@')) return null;
+      return trimmed;
+    };
+
+    const joinNames = (first?: string | null, last?: string | null) => {
+      const parts = [first, last].map((part) => part?.trim()).filter(Boolean) as string[];
+      if (!parts.length) return null;
+      return parts.join(' ');
+    };
+
+    const candidates = [
+      profile?.display_name,
+      joinNames(profile?.user?.first_name, profile?.user?.last_name),
+      preferredName,
+      joinNames(user?.first_name, user?.last_name),
+      profile?.user?.username,
+      user?.username,
+    ];
+
+    for (const candidate of candidates) {
+      const sanitized = sanitize(candidate);
+      if (sanitized) return sanitized;
+    }
+
+    return '';
+  }, [
+    preferredName,
+    profile?.display_name,
+    profile?.user?.first_name,
+    profile?.user?.last_name,
+    profile?.user?.username,
+    user?.first_name,
+    user?.last_name,
+    user?.username,
+  ]);
+
+  const greetingText = greetingName ? `Hola, ${greetingName}` : 'Hola';
 
   const refreshControl = (
     <RefreshControl
@@ -221,8 +266,8 @@ const DashboardScreen = () => {
             <View style={styles.heroCard}>
               <View style={styles.heroHeader}>
                 <View>
-                  <Text style={styles.greeting}>Hola, {greetingName}</Text>
-                  <Text style={styles.greetingSubtitle}>Tu centro de operaciones está listo</Text>
+                  <Text style={styles.greeting}>{greetingText}</Text>
+                  <Text style={styles.greetingSubtitle}>Centro de operaciones</Text>
                 </View>
                 <View style={styles.statusContainer}>
                   <Text style={styles.statusLabel}>Estado</Text>
@@ -232,14 +277,8 @@ const DashboardScreen = () => {
                       isAvailable ? styles.statusBadgeActive : styles.statusBadgePaused,
                     ]}
                   >
-                    <Ionicons
-                      name={isAvailable ? 'play-circle' : 'pause-circle'}
-                      size={18}
-                      color={isAvailable ? colors.success : colors.warning}
-                    />
                     <Text style={styles.statusBadgeText}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
                   </View>
-                  <Text style={styles.statusHelper}>Gestiona tu disponibilidad desde Ofertas</Text>
                 </View>
               </View>
 
@@ -425,7 +464,7 @@ const DashboardScreen = () => {
                   <Ionicons name="sparkles-outline" size={20} color={colors.textSecondary} />
                   <Text style={styles.emptyTitle}>Sin ofertas por ahora</Text>
                   <Text style={styles.emptySubtitle}>
-                    Mantén tu disponibilidad activa y te avisaremos cuando llegue la próxima misión.
+                    Estamos buscando nuevas misiones para ti. Te avisaremos apenas tengamos una disponible.
                   </Text>
                 </View>
               )}
@@ -488,7 +527,7 @@ const createStyles = (colors: ThemeColors) =>
     },
     statusContainer: {
       alignItems: 'flex-end',
-      gap: 6,
+      gap: 10,
     },
     statusLabel: {
       color: colors.textMuted,
@@ -499,9 +538,9 @@ const createStyles = (colors: ThemeColors) =>
     statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
+      gap: 8,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
       borderRadius: 999,
       backgroundColor: colors.pillBackground,
     },
@@ -514,11 +553,6 @@ const createStyles = (colors: ThemeColors) =>
     statusBadgeText: {
       color: colors.heading,
       fontWeight: '700',
-    },
-    statusHelper: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      textAlign: 'right',
     },
     metricsGrid: {
       flexDirection: 'row',
@@ -537,14 +571,15 @@ const createStyles = (colors: ThemeColors) =>
     },
     metricValue: {
       color: colors.heading,
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 18,
+      fontWeight: '600',
     },
     metricLabel: {
-      color: colors.textMuted,
-      fontSize: 12,
-      letterSpacing: 0.8,
-      textTransform: 'uppercase',
+      color: colors.textSecondary,
+      fontSize: 11,
+      letterSpacing: 0.4,
+      textTransform: 'none',
+      fontWeight: '500',
     },
     inlineAlert: {
       flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -32,6 +32,7 @@ import {
   setAvailability,
   updatePilotProfile,
 } from '@services/operatorJobs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, ThemeColors } from '@theme';
 
 type JobsScreenNav = CompositeNavigationProp<
@@ -75,6 +76,7 @@ const formatDuration = (value?: number | null) => {
 
 const RADIUS_BOUNDS = { min: 5, max: 200, step: 5 };
 const DEFAULT_RADIUS = 50;
+const RADIUS_STORAGE_KEY = 'skyterra-operator-radius-km';
 
 const clampRadius = (value: number) => {
   if (!Number.isFinite(value)) {
@@ -85,6 +87,8 @@ const clampRadius = (value: number) => {
   if (rounded > RADIUS_BOUNDS.max) return RADIUS_BOUNDS.max;
   return rounded;
 };
+
+type LoadMode = 'initial' | 'refresh' | 'silent';
 
 const JobListScreen = () => {
   const navigation = useNavigation<JobsScreenNav>();
@@ -100,6 +104,7 @@ const JobListScreen = () => {
   const [radiusCommitted, setRadiusCommitted] = useState<number>(DEFAULT_RADIUS);
   const [radiusSaving, setRadiusSaving] = useState(false);
   const [radiusError, setRadiusError] = useState<string | null>(null);
+  const radiusRef = useRef<number>(DEFAULT_RADIUS);
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const backgroundGradient = useMemo(
@@ -114,9 +119,9 @@ const JobListScreen = () => {
 
   const pendingOffers = useMemo(() => jobs.length, [jobs]);
 
-  const loadJobs = async (refreshOnly = false) => {
-    if (!refreshOnly) setLoading(true);
-    setRefreshing(refreshOnly);
+  const loadJobs = async (mode: LoadMode = 'initial') => {
+    if (mode === 'initial') setLoading(true);
+    if (mode === 'refresh') setRefreshing(true);
     setError(null);
     setRadiusError(null);
     try {
@@ -128,10 +133,12 @@ const JobListScreen = () => {
 
       setPilotProfile(profileData);
       setIsAvailable(profileData.is_available);
-      const radiusValue =
-        typeof profileData.coverage_radius_km === 'number'
+      const serverRadius =
+        typeof profileData.coverage_radius_km === 'number' && profileData.coverage_radius_km > 0
           ? clampRadius(profileData.coverage_radius_km)
-          : DEFAULT_RADIUS;
+          : null;
+      const radiusValue = serverRadius ?? radiusRef.current ?? DEFAULT_RADIUS;
+      radiusRef.current = radiusValue;
       setRadiusDraft(radiusValue);
       setRadiusCommitted(radiusValue);
       setJobs(availableJobs);
@@ -143,13 +150,27 @@ const JobListScreen = () => {
       console.error('Error fetching jobs', err);
       setError('No pudimos cargar los trabajos. Desliza hacia abajo para reintentar.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mode === 'initial') setLoading(false);
+      if (mode === 'refresh') setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadJobs();
+    const bootstrap = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(RADIUS_STORAGE_KEY);
+        if (stored) {
+          const parsed = clampRadius(Number(stored));
+          radiusRef.current = parsed;
+          setRadiusDraft(parsed);
+          setRadiusCommitted(parsed);
+        }
+      } catch (err) {
+        console.warn('No se pudo restaurar el radio guardado', err);
+      }
+      await loadJobs('initial');
+    };
+    bootstrap();
   }, []);
 
   const toggleAvailability = async (value: boolean) => {
@@ -159,7 +180,7 @@ const JobListScreen = () => {
       const confirmed = await setAvailability(value);
       setIsAvailable(confirmed);
       setPilotProfile((prev) => (prev ? { ...prev, is_available: confirmed } : prev));
-      await loadJobs(true);
+      await loadJobs('silent');
     } catch (err) {
       console.warn('No se pudo actualizar la disponibilidad', err);
       setIsAvailable(previous);
@@ -176,14 +197,17 @@ const JobListScreen = () => {
     setRadiusError(null);
     setRadiusSaving(true);
     try {
-      await updatePilotProfile({ coverage_radius_km: normalized });
+      radiusRef.current = normalized;
+      await AsyncStorage.setItem(RADIUS_STORAGE_KEY, String(normalized));
+      const updatedProfile = await updatePilotProfile({ coverage_radius_km: normalized });
       setRadiusCommitted(normalized);
-      setPilotProfile((prev) => (prev ? { ...prev, coverage_radius_km: normalized } : prev));
-      await loadJobs(true);
+      setPilotProfile(updatedProfile);
+      await loadJobs('silent');
     } catch (err) {
       console.warn('No se pudo actualizar el radio de cobertura', err);
       setRadiusError('No pudimos actualizar el radio de trabajo. Intenta nuevamente.');
       setRadiusDraft(radiusCommitted);
+      radiusRef.current = radiusCommitted;
     } finally {
       setRadiusSaving(false);
     }
@@ -324,7 +348,7 @@ const JobListScreen = () => {
       <StatusBar style={colors.statusBarStyle} backgroundColor={backgroundGradient[0]} />
       <SafeAreaView style={styles.safe}>
         <View style={styles.topRow}>
-          <View>
+          <View style={styles.topRowBrand}>
             <Text style={styles.brand}>Ofertas</Text>
             <Text style={styles.brandSubtitle}>Ajusta tu radio para ver misiones cercanas</Text>
           </View>
@@ -341,7 +365,7 @@ const JobListScreen = () => {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => loadJobs(true)}
+              onRefresh={() => loadJobs('refresh')}
               tintColor={colors.primary}
               progressBackgroundColor={colors.surfaceMuted}
             />
@@ -529,6 +553,11 @@ const createStyles = (colors: ThemeColors) =>
       paddingTop: 12,
       paddingBottom: 4,
     },
+    topRowBrand: {
+      flex: 1,
+      minWidth: 0,
+      paddingRight: 12,
+    },
     brand: {
       color: colors.heading,
       fontSize: 22,
@@ -537,21 +566,24 @@ const createStyles = (colors: ThemeColors) =>
     brandSubtitle: {
       color: colors.textSecondary,
       marginTop: 4,
+      flexShrink: 1,
     },
     signOutButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      paddingHorizontal: 14,
+      paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 16,
       backgroundColor: colors.surfaceMuted,
       borderWidth: 1,
       borderColor: colors.cardBorder,
+      flexShrink: 0,
     },
     signOutText: {
       color: colors.textPrimary,
       fontWeight: '600',
+      flexShrink: 1,
     },
     listContent: {
       paddingHorizontal: 20,

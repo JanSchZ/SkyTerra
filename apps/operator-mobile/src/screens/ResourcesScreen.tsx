@@ -85,22 +85,6 @@ const ResourcesScreen = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Documentos destacados</Text>
-            <View style={styles.documentCard}>
-              <Text style={styles.documentText}>
-                Descarga el kit de estilo, logos y plantillas para compartir tu trabajo con los clientes.
-              </Text>
-              <TouchableOpacity
-                style={styles.documentButton}
-                onPress={() => handleOpenLink('https://skyterra.cl/recursos/brand-kit.zip')}
-              >
-                <Ionicons name="download-outline" size={18} color={colors.primaryOn} />
-                <Text style={styles.documentButtonLabel}>Descargar kit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Guías operativas</Text>
             {resources.map((item) => (
               <TouchableOpacity key={item.id} onPress={() => handleOpenGuide(item.id)}>
@@ -205,33 +189,6 @@ const createStyles = (colors: ThemeColors) =>
     sectionTitle: {
       color: colors.heading,
       fontSize: 18,
-      fontWeight: '700',
-    },
-    documentCard: {
-      borderRadius: 26,
-      padding: 18,
-      backgroundColor: colors.surfaceRaised,
-      borderWidth: 1,
-      borderColor: colors.cardBorder,
-      gap: 12,
-    },
-    documentText: {
-      color: colors.textSecondary,
-      lineHeight: 20,
-    },
-    documentButton: {
-      marginTop: 8,
-      backgroundColor: colors.primary,
-      borderRadius: 18,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      alignSelf: 'flex-start',
-    },
-    documentButtonLabel: {
-      color: colors.primaryOn,
       fontWeight: '700',
     },
     resourceCard: {

@@ -136,6 +136,13 @@ export interface PilotProfile {
   location_longitude?: number | null;
   documents?: PilotDocument[];
   pending_requirements?: string[];
+  user?: {
+    id: number;
+    email: string;
+    username?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+  };
 }
 
 export const fetchPilotProfile = async (): Promise<PilotProfile> => {

@@ -12,6 +12,9 @@ if (!apiBaseUrl) {
 const ACCESS_TOKEN_KEY = 'skyterra-operator-access-token';
 const REFRESH_TOKEN_KEY = 'skyterra-operator-refresh-token';
 const LEGACY_REFRESH_KEY = 'refreshToken';
+const CREDENTIAL_EMAIL_KEY = 'skyterra-operator-cred-email';
+const CREDENTIAL_PASSWORD_KEY = 'skyterra-operator-cred-password';
+const PREFERRED_NAME_KEY = 'skyterra-operator-preferred-name';
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -67,6 +70,40 @@ export const clearStoredTokens = async () => {
     SecureStore.deleteItemAsync(LEGACY_REFRESH_KEY),
   ]);
 };
+
+export const persistCredentials = async ({ email, password }: { email: string; password: string }) => {
+  await Promise.all([
+    SecureStore.setItemAsync(CREDENTIAL_EMAIL_KEY, email),
+    SecureStore.setItemAsync(CREDENTIAL_PASSWORD_KEY, password),
+  ]);
+};
+
+export const loadStoredCredentials = async () => {
+  const [email, password] = await Promise.all([
+    SecureStore.getItemAsync(CREDENTIAL_EMAIL_KEY),
+    SecureStore.getItemAsync(CREDENTIAL_PASSWORD_KEY),
+  ]);
+  return { email, password };
+};
+
+export const clearStoredCredentials = async () => {
+  await Promise.all([
+    SecureStore.deleteItemAsync(CREDENTIAL_EMAIL_KEY),
+    SecureStore.deleteItemAsync(CREDENTIAL_PASSWORD_KEY),
+  ]);
+};
+
+export const persistPreferredName = async (name: string | null | undefined) => {
+  if (name && name.trim().length > 0) {
+    await SecureStore.setItemAsync(PREFERRED_NAME_KEY, name.trim());
+  } else {
+    await SecureStore.deleteItemAsync(PREFERRED_NAME_KEY);
+  }
+};
+
+export const loadPreferredName = async () => SecureStore.getItemAsync(PREFERRED_NAME_KEY);
+
+export const clearPreferredName = async () => SecureStore.deleteItemAsync(PREFERRED_NAME_KEY);
 
 const rawClient = axios.create({
   baseURL: apiBaseUrl,
