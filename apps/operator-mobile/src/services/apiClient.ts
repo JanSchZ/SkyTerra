@@ -290,3 +290,13 @@ export const fetchCurrentUser = async (): Promise<OperatorUser> => {
   const { data } = await api.get('/api/auth/profile/');
   return mapUser(data);
 };
+
+export const updateAccountProfile = async (
+  payload: Partial<Pick<OperatorUser, 'first_name' | 'last_name' | 'username'>>
+): Promise<OperatorUser> => {
+  const body = Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => typeof value === 'string')
+  );
+  const { data } = await api.put('/api/auth/profile/', body);
+  return mapUser(data);
+};

@@ -4,10 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthLayout from '@components/AuthLayout';
 import { RootStackParamList } from '@navigation/RootNavigator';
-import { signUp } from '@services/apiClient';
+import { signUp, updateAccountProfile } from '@services/apiClient';
 import { useAuth } from '@context/AuthContext';
 import { getErrorMessage } from '@utils/errorMessages';
 import { useTheme, ThemeColors } from '@theme';
+import { updatePilotProfile } from '@services/operatorJobs';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
@@ -16,7 +17,7 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const placeholderColor = isDark ? 'rgba(148,163,184,0.75)' : 'rgba(71,85,105,0.6)';
   const iconColor = isDark ? 'rgba(226,232,240,0.85)' : colors.textMuted;
-  const { signInWithCredentials } = useAuth();
+  const { signInWithCredentials, refreshUser } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,6 +28,42 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const syncIdentity = async (first: string, last: string) => {
+    const trimmedFirst = first.trim();
+    const trimmedLast = last.trim();
+    const displayName = [trimmedFirst, trimmedLast].filter(Boolean).join(' ').trim();
+
+    const promises: Array<Promise<unknown>> = [];
+
+    if (trimmedFirst || trimmedLast) {
+      promises.push(
+        updateAccountProfile({
+          first_name: trimmedFirst || undefined,
+          last_name: trimmedLast || undefined,
+        }).catch((err) => {
+          console.warn('No se pudo sincronizar nombres en el perfil de cuenta', err);
+        })
+      );
+    }
+
+    if (displayName) {
+      promises.push(
+        updatePilotProfile({ display_name: displayName }).catch((err) => {
+          console.warn('No se pudo actualizar el nombre público del piloto', err);
+        })
+      );
+    }
+
+    if (promises.length) {
+      await Promise.all(promises);
+      try {
+        await refreshUser();
+      } catch (err) {
+        console.warn('No se pudo refrescar el usuario tras sincronizar nombres', err);
+      }
+    }
+  };
 
   const handleSubmit = async () => {
     const trimmedEmail = email.trim();
@@ -59,6 +96,7 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
       if (result.tokens) {
         try {
           await signInWithCredentials({ email: trimmedEmail, password });
+          await syncIdentity(trimmedFirst, trimmedLast);
           return;
         } catch (authError) {
           console.warn('Auto-login tras registro falló', authError);

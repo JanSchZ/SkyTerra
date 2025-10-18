@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Circle, MapPressEvent, Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '@theme';
+import Constants from 'expo-constants';
 
 interface Coordinates {
   latitude: number;
@@ -108,25 +109,36 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, on
 
   return (
     <View style={[styles.wrapper, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
-      <MapView
-        style={styles.map}
-        region={region}
-        onRegionChangeComplete={setRegion}
-        onPress={handleMapPress}
-      >
-        {value ? (
-          <>
-            <Marker coordinate={value} />
-            <Circle
-              key={`${radiusMeters}-${value.latitude}-${value.longitude}`}
-              center={value}
-              radius={radiusMeters}
-              strokeColor={colors.map.radiusStroke}
-              fillColor={colors.map.radiusFill}
-            />
-          </>
-        ) : null}
-      </MapView>
+      {Platform.OS === 'android' && Constants.appOwnership === 'standalone' ? (
+        <View style={styles.mapFallback}>
+          <Ionicons name="map-outline" size={32} color={colors.textSecondary} />
+          <Text style={[styles.fallbackTitle, { color: colors.textPrimary }]}>Mapa no disponible en esta build</Text>
+          <Text style={[styles.fallbackDescription, { color: colors.textSecondary }]}>
+            Próximamente podrás seleccionar la ubicación desde el mapa. Mientras tanto, usa tu ubicación actual para
+            guardar el punto base.
+          </Text>
+        </View>
+      ) : (
+        <MapView
+          style={styles.map}
+          region={region}
+          onRegionChangeComplete={setRegion}
+          onPress={handleMapPress}
+        >
+          {value ? (
+            <>
+              <Marker coordinate={value} />
+              <Circle
+                key={`${radiusMeters}-${value.latitude}-${value.longitude}`}
+                center={value}
+                radius={radiusMeters}
+                strokeColor={colors.map.radiusStroke}
+                fillColor={colors.map.radiusFill}
+              />
+            </>
+          ) : null}
+        </MapView>
+      )}
       <View style={[styles.controls, { backgroundColor: colors.surface }]}>
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.primary }]}
@@ -157,6 +169,23 @@ const styles = StyleSheet.create({
   },
   map: {
     height: 220,
+  },
+  mapFallback: {
+    height: 220,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  fallbackTitle: {
+    fontWeight: '600',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  fallbackDescription: {
+    fontSize: 13,
+    textAlign: 'center',
   },
   controls: {
     paddingHorizontal: 12,

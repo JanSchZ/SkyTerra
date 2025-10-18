@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import axios from 'axios';
 import {
   signIn,
   fetchCurrentUser,
@@ -17,6 +18,7 @@ interface AuthContextValue {
   initializing: boolean;
   signInWithCredentials: (payload: SignInPayload) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -43,14 +45,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const tokens = await loadStoredTokens();
         if (tokens.refreshToken) {
-          const me = await fetchCurrentUser();
-          setUser(me);
+          try {
+            const me = await fetchCurrentUser();
+            setUser(me);
+          } catch (error) {
+            console.warn('Auth bootstrap fetch user failed', error);
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              await clearStoredTokens();
+              setUser(null);
+            }
+          }
         } else {
           setUser(null);
         }
       } catch (error) {
         console.warn('Auth bootstrap error', error);
-        await clearStoredTokens();
+        const shouldClear = axios.isAxiosError(error) && error.response?.status === 401;
+        if (shouldClear) {
+          await clearStoredTokens();
+        }
         setUser(null);
       } finally {
         setInitializing(false);
@@ -60,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     bootstrap();
   }, []);
 
-  const signInWithCredentials = async (payload: SignInPayload) => {
+  const signInWithCredentials = useCallback(async (payload: SignInPayload) => {
     setLoading(true);
     try {
       const result = await signIn(payload);
@@ -76,16 +89,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await fetchCurrentUser();
+      setUser(me);
+    } catch (error) {
+      console.warn('refreshUser failed', error);
+      throw error;
+    }
+  }, []);
+
+  const signOut = useCallback(async () => {
     await clearStoredTokens();
     setUser(null);
-  };
+  }, []);
 
   const value = useMemo(
-    () => ({ user, loading, initializing, signInWithCredentials, signOut }),
-    [user, loading, initializing]
+    () => ({ user, loading, initializing, signInWithCredentials, signOut, refreshUser }),
+    [user, loading, initializing, signInWithCredentials, signOut, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
