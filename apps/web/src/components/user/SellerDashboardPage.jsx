@@ -17,6 +17,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
 import marketplaceService from '../../services/marketplaceService.js';
 import StatusBar from '../seller/StatusBar.jsx';
+import WorkflowTimeline from '../ui/WorkflowTimeline.jsx';
 
 const SellerDashboardPage = ({ user }) => {
   const navigate = useNavigate();
@@ -111,6 +112,7 @@ const SellerDashboardPage = ({ user }) => {
             </Stack>
             <Divider sx={{ my: 2 }} />
             <StatusBar status={property.status_bar} />
+            <WorkflowTimeline timeline={property.workflow_timeline} dense />
             {(property.workflow_alerts || []).map((alert, index) => (
               <Alert
                 key={`${property.id}-alert-${index}`}

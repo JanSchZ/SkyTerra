@@ -1,8 +1,9 @@
 import uuid
 import json
 from decimal import Decimal
+from types import SimpleNamespace
+
 from django.db import models
-from django.contrib.auth.models import User
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -128,6 +129,34 @@ class Property(models.Model):
         validators=[validate_boundary_polygon]
     )
     description = models.TextField(blank=True)
+    contact_name = models.CharField(
+        max_length=120,
+        blank=True,
+        help_text="Nombre de contacto principal para coordinar la visita del piloto."
+    )
+    contact_email = models.EmailField(
+        blank=True,
+        help_text="Correo directo del vendedor o encargado."
+    )
+    contact_phone = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text="Teléfono del vendedor o encargado disponible para los pilotos."
+    )
+    address_line1 = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Dirección o punto de encuentro principal para la grabación."
+    )
+    address_line2 = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Información adicional de la dirección (interior, lote, etc.)."
+    )
+    address_city = models.CharField(max_length=120, blank=True)
+    address_region = models.CharField(max_length=120, blank=True)
+    address_country = models.CharField(max_length=120, blank=True)
+    address_postal_code = models.CharField(max_length=20, blank=True)
     has_water = models.BooleanField(default=False)
     has_views = models.BooleanField(default=False)
     publication_status = models.CharField(
@@ -348,6 +377,131 @@ class Property(models.Model):
             'nodes': nodes_payload,
         }
 
+    def build_workflow_timeline(self):
+        """Construye una línea de tiempo consolidada por nodo (5 hitos clave)."""
+        now = timezone.now()
+        history_qs = self.status_history.all().order_by('created_at')
+        history = list(history_qs)
+
+        if not history:
+            history.append(
+                SimpleNamespace(
+                    node='review',
+                    substate='draft',
+                    percent=0,
+                    message='Publicación creada',
+                    metadata={'auto': True},
+                    actor=None,
+                    created_at=self.created_at or now,
+                )
+            )
+        elif not any(event.node == 'review' for event in history):
+            first = history[0]
+            history.insert(
+                0,
+                SimpleNamespace(
+                    node='review',
+                    substate='draft',
+                    percent=0,
+                    message='Publicación creada',
+                    metadata={'auto': True},
+                    actor=None,
+                    created_at=min(self.created_at or now, first.created_at),
+                ),
+            )
+
+        history.sort(key=lambda entry: entry.created_at or now)
+
+        node_start_times = {key: None for key in WORKFLOW_NODE_ORDER}
+        node_end_times = {key: None for key in WORKFLOW_NODE_ORDER}
+        events_by_node = {key: [] for key in WORKFLOW_NODE_ORDER}
+
+        previous_node = None
+        for event in history:
+            node_key = getattr(event, 'node', None)
+            if node_key not in events_by_node:
+                continue
+            if node_start_times[node_key] is None:
+                node_start_times[node_key] = event.created_at
+            events_by_node[node_key].append(event)
+            if previous_node and previous_node != node_key and node_end_times.get(previous_node) is None:
+                node_end_times[previous_node] = event.created_at
+            previous_node = node_key
+
+        timeline = []
+        current_index = WORKFLOW_NODE_ORDER.index(self.workflow_node) if self.workflow_node in WORKFLOW_NODE_ORDER else 0
+
+        for idx, node_key in enumerate(WORKFLOW_NODE_ORDER):
+            node_label = WORKFLOW_NODE_LABELS.get(node_key, node_key.title())
+            events = events_by_node.get(node_key, [])
+            started_at = node_start_times.get(node_key) or (self.created_at if idx == 0 else None)
+            completed_at = node_end_times.get(node_key)
+
+            state = 'pending'
+            if idx < current_index:
+                state = 'done'
+            elif idx == current_index:
+                state = 'active'
+
+            # Si la publicación ya está en vivo (subestado published), marcar el hito como completado.
+            if node_key == 'live' and self.workflow_substate == 'published':
+                state = 'done'
+
+            if completed_at is None and events and state == 'done':
+                # Para el último hito no existe un nodo siguiente que establezca completed_at.
+                last_event = events[-1]
+                completed_at = getattr(last_event, 'created_at', None) or now
+
+            end_reference = completed_at
+            if started_at and not end_reference and state in {'active', 'done'}:
+                end_reference = now
+
+            duration_hours = None
+            duration_days = None
+            if started_at and end_reference:
+                delta = end_reference - started_at
+                seconds = max(delta.total_seconds(), 0)
+                duration_hours = round(seconds / 3600, 2)
+                duration_days = round(seconds / 86400, 2)
+
+            expected_hours = None
+            plan_eta = self.plan.get_eta_for_node(node_key) if self.plan else None
+            if plan_eta is not None:
+                expected_hours = plan_eta
+            else:
+                expected_hours = WORKFLOW_NODE_DEFAULT_ETAS.get(node_key, {}).get('hours')
+
+            def serialize_event(event):
+                substate_meta = WORKFLOW_SUBSTATE_DEFINITIONS.get(getattr(event, 'substate', ''), {})
+                return {
+                    'substate': getattr(event, 'substate', None),
+                    'substate_label': substate_meta.get('label'),
+                    'created_at': (event.created_at or now).isoformat(),
+                    'message': getattr(event, 'message', ''),
+                    'metadata': getattr(event, 'metadata', {}) or {},
+                    'percent': getattr(event, 'percent', None),
+                    'actor': getattr(event, 'actor', None),
+                }
+
+            serialized_events = [serialize_event(event) for event in events]
+            current_event = serialized_events[-1] if serialized_events else None
+
+            timeline.append({
+                'key': node_key,
+                'label': node_label,
+                'state': state,
+                'started_at': started_at.isoformat() if started_at else None,
+                'completed_at': completed_at.isoformat() if completed_at else None,
+                'duration_hours': duration_hours,
+                'duration_days': duration_days,
+                'expected_hours': expected_hours,
+                'expected_days': round(expected_hours / 24, 2) if expected_hours is not None else None,
+                'events': serialized_events,
+                'current_event': current_event,
+            })
+
+        return timeline
+
     def ensure_job(self, actor=None, auto_invite=True):
         """Garantiza que exista un Job operativo asociado."""
         job = getattr(self, 'job', None)
@@ -363,6 +517,11 @@ class Property(models.Model):
             pilot_payout_decimal = _Decimal(str(pilot_payout)) if pilot_payout is not None else None
         except Exception:
             pilot_payout_decimal = None
+        if pilot_payout_decimal is None and plan and getattr(plan, 'price', None) is not None:
+            try:
+                pilot_payout_decimal = _Decimal(str(plan.price))
+            except Exception:
+                pilot_payout_decimal = plan.price
 
         job = Job.objects.create(
             property=self,
@@ -398,16 +557,21 @@ class Property(models.Model):
             status_map.setdefault(document.doc_type, document.status)
         missing = [doc for doc in required_docs if status_map.get(doc) != 'approved']
         has_boundary = bool(self.boundary_polygon)
+        has_contact = bool(self.contact_phone and self.contact_name)
+        has_address = bool(self.address_line1)
         return {
             'missing_documents': missing,
             'has_boundary': has_boundary,
-            'can_submit': not missing and has_boundary,
+            'has_contact': has_contact,
+            'has_address': has_address,
+            'can_submit': not missing and has_boundary and has_contact and has_address,
             'required_documents': list(required_docs),
         }
 
     def save(self, *args, **kwargs):
         """Override save para calcular automáticamente el plusvalia_score antes de guardar."""
         # Ejecuta validaciones estándar
+        is_new = self.pk is None
         self.full_clean()
         # Calcular puntaje de plusvalía (si no se pasa explícitamente o si se fuerza recálculo)
         # El parámetro de palabra clave 'recalculate_plusvalia' permite recalcular desde callers
@@ -420,6 +584,22 @@ class Property(models.Model):
                 import logging
                 logging.getLogger(__name__).error(f"Error calculando plusvalia_score para propiedad {self.id}: {e}")
         super().save(*args, **kwargs)
+
+        if is_new:
+            try:
+                has_history = self.status_history.exists()
+            except Exception:
+                has_history = False
+            if not has_history:
+                PropertyStatusHistory.objects.create(
+                    property=self,
+                    node=self.workflow_node,
+                    substate=self.workflow_substate,
+                    percent=self.workflow_progress,
+                    message='Publicación creada',
+                    metadata={'auto': True},
+                    actor=None,
+                )
 
     def __str__(self):
         return self.name

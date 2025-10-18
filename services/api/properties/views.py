@@ -464,6 +464,8 @@ class PropertyViewSet(viewsets.ModelViewSet):
                     'error': 'La publicación aún no cumple los requisitos para revisión.',
                     'missing_documents': requirements.get('missing_documents', []),
                     'has_boundary': requirements.get('has_boundary'),
+                    'has_contact': requirements.get('has_contact'),
+                    'has_address': requirements.get('has_address'),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

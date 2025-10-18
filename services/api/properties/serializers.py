@@ -30,6 +30,49 @@ class BasicUserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email']
 
+
+def _serialize_actor(actor):
+    if not actor:
+        return None
+    try:
+        return BasicUserSerializer(actor).data
+    except Exception:
+        return None
+
+
+def _serialize_timeline_payload(timeline):
+    serialized = []
+    for entry in timeline or []:
+        entry_copy = {
+            'key': entry.get('key'),
+            'label': entry.get('label'),
+            'state': entry.get('state'),
+            'started_at': entry.get('started_at'),
+            'completed_at': entry.get('completed_at'),
+            'duration_hours': entry.get('duration_hours'),
+            'duration_days': entry.get('duration_days'),
+            'expected_hours': entry.get('expected_hours'),
+            'expected_days': entry.get('expected_days'),
+        }
+
+        events = []
+        for event in entry.get('events', []):
+            event_copy = event.copy()
+            event_copy['actor'] = _serialize_actor(event.get('actor'))
+            events.append(event_copy)
+        entry_copy['events'] = events
+
+        current_event = entry.get('current_event')
+        if current_event:
+            current_copy = current_event.copy()
+            current_copy['actor'] = _serialize_actor(current_event.get('actor'))
+            entry_copy['current_event'] = current_copy
+        else:
+            entry_copy['current_event'] = None
+
+        serialized.append(entry_copy)
+    return serialized
+
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
@@ -56,11 +99,30 @@ class ListingPlanSerializer(serializers.ModelSerializer):
 
 class PropertyStatusHistorySerializer(serializers.ModelSerializer):
     actor = BasicUserSerializer(read_only=True)
+    node_label = serializers.SerializerMethodField()
+    substate_label = serializers.SerializerMethodField()
 
     class Meta:
         model = PropertyStatusHistory
-        fields = ['id', 'node', 'substate', 'percent', 'message', 'metadata', 'actor', 'created_at']
+        fields = [
+            'id',
+            'node',
+            'node_label',
+            'substate',
+            'substate_label',
+            'percent',
+            'message',
+            'metadata',
+            'actor',
+            'created_at',
+        ]
         read_only_fields = fields
+
+    def get_node_label(self, obj):
+        return WORKFLOW_NODE_LABELS.get(obj.node, obj.node.title())
+
+    def get_substate_label(self, obj):
+        return WORKFLOW_SUBSTATE_DEFINITIONS.get(obj.substate, {}).get('label', obj.substate)
 
 
 class PropertyStatusBarSerializer(serializers.Serializer):
@@ -273,6 +335,8 @@ class JobSerializer(serializers.ModelSerializer):
     offers = JobOfferSerializer(many=True, read_only=True)
     status_label = serializers.SerializerMethodField()
     status_bar = serializers.SerializerMethodField()
+    contact = serializers.SerializerMethodField()
+    location = serializers.SerializerMethodField()
 
     class Meta:
         model = Job
@@ -296,6 +360,8 @@ class JobSerializer(serializers.ModelSerializer):
             'timeline',
             'offers',
             'status_bar',
+            'contact',
+            'location',
             'created_at',
             'updated_at',
         ]
@@ -306,6 +372,8 @@ class JobSerializer(serializers.ModelSerializer):
             'timeline',
             'offers',
             'status_bar',
+            'contact',
+            'location',
             'created_at',
             'updated_at',
             'property_id',
@@ -325,6 +393,38 @@ class JobSerializer(serializers.ModelSerializer):
             return None
         return PropertyPreviewSerializer(obj.property, context=self.context).data
 
+    def get_contact(self, obj):
+        prop = getattr(obj, 'property', None)
+        if not prop:
+            return None
+        owner = getattr(prop, 'owner', None)
+        fallback_name = prop.contact_name or (owner.get_full_name() if owner and owner.get_full_name() else None)
+        if not fallback_name and owner:
+            fallback_name = owner.username or owner.email
+        email = prop.contact_email or (owner.email if owner else None)
+        phone = prop.contact_phone or None
+        return {
+            'name': fallback_name,
+            'email': email,
+            'phone': phone,
+        }
+
+    def get_location(self, obj):
+        prop = getattr(obj, 'property', None)
+        if not prop:
+            return None
+        return {
+            'address_line1': prop.address_line1 or None,
+            'address_line2': prop.address_line2 or None,
+            'city': prop.address_city or None,
+            'region': prop.address_region or None,
+            'country': prop.address_country or None,
+            'postal_code': prop.address_postal_code or None,
+            'latitude': prop.latitude,
+            'longitude': prop.longitude,
+            'reference': prop.access_notes or None,
+        }
+
 class PropertySerializer(serializers.ModelSerializer):
     images = ImageSerializer(many=True, read_only=True)
     tours = TourSerializer(many=True, read_only=True)
@@ -338,18 +438,21 @@ class PropertySerializer(serializers.ModelSerializer):
     status_history = PropertyStatusHistorySerializer(many=True, read_only=True)
     status_bar = serializers.SerializerMethodField()
     submission_requirements = serializers.SerializerMethodField()
+    workflow_timeline = serializers.SerializerMethodField()
     # TODO: add documents serializer when backend model ready
 
     class Meta:
         model = Property
-        fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
-                 'boundary_polygon', 'description', 'has_water', 'has_views', 
+        fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude',
+                 'boundary_polygon', 'description', 'has_water', 'has_views',
+                 'contact_name', 'contact_email', 'contact_phone',
+                 'address_line1', 'address_line2', 'address_city', 'address_region', 'address_country', 'address_postal_code',
                  'created_at', 'updated_at', 'images', 'tours', 'publication_status',
                   'owner_details', 'listing_type', 'rent_price', 'rental_terms', 'documents', 'plusvalia_score', 'plusvalia_breakdown',
                  'terrain', 'access', 'legal_status', 'utilities',
                  'workflow_node', 'workflow_substate', 'workflow_progress', 'workflow_alerts',
                  'plan', 'plan_details', 'preferred_time_windows', 'access_notes', 'seller_notes',
-                 'status_history', 'status_bar', 'submission_requirements',
+                 'status_history', 'status_bar', 'workflow_timeline', 'submission_requirements',
                  'ai_category', 'ai_summary']
         extra_kwargs = {
             'workflow_node': {'read_only': True},
@@ -359,6 +462,7 @@ class PropertySerializer(serializers.ModelSerializer):
             'plan_details': {'read_only': True},
             'status_history': {'read_only': True},
             'status_bar': {'read_only': True},
+            'workflow_timeline': {'read_only': True},
         }
         
     def validate_boundary_polygon(self, value):
@@ -423,23 +527,30 @@ class PropertySerializer(serializers.ModelSerializer):
     def get_submission_requirements(self, obj):
         return obj.compute_submission_requirements()
 
+    def get_workflow_timeline(self, obj):
+        return _serialize_timeline_payload(obj.build_workflow_timeline())
+
 class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer para listar propiedades con menos detalles"""
     image_count = serializers.IntegerField(source='image_count_annotation', read_only=True)
     has_tour = serializers.BooleanField(source='has_tour_annotation', read_only=True)
     owner_details = BasicUserSerializer(source='owner', read_only=True)
     plusvalia_score = serializers.SerializerMethodField()
-    
+    workflow_timeline = serializers.SerializerMethodField()
+
     class Meta:
         model = Property
-        fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude', 
+        fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude',
                  'has_water', 'has_views', 'image_count', 'has_tour',
-                 'publication_status', 'workflow_node', 'workflow_substate', 'workflow_progress',
+                 'publication_status', 'workflow_node', 'workflow_substate', 'workflow_progress', 'workflow_timeline',
                  'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms', 'plusvalia_score']
 
     def get_plusvalia_score(self, obj):
         # Beta/prelanzamiento: visible para todos
         return obj.plusvalia_score
+
+    def get_workflow_timeline(self, obj):
+        return _serialize_timeline_payload(obj.build_workflow_timeline())
 
 class PropertyPreviewSerializer(serializers.ModelSerializer):
     """Serializer para mostrar información mínima de una propiedad a usuarios anónimos"""

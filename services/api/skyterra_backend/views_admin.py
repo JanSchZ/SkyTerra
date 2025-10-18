@@ -1,16 +1,22 @@
-from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
-from django.utils import timezone
-from datetime import timedelta
-from properties.models import Property
-from support_tickets.models import Ticket
+from collections import defaultdict
+from statistics import mean, median
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db import models
 from django.db.models import Avg, Count, Sum
-from .serializers import UserSerializer # Import the new serializer
-from django.contrib.auth.models import Group
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from datetime import timedelta
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAdminUser
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from properties.models import Job, PilotProfile, Property
+from support_tickets.models import Ticket
+
+from .serializers import UserSerializer  # Import the new serializer
 
 User = get_user_model()
 
@@ -20,43 +26,152 @@ class AdminDashboardSummaryView(APIView):
     def get(self, request):
         now = timezone.now()
         today = now.date()
-        last_7_days_start = now - timedelta(days=7) # Renamed for clarity
+        last_7_days_start = now - timedelta(days=7)
         last_month_start = now - timedelta(days=30)
 
-        # Propiedades pendientes de aprobación
-        pending_properties = Property.objects.filter(publication_status='pending').count()
-        # Propiedades aprobadas/publicadas hoy
-        published_today = Property.objects.filter(publication_status='approved', created_at__date=today).count()
-        # Tickets de soporte abiertos
-        open_tickets = Ticket.objects.filter(status__in=['new', 'in_progress', 'on_hold']).count()
-        # Nuevos usuarios últimos 7 días
-        new_users = User.objects.filter(date_joined__gte=last_7_days_start).count() # Use renamed variable
+        properties_qs = (
+            Property.objects.select_related('plan', 'owner')
+            .prefetch_related('status_history')
+            .order_by('-created_at')
+        )
 
-        # Nuevas estadísticas
-        properties_last_week = Property.objects.filter(created_at__gte=last_7_days_start, created_at__lte=now).count()
-        properties_last_month = Property.objects.filter(created_at__gte=last_month_start, created_at__lte=now).count()
-        average_property_size_data = Property.objects.aggregate(avg_size=Avg('size'))
-        average_property_size = average_property_size_data['avg_size']
+        workflow_nodes = [node for node, _ in Property.WORKFLOW_NODE_CHOICES]
+        workflow_counts = {node: 0 for node in workflow_nodes}
+        duration_samples = defaultdict(list)
+        expected_samples = defaultdict(list)
+        sla_breaches = defaultdict(int)
 
-        # Propiedades creadas por día en los últimos 7 días (para gráfico)
+        properties_in_progress = []
+        alerts_total = 0
+        published_today = 0
+
+        for property_instance in properties_qs:
+            workflow_counts[property_instance.workflow_node] = workflow_counts.get(property_instance.workflow_node, 0) + 1
+            if property_instance.workflow_alerts:
+                alerts_total += len(property_instance.workflow_alerts)
+
+            timeline = property_instance.build_workflow_timeline()
+            active_entry = next((entry for entry in timeline if entry.get('state') == 'active'), None)
+            last_entry = timeline[-1] if timeline else None
+            stage_entry = active_entry or last_entry
+
+            if stage_entry and (property_instance.workflow_node != 'live' or stage_entry.get('state') != 'done'):
+                properties_in_progress.append({
+                    'id': property_instance.id,
+                    'name': property_instance.name,
+                    'owner_email': getattr(property_instance.owner, 'email', None),
+                    'owner_name': property_instance.owner.get_full_name() if getattr(property_instance.owner, 'get_full_name', None) else None,
+                    'plan_name': property_instance.plan.name if property_instance.plan else None,
+                    'workflow_node': property_instance.workflow_node,
+                    'workflow_label': stage_entry.get('label'),
+                    'stage_state': stage_entry.get('state'),
+                    'stage_duration_hours': stage_entry.get('duration_hours'),
+                    'stage_duration_days': stage_entry.get('duration_days'),
+                    'last_event': stage_entry.get('current_event'),
+                    'timeline': timeline,
+                })
+
+            for entry in timeline:
+                node_key = entry.get('key')
+                duration = entry.get('duration_hours')
+                expected = entry.get('expected_hours')
+
+                if duration is not None and node_key:
+                    duration_samples[node_key].append(duration)
+                    if expected is not None:
+                        expected_samples[node_key].append(expected)
+                        if duration > expected:
+                            sla_breaches[node_key] += 1
+
+                if node_key == 'live' and entry.get('started_at'):
+                    started_at = parse_datetime(entry['started_at'])
+                    if started_at and started_at.date() == today:
+                        published_today += 1
+
+        # Ordenar por mayor tiempo en etapa y limitar lista
+        properties_in_progress.sort(
+            key=lambda item: (item['stage_duration_hours'] or 0),
+            reverse=True,
+        )
+        properties_in_progress = properties_in_progress[:20]
+
+        def summarize_stage(node_key):
+            samples = duration_samples.get(node_key, [])
+            expected = expected_samples.get(node_key, [])
+            if not samples:
+                return {
+                    'average_hours': None,
+                    'average_days': None,
+                    'median_hours': None,
+                    'median_days': None,
+                    'expected_hours': mean(expected) if expected else None,
+                    'expected_days': (mean(expected) / 24) if expected else None,
+                    'samples': 0,
+                    'sla_breaches': sla_breaches.get(node_key, 0),
+                }
+
+            avg_hours = mean(samples)
+            med_hours = median(samples)
+            avg_expected = mean(expected) if expected else None
+
+            return {
+                'average_hours': round(avg_hours, 2),
+                'average_days': round(avg_hours / 24, 2),
+                'median_hours': round(med_hours, 2),
+                'median_days': round(med_hours / 24, 2),
+                'expected_hours': round(avg_expected, 2) if avg_expected is not None else None,
+                'expected_days': round(avg_expected / 24, 2) if avg_expected is not None else None,
+                'samples': len(samples),
+                'sla_breaches': sla_breaches.get(node_key, 0),
+            }
+
+        stage_duration_stats = {
+            node: summarize_stage(node)
+            for node in workflow_nodes
+        }
+
+        # Métricas adicionales
+        pending_properties = workflow_counts.get('review', 0)
+        live_properties = workflow_counts.get('live', 0)
         from django.db.models.functions import TruncDate
+
         properties_by_day = (
-            Property.objects.filter(created_at__gte=last_7_days_start) # Use renamed variable
+            Property.objects.filter(created_at__gte=last_7_days_start)
             .annotate(day=TruncDate('created_at'))
             .values('day')
             .order_by('day')
             .annotate(count=models.Count('id'))
         )
 
+        properties_last_week = Property.objects.filter(created_at__gte=last_7_days_start, created_at__lte=now).count()
+        properties_last_month = Property.objects.filter(created_at__gte=last_month_start, created_at__lte=now).count()
+        average_property_size_data = Property.objects.aggregate(avg_size=Avg('size'))
+        average_property_size = average_property_size_data['avg_size']
+
+        open_tickets = Ticket.objects.filter(status__in=['new', 'in_progress', 'on_hold']).count()
+        new_users = User.objects.filter(date_joined__gte=last_7_days_start).count()
+
+        active_jobs = Job.objects.filter(status__in=['inviting', 'assigned', 'scheduling', 'scheduled', 'shooting']).count()
+        postproduction_jobs = Job.objects.filter(status__in=['uploading', 'received', 'qc', 'editing', 'preview_ready', 'ready_for_publish']).count()
+        pilots_available = PilotProfile.objects.filter(status='approved', is_available=True).count()
+
         return Response({
-            "pending_properties": pending_properties,
-            "published_today": published_today,
-            "open_tickets": open_tickets,
-            "new_users": new_users,
-            "properties_by_day": list(properties_by_day),
-            "properties_last_week": properties_last_week,
-            "properties_last_month": properties_last_month,
-            "average_property_size": average_property_size if average_property_size is not None else 0,
+            'pending_properties': pending_properties,
+            'live_properties': live_properties,
+            'published_today': published_today,
+            'open_tickets': open_tickets,
+            'new_users': new_users,
+            'workflow_counts': workflow_counts,
+            'stage_duration_stats': stage_duration_stats,
+            'properties_in_progress': properties_in_progress,
+            'alerts_total': alerts_total,
+            'properties_by_day': list(properties_by_day),
+            'properties_last_week': properties_last_week,
+            'properties_last_month': properties_last_month,
+            'average_property_size': average_property_size if average_property_size is not None else 0,
+            'active_jobs': active_jobs,
+            'postproduction_jobs': postproduction_jobs,
+            'pilots_available': pilots_available,
         })
 
 class AdminUserListView(ListAPIView):

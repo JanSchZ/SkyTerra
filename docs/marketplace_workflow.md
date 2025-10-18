@@ -1,89 +1,100 @@
 # SkyTerra Marketplace & Operaciones
 
-Este documento resume la primera iteración del flujo unificado entre vendedores, administradores y operadores de dron. Incluye la estructura de datos recién agregada, endpoints principales, componentes de interfaz y puntos pendientes para las siguientes iteraciones.
+Este documento describe el flujo operativo unificado entre vendedores, administradores y operadores de dron. Incluye la máquina de estados vigente, los endpoints expuestos por el backend, los componentes de interfaz que ya fueron actualizados y un backlog sugerido para las siguientes iteraciones.
 
 ## 1. Estados de la publicación
 
-La entidad `Property` incorpora una máquina de estados granular orientada a la barra de progreso:
+Cada propiedad recorre cinco hitos principales. El backend registra todas las transiciones en `PropertyStatusHistory` y expone un timeline consolidado (`workflow_timeline`) con duración por etapa, actor y cumplimiento de SLA.
 
-| Nodo | Subestados | Progreso aproximado |
+| Etapa | Propósito | Disparadores principales |
 | --- | --- | --- |
-| `review` | `draft`, `submitted`, `under_review`, `changes_requested`, `resubmitted` | 0–30% |
-| `approved` | `approved_for_shoot` | 45% |
-| `pilot` | `inviting`, `assigned`, `scheduling`, `scheduled`, `shooting`, `finished` | 48–75% |
-| `post` | `uploading`, `received`, `qc`, `editing`, `preview_ready`, `ready_for_publish` | 80–98% |
-| `live` | `published` | 100% |
+| `review` | Revisión documental y validación de datos. Para poder enviar la publicación se exige polígono guardado, documentos base aprobados y contacto operativo completo (nombre, teléfono y dirección de encuentro). | Creación de la propiedad, `submitted`, `changes_requested`. |
+| `approved` | Validación final del equipo Skyterra. Se genera automáticamente el `Job`, se calculan payouts y se dispara la primera ola de invitaciones a pilotos dentro del radio definido por el plan. | `approved_for_shoot`. |
+| `pilot` | Coordinación con el operador asignado: invitaciones, aceptación, agenda, vuelo y cierre de terreno. | `inviting`, `assigned`, `scheduling`, `scheduled`, `shooting`, `finished`. |
+| `post` | Postproducción y control de calidad. El operador sube ZIP/RAW/JPG/PNG desde la app; el staff marca recepción, QC y edición. | `uploading`, `received`, `qc`, `editing`, `preview_ready`, `ready_for_publish`. |
+| `live` | Publicación activa y visible en Skyterra. | `published`. |
 
-Cada transición crea un registro en `PropertyStatusHistory` (actor, mensaje y `percent`). Las alertas visibles para el vendedor viven en `Property.workflow_alerts`.
+Las alertas visibles para el vendedor continúan en `Property.workflow_alerts`. El timeline permite visualizar en dashboards cuántos días tomó cada etapa y quién accionó el último cambio.
 
 ## 2. Nuevos modelos principales
 
-- **ListingPlan**: define planes, precio y SLA (`sla_hours`).
+- **Property**: incorpora campos `contact_name`, `contact_phone`, `contact_email`, `address_*` y el método `build_workflow_timeline()`.
+- **ListingPlan**: define planes, precios y SLA (`sla_hours`).
 - **PilotProfile / PilotDocument**: perfil operativo, disponibilidad y documentos obligatorios.
-- **Job**: representa el trabajo operativo por propiedad (estado, agenda, payouts, ofertas vinculadas).
-- **JobOffer**: invitaciones en oleadas a pilotos (score, radio, TTL). El primero en aceptar asigna el trabajo.
+- **Job**: trabajo operativo por propiedad (estado, agenda, payouts, ofertas). Si el plan no define `pilot_payout_amount`, se usa automáticamente el precio del plan como pago al operador.
+- **JobOffer**: invitaciones en oleadas a pilotos (score, radio, TTL). El primero que acepta asigna el trabajo.
 
 ## 3. Endpoints clave
 
 Ruta base REST `/api/`.
 
 ### Propiedades
-- `POST /properties/` creación por vendedor autenticado.
-- `PATCH /properties/{id}/` edición por propietario o staff.
-- `POST /properties/{id}/submit/` envía a revisión (`submitted`).
-- `GET /properties/{id}/status-bar/` y `/status-history/` para UI de avance.
-- `POST /properties/{id}/transition/` uso interno admin (mover a cualquier subestado).
-- `POST /properties/{id}/alerts/` y `/clear-alerts/` para administrar alertas visibles.
+- `POST /properties/`: creación por vendedor autenticado (contacto y dirección obligatorios).
+- `PATCH /properties/{id}/`: edición por propietario o staff.
+- `POST /properties/{id}/submit/`: envía a revisión (`submitted`).
+- `GET /properties/{id}/`: incluye `status_bar`, `status_history`, `workflow_timeline` y requisitos de envío.
+- `GET /properties/{id}/status-bar/` y `/status-history/`: endpoints ligeros para UI.
+- `POST /properties/{id}/transition/`: uso interno de admin; la nueva vista de administración usa acciones rápidas sobre esta ruta.
+- `POST /properties/{id}/alerts/` y `/clear-alerts/`: gestión de alertas visibles para el vendedor.
 
 ### Planes y workflow
-- `GET /plans/` lista de planes disponibles.
-- `GET /properties/workflow-structure/` definiciones de nodos/subestados (front).
+- `GET /plans/`: planes disponibles.
+- `GET /properties/workflow-structure/`: definición de nodos/subestados consumida por el front.
 
 ### Pilotos y matching
-- `GET/PATCH /pilot-profiles/me/` perfil del operador (incluye documentos).
-- `POST /pilot-profiles/availability/` heartbeat y disponibilidad.
-- `GET /jobs/available/` obtiene trabajos con invitaciones pendientes.
-- `POST /job-offers/{id}/accept|decline/` acciones sobre la invitación.
-- `POST /jobs/{id}/schedule/` confirma agenda.
-- `POST /jobs/{id}/start-flight/` y `/complete-flight/` permiten al piloto iniciar/finalizar la grabación.
-- `POST /jobs/{id}/invite-next-wave/` (admin) fuerza una nueva ola de invitaciones.
-- `POST /jobs/{id}/set-status/` (admin) sincroniza job y property.
-- El backend expira ofertas vencidas y lanza automáticamente la siguiente ola (máx. 3) agregando alertas si no hay pilotos disponibles.
-- La transición `approved_for_shoot` crea automáticamente el `Job`, asigna plan/payout y dispara la primera ola de matching.
+- `GET/PATCH /pilot-profiles/me/`: perfil del operador.
+- `POST /pilot-profiles/availability/`: heartbeat y disponibilidad.
+- `GET /jobs/available/`: trabajos con invitaciones pendientes.
+- `POST /job-offers/{id}/accept|decline/`: acciones sobre la invitación.
+- `POST /jobs/{id}/schedule/`: confirma agenda.
+- `POST /jobs/{id}/start-flight/` y `/complete-flight/`: inicio y término de vuelo.
+- `POST /jobs/{id}/invite-next-wave/` (admin): fuerza una nueva ola.
+- `POST /jobs/{id}/set-status/` (admin): sincroniza job y property.
+
+El backend expira ofertas vencidas y lanza automáticamente la siguiente ola (máximo 3), agregando alertas cuando no hay pilotos disponibles.
 
 ## 4. Frontend Web (Vendedor)
 
-- **Dashboard** (`/dashboard`): cards con barra de estado (`StatusBar`), alertas operativas (matching, documentos), plan activo y CTA a la guía.
-- **Wizard** (`/seller/listings/new` y `/seller/listings/:id`): pasos Datos → Documentos → Polígono (Mapbox + `PropertyBoundaryDraw`) → Preferencias → Revisión. El botón “Enviar a revisión” sólo se habilita cuando hay polígono guardado y los documentos críticos están aprobados.
-- Servicio centralizado `services/marketplaceService.js` para planes, propiedades, documentos, polígono y transiciones.
+- **Dashboard (`/dashboard`)**: cards por publicación con barra de estado (`StatusBar`), timeline compacto (`WorkflowTimeline`), alertas y CTA contextuales. Se muestran los días que lleva cada etapa y el último actor.
+- **Wizard (`/seller/listings/...`)**: pasos Datos → Documentos → Polígono → Preferencias → Revisión. El paso de datos ahora recopila contacto operativo y dirección exacta; no se puede enviar a revisión hasta completar estos campos, subir documentos críticos y guardar el polígono.
+- **Servicios**: `services/marketplaceService.js` centraliza planes, propiedades, documentos, polígono y transiciones.
 
-## 5. App Operadores (Expo)
+## 5. Panel de administración web
 
-- Pantalla principal tipo “Uber”: cards con pago estimado, distancia, countdown de invitación, y CTAs `Aceptar`/`Pasar`. Incluye toggle de disponibilidad, `listAvailableJobs()` y expira ofertas caducadas automáticamente.
-- Detalle de trabajo muestra estado actual, instrucciones del vendedor, agenda, timeline y botones contextuales para confirmar horario, iniciar vuelo y finalizar vuelo.
-- Servicios `fetchPilotProfile`, `setAvailability`, `acceptOffer`, `declineOffer`, `fetchJob`, `scheduleJob`, `startFlight`, `completeFlight` reemplazan los endpoints antiguos.
+- **Dashboard operativo (`/admin/dashboard`)**: tarjetas KPI para pilotos disponibles, operaciones en terreno, postproducción en curso y alertas activas. Incluye distribución por etapa, duración promedio vs SLA y tabla de publicaciones en curso con timeline integrado.
+- **Analítica (`/admin/analytics`)**: funnel consolidado por nodo, tiempos promedio/mediana por etapa y curva de altas recientes. Permite identificar cuellos de botella con datos provenientes de `workflow_timeline`.
+- **Publicaciones (`/admin/publications`)**: tabla compacta con filtro por etapa, chip de estado, duración de la etapa actual y acciones rápidas (`changes_requested`, `approved_for_shoot`, `received`, `ready_for_publish`, `published`).
+- **Detalle**: diálogo con timeline completo, contacto del vendedor (nombre, teléfono, email) y dirección. Todo se alimenta del campo `workflow_timeline` del backend.
+- Las acciones rápidas llaman a `POST /properties/{id}/transition/` y actualizan automáticamente la lista.
 
-## 6. Configuración y dependencias
+## 6. App Operadores (Expo)
 
-- Se creó migración `properties/migrations/0019_*` para nuevos modelos y campos.
-- React web reutiliza Mapbox (`VITE_MAPBOX_ACCESS_TOKEN`). Si falta token, la herramienta de polígono mostrará base neutra.
-- El proyecto móvil ya usaba `expo-constants`; definir `apiUrl` en `app.config.ts` o `.env`.
+- Pantalla principal tipo “Uber” con payout igual al costo del plan (cuando no hay override), distancia, countdown de invitación y CTAs `Aceptar`/`Pasar`.
+- Detalle de trabajo incluye estado, instrucciones, timeline, contacto del vendedor y dirección referencial para coordinar la visita.
+- Se mantienen los servicios `fetchPilotProfile`, `setAvailability`, `acceptOffer`, `declineOffer`, `fetchJob`, `scheduleJob`, `startFlight`, `completeFlight`.
 
-## 7. Pendientes sugeridos (siguientes iteraciones)
+## 7. Configuración y dependencias
 
-1. **Notificaciones**: conectar emails/Push en cada transición (`submitted`, `changes_requested`, `assigned`, `scheduled`, `preview_ready`, `published`).
-2. **Validaciones avanzadas**: reglas de negocio por plan (documentos obligatorios, límites de área, reintentos de oferta).
-3. **Coordinación agenda**: formularios reales vendedor ↔ piloto (rangos personalizados y mensajes).
-4. **Estado Operador**: endpoints adicionales `jobs/{id}/start` y `jobs/{id}/complete` con checklist.
-5. **Analytics**: tableros SLA en admin, consumo de `PropertyStatusHistory` y `JobTimelineEvent`.
-6. **Seguridad**: webhook para actualizar documentos vencidos, bloqueo automático, auditoría de acciones admin.
-7. **Pagos**: enlazar `price_amount`/`pilot_payout_amount` con flujos reales (Stripe/transferencias) y split.
-8. **Postproducción**: endpoints automáticos para marcar `uploading → received → qc → editing`, con colas de transcodificación.
+- Nueva migración `properties/migrations/0020_*` agrega campos de contacto/dirección y actualiza la trazabilidad del workflow.
+- React web sigue usando Mapbox (`VITE_MAPBOX_ACCESS_TOKEN`). Si falta el token, la herramienta de polígono carga un estilo neutro.
+- La app móvil (Expo) requiere `apiUrl` en `app.config.ts` o `.env` para consumir los nuevos campos.
 
-## 8. Testing rápido Manual
+## 8. Pendientes sugeridos
 
-- Crear publicación nueva → completar wizard → subir documento (PDF) → dibujar polígono → guardar preferencias → enviar a revisión.
-- Desde admin (Django admin) mover a `approved_for_shoot` y crear job (automático en migración actual cuando se apruebe manualmente mediante acción `transition`).
-- Iniciar app operador → alternar disponibilidad → ver invitaciones → aceptar → revisar detalle.
+1. **Analytics**: tablero con promedios/SLA por etapa usando `workflow_timeline` y `JobTimelineEvent`.
+2. **Notificaciones**: emails/push automáticos en transiciones clave (`submitted`, `changes_requested`, `assigned`, `scheduled`, `preview_ready`, `published`).
+3. **Coordinación avanzada**: formularios para propuesta de horarios bidireccionales vendedor ↔ piloto.
+4. **Seguridad**: webhook para documentos vencidos, bloqueo automático de pilotos sin papeles, auditoría de acciones admin.
+5. **Pagos**: integrar `price_amount`/`pilot_payout_amount` con Stripe/transferencias y split de comisiones.
+6. **Postproducción automática**: endpoints y colas para `uploading → received → qc → editing`.
+7. **BI externo**: exportación o API dedicada con métricas del timeline para optimizar el flujo.
 
-Mantener este documento actualizado conforme se automaticen pasos (matching inteligente, reprogramaciones, etc.).
+## 9. Testing rápido manual
+
+1. Crear publicación nueva, completar datos de contacto/dirección, subir documentos obligatorios, dibujar polígono y enviar a revisión.
+2. Desde el panel de admin usar “Aprobar y enviar a pilotos”. Verificar que se crea el `Job` y que los pilotos reciben la invitación.
+3. En la app de operadores aceptar la invitación, marcar inicio y término del vuelo, subir entregables.
+4. Regresar al panel de admin, revisar el timeline (etapas con duración), marcar “Marcar material recibido” y finalmente “Publicar en Skyterra”.
+5. Validar que el vendedor ve el progreso actualizado en su dashboard y que la publicación aparece como activa en el marketplace.
+
+Mantén este documento actualizado conforme se automaticen reprogramaciones, matching inteligente y analítica adicional.
