@@ -12,7 +12,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
@@ -32,6 +31,7 @@ import {
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { calculateDistanceInKm, estimateTravelMinutes } from '@utils/geo';
 import { getErrorMessage } from '@utils/errorMessages';
+import { useTheme, ThemeColors } from '@theme';
 
 type JobDetailRoute = RouteProp<RootStackParamList, 'JobDetail'>;
 type JobDetailNavigation = NativeStackNavigationProp<RootStackParamList, 'JobDetail'>;
@@ -55,6 +55,12 @@ const JobDetailScreen = () => {
   const [requirementLoadingId, setRequirementLoadingId] = useState<number | null>(null);
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const backgroundGradient = useMemo(
+    () => (isDark ? ['#050608', '#0b0d11'] : [colors.background, colors.backgroundAlt]),
+    [colors.background, colors.backgroundAlt, isDark]
+  );
 
   const loadJob = useCallback(async () => {
     try {
@@ -257,18 +263,18 @@ const JobDetailScreen = () => {
       : null;
 
   return (
-    <LinearGradient colors={['#050608', '#0b0d11']} style={styles.gradient}>
-      <StatusBar style="light" />
+    <LinearGradient colors={backgroundGradient} style={styles.gradient}>
+      <StatusBar style={colors.statusBarStyle} backgroundColor={backgroundGradient[0]} />
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.content}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={20} color="#F8FAFC" />
+            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
             <Text style={styles.backLabel}>Volver</Text>
           </TouchableOpacity>
 
-          <BlurView intensity={90} tint="dark" style={styles.heroCard}>
+          <View style={styles.heroCard}>
             <View style={styles.statusBadge}>
-              <Ionicons name="rocket-outline" size={16} color="#F8FAFC" />
+              <Ionicons name="rocket-outline" size={16} color={colors.primary} />
               <Text style={styles.statusText}>{statusLabel}</Text>
             </View>
             <Text style={styles.title}>{propertyName}</Text>
@@ -295,7 +301,7 @@ const JobDetailScreen = () => {
                   onPress={handleSchedule}
                   disabled={actionLoading !== null}
                 >
-                  <Ionicons name="calendar-outline" size={18} color="#0F172A" />
+                  <Ionicons name="calendar-outline" size={18} color={colors.primaryOn} />
                   <Text style={styles.primaryActionLabel}>
                     {actionLoading === 'schedule' ? 'Confirmando…' : 'Confirmar horario sugerido'}
                   </Text>
@@ -307,7 +313,7 @@ const JobDetailScreen = () => {
                   onPress={handleStartFlight}
                   disabled={actionLoading !== null}
                 >
-                  <Ionicons name="airplane-outline" size={18} color="#0F172A" />
+                  <Ionicons name="airplane-outline" size={18} color={colors.primaryOn} />
                   <Text style={styles.primaryActionLabel}>
                     {actionLoading === 'start' ? 'Iniciando…' : 'Iniciar vuelo'}
                   </Text>
@@ -319,7 +325,7 @@ const JobDetailScreen = () => {
                   onPress={handleCompleteFlight}
                   disabled={actionLoading !== null}
                 >
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#0F172A" />
+                  <Ionicons name="checkmark-circle-outline" size={18} color={colors.primaryOn} />
                   <Text style={styles.primaryActionLabel}>
                     {actionLoading === 'complete' ? 'Enviando…' : 'Finalizar vuelo'}
                   </Text>
@@ -328,10 +334,10 @@ const JobDetailScreen = () => {
             </View>
 
             <View style={styles.nextStepBox}>
-              <Ionicons name="compass-outline" size={18} color="#F8FAFC" />
+              <Ionicons name="compass-outline" size={18} color={colors.primary} />
               <Text style={styles.nextStepText}>{upcomingStep}</Text>
             </View>
-          </BlurView>
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Trayecto y punto de encuentro</Text>
@@ -365,24 +371,24 @@ const JobDetailScreen = () => {
           {job.vendor_instructions ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Instrucciones del cliente</Text>
-              <BlurView intensity={90} tint="dark" style={styles.infoCard}>
+              <View style={styles.infoCard}>
                 <Text style={styles.infoText}>{job.vendor_instructions}</Text>
-              </BlurView>
+              </View>
             </View>
           ) : null}
 
           {job.notes ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Notas internas</Text>
-              <BlurView intensity={80} tint="dark" style={styles.infoCard}>
+              <View style={styles.infoCard}>
                 <Text style={styles.infoText}>{job.notes}</Text>
-              </BlurView>
+              </View>
             </View>
           ) : null}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Pago</Text>
-            <BlurView intensity={85} tint="dark" style={styles.payoutCard}>
+            <View style={styles.payoutCard}>
               <View style={styles.payoutRow}>
                 <Text style={styles.payoutLabel}>Total estimado</Text>
                 <Text style={styles.payoutValue}>
@@ -412,28 +418,28 @@ const JobDetailScreen = () => {
                   <Text style={styles.helperText}>{job.payout_breakdown.notes}</Text>
                 ) : null}
               </View>
-            </BlurView>
+            </View>
           </View>
 
           {job.contact ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Contacto del cliente</Text>
-              <BlurView intensity={90} tint="dark" style={styles.infoCard}>
+              <View style={styles.infoCard}>
                 {job.contact.name ? <Text style={styles.infoText}>{job.contact.name}</Text> : null}
                 {job.contact.phone ? <Text style={styles.infoText}>{job.contact.phone}</Text> : null}
                 {job.contact.email ? <Text style={styles.infoText}>{job.contact.email}</Text> : null}
-              </BlurView>
+              </View>
             </View>
           ) : null}
 
           {job.timeline?.length ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Historial</Text>
-              <BlurView intensity={80} tint="dark" style={styles.timelineCard}>
+              <View style={styles.timelineCard}>
                 {job.timeline.map((event) => (
                   <View key={event.id} style={styles.timelineRow}>
                     <View style={styles.timelineIcon}>
-                      <Ionicons name="ellipse" size={8} color="#F8FAFC" />
+                      <Ionicons name="ellipse" size={8} color={colors.primary} />
                     </View>
                     <View style={styles.timelineTexts}>
                       <Text style={styles.timelineDate}>
@@ -443,7 +449,7 @@ const JobDetailScreen = () => {
                     </View>
                   </View>
                 ))}
-              </BlurView>
+              </View>
             </View>
           ) : null}
         </ScrollView>
@@ -452,204 +458,213 @@ const JobDetailScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
-  safe: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-    gap: 24,
-    paddingBottom: 40,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  backLabel: {
-    color: '#F8FAFC',
-    fontWeight: '600',
-  },
-  heroCard: {
-    borderRadius: 32,
-    padding: 24,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 18,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(59,130,246,0.18)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusText: {
-    color: '#E0F2FE',
-    fontWeight: '600',
-  },
-  title: {
-    color: '#F8FAFC',
-    fontSize: 26,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: '#E2E8F0',
-    fontSize: 16,
-  },
-  planLabel: {
-    color: '#94A3B8',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  metric: {
-    flex: 1,
-    gap: 6,
-  },
-  metricLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  metricValue: {
-    color: '#F8FAFC',
-    fontWeight: '600',
-  },
-  actions: {
-    gap: 12,
-  },
-  primaryAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 18,
-    paddingVertical: 14,
-  },
-  primaryActionLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  disabled: {
-    opacity: 0.65,
-  },
-  nextStepBox: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: 'rgba(15,23,42,0.4)',
-    borderRadius: 18,
-    padding: 16,
-    alignItems: 'center',
-  },
-  nextStepText: {
-    color: '#E2E8F0',
-    flex: 1,
-    lineHeight: 20,
-  },
-  section: {
-    gap: 14,
-  },
-  sectionTitle: {
-    color: '#F8FAFC',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  helperText: {
-    color: '#94A3B8',
-    fontSize: 13,
-  },
-  infoCard: {
-    borderRadius: 24,
-    padding: 18,
-    backgroundColor: 'rgba(15,17,23,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 10,
-  },
-  infoText: {
-    color: '#E2E8F0',
-    lineHeight: 20,
-  },
-  payoutCard: {
-    borderRadius: 26,
-    padding: 20,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 16,
-  },
-  payoutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  payoutLabel: {
-    color: '#CBD5F5',
-  },
-  payoutValue: {
-    color: '#F8FAFC',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  payoutBreakdown: {
-    gap: 10,
-  },
-  payoutLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  payoutLineLabel: {
-    color: '#94A3B8',
-  },
-  payoutLineValue: {
-    color: '#E2E8F0',
-    fontWeight: '600',
-  },
-  timelineCard: {
-    borderRadius: 26,
-    padding: 20,
-    backgroundColor: 'rgba(15,17,23,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 16,
-  },
-  timelineRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  timelineIcon: {
-    paddingTop: 6,
-  },
-  timelineTexts: {
-    flex: 1,
-    gap: 4,
-  },
-  timelineDate: {
-    color: '#94A3B8',
-    fontSize: 12,
-  },
-  timelineMessage: {
-    color: '#E2E8F0',
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#020617',
-  },
-  loadingText: {
-    color: '#94A3B8',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    gradient: {
+      flex: 1,
+    },
+    safe: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: 20,
+      gap: 24,
+      paddingBottom: 40,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    backLabel: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    heroCard: {
+      borderRadius: 32,
+      padding: 24,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 18,
+    },
+    statusBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: colors.primarySoft,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    statusText: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    title: {
+      color: colors.heading,
+      fontSize: 26,
+      fontWeight: '700',
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontSize: 16,
+    }, 
+    planLabel: {
+      color: colors.textMuted,
+    },
+    metricsRow: {
+      flexDirection: 'row',
+      gap: 16,
+    },
+    metric: {
+      flex: 1,
+      gap: 6,
+    },
+    metricLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    metricValue: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    actions: {
+      gap: 12,
+    },
+    primaryAction: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      paddingVertical: 14,
+    },
+    primaryActionLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+    nextStepBox: {
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 18,
+      padding: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    nextStepText: {
+      color: colors.textSecondary,
+      flex: 1,
+      lineHeight: 20,
+    },
+    section: {
+      gap: 14,
+    },
+    sectionTitle: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    helperText: {
+      color: colors.textMuted,
+      fontSize: 13,
+    },
+    infoCard: {
+      borderRadius: 24,
+      padding: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 10,
+    },
+    infoText: {
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    payoutCard: {
+      borderRadius: 26,
+      padding: 20,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 16,
+    },
+    payoutRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    payoutLabel: {
+      color: colors.textSecondary,
+    },
+    payoutValue: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    payoutBreakdown: {
+      gap: 10,
+    },
+    payoutLine: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    payoutLineLabel: {
+      color: colors.textSecondary,
+    },
+    payoutLineValue: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    timelineCard: {
+      borderRadius: 26,
+      padding: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 16,
+    },
+    timelineRow: {
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'flex-start',
+    },
+    timelineIcon: {
+      paddingTop: 6,
+    },
+    timelineTexts: {
+      flex: 1,
+      gap: 4,
+    },
+    timelineDate: {
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    timelineMessage: {
+      color: colors.textPrimary,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      padding: 32,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+    },
+  });
 
 export default JobDetailScreen;

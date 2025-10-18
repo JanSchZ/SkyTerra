@@ -30,6 +30,15 @@
       "@utils/*": [
         "utils/*"
       ],
+      "@navigation/*": [
+        "navigation/*"
+      ],
+      "@content/*": [
+        "content/*"
+      ],
+      "@theme": [
+        "theme/index"
+      ],
       "@theme/*": [
         "theme/*"
       ]

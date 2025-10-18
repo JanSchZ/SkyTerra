@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -8,6 +7,7 @@ import {
   uploadJobDeliverables,
 } from '@services/operatorJobs';
 import { getErrorMessage } from '@utils/errorMessages';
+import { useTheme, ThemeColors } from '@theme';
 
 interface DeliverablesUploaderProps {
   jobId: number;
@@ -15,31 +15,26 @@ interface DeliverablesUploaderProps {
   onUpload?: (result: OperatorJobDeliverables) => void;
 }
 
-const statusCopy: Record<OperatorJobDeliverables['status'], { label: string; description: string; tone: string }> = {
+const statusCopy: Record<OperatorJobDeliverables['status'], { label: string; description: string }> = {
   pending: {
     label: 'Pendiente',
     description: 'Debes subir el material final para el cliente.',
-    tone: '#FBBF24',
   },
   processing: {
     label: 'Procesando',
     description: 'Estamos revisando la entrega recibida.',
-    tone: '#38BDF8',
   },
   submitted: {
     label: 'Enviado',
     description: 'Tu envío fue recibido y está en revisión.',
-    tone: '#38BDF8',
   },
   approved: {
     label: 'Aprobado',
     description: '¡Excelente! El cliente aprobó el material.',
-    tone: '#34D399',
   },
   rejected: {
     label: 'Rechazado',
     description: 'Revisa los comentarios del cliente y vuelve a subir el contenido.',
-    tone: '#F87171',
   },
 };
 
@@ -48,6 +43,8 @@ const DeliverablesUploader: React.FC<DeliverablesUploaderProps> = ({ jobId, deli
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const statusInfo = useMemo(() => {
     if (deliverables) {
@@ -55,6 +52,23 @@ const DeliverablesUploader: React.FC<DeliverablesUploaderProps> = ({ jobId, deli
     }
     return statusCopy.pending;
   }, [deliverables]);
+
+  const statusTone = useMemo(() => {
+    switch (deliverables?.status) {
+      case 'approved':
+        return colors.success;
+      case 'processing':
+      case 'submitted':
+        return colors.primary;
+      case 'rejected':
+        return colors.danger;
+      case 'pending':
+      default:
+        return colors.warning;
+    }
+  }, [colors, deliverables?.status]);
+
+  const placeholderColor = isDark ? 'rgba(226,232,240,0.5)' : 'rgba(100,116,139,0.6)';
 
   const handleUpload = async () => {
     setError(null);
@@ -127,15 +141,15 @@ const DeliverablesUploader: React.FC<DeliverablesUploaderProps> = ({ jobId, deli
     : null;
 
   return (
-    <BlurView intensity={85} tint="dark" style={styles.card}>
+    <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.iconBadge}>
-          <Ionicons name="cloud-upload-outline" size={20} color="#0F172A" />
+          <Ionicons name="cloud-upload-outline" size={20} color={colors.primaryOn} />
         </View>
         <View style={styles.headerText}>
           <Text style={styles.title}>Entrega de contenido</Text>
           <Text style={styles.statusLabel}>
-            Estado: <Text style={[styles.statusValue, { color: statusInfo.tone }]}>{statusInfo.label}</Text>
+            Estado: <Text style={[styles.statusValue, { color: statusTone }]}>{statusInfo.label}</Text>
           </Text>
           <Text style={styles.statusDescription}>{statusInfo.description}</Text>
           {lastUploadLabel ? <Text style={styles.meta}>Última carga: {lastUploadLabel}</Text> : null}
@@ -147,7 +161,7 @@ const DeliverablesUploader: React.FC<DeliverablesUploaderProps> = ({ jobId, deli
         <TextInput
           style={styles.notesInput}
           placeholder="Ej: incluye fotos del panel sur y panorámicas en 4K"
-          placeholderTextColor="rgba(226,232,240,0.5)"
+          placeholderTextColor={placeholderColor}
           multiline
           value={notes}
           onChangeText={setNotes}
@@ -164,123 +178,124 @@ const DeliverablesUploader: React.FC<DeliverablesUploaderProps> = ({ jobId, deli
           onPress={handleUpload}
           disabled={uploading}
         >
-          <Ionicons name="arrow-up-circle-outline" size={18} color="#0F172A" />
+          <Ionicons name="arrow-up-circle-outline" size={18} color={colors.primaryOn} />
           <Text style={styles.primaryLabel}>{uploading ? 'Subiendo…' : 'Subir archivo ZIP'}</Text>
         </TouchableOpacity>
         {deliverables?.download_url ? (
           <TouchableOpacity style={styles.secondary} onPress={handleOpenDownload}>
-            <Ionicons name="download-outline" size={18} color="#E5E7EB" />
+            <Ionicons name="download-outline" size={18} color={colors.textSecondary} />
             <Text style={styles.secondaryLabel}>Descargar última entrega</Text>
           </TouchableOpacity>
         ) : null}
       </View>
-    </BlurView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: 'rgba(15,17,23,0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: 18,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  iconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerText: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    color: '#F8FAFC',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  statusLabel: {
-    color: '#CBD5F5',
-    fontSize: 13,
-  },
-  statusValue: {
-    fontWeight: '700',
-  },
-  statusDescription: {
-    color: '#CBD5F5',
-    fontSize: 14,
-  },
-  meta: {
-    color: '#94A3B8',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  notesBox: {
-    gap: 8,
-  },
-  notesLabel: {
-    color: '#E2E8F0',
-    fontWeight: '600',
-  },
-  notesInput: {
-    minHeight: 80,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.35)',
-    padding: 14,
-    color: '#F8FAFC',
-    fontSize: 14,
-    backgroundColor: 'rgba(15,23,42,0.45)',
-  },
-  actions: {
-    gap: 12,
-  },
-  primary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 18,
-    paddingVertical: 16,
-    backgroundColor: '#F8FAFC',
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  primaryLabel: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  secondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 18,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.45)',
-    backgroundColor: 'transparent',
-  },
-  secondaryLabel: {
-    color: '#E5E7EB',
-    fontWeight: '600',
-  },
-  error: {
-    color: '#F87171',
-  },
-  success: {
-    color: '#34D399',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    card: {
+      borderRadius: 28,
+      padding: 20,
+      backgroundColor: colors.surfaceRaised,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      gap: 18,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      gap: 14,
+    },
+    iconBadge: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerText: {
+      flex: 1,
+      gap: 4,
+    },
+    title: {
+      color: colors.heading,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    statusLabel: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    statusValue: {
+      fontWeight: '700',
+    },
+    statusDescription: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    meta: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    notesBox: {
+      gap: 8,
+    },
+    notesLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    notesInput: {
+      minHeight: 80,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      padding: 14,
+      color: colors.textPrimary,
+      fontSize: 14,
+      backgroundColor: colors.surfaceMuted,
+    },
+    actions: {
+      gap: 12,
+    },
+    primary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderRadius: 18,
+      paddingVertical: 16,
+      backgroundColor: colors.primary,
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+    primaryLabel: {
+      color: colors.primaryOn,
+      fontWeight: '700',
+    },
+    secondary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderRadius: 18,
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      backgroundColor: colors.surfaceMuted,
+    },
+    secondaryLabel: {
+      color: colors.textPrimary,
+      fontWeight: '600',
+    },
+    error: {
+      color: colors.danger,
+    },
+    success: {
+      color: colors.success,
+    },
+  });
 
 export default DeliverablesUploader;

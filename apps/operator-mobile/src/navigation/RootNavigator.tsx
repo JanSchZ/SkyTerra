@@ -1,41 +1,66 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useMemo } from 'react';
+import { NavigationContainer, DefaultTheme as NavigationDefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import SignInScreen from '@screens/SignInScreen';
 import SignUpScreen from '@screens/SignUpScreen';
-import JobListScreen from '@screens/JobListScreen';
 import JobDetailScreen from '@screens/JobDetailScreen';
+import GuideScreen from '@screens/GuideScreen';
+import MainTabsNavigator from './MainTabsNavigator';
 import { useAuth } from '@context/AuthContext';
+import { useTheme, ThemeColors } from '@theme';
+import { StatusBar } from 'expo-status-bar';
 
 export type RootStackParamList = {
   SignIn: { email?: string } | undefined;
   SignUp: undefined;
-  Jobs: undefined;
+  MainTabs: undefined;
   JobDetail: { jobId: string };
+  Guide: { guideId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const RootNavigator = () => {
-  const { user, loading } = useAuth();
+  const { user, initializing } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const statusBarStyle = colors.statusBarStyle;
 
-  if (loading) {
+  const navigationTheme = useMemo(
+    () => ({
+      dark: isDark,
+      colors: {
+        ...NavigationDefaultTheme.colors,
+        primary: colors.primary,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.textPrimary,
+        border: colors.cardBorder,
+        notification: colors.primary,
+      },
+    }),
+    [colors, isDark]
+  );
+
+  if (initializing) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Preparando tu sesión…</Text>
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar style={statusBarStyle} backgroundColor={colors.background} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
           <>
-            <Stack.Screen name="Jobs" component={JobListScreen} />
+            <Stack.Screen name="MainTabs" component={MainTabsNavigator} />
             <Stack.Screen name="JobDetail" component={JobDetailScreen} />
+            <Stack.Screen name="Guide" component={GuideScreen} />
           </>
         ) : (
           <>
@@ -50,15 +75,16 @@ const RootNavigator = () => {
 
 export default RootNavigator;
 
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#020617',
-    gap: 16,
-  },
-  loadingText: {
-    color: '#94A3B8',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      gap: 16,
+    },
+    loadingText: {
+      color: colors.textMuted,
+    },
+  });

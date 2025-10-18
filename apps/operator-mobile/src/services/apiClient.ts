@@ -12,6 +12,9 @@ if (!apiBaseUrl) {
 const ACCESS_TOKEN_KEY = 'skyterra-operator-access-token';
 const REFRESH_TOKEN_KEY = 'skyterra-operator-refresh-token';
 const LEGACY_REFRESH_KEY = 'refreshToken';
+const CREDENTIAL_EMAIL_KEY = 'skyterra-operator-cred-email';
+const CREDENTIAL_PASSWORD_KEY = 'skyterra-operator-cred-password';
+const PREFERRED_NAME_KEY = 'skyterra-operator-preferred-name';
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -67,6 +70,40 @@ export const clearStoredTokens = async () => {
     SecureStore.deleteItemAsync(LEGACY_REFRESH_KEY),
   ]);
 };
+
+export const persistCredentials = async ({ email, password }: { email: string; password: string }) => {
+  await Promise.all([
+    SecureStore.setItemAsync(CREDENTIAL_EMAIL_KEY, email),
+    SecureStore.setItemAsync(CREDENTIAL_PASSWORD_KEY, password),
+  ]);
+};
+
+export const loadStoredCredentials = async () => {
+  const [email, password] = await Promise.all([
+    SecureStore.getItemAsync(CREDENTIAL_EMAIL_KEY),
+    SecureStore.getItemAsync(CREDENTIAL_PASSWORD_KEY),
+  ]);
+  return { email, password };
+};
+
+export const clearStoredCredentials = async () => {
+  await Promise.all([
+    SecureStore.deleteItemAsync(CREDENTIAL_EMAIL_KEY),
+    SecureStore.deleteItemAsync(CREDENTIAL_PASSWORD_KEY),
+  ]);
+};
+
+export const persistPreferredName = async (name: string | null | undefined) => {
+  if (name && name.trim().length > 0) {
+    await SecureStore.setItemAsync(PREFERRED_NAME_KEY, name.trim());
+  } else {
+    await SecureStore.deleteItemAsync(PREFERRED_NAME_KEY);
+  }
+};
+
+export const loadPreferredName = async () => SecureStore.getItemAsync(PREFERRED_NAME_KEY);
+
+export const clearPreferredName = async () => SecureStore.deleteItemAsync(PREFERRED_NAME_KEY);
 
 const rawClient = axios.create({
   baseURL: apiBaseUrl,
@@ -162,6 +199,7 @@ export interface SignUpPayload {
   password2: string;
   first_name?: string;
   last_name?: string;
+  username?: string;
 }
 
 export interface SignUpResult {
@@ -200,7 +238,18 @@ const mapUser = (data: RawUser | null | undefined): OperatorUser => ({
 
 export const signIn = async (payload: SignInPayload): Promise<SignInResult> => {
   try {
-    const { data } = await rawClient.post('/api/auth/login/', payload);
+    const loginIdentifier = payload.email?.trim();
+    const submission: Record<string, string> = {
+      password: payload.password,
+    };
+
+    if (loginIdentifier) {
+      submission.email = loginIdentifier;
+      submission.username = loginIdentifier;
+      submission.login_identifier = loginIdentifier;
+    }
+
+    const { data } = await rawClient.post('/api/auth/login/', submission);
     const tokens: SignInTokens = {
       access: data?.access ?? data?.access_token,
       refresh: data?.refresh ?? data?.refresh_token,
@@ -244,6 +293,7 @@ export const signIn = async (payload: SignInPayload): Promise<SignInResult> => {
 export const signUp = async (payload: SignUpPayload): Promise<SignUpResult> => {
   const submission = {
     email: payload.email?.trim(),
+    username: payload.username?.trim() || payload.email?.trim(),
     password1: payload.password1,
     password2: payload.password2,
     first_name: payload.first_name?.trim() || undefined,
@@ -275,5 +325,15 @@ export const signUp = async (payload: SignUpPayload): Promise<SignUpResult> => {
 
 export const fetchCurrentUser = async (): Promise<OperatorUser> => {
   const { data } = await api.get('/api/auth/profile/');
+  return mapUser(data);
+};
+
+export const updateAccountProfile = async (
+  payload: Partial<Pick<OperatorUser, 'first_name' | 'last_name' | 'username'>>
+): Promise<OperatorUser> => {
+  const body = Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => typeof value === 'string')
+  );
+  const { data } = await api.put('/api/auth/profile/', body);
   return mapUser(data);
 };

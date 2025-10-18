@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import axios from 'axios';
 import {
   signIn,
   fetchCurrentUser,
@@ -7,80 +8,200 @@ import {
   loadStoredTokens,
   clearStoredTokens,
   setUnauthorizedHandler,
+  persistCredentials,
+  loadStoredCredentials,
+  clearStoredCredentials,
+  loadPreferredName,
+  persistPreferredName,
+  clearPreferredName,
 } from '@services/apiClient';
 
 interface AuthContextValue {
   user: OperatorUser | null;
+  /** true mientras se ejecuta una acción explícita (login/logout) */
   loading: boolean;
+  /** true únicamente durante la rehidratación/autologin inicial */
+  initializing: boolean;
   signInWithCredentials: (payload: SignInPayload) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  preferredName: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<OperatorUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [preferredName, setPreferredName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadName = async () => {
+      const stored = await loadPreferredName();
+      if (stored) setPreferredName(stored);
+    };
+    loadName();
+  }, []);
+
+  const computePreferredName = useCallback((candidate: OperatorUser | null | undefined) => {
+    if (!candidate) return null;
+    const first = candidate.first_name?.trim();
+    const last = candidate.last_name?.trim();
+    const parts = [first, last].filter((part): part is string => Boolean(part && part.length));
+    if (parts.length) {
+      return parts.join(' ');
+    }
+    return null;
+  }, []);
+
+  const performSignIn = useCallback(
+    async (payload: SignInPayload, options: { remember: boolean; markLoading: boolean } = { remember: false, markLoading: false }) => {
+      const trimmedEmail = payload.email.trim();
+      const effectivePayload: SignInPayload = { email: trimmedEmail, password: payload.password };
+      if (options.markLoading) {
+        setLoading(true);
+      }
+      try {
+        const result = await signIn(effectivePayload);
+        let resolvedUser: OperatorUser | null = null;
+        if (result.user) {
+          setUser(result.user);
+          resolvedUser = result.user;
+        } else {
+          const me = await fetchCurrentUser();
+          setUser(me);
+          resolvedUser = me;
+        }
+        const name = computePreferredName(resolvedUser);
+        setPreferredName(name);
+        if (options.remember) {
+          await persistCredentials(effectivePayload);
+        }
+        await persistPreferredName(name);
+        return true;
+      } catch (error) {
+        if (options.remember) {
+          await clearStoredCredentials();
+        }
+        await clearStoredTokens();
+        await clearPreferredName();
+        throw error;
+      } finally {
+        if (options.markLoading) {
+          setLoading(false);
+        }
+      }
+    },
+    [computePreferredName]
+  );
+
+  const attemptStoredCredentialLogin = useCallback(async () => {
+    try {
+      const { email, password } = await loadStoredCredentials();
+      if (!email || !password) {
+        return false;
+      }
+      await performSignIn({ email, password }, { remember: false, markLoading: false });
+      return true;
+    } catch (error) {
+      console.warn('Auto-login con credenciales guardadas falló', error);
+      await clearStoredCredentials();
+      await clearPreferredName();
+      return false;
+    }
+  }, [performSignIn]);
 
   useEffect(() => {
     setUnauthorizedHandler(async () => {
       await clearStoredTokens();
       setUser(null);
       setLoading(false);
+      const restored = await attemptStoredCredentialLogin();
+      if (!restored) {
+        setInitializing(false);
+      }
     });
     return () => {
       setUnauthorizedHandler(undefined);
     };
-  }, []);
+  }, [attemptStoredCredentialLogin]);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
         const tokens = await loadStoredTokens();
+        let authenticated = false;
         if (tokens.refreshToken) {
-          const me = await fetchCurrentUser();
-          setUser(me);
-        } else {
-          setUser(null);
+          try {
+            const me = await fetchCurrentUser();
+            setUser(me);
+            const name = computePreferredName(me);
+            if (name) {
+              setPreferredName(name);
+              await persistPreferredName(name);
+            }
+            authenticated = true;
+          } catch (error) {
+            console.warn('Auth bootstrap fetch user failed', error);
+            if (axios.isAxiosError(error) && error.response?.status === 401) {
+              await clearStoredTokens();
+              setUser(null);
+            }
+          }
+        }
+        if (!authenticated) {
+          const restored = await attemptStoredCredentialLogin();
+          if (!restored) {
+            setUser(null);
+          }
         }
       } catch (error) {
         console.warn('Auth bootstrap error', error);
-        await clearStoredTokens();
+        const shouldClear = axios.isAxiosError(error) && error.response?.status === 401;
+        if (shouldClear) {
+          await clearStoredTokens();
+        }
         setUser(null);
       } finally {
-        setLoading(false);
+        setInitializing(false);
       }
     };
 
     bootstrap();
-  }, []);
+  }, [attemptStoredCredentialLogin, computePreferredName]);
 
-  const signInWithCredentials = async (payload: SignInPayload) => {
-    setLoading(true);
+  const signInWithCredentials = useCallback(
+    async (payload: SignInPayload) => {
+      await performSignIn(payload, { remember: true, markLoading: true });
+    },
+    [performSignIn]
+  );
+
+  const refreshUser = useCallback(async () => {
     try {
-      const result = await signIn(payload);
-      if (result.user) {
-        setUser(result.user);
-        return;
-      }
       const me = await fetchCurrentUser();
       setUser(me);
+      const name = computePreferredName(me);
+      setPreferredName(name);
+      await persistPreferredName(name);
     } catch (error) {
-      await clearStoredTokens();
+      console.warn('refreshUser failed', error);
       throw error;
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [computePreferredName]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await clearStoredTokens();
+    await clearStoredCredentials();
+    await clearPreferredName();
     setUser(null);
-  };
+    setPreferredName(null);
+  }, []);
 
   const value = useMemo(
-    () => ({ user, loading, signInWithCredentials, signOut }),
-    [user, loading]
+    () => ({ user, loading, initializing, signInWithCredentials, signOut, refreshUser, preferredName }),
+    [user, loading, initializing, signInWithCredentials, signOut, refreshUser, preferredName]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
