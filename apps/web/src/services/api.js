@@ -819,6 +819,24 @@ export const propertyService = {
     }
   },
 
+  async transitionWorkflow(propertyId, substate, message) {
+    try {
+      const payload = { substate };
+      if (message) {
+        payload.message = message;
+      }
+      const response = await api.post(`/properties/${propertyId}/transition/`, payload);
+      return response.data;
+    } catch (error) {
+      console.error(`Error transitioning property ${propertyId} to ${substate}:`, error);
+      if (error.response && error.response.data) {
+        const errorMessage = error.response.data.error || error.response.data.detail || 'Error al actualizar el flujo de publicación.';
+        throw new Error(errorMessage);
+      }
+      throw error;
+    }
+  },
+
   // Eliminar una propiedad
   async deleteProperty(id) {
     try {

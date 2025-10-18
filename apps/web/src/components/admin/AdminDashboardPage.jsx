@@ -1,433 +1,375 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
-import PendingIcon from '@mui/icons-material/PendingRounded';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import RefreshIcon from '@mui/icons-material/RefreshOutlined';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
-import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts';
-import { propertyService, api } from '../../services/api';
-import sectionsData from './dashboard/sectionsData';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import FlightIcon from '@mui/icons-material/FlightTakeoff';
+import CameraIcon from '@mui/icons-material/PhotoCamera';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
+import { propertyService } from '../../services/api';
+import WorkflowTimeline from '../ui/WorkflowTimeline.jsx';
 
-const DEFAULT_CHART = sectionsData.slice(0, 30).map((item, index) => ({
-  date: `2024-05-${String(index + 1).padStart(2, '0')}`,
-  desktop: 100 + index * 5,
-  mobile: 75 + index * 4,
-}));
+const WORKFLOW_STAGE_LABELS = {
+  review: 'En revisión',
+  approved: 'Publicación aprobada',
+  pilot: 'Operación con piloto',
+  post: 'En postproducción',
+  live: 'Publicada',
+};
 
-const RANGE_OPTIONS = [
-  { label: 'Last 3 months', value: '90d' },
-  { label: 'Last 30 days', value: '30d' },
-  { label: 'Last 7 days', value: '7d' },
-];
+const WORKFLOW_ORDER = ['review', 'approved', 'pilot', 'post', 'live'];
+
+const formatNumber = (value) => Number(value || 0).toLocaleString('es-CL');
+
+const formatDuration = (hours) => {
+  if (hours == null) return '—';
+  if (hours >= 48) return `${(hours / 24).toFixed(1)} días`;
+  if (hours >= 1) return `${hours.toFixed(1)} h`;
+  return `${Math.round(hours * 60)} min`;
+};
 
 const AdminDashboardPage = () => {
-  const [timeRange, setTimeRange] = useState('90d');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [summary, setSummary] = useState(null);
-  const [aiUsage, setAiUsage] = useState(null);
-  const [pendingProperties, setPendingProperties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('moderation');
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState(null);
 
-  const loadData = useCallback(async () => {
+  const loadSummary = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [summaryData, usageResp, pendingResp] = await Promise.all([
-        propertyService.getAdminSummary().catch((err) => {
-          console.error('Resumen admin', err);
-          return null;
-        }),
-        api.get('/ai/logs/usage_stats/?days=30').catch((err) => {
-          console.error('IA usage', err);
-          return null;
-        }),
-        propertyService.getPaginatedProperties(1, { publication_status: 'pending' }, 10).catch((err) => {
-          console.error('Propiedades pendientes', err);
-          return null;
-        }),
-      ]);
-
-      setSummary(summaryData);
-      setAiUsage(usageResp ? usageResp.data : null);
-      setPendingProperties(pendingResp?.results || []);
-    } catch (fetchError) {
-      console.error(fetchError);
-      setError('Error al cargar datos. Intenta nuevamente.');
+      const response = await propertyService.getAdminSummary();
+      setSummary(response);
+    } catch (err) {
+      console.error('Error loading admin summary', err);
+      setError('No fue posible cargar el resumen operativo.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadSummary();
+  }, [loadSummary]);
 
-  const filteredClicksData = useMemo(() => {
-    const referenceDate = new Date();
-    const days = timeRange === '30d' ? 30 : timeRange === '7d' ? 7 : 90;
-    const startDate = new Date(referenceDate);
-    startDate.setDate(referenceDate.getDate() - days);
+  const workflowCounts = summary?.workflow_counts || {};
+  const stageStats = summary?.stage_duration_stats || {};
+  const propertiesInProgress = summary?.properties_in_progress || [];
 
-    // Preferimos clicks reales si el backend los provee
-    const clicks = (summary?.clicks_by_day || []).map((item) => ({
-      date: item.day || item.date,
-      desktop: item.clicks || item.total || 0,
-      mobile: Math.round((item.clicks || item.total || 0) * 0.6),
-    }));
-    // Fallback heurístico a partir de propiedades registradas (proporcional)
-    const source = clicks.length ? clicks : (summary?.properties_by_day || []).map((item) => {
-      const base = (item.count || item.total || 0) * 8; // ~8 clicks por alta como base
-      return {
-        date: item.day || item.date,
-        desktop: Math.round(base * 0.6),
-        mobile: Math.round(base * 0.4),
-      };
-    });
-
-    const dataset = source.length ? source : DEFAULT_CHART;
-    return dataset.filter((item) => new Date(item.date) >= startDate);
-  }, [summary, timeRange]);
-
-  const outlineRows = sectionsData;
-  const moderationRows = pendingProperties;
-  const focusRows = useMemo(() => sectionsData.filter((item) => item.status === 'Done'), []);
-  const aiRows = useMemo(() => {
-    const usage = aiUsage?.usage_by_model || [];
-    if (!usage.length) return [];
-    return usage.map((item, index) => ({
-      id: index + 1,
-      header: item['model_used__name'] || item.model_used?.name || 'Modelo IA',
-      type: 'IA',
-      status: `${item.request_count || 0} solicitudes`,
-      target: `$${Number(item.total_cost || 0).toFixed(2)}`,
-      limit: `${item.total_tokens_output || 0} tokens`,
-      reviewer: `${Math.round(item.avg_response_time || 0)} ms`,
-    }));
-  }, [aiUsage]);
-
-  const tabs = useMemo(
-    () => [
-      {
-        key: 'moderation',
-        label: 'Moderación',
-        icon: <PendingIcon fontSize="small" />,
-        rows: moderationRows,
-      },
-      {
-        key: 'outline',
-        label: 'Outline',
-        icon: <FormatListBulletedIcon fontSize="small" />,
-        rows: outlineRows,
-      },
-      {
-        key: 'focus',
-        label: 'Reportes',
-        icon: <InsightsOutlinedIcon fontSize="small" />,
-        rows: focusRows,
-      },
-      {
-        key: 'ai',
-        label: 'Sam',
-        icon: <TrendingUpIcon fontSize="small" />,
-        rows: aiRows,
-      },
-    ],
-    [moderationRows, outlineRows, focusRows, aiRows]
+  const stageDurationData = useMemo(
+    () =>
+      WORKFLOW_ORDER.map((key) => {
+        const stats = stageStats[key] || {};
+        return {
+          key,
+          label: WORKFLOW_STAGE_LABELS[key] || key,
+          average: stats.average_days ?? 0,
+          expected: stats.expected_days ?? 0,
+          breaches: stats.sla_breaches ?? 0,
+        };
+      }),
+    [stageStats]
   );
 
-  useEffect(() => {
-    if (activeTab === 'moderation' && moderationRows.length === 0) {
-      const fallback = tabs.find((tab) => tab.rows.length > 0);
-      if (fallback) setActiveTab(fallback.key);
-    }
-  }, [activeTab, moderationRows.length, tabs]);
+  const metricCards = useMemo(
+    () => [
+      {
+        label: 'Pilotos disponibles',
+        value: formatNumber(summary?.pilots_available ?? 0),
+        icon: <FlightIcon fontSize="small" />, 
+        helper: 'Pilotos aprobados con disponibilidad activa.',
+      },
+      {
+        label: 'Operaciones en terreno',
+        value: formatNumber(summary?.active_jobs ?? 0),
+        icon: <TimelineIcon fontSize="small" />, 
+        helper: 'Trabajos invitando, asignados o agendados.',
+      },
+      {
+        label: 'Postproducción en curso',
+        value: formatNumber(summary?.postproduction_jobs ?? 0),
+        icon: <CameraIcon fontSize="small" />, 
+        helper: 'Material recibido, en QC o edición.',
+      },
+      {
+        label: 'Alertas activas',
+        value: formatNumber(summary?.alerts_total ?? 0),
+        icon: <WarningAmberIcon fontSize="small" />, 
+        helper: 'Alertas visibles para el equipo administrador.',
+      },
+    ],
+    [summary]
+  );
 
-  const currentTab = tabs.find((tab) => tab.key === activeTab) || tabs[0];
-  const activeRows = currentTab?.rows || [];
-  const totalPages = Math.ceil(activeRows.length / rowsPerPage) || 1;
-  const paginatedRows = useMemo(() => {
-    const start = page * rowsPerPage;
-    return activeRows.slice(start, start + rowsPerPage);
-  }, [activeRows, page, rowsPerPage]);
+  const workflowCards = useMemo(
+    () =>
+      WORKFLOW_ORDER.map((key) => ({
+        key,
+        label: WORKFLOW_STAGE_LABELS[key] || key,
+        value: formatNumber(workflowCounts[key] ?? 0),
+      })),
+    [workflowCounts]
+  );
 
-  const handlePrev = () => setPage((prev) => Math.max(prev - 1, 0));
-  const handleNext = () => setPage((prev) => Math.min(prev + 1, totalPages - 1));
-
-  const refreshData = () => {
-    setPage(0);
-    loadData();
+  const handleOpenDetail = (property) => {
+    setSelectedProperty(property);
+    setDetailOpen(true);
   };
 
-  const kpiCards = useMemo(() => {
-    const pending = summary?.pending_properties ?? 0;
-    const publishedToday = summary?.published_today ?? 0;
-    const tickets = summary?.open_tickets ?? 0;
-    const totalRequests = aiUsage?.total_requests ?? 0;
-    const totalCost = typeof aiUsage?.total_cost === 'number' ? aiUsage.total_cost : null;
-
-    return [
-      {
-        label: 'Propiedades pendientes',
-        value: pending.toLocaleString('es-CL'),
-        trendLabel: pending > 0 ? `${pending} en espera` : 'Sin pendientes',
-        trendIcon: pending > 0 ? <TrendingDownIcon fontSize="small" /> : <TrendingUpIcon fontSize="small" />,
-        meta: 'Necesitan revisión editorial',
-      },
-      {
-        label: 'Publicadas hoy',
-        value: publishedToday.toLocaleString('es-CL'),
-        trendLabel: publishedToday > 0 ? '+ actividad' : 'Sin novedades',
-        trendIcon: <TrendingUpIcon fontSize="small" />,
-        meta: 'Altas en las últimas 24h',
-      },
-      {
-        label: 'Tickets abiertos',
-        value: tickets.toLocaleString('es-CL'),
-        trendLabel: tickets > 0 ? `${tickets} activos` : 'Todo resuelto',
-        trendIcon: tickets > 0 ? <TrendingDownIcon fontSize="small" /> : <TrendingUpIcon fontSize="small" />,
-        meta: 'Soporte a clientes y brokers',
-      },
-      {
-        label: 'Uso de Sam (30d)',
-        value: totalCost !== null ? `$${totalCost.toFixed(2)}` : '—',
-        trendLabel: `${totalRequests.toLocaleString('es-CL')} solicitudes`,
-        trendIcon: <TrendingUpIcon fontSize="small" />,
-        meta: 'Tokens consumidos por la IA',
-      },
-    ];
-  }, [summary, aiUsage]);
+  const handleCloseDetail = () => {
+    setDetailOpen(false);
+    setSelectedProperty(null);
+  };
 
   return (
-    <div className="admin-dashboard-wrap">
-      {loading && (
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 13,
-            color: 'rgba(16,16,16,0.6)',
-          }}
-        >
-          <RefreshIcon fontSize="small" className="spin" /> Actualizando métricas...
-        </div>
-      )}
-      <section className="admin-kpi-grid">
-        {kpiCards.map((card) => (
-          <article key={card.label} className="admin-kpi-card">
-            <span className="label">{card.label}</span>
-            <span className="value">{card.value}</span>
-            <span className="trend">
-              {card.trendIcon}
-              {card.trendLabel}
-            </span>
-            <span className="meta">{card.meta}</span>
-          </article>
-        ))}
-      </section>
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
+      <Container maxWidth="xl">
+        <Stack spacing={4}>
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={2}>
+            <Box>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                Panel operativo Skyterra
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sincroniza a vendedores, administradores y pilotos con una vista única del workflow.
+              </Typography>
+            </Box>
+            <IconButton onClick={loadSummary} disabled={loading}>
+              <RefreshIcon className={loading ? 'spin' : ''} />
+            </IconButton>
+          </Stack>
 
-      <section className="admin-panel">
-        <header>
-          <div className="admin-panel-title">
-            <h3>Clicks en publicaciones</h3>
-            <span>Total por rango seleccionado</span>
-          </div>
-          <div className="admin-chip-group">
-            {RANGE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`admin-chip${timeRange === option.value ? ' active' : ''}`}
-                onClick={() => setTimeRange(option.value)}
-              >
-                {option.label}
-              </button>
+          {error && <Alert severity="error">{error}</Alert>}
+
+          <Grid container spacing={2}>
+            {metricCards.map((card) => (
+              <Grid item xs={12} sm={6} md={3} key={card.label}>
+                <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)', height: '100%' }}>
+                  <Stack spacing={1}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {card.icon}
+                      <Typography variant="subtitle2" color="text.secondary">
+                        {card.label}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {card.value}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {card.helper}
+                    </Typography>
+                  </Stack>
+                </Paper>
+              </Grid>
             ))}
-          </div>
-        </header>
-        <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer>
-            <AreaChart data={filteredClicksData} margin={{ top: 10, left: 0, right: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorDesktop" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#c1c1c1" stopOpacity={0.85} />
-                  <stop offset="95%" stopColor="#f1f1f1" stopOpacity={0.2} />
-                </linearGradient>
-                <linearGradient id="colorMobile" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#d5d5d5" stopOpacity={0.75} />
-                  <stop offset="95%" stopColor="#f7f7f7" stopOpacity={0.2} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.08)" />
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={12}
-                tickFormatter={(value) => {
-                  const date = new Date(value);
-                  return date.toLocaleDateString('es-CL', { month: 'short', day: 'numeric' });
-                }}
-                stroke="rgba(16,16,16,0.45)"
-              />
-              <RechartsTooltip
-                contentStyle={{
-                  background: '#101010',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 10,
-                  color: '#ffffff',
-                  padding: '12px 16px',
-                }}
-                labelFormatter={(value) => new Date(value).toLocaleDateString('es-CL', { month: 'long', day: 'numeric' })}
-              />
-              <Area type="monotone" dataKey="desktop" stroke="#7b7b7b" fill="url(#colorDesktop)" strokeWidth={2} />
-              <Area type="monotone" dataKey="mobile" stroke="#a2a2a2" fill="url(#colorMobile)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+          </Grid>
 
-      <section className="admin-panel">
-        <header>
-          <div className="admin-panel-title">
-            <h3>Revisión de propiedades</h3>
-            <span>Solicitudes moderadas por el equipo editorial</span>
-          </div>
-        </header>
-
-        <div className="admin-panel-tabs">
-          <div className="admin-tab-bar">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`admin-tab${activeTab === tab.key ? ' active' : ''}`}
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  setPage(0);
-                }}
-              >
-                <span className="admin-tab-icon">{tab.icon}</span>
-                <span>{tab.label}</span>
-                {tab.rows.length > 0 && <span className="admin-tab-badge">{tab.rows.length}</span>}
-              </button>
-            ))}
-          </div>
-          <div className="admin-tab-actions">
-            <button type="button" className="admin-icon-button" onClick={refreshData} disabled={loading}>
-              <RefreshIcon fontSize="small" className={loading ? 'spin' : ''} />
-            </button>
-            <button type="button" className="admin-chip admin-chip-ghost">Personalizar columnas</button>
-            <button type="button" className="admin-chip admin-chip-dark">Añadir sección</button>
-          </div>
-        </div>
-
-        {error && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '12px 16px',
-              borderRadius: 12,
-              border: '1px solid rgba(0,0,0,0.12)',
-              background: '#fff1f1',
-              color: '#101010',
-            }}
-          >
-            <ErrorOutlineIcon fontSize="small" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="admin-table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Header</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th style={{ textAlign: 'right' }}>Monto</th>
-                <th style={{ textAlign: 'right' }}>Referencia</th>
-                <th>Responsable</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedRows.map((row, index) => {
-                const rawStatus = (row.status || row.publication_status || row.review_status || 'En proceso').toString();
-                const isAIRow = activeTab === 'ai';
-                const statusClass = isAIRow || /done|approved|publicad/i.test(rawStatus) ? 'done' : 'progress';
-                const StatusIcon = statusClass === 'done' ? DoneAllIcon : PendingIcon;
-                const header = row.header || row.name || row.title || `Propiedad ${row.id}`;
-                const type = row.type || row.publication_status || row.category || 'Pendiente';
-                const priceValue = row.price ?? row.list_price ?? row.target;
-                const formattedPrice = priceValue !== undefined && priceValue !== null && !Number.isNaN(Number(priceValue))
-                  ? `$${Number(priceValue).toLocaleString('es-CL')}`
-                  : row.size ?? row.surface ?? '-';
-                const target = formattedPrice;
-                const limit = row.limit || row.reference || row.owner?.username || row.owner_name || '-';
-                const reviewer = row.reviewer || row.assigned_to || row.last_reviewed_by || row.reviewer_name || 'Sin asignar';
-                const rowIdentifier = row.id ?? row.pk ?? page * rowsPerPage + index + 1;
-                return (
-                  <tr key={`${rowIdentifier}-${header}`}>
-                    <td>{rowIdentifier.toString().padStart(2, '0')}</td>
-                    <td style={{ fontWeight: 600 }}>{header}</td>
-                    <td>{type}</td>
-                    <td>
-                      <span className={`admin-status ${statusClass}`}>
-                        <StatusIcon fontSize="inherit" />
-                        {isAIRow ? row.status : rawStatus}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>{target}</td>
-                    <td style={{ textAlign: 'right' }}>{limit}</td>
-                    <td>{reviewer}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className="admin-table-footer">
-            <div>{activeRows.length.toLocaleString('es-CL')} registros</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 13 }}>Filas por página</span>
-              <select
-                value={rowsPerPage}
-                onChange={(event) => {
-                  setRowsPerPage(Number(event.target.value));
-                  setPage(0);
-                }}
-              >
-                {[10, 20, 30, 40].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
+            <Stack spacing={2}>
+              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Distribución por etapa
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Publicaciones por hito del workflow (review → live).
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <SupportAgentIcon fontSize="small" color="action" />
+                  <Typography variant="caption" color="text.secondary">
+                    {formatNumber(summary?.pending_properties ?? 0)} publicaciones esperando revisión manual.
+                  </Typography>
+                </Stack>
+              </Stack>
+              <Grid container spacing={2}>
+                {workflowCards.map((item) => (
+                  <Grid item xs={12} sm={6} md={4} lg={2} key={item.key}>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px dashed rgba(0,0,0,0.12)', textAlign: 'center' }}>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        {item.label}
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        {item.value}
+                      </Typography>
+                    </Paper>
+                  </Grid>
                 ))}
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button type="button" onClick={handlePrev} disabled={page === 0}>
-                ←
-              </button>
-              <span style={{ fontSize: 13 }}>
-                Página {page + 1} de {totalPages}
-              </span>
-              <button type="button" onClick={handleNext} disabled={page >= totalPages - 1}>
-                →
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
+              </Grid>
+            </Stack>
+          </Paper>
+
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Duración promedio por etapa
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Compara el tiempo real vs el SLA objetivo de cada hito.
+                </Typography>
+              </Box>
+              <Box sx={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <BarChart data={stageDurationData} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.08)" vertical={false} />
+                    <XAxis dataKey="label" stroke="rgba(0,0,0,0.45)" tick={{ fontSize: 12 }} />
+                    <YAxis stroke="rgba(0,0,0,0.45)" tickFormatter={(value) => `${value.toFixed(1)}d`} />
+                    <RechartsTooltip
+                      cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                      contentStyle={{ background: '#101010', color: '#ffffff', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)' }}
+                      formatter={(value, name) => {
+                        if (name === 'average') return [`${value.toFixed(2)} días`, 'Promedio real'];
+                        if (name === 'expected' && value > 0) return [`${value.toFixed(2)} días`, 'SLA plan'];
+                        return ['—', name];
+                      }}
+                    />
+                    <Bar dataKey="average" name="Promedio real" fill="#101010" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="expected" name="SLA plan" fill="#9aa0a6" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+              <Stack direction="row" spacing={2} flexWrap="wrap">
+                {stageDurationData.map((item) => (
+                  <Chip
+                    key={item.key}
+                    size="small"
+                    label={`${WORKFLOW_STAGE_LABELS[item.key] || item.key}: ${item.breaches} fuera de SLA`}
+                    color={item.breaches > 0 ? 'warning' : 'default'}
+                    variant={item.breaches > 0 ? 'filled' : 'outlined'}
+                  />
+                ))}
+              </Stack>
+            </Stack>
+          </Paper>
+
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Publicaciones en curso
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Revisa cuánto tiempo llevan en la etapa actual y el último evento registrado.
+                </Typography>
+              </Box>
+              <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>ID</TableCell>
+                      <TableCell>Propiedad</TableCell>
+                      <TableCell>Plan</TableCell>
+                      <TableCell>Etapa</TableCell>
+                      <TableCell>Días en etapa</TableCell>
+                      <TableCell>Último evento</TableCell>
+                      <TableCell align="right">Acciones</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {propertiesInProgress.map((property) => {
+                      const lastEvent = property.last_event;
+                      return (
+                        <TableRow key={property.id} hover>
+                          <TableCell>{property.id}</TableCell>
+                          <TableCell>
+                            <Stack spacing={0.5}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {property.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {property.owner_email || 'Sin correo'}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
+                          <TableCell>{property.plan_name || '—'}</TableCell>
+                          <TableCell>
+                            <Chip label={property.workflow_label} size="small" color="primary" variant={property.stage_state === 'pending' ? 'outlined' : 'filled'} />
+                          </TableCell>
+                          <TableCell>{formatDuration(property.stage_duration_hours)}</TableCell>
+                          <TableCell>
+                            <Stack spacing={0.5}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {lastEvent?.substate_label || lastEvent?.substate || '—'}
+                              </Typography>
+                              {lastEvent?.message && (
+                                <Tooltip title={lastEvent.message} placement="top">
+                                  <Typography variant="caption" color="text.secondary" noWrap>
+                                    {lastEvent.message}
+                                  </Typography>
+                                </Tooltip>
+                              )}
+                            </Stack>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button size="small" variant="outlined" onClick={() => handleOpenDetail(property)}>
+                              Ver timeline
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {propertiesInProgress.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                          No hay publicaciones activas fuera del estado publicado.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Stack>
+          </Paper>
+        </Stack>
+      </Container>
+
+      <Dialog open={detailOpen} onClose={handleCloseDetail} maxWidth="md" fullWidth>
+        <DialogTitle>Detalle de workflow</DialogTitle>
+        <DialogContent dividers>
+          {selectedProperty ? (
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h6">{selectedProperty.name}</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  ID {selectedProperty.id} · {selectedProperty.plan_name || 'Sin plan asignado'}
+                </Typography>
+              </Box>
+              <WorkflowTimeline timeline={selectedProperty.timeline} />
+            </Stack>
+          ) : (
+            <Typography variant="body2">Selecciona una publicación para revisar su historial.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDetail}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 
