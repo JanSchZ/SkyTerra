@@ -22,7 +22,7 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const RootNavigator = () => {
-  const { user, loading } = useAuth();
+  const { user, initializing } = useAuth();
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const statusBarStyle = colors.statusBarStyle;
@@ -43,7 +43,7 @@ const RootNavigator = () => {
     [colors, isDark]
   );
 
-  if (loading) {
+  if (initializing) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={colors.primary} />

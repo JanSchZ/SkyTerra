@@ -162,6 +162,7 @@ export interface SignUpPayload {
   password2: string;
   first_name?: string;
   last_name?: string;
+  username?: string;
 }
 
 export interface SignUpResult {
@@ -200,7 +201,18 @@ const mapUser = (data: RawUser | null | undefined): OperatorUser => ({
 
 export const signIn = async (payload: SignInPayload): Promise<SignInResult> => {
   try {
-    const { data } = await rawClient.post('/api/auth/login/', payload);
+    const loginIdentifier = payload.email?.trim();
+    const submission: Record<string, string> = {
+      password: payload.password,
+    };
+
+    if (loginIdentifier) {
+      submission.email = loginIdentifier;
+      submission.username = loginIdentifier;
+      submission.login_identifier = loginIdentifier;
+    }
+
+    const { data } = await rawClient.post('/api/auth/login/', submission);
     const tokens: SignInTokens = {
       access: data?.access ?? data?.access_token,
       refresh: data?.refresh ?? data?.refresh_token,
@@ -244,6 +256,7 @@ export const signIn = async (payload: SignInPayload): Promise<SignInResult> => {
 export const signUp = async (payload: SignUpPayload): Promise<SignUpResult> => {
   const submission = {
     email: payload.email?.trim(),
+    username: payload.username?.trim() || payload.email?.trim(),
     password1: payload.password1,
     password2: payload.password2,
     first_name: payload.first_name?.trim() || undefined,

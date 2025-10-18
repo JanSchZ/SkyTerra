@@ -11,7 +11,10 @@ import {
 
 interface AuthContextValue {
   user: OperatorUser | null;
+  /** true mientras se ejecuta una acción explícita (login/logout) */
   loading: boolean;
+  /** true únicamente durante la rehidratación/autologin inicial */
+  initializing: boolean;
   signInWithCredentials: (payload: SignInPayload) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -20,13 +23,15 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<OperatorUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setUnauthorizedHandler(async () => {
       await clearStoredTokens();
       setUser(null);
       setLoading(false);
+      setInitializing(false);
     });
     return () => {
       setUnauthorizedHandler(undefined);
@@ -48,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await clearStoredTokens();
         setUser(null);
       } finally {
-        setLoading(false);
+        setInitializing(false);
       }
     };
 
@@ -79,8 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = useMemo(
-    () => ({ user, loading, signInWithCredentials, signOut }),
-    [user, loading]
+    () => ({ user, loading, initializing, signInWithCredentials, signOut }),
+    [user, loading, initializing]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

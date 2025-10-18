@@ -38,6 +38,7 @@ const SignInScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       await signInWithCredentials({ email: email.trim(), password });
     } catch (err) {
+      console.warn('Fallo al iniciar sesión', err);
       const message = getErrorMessage(err, 'No pudimos iniciar sesión. Verifica tus credenciales o intenta nuevamente.');
       setError(message);
     }
@@ -94,7 +95,13 @@ const SignInScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error
+        ? error.split(' | ').map((msg, index) => (
+            <Text key={`${msg}-${index}`} style={styles.error}>
+              {msg}
+            </Text>
+          ))
+        : null}
 
       <TouchableOpacity
         style={[styles.button, isDisabled && styles.buttonDisabled]}

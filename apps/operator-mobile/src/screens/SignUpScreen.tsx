@@ -49,6 +49,7 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const result = await signUp({
         email: trimmedEmail,
+        username: trimmedEmail,
         password1: password,
         password2: confirmPassword,
         first_name: trimmedFirst || undefined,
@@ -73,6 +74,7 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
       setSuccess(message);
       setTimeout(() => navigation.replace('SignIn', { email: trimmedEmail }), 1200);
     } catch (err) {
+      console.warn('Fallo al registrar operador', err);
       const message = getErrorMessage(err, 'No pudimos crear la cuenta. Intenta nuevamente.');
       setError(message);
     } finally {
@@ -183,7 +185,13 @@ const SignUpScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error
+        ? error.split(' | ').map((msg, index) => (
+            <Text key={`${msg}-${index}`} style={styles.error}>
+              {msg}
+            </Text>
+          ))
+        : null}
       {success ? <Text style={styles.success}>{success}</Text> : null}
 
       <TouchableOpacity
