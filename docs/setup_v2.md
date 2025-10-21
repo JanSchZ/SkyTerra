@@ -88,6 +88,22 @@ Expo start:
 npm run start
 ```
 
+### 4.1 Google Maps en Android
+- Habilita en Google Cloud: "Maps SDK for Android" (y opcionalmente Places/Directions si las usas). Activa facturación.
+- Restringe la key a paquete `com.skyterra.operators` + SHA‑1 (obtén con `cd apps/operator-mobile/android && ./gradlew signingReport`).
+- No la subas al repo. Entrégala al build así:
+  1. **Recomendado**: crea `apps/operator-mobile/android/gradle.properties.local` con `GOOGLE_MAPS_API_KEY=AIza...` (el archivo está gitignored).
+  2. Variable de entorno puntual:
+     ```bash
+     cd apps/operator-mobile/android
+     GOOGLE_MAPS_API_KEY=AIza... ./gradlew assembleDebug
+     # o assembleRelease
+     ```
+  3. Global en tu máquina: `~/.gradle/gradle.properties` → `GOOGLE_MAPS_API_KEY=AIza...`.
+  4. EAS/CI: define el secreto `GOOGLE_MAPS_API_KEY`.
+
+El manifest ya incluye el placeholder (`com.google.android.geo.API_KEY`); si la clave falta, Gradle aborta con el mensaje “Falta la API key de Google Maps… pídesela a Jan”.
+
 ## 5. App Android oficial (apps/android)
 1. Definir tokens Mapbox (servicio y runtime). Agregar en `~/.gradle/gradle.properties` o copiar `apps/android/gradle.properties.example` a `apps/android/gradle.properties`:
    ```
@@ -151,4 +167,5 @@ Ajustar `DATABASE_URL` y `REDIS_URL` en `services/api/.env`.
 | Backend | services/api/.env | SECRET_KEY, DATABASE_URL, USE_S3, AWS_*, CORS_ALLOWED_ORIGINS, CSRF_TRUSTED_ORIGINS, CLIENT_URL |
 | Web | apps/web/.env | VITE_API_BASE_URL, VITE_MAPBOX_ACCESS_TOKEN, VITE_STRIPE_PUBLISHABLE_KEY |
 | Operadores | apps/operator-mobile/.env | API_URL |
+| Operadores Android | ~/.gradle/gradle.properties (o env var) | GOOGLE_MAPS_API_KEY |
 | Android | apps/android/gradle.properties | MAPBOX_DOWNLOADS_TOKEN, MAPBOX_ACCESS_TOKEN, MAPBOX_STYLE_URI |

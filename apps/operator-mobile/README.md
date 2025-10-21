@@ -47,6 +47,38 @@ npm run start               # Expo start (web dashboard)
 npm run android / ios / web
 ```
 
+## Google Maps en Android (clave requerida)
+
+Para que el mapa funcione en Android (React Native Maps con Google Play Services), necesitas una API key de Google Maps:
+
+- Activa en Google Cloud: “Maps SDK for Android”. Opcional: Places/Directions/Geocoding si las usas.
+- Restricción recomendada de la key: tipo "Android apps", paquete `com.skyterra.operators` y SHA‑1 (usa `./gradlew signingReport`).
+
+Cómo pasar la clave al build (no la subas al repo):
+
+- Opción 1 (recomendada): crea `apps/operator-mobile/android/gradle.properties.local` con
+  ```
+  GOOGLE_MAPS_API_KEY=AIza...
+  ```
+- Opción 2 (variable de entorno puntual):
+  ```bash
+  cd apps/operator-mobile/android
+  GOOGLE_MAPS_API_KEY=AIza... ./gradlew assembleDebug
+  # para release: ./gradlew assembleRelease
+  ```
+- Opción 3 (global en tu máquina, sin commitear): añade en `~/.gradle/gradle.properties`:
+  ```
+  GOOGLE_MAPS_API_KEY=AIza...
+  ```
+- Opción 4 (EAS/CI): crea un secreto `GOOGLE_MAPS_API_KEY` y compila normalmente.
+
+El proyecto ya está configurado con un placeholder en el manifest (`com.google.android.geo.API_KEY`). No necesitas tocar código: si la variable existe al compilar, la app no crashea y el mapa carga.
+
+Si te falta la clave, el build se detendrá con el mensaje:  
+`Falta la API key de Google Maps. Crea apps/operator-mobile/android/gradle.properties.local con GOOGLE_MAPS_API_KEY=tu_clave (pídesela a Jan).`
+
+Verifica en Android Studio (Merged Manifest) que aparezca la línea `<meta-data android:name="com.google.android.geo.API_KEY" ...>` con tu valor.
+
 ## Builds nativas (APK/AAB) con EAS
 
 1. **Preparar configuración**

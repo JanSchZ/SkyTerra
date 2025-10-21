@@ -192,6 +192,16 @@ cp .env.example .env
 npm run start
 ```
 
+Google Maps en Android (clave necesaria):
+- Activa "Maps SDK for Android" en GCP y crea una API key restringida a `com.skyterra.operators` + SHA‑1.
+- No la subas al repo. Guarda la clave en uno de estos sitios:
+  1. **Local recomendado**: crea `apps/operator-mobile/android/gradle.properties.local` con `GOOGLE_MAPS_API_KEY=AIza...`.
+  2. Variable de entorno puntual: `cd apps/operator-mobile/android && GOOGLE_MAPS_API_KEY=AIza... ./gradlew assembleDebug`.
+  3. Global (máquina): `~/.gradle/gradle.properties` → `GOOGLE_MAPS_API_KEY=AIza...`.
+  4. EAS/CI: secreto `GOOGLE_MAPS_API_KEY`.
+- El build falla con un mensaje claro si falta la clave (“Falta la API key de Google Maps, pídesela a Jan”).
+- El manifest ya tiene el placeholder (`com.google.android.geo.API_KEY`). Verifica en Android Studio (Merged Manifest) que aparezca con valor.
+
 ### 6. Android App (Kotlin / Compose + Mapbox)
 
 ```bash
@@ -303,4 +313,3 @@ python manage.py test
 ---
 
 Developed by the SkyTerra team.
-

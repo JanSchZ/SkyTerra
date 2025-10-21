@@ -13,6 +13,7 @@ Thumbs.db
 *.env.test.local
 *.env.production.local
 local_settings.py
+apps/operator-mobile/android/gradle.properties.local
 
 # Python
 __pycache__/
