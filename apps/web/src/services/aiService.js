@@ -2,7 +2,7 @@ import { api } from './api';
 
 // This service simulates AI-powered operations.
 
-const highPriorityKeywords = ['error', 'no puedo', 'caído', 'urgente', 'falla', 'problema', 'bloqueado'];
+const highPriorityKeywords = ['error', 'caído', 'urgente', 'falla', 'problema', 'bloqueado'];
 const mediumPriorityKeywords = ['duda', 'ayuda', 'cómo', 'facturación', 'lento'];
 
 /**
@@ -14,7 +14,8 @@ export const assignTicketPriority = (title) => {
     const lowerCaseTitle = title.toLowerCase();
 
     for (const keyword of highPriorityKeywords) {
-        if (lowerCaseTitle.includes(keyword)) {
+        const regex = new RegExp(`\\b${keyword.replace(' ', '\\s+')}\\b`);
+        if (regex.test(lowerCaseTitle)) {
             // Simulate sending an immediate email for high priority tickets
             if (import.meta.env.MODE === 'development') {
                 console.log(`%c[AI Notification Service]%c Sending immediate email for high priority ticket: "${title}"`, 'color: #8A2BE2; font-weight: bold;', 'color: inherit;');
@@ -24,7 +25,8 @@ export const assignTicketPriority = (title) => {
     }
 
     for (const keyword of mediumPriorityKeywords) {
-        if (lowerCaseTitle.includes(keyword)) {
+        const regex = new RegExp(`\\b${keyword}\\b`);
+        if (regex.test(lowerCaseTitle)) {
             return 'medium';
         }
     }
