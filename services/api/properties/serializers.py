@@ -532,6 +532,25 @@ class PropertySerializer(serializers.ModelSerializer):
     def get_workflow_timeline(self, obj):
         return _serialize_timeline_payload(obj.build_workflow_timeline())
 
+    def create(self, validated_data):
+        """Ensure new properties always start in pending status."""
+        # Always enforce pending status on creation regardless of client input
+        validated_data.pop('publication_status', None)
+        pending_status = Property._meta.get_field('publication_status').default
+        validated_data['publication_status'] = pending_status
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """Prevent non-admin users from altering the publication status."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+
+        if 'publication_status' in validated_data and not (user and user.is_staff):
+            # Preserve the existing status when the user is not staff
+            validated_data.pop('publication_status')
+
+        return super().update(instance, validated_data)
+
 class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer para listar propiedades con menos detalles"""
     image_count = serializers.IntegerField(source='image_count_annotation', read_only=True)

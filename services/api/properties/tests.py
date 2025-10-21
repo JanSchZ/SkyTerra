@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from .models import Property
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
@@ -31,9 +32,19 @@ class PropertyAPITests(APITestCase):
             # latitude and longitude can be optional based on model
         }
 
+    def authenticate(self, user):
+        """Helper to authenticate API requests using JWT tokens."""
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
+
+    def clear_credentials(self):
+        """Clear authentication credentials from the client."""
+        self.client.credentials()
+
     def test_create_property_enforces_pending_status(self):
         """Test that new properties are always created with 'pending' status, regardless of input."""
-        self.client.login(username='testuser', password='password123')
+        self.authenticate(self.user)
 
         # Attempt to create a property with 'approved' status
         data_with_approved_status = self.property_data.copy()
@@ -48,10 +59,11 @@ class PropertyAPITests(APITestCase):
         # Verify in DB as well
         created_property = Property.objects.get(id=response.data['id'])
         self.assertEqual(created_property.publication_status, 'pending')
+        self.clear_credentials()
 
     def test_non_admin_cannot_change_publication_status_on_update(self):
         """Test that non-admin users cannot change publication_status when updating their property."""
-        self.client.login(username='testuser', password='password123')
+        self.authenticate(self.user)
 
         # Create a property first
         create_url = reverse('property-list')
@@ -74,26 +86,27 @@ class PropertyAPITests(APITestCase):
         updated_property = Property.objects.get(id=property_id)
         self.assertEqual(updated_property.publication_status, 'pending')
         self.assertEqual(updated_property.name, 'Updated Name')
+        self.clear_credentials()
 
     def test_non_admin_cannot_change_status_of_admin_approved_property(self):
         """Test non-admin cannot change status if admin already approved it."""
         # User creates property
-        self.client.login(username='testuser', password='password123')
+        self.authenticate(self.user)
         create_url = reverse('property-list')
         create_response = self.client.post(create_url, self.property_data, format='json')
         property_id = create_response.data['id']
 
         # Admin approves it
-        self.client.logout()
-        self.client.login(username='adminuser', password='password123')
+        self.clear_credentials()
+        self.authenticate(self.admin_user)
         set_status_url = reverse('property-set-publication-status', kwargs={'pk': property_id}) # Corrected URL name
         admin_response = self.client.post(set_status_url, {'status': 'approved'}, format='json')
         self.assertEqual(admin_response.status_code, status.HTTP_200_OK)
         self.assertEqual(admin_response.data['publication_status'], 'approved')
 
         # User (owner) tries to change it back to 'pending'
-        self.client.logout()
-        self.client.login(username='testuser', password='password123')
+        self.clear_credentials()
+        self.authenticate(self.user)
         update_url = reverse('property-detail', kwargs={'pk': property_id})
         user_update_data = {'publication_status': 'pending', 'description': 'User trying to revert status'}
         user_response = self.client.patch(update_url, user_update_data, format='json') # Use PATCH for partial update
@@ -102,21 +115,22 @@ class PropertyAPITests(APITestCase):
         # Status should remain 'approved' as user cannot change it
         self.assertEqual(user_response.data['publication_status'], 'approved')
         self.assertEqual(user_response.data['description'], 'User trying to revert status')
+        self.clear_credentials()
 
 
     def test_admin_can_change_publication_status_via_set_status_endpoint(self):
         """Test that admin users can change publication_status using the set-status endpoint."""
         # User creates property
-        self.client.login(username='testuser', password='password123')
+        self.authenticate(self.user)
         create_url = reverse('property-list')
         create_response = self.client.post(create_url, self.property_data, format='json')
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
         property_id = create_response.data['id']
         self.assertEqual(create_response.data['publication_status'], 'pending')
-        self.client.logout()
+        self.clear_credentials()
 
         # Admin logs in
-        self.client.login(username='adminuser', password='password123')
+        self.authenticate(self.admin_user)
 
         # Admin approves the property
         set_status_url = reverse('property-set-publication-status', kwargs={'pk': property_id}) # Corrected URL name
@@ -136,6 +150,7 @@ class PropertyAPITests(APITestCase):
         # Verify in DB
         rejected_property = Property.objects.get(id=property_id)
         self.assertEqual(rejected_property.publication_status, 'rejected')
+        self.clear_credentials()
 
     def test_admin_can_change_publication_status_via_direct_update_if_allowed(self):
         """
@@ -145,14 +160,14 @@ class PropertyAPITests(APITestCase):
         So, an admin *should* be able to update it via PUT.
         """
         # User creates property
-        self.client.login(username='testuser', password='password123')
+        self.authenticate(self.user)
         create_url = reverse('property-list')
         create_response = self.client.post(create_url, self.property_data, format='json')
         property_id = create_response.data['id']
-        self.client.logout()
+        self.clear_credentials()
 
         # Admin logs in
-        self.client.login(username='adminuser', password='password123')
+        self.authenticate(self.admin_user)
         update_url = reverse('property-detail', kwargs={'pk': property_id})
 
         # Admin updates the status to 'approved' via PATCH
@@ -169,3 +184,4 @@ class PropertyAPITests(APITestCase):
         self.assertEqual(response_reject.status_code, status.HTTP_200_OK)
         self.assertEqual(response_reject.data['publication_status'], 'rejected')
         self.assertEqual(response_reject.data['name'], 'Admin Rejected Name')
+        self.clear_credentials()
