@@ -46,7 +46,7 @@ start "SkyTerra Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm.cmd run dev -- -
 REM Iniciar app de operadores si existe
 IF EXIST "%OPERATOR_DIR%" (
     echo Iniciando app de operadores (Expo)...
-    start "SkyTerra Operadores" cmd /k "cd /d "%OPERATOR_DIR%" && npx.cmd expo start"
+    start "SkyTerra Operadores" cmd /k "cd /d "%OPERATOR_DIR%" && set "APP_ENV=development" && npx.cmd expo start"
 ) ELSE (
     echo [INFO] No se encontro "%OPERATOR_DIR%". Omitiendo app de operadores.
 )
