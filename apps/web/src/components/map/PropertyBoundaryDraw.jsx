@@ -1,19 +1,72 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Box, Button, Typography, Paper, Stack } from '@mui/material';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { Box, Button, Typography, Stack } from '@mui/material';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import PolylineIcon from '@mui/icons-material/Polyline';
 import DeleteIcon from '@mui/icons-material/Delete';
-import UndoIcon from '@mui/icons-material/Undo';
 import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
 import * as turf from '@turf/turf';
+
+const sanitizePolygonFeature = (feature) => {
+  if (!feature || feature.type !== 'Feature' || feature.geometry?.type !== 'Polygon') {
+    return null;
+  }
+
+  const coordinates = feature.geometry.coordinates?.map((ring) =>
+    ring.map((point) => [...point])
+  );
+
+  return {
+    type: 'Feature',
+    properties: { ...(feature.properties || {}) },
+    geometry: {
+      type: 'Polygon',
+      coordinates: coordinates || [],
+    },
+  };
+};
+
+const calculateFeatureMetadata = (feature) => {
+  const sanitizedFeature = sanitizePolygonFeature(feature);
+  if (!sanitizedFeature) return null;
+
+  try {
+    const areaSqMeters = turf.area(sanitizedFeature);
+    const areaHa = areaSqMeters / 10000;
+    const centroidPoint = turf.center(sanitizedFeature);
+    const centroid =
+      centroidPoint?.geometry?.coordinates && centroidPoint.geometry.coordinates.length === 2
+        ? [...centroidPoint.geometry.coordinates]
+        : null;
+
+    return {
+      feature: sanitizedFeature,
+      areaSqMeters,
+      areaHa,
+      centroid,
+    };
+  } catch (error) {
+    console.error('PropertyBoundaryDraw: unable to calculate metadata', error, feature);
+    return {
+      feature: sanitizedFeature,
+      areaSqMeters: null,
+      areaHa: null,
+      centroid: null,
+    };
+  }
+};
 
 const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, compact = false }) => {
   const drawRef = useRef(null);
   const [area, setArea] = useState(0);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
   const [hasExistingBoundaries, setHasExistingBoundaries] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  const normalizedExistingBoundary = useMemo(
+    () => calculateFeatureMetadata(existingBoundaries)?.feature || null,
+    [existingBoundaries]
+  );
 
   useEffect(() => {
     if (!map) return;
@@ -131,37 +184,40 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
     map.addControl(draw);
     drawRef.current = draw;
 
-    if (existingBoundaries && existingBoundaries.type === 'Feature' && existingBoundaries.geometry && existingBoundaries.geometry.type === 'Polygon') {
-      draw.add(existingBoundaries);
+    if (normalizedExistingBoundary) {
       try {
-        const existingArea = turf.area(existingBoundaries);
-        const areaInHectares = existingArea / 10000;
-        setArea(areaInHectares);
-        setHasExistingBoundaries(true);
-      } catch (e) {
-        console.error("Error calculating area for existing boundaries:", e);
-      }
-    } else if (existingBoundaries && existingBoundaries.coordinates) {
-      const polygonFeature = {
-        id: 'existing-boundary',
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Polygon',
-          coordinates: existingBoundaries.coordinates
+        const [featureId] = draw.add(normalizedExistingBoundary) || [];
+        if (featureId) {
+          try {
+            draw.setFeatureProperty(featureId, 'mode', 'static');
+          } catch (_) {}
         }
-      };
-      draw.add(polygonFeature);
-      try {
-        const existingArea = turf.area(polygonFeature);
-        const areaInHectares = existingArea / 10000;
-        setArea(areaInHectares);
+        const metadata = calculateFeatureMetadata(normalizedExistingBoundary);
+        if (metadata?.areaHa) {
+          setArea(metadata.areaHa);
+        }
         setHasExistingBoundaries(true);
-      } catch(e) {
-        console.error("Error calculating area for legacy existing boundaries:", e);
+
+        try {
+          const bbox = turf.bbox(normalizedExistingBoundary);
+          if (bbox && bbox.every((value) => Number.isFinite(value))) {
+            map.fitBounds(
+              [
+                [bbox[0], bbox[1]],
+                [bbox[2], bbox[3]],
+              ],
+              { padding: 40, maxZoom: 17 }
+            );
+          }
+        } catch (error) {
+          console.warn('PropertyBoundaryDraw: unable to fit bounds for existing polygon', error);
+        }
+      } catch (error) {
+        console.error('PropertyBoundaryDraw: error loading existing boundaries', error);
       }
     }
 
+    setIsReady(true);
     calculateArea();
 
     return () => {
@@ -195,65 +251,38 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
   const calculateArea = () => {
     if (!drawRef.current) return;
     const data = drawRef.current.getAll();
-    
+
     try {
-      if (data && data.features && data.features.length > 0) {
+      if (data?.features?.length) {
         const polygonFeature = data.features[0];
+        const metadata = calculateFeatureMetadata(polygonFeature);
 
-        if (polygonFeature && polygonFeature.type === 'Feature' &&
-            polygonFeature.geometry && polygonFeature.geometry.type === 'Polygon' &&
-            polygonFeature.geometry.coordinates && polygonFeature.geometry.coordinates.length > 0 &&
-            polygonFeature.geometry.coordinates[0].length > 3) {
-
-          const calculatedArea = turf.area(polygonFeature);
-          const areaInHectares = calculatedArea / 10000;
-          setArea(areaInHectares);
+        if (metadata?.feature) {
+          setArea(metadata.areaHa || 0);
           setHasExistingBoundaries(true);
-
-          const centerPoint = turf.center(polygonFeature);
-          const centerCoords = centerPoint.geometry.coordinates;
-
-          if (onBoundariesUpdate) {
-            onBoundariesUpdate({
-              coordinates: polygonFeature.geometry.coordinates,
-              area: areaInHectares,
-              center: centerCoords,
-              geojson: polygonFeature
-            });
-          }
-        } else {
-          setArea(0);
-          if (onBoundariesUpdate) {
-            const currentFeatures = drawRef.current.getAll();
-            if (currentFeatures.features.length === 0) {
-                onBoundariesUpdate(null);
-                setHasExistingBoundaries(false);
-            }
-          }
-        }
-      } else {
-        setArea(0);
-        setHasExistingBoundaries(false);
-        if (onBoundariesUpdate) {
-          onBoundariesUpdate(null);
+          onBoundariesUpdate?.(metadata);
+          return;
         }
       }
-    } catch (error) {
-      console.error("Error in calculateArea with turf:", error, "Data:", data?.features?.[0]);
+
       setArea(0);
-      if (onBoundariesUpdate) {
-        onBoundariesUpdate(null);
-      }
+      setHasExistingBoundaries(false);
+      onBoundariesUpdate?.({ feature: null, areaSqMeters: null, areaHa: null, centroid: null, removed: true });
+    } catch (error) {
+      console.error('PropertyBoundaryDraw: error calculating area', error, data?.features?.[0]);
+      setArea(0);
+      setHasExistingBoundaries(false);
+      onBoundariesUpdate?.({ feature: null, areaSqMeters: null, areaHa: null, centroid: null, removed: true });
     }
   };
 
   useEffect(() => {
-    if (!map || !drawRef.current) return;
-    
+    if (!map || !drawRef.current || !isReady) return;
+
     const handleModeChange = (e) => {
-        setIsDrawingActive(e.mode === 'draw_polygon' || e.mode === 'direct_select');
+      setIsDrawingActive(e.mode === 'draw_polygon' || e.mode === 'direct_select');
     };
-    
+
     map.on('draw.create', calculateArea);
     map.on('draw.update', calculateArea);
     map.on('draw.delete', calculateArea);
@@ -267,7 +296,23 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
         map.off('draw.modechange', handleModeChange);
       }
     };
-  }, [map, onBoundariesUpdate]);
+  }, [map, onBoundariesUpdate, isReady]);
+
+  useEffect(() => {
+    if (!map || typeof map.doubleClickZoom?.disable !== 'function') return;
+
+    if (isDrawingActive) {
+      map.doubleClickZoom.disable();
+    } else {
+      map.doubleClickZoom.enable();
+    }
+
+    return () => {
+      try {
+        map.doubleClickZoom.enable();
+      } catch (_) {}
+    };
+  }, [map, isDrawingActive]);
 
   const handleDeleteAll = () => {
     if (drawRef.current) {
@@ -282,28 +327,23 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
   };
 
   const handleSave = () => {
-    if (drawRef.current && onBoundariesUpdate) {
-      const data = drawRef.current.getAll();
-      if (data.features.length > 0) {
-        const polygon = data.features[0];
-        const area = turf.area(polygon);
-        const areaInHectares = area / 10000;
-        
-        const center = turf.center(polygon).geometry.coordinates;
-        
-        onBoundariesUpdate({
-          coordinates: polygon.geometry.coordinates,
-          area: areaInHectares,
-          center: center,
-          geojson: polygon
-        });
+    if (!drawRef.current) return;
+    const data = drawRef.current.getAll();
+    if (!data?.features?.length) return;
 
-        // Poner el polígono en modo "static" para que quede visible
-        try {
-          drawRef.current.setFeatureProperty(polygon.id, 'mode', 'static');
-          drawRef.current.changeMode('simple_select');
-        } catch (_) {}
-      }
+    try {
+      const polygon = data.features[0];
+      const metadata = calculateFeatureMetadata(polygon);
+      if (!metadata?.feature) return;
+
+      onBoundariesUpdate?.(metadata);
+
+      try {
+        drawRef.current.setFeatureProperty(polygon.id, 'mode', 'static');
+        drawRef.current.changeMode('simple_select');
+      } catch (_) {}
+    } catch (error) {
+      console.error('PropertyBoundaryDraw: error on save', error);
     }
   };
 

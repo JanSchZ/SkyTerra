@@ -87,6 +87,75 @@ const initialBasicForm = {
   address_postal_code: '',
 };
 
+const normalizeBoundaryFeature = (boundary) => {
+  if (!boundary) return null;
+  if (boundary.type === 'Feature' && boundary.geometry?.type === 'Polygon') {
+    return {
+      type: 'Feature',
+      properties: { ...(boundary.properties || {}) },
+      geometry: {
+        type: 'Polygon',
+        coordinates: boundary.geometry.coordinates?.map((ring) =>
+          ring.map((point) => [...point])
+        ) || [],
+      },
+    };
+  }
+
+  if (boundary.geojson) {
+    return normalizeBoundaryFeature(boundary.geojson);
+  }
+
+  if (Array.isArray(boundary.coordinates)) {
+    return {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: boundary.coordinates.map((ring) =>
+          ring.map((point) => [...point])
+        ),
+      },
+    };
+  }
+
+  if (boundary.geometry?.coordinates) {
+    return normalizeBoundaryFeature({
+      type: 'Feature',
+      properties: boundary.properties,
+      geometry: boundary.geometry,
+    });
+  }
+
+  return null;
+};
+
+const buildBoundaryMetadata = (boundary) => {
+  const feature = normalizeBoundaryFeature(boundary);
+  if (!feature) return null;
+
+  try {
+    const areaSqMeters = turf.area(feature);
+    const areaHa = areaSqMeters / 10000;
+    const centroid = turf.centroid(feature)?.geometry?.coordinates;
+
+    return {
+      feature,
+      areaSqMeters,
+      areaHa,
+      centroid: Array.isArray(centroid) && centroid.length === 2 ? [...centroid] : null,
+    };
+  } catch (error) {
+    console.error('SellerListingWizard: error building boundary metadata', error, boundary);
+    return {
+      feature,
+      areaSqMeters: null,
+      areaHa: null,
+      centroid: null,
+    };
+  }
+};
+
 const SellerListingWizard = ({ listingId: initialListingId }) => {
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
@@ -102,6 +171,24 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [pendingBoundary, setPendingBoundary] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, severity: 'success', message: '' });
+
+  const savedBoundary = useMemo(
+    () => buildBoundaryMetadata(listing?.boundary_polygon),
+    [listing?.boundary_polygon]
+  );
+  const displayedBoundary = pendingBoundary?.feature ? pendingBoundary : savedBoundary;
+  const hasUnsavedBoundaryChanges = useMemo(() => {
+    if (pendingBoundary?.removed) return true;
+    if (!pendingBoundary?.feature) return false;
+    if (!savedBoundary?.feature) return true;
+    try {
+      const pendingCoordinates = JSON.stringify(pendingBoundary.feature.geometry?.coordinates || []);
+      const savedCoordinates = JSON.stringify(savedBoundary.feature.geometry?.coordinates || []);
+      return pendingCoordinates !== savedCoordinates;
+    } catch (_) {
+      return false;
+    }
+  }, [pendingBoundary, savedBoundary]);
 
   const currentDocuments = useMemo(() => listing?.documents ?? [], [listing]);
 
@@ -125,35 +212,38 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         return null;
       }
       const data = await marketplaceService.fetchProperty(id);
-      setListing(data);
-      setListingId(data.id);
+      const normalizedBoundary = normalizeBoundaryFeature(data.boundary_polygon);
+      const preparedListing = {
+        ...data,
+        boundary_polygon: normalizedBoundary,
+      };
+      setListing(preparedListing);
+      setListingId(preparedListing.id);
       setBasicForm({
-        name: data.name || '',
-        type: data.type || '',
-        description: data.description || '',
-        price: data.price ?? '',
-        size: data.size ?? '',
-        listing_type: data.listing_type || 'sale',
-        rent_price: data.rent_price ?? '',
-        plan: data.plan ?? '',
-        has_water: Boolean(data.has_water),
-        has_views: Boolean(data.has_views),
-        contact_name: data.contact_name || '',
-        contact_email: data.contact_email || '',
-        contact_phone: data.contact_phone || '',
-        address_line1: data.address_line1 || '',
-        address_line2: data.address_line2 || '',
-        address_city: data.address_city || '',
-        address_region: data.address_region || '',
-        address_country: data.address_country || '',
-        address_postal_code: data.address_postal_code || '',
+        name: preparedListing.name || '',
+        type: preparedListing.type || '',
+        description: preparedListing.description || '',
+        price: preparedListing.price ?? '',
+        size: preparedListing.size ?? '',
+        listing_type: preparedListing.listing_type || 'sale',
+        rent_price: preparedListing.rent_price ?? '',
+        plan: preparedListing.plan ?? '',
+        has_water: Boolean(preparedListing.has_water),
+        has_views: Boolean(preparedListing.has_views),
+        contact_name: preparedListing.contact_name || '',
+        contact_email: preparedListing.contact_email || '',
+        contact_phone: preparedListing.contact_phone || '',
+        address_line1: preparedListing.address_line1 || '',
+        address_line2: preparedListing.address_line2 || '',
+        address_city: preparedListing.address_city || '',
+        address_region: preparedListing.address_region || '',
+        address_country: preparedListing.address_country || '',
+        address_postal_code: preparedListing.address_postal_code || '',
       });
-      setAccessNotes(data.access_notes || '');
-      setTimeSlots(Array.isArray(data.preferred_time_windows) ? data.preferred_time_windows : []);
-      if (data.boundary_polygon) {
-        setPendingBoundary(data.boundary_polygon);
-      }
-      return data;
+      setAccessNotes(preparedListing.access_notes || '');
+      setTimeSlots(Array.isArray(preparedListing.preferred_time_windows) ? preparedListing.preferred_time_windows : []);
+      setPendingBoundary(buildBoundaryMetadata(normalizedBoundary));
+      return preparedListing;
     },
     []
   );
@@ -264,8 +354,18 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     }
   };
 
-  const handleBoundaryUpdate = useCallback((feature) => {
-    setPendingBoundary(feature);
+  const handleBoundaryUpdate = useCallback((boundaryMetadata) => {
+    if (boundaryMetadata?.feature) {
+      setPendingBoundary(boundaryMetadata);
+      return;
+    }
+
+    if (boundaryMetadata?.removed) {
+      setPendingBoundary({ feature: null, areaSqMeters: null, areaHa: null, centroid: null, removed: true });
+      return;
+    }
+
+    setPendingBoundary(null);
   }, []);
 
   const saveBoundary = async () => {
@@ -273,17 +373,53 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       showMessage('Guarda primero la información básica.', 'warning');
       return;
     }
-    if (!pendingBoundary) {
+
+    if (!hasUnsavedBoundaryChanges && savedBoundary?.feature) {
+      setActiveStep((prev) => prev + 1);
+      return;
+    }
+    if (pendingBoundary?.removed) {
+      if (!listingId) {
+        showMessage('Guarda primero la información básica.', 'warning');
+        return;
+      }
+
+      try {
+        setSaving(true);
+        await marketplaceService.updateProperty(listingId, {
+          boundary_polygon: null,
+          latitude: null,
+          longitude: null,
+          size: null,
+          has_boundary: false,
+        });
+        await loadListing(listingId);
+        setPendingBoundary(null);
+        showMessage('Polígono eliminado correctamente.');
+        return;
+      } catch (error) {
+        console.error('Error removing boundary', error);
+        showMessage('No fue posible eliminar el polígono.', 'error');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    const boundaryToSave = pendingBoundary?.feature ? pendingBoundary : buildBoundaryMetadata(listing?.boundary_polygon);
+
+    if (!boundaryToSave?.feature) {
       showMessage('Dibuja un polígono antes de guardar.', 'warning');
       return;
     }
     try {
       setSaving(true);
-      const centroid = turf.centroid(pendingBoundary)?.geometry?.coordinates;
-      const area = turf.area(pendingBoundary);
-      const sizeHa = area ? Number((area / 10000).toFixed(2)) : undefined;
+      const centroid = boundaryToSave.centroid || null;
+      const sizeHa = Number.isFinite(boundaryToSave?.areaHa)
+        ? Number(boundaryToSave.areaHa.toFixed(2))
+        : undefined;
       const payload = {
-        boundary_polygon: pendingBoundary,
+        boundary_polygon: boundaryToSave.feature,
       };
       if (centroid?.length === 2) {
         payload.longitude = centroid[0];
@@ -294,6 +430,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       }
       await marketplaceService.updateProperty(listingId, payload);
       await loadListing(listingId);
+      setPendingBoundary(buildBoundaryMetadata(boundaryToSave.feature));
       showMessage('Ubicación guardada correctamente.');
       setActiveStep((prev) => prev + 1);
     } catch (error) {
@@ -628,7 +765,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const renderBoundaryStep = () => (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
-        Dibuja el polígono que representa la propiedad. Ajusta tanto como necesites y asegúrate que el área sea representativa.
+        Dibuja el polígono que representa la propiedad. Haz clic para añadir vértices y usa doble clic para cerrar. Puedes editar los puntos existentes antes de guardar.
       </Typography>
       <Box sx={{ position: 'relative', height: 400, borderRadius: 2, overflow: 'hidden' }}>
         <Map
@@ -655,11 +792,29 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
         <Box>
           <Typography variant="body2" color="text.secondary">
-            Área estimada: {pendingBoundary ? `${(turf.area(pendingBoundary) / 10000).toFixed(2)} ha` : listing?.size ? `${listing.size} ha` : '—'}
+            Área estimada: {
+              pendingBoundary?.removed
+                ? '—'
+                : Number.isFinite(displayedBoundary?.areaHa)
+                  ? `${displayedBoundary.areaHa.toFixed(2)} ha`
+                  : listing?.size
+                    ? `${listing.size} ha`
+                    : '—'
+            }
           </Typography>
+          {pendingBoundary?.removed && (
+            <Typography variant="caption" color="warning.main">
+              El polígono guardado se eliminará al guardar los cambios.
+            </Typography>
+          )}
+          {hasUnsavedBoundaryChanges && (
+            <Typography variant="caption" color="warning.main">
+              Tienes cambios sin guardar en el polígono.
+            </Typography>
+          )}
         </Box>
         <Button variant="contained" onClick={saveBoundary} disabled={saving}>
-          Guardar polígono
+          {hasUnsavedBoundaryChanges || !savedBoundary?.feature ? 'Guardar polígono' : 'Continuar'}
         </Button>
       </Stack>
     </Stack>
