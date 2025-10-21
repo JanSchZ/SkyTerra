@@ -76,6 +76,15 @@ const initialBasicForm = {
   plan: '',
   has_water: false,
   has_views: false,
+  contact_name: '',
+  contact_email: '',
+  contact_phone: '',
+  address_line1: '',
+  address_line2: '',
+  address_city: '',
+  address_region: '',
+  address_country: '',
+  address_postal_code: '',
 };
 
 const SellerListingWizard = ({ listingId: initialListingId }) => {
@@ -129,6 +138,15 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         plan: data.plan ?? '',
         has_water: Boolean(data.has_water),
         has_views: Boolean(data.has_views),
+        contact_name: data.contact_name || '',
+        contact_email: data.contact_email || '',
+        contact_phone: data.contact_phone || '',
+        address_line1: data.address_line1 || '',
+        address_line2: data.address_line2 || '',
+        address_city: data.address_city || '',
+        address_region: data.address_region || '',
+        address_country: data.address_country || '',
+        address_postal_code: data.address_postal_code || '',
       });
       setAccessNotes(data.access_notes || '');
       setTimeSlots(Array.isArray(data.preferred_time_windows) ? data.preferred_time_windows : []);
@@ -179,6 +197,15 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       plan: basicForm.plan || null,
       has_water: Boolean(basicForm.has_water),
       has_views: Boolean(basicForm.has_views),
+      contact_name: basicForm.contact_name?.trim() || '',
+      contact_email: basicForm.contact_email?.trim() || '',
+      contact_phone: basicForm.contact_phone?.trim() || '',
+      address_line1: basicForm.address_line1?.trim() || '',
+      address_line2: basicForm.address_line2?.trim() || '',
+      address_city: basicForm.address_city?.trim() || '',
+      address_region: basicForm.address_region?.trim() || '',
+      address_country: basicForm.address_country?.trim() || '',
+      address_postal_code: basicForm.address_postal_code?.trim() || '',
     };
     try {
       setSaving(true);
@@ -435,6 +462,103 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
           fullWidth
         />
       </Grid>
+      <Grid item xs={12}>
+        <Typography variant="subtitle1" sx={{ mt: 1 }}>Contacto operativo</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Estos datos se comparten con los operadores una vez que la publicación es aprobada.
+        </Typography>
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <TextField
+          label="Nombre de contacto"
+          name="contact_name"
+          value={basicForm.contact_name}
+          onChange={handleBasicChange}
+          fullWidth
+          required
+        />
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <TextField
+          label="Correo de contacto"
+          name="contact_email"
+          type="email"
+          value={basicForm.contact_email}
+          onChange={handleBasicChange}
+          fullWidth
+        />
+      </Grid>
+      <Grid item xs={12} md={4}>
+        <TextField
+          label="Teléfono de contacto"
+          name="contact_phone"
+          value={basicForm.contact_phone}
+          onChange={handleBasicChange}
+          fullWidth
+          required
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <Typography variant="subtitle1" sx={{ mt: 2 }}>Dirección de la publicación</Typography>
+        <Typography variant="body2" color="text.secondary">
+          Informa el punto de encuentro para el piloto. Puedes complementar con referencias en las notas de acceso.
+        </Typography>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          label="Dirección principal"
+          name="address_line1"
+          value={basicForm.address_line1}
+          onChange={handleBasicChange}
+          fullWidth
+          required
+        />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <TextField
+          label="Detalle adicional (interior, lote, etc.)"
+          name="address_line2"
+          value={basicForm.address_line2}
+          onChange={handleBasicChange}
+          fullWidth
+        />
+      </Grid>
+      <Grid item xs={12} md={3}>
+        <TextField
+          label="Ciudad"
+          name="address_city"
+          value={basicForm.address_city}
+          onChange={handleBasicChange}
+          fullWidth
+        />
+      </Grid>
+      <Grid item xs={12} md={3}>
+        <TextField
+          label="Región / Estado"
+          name="address_region"
+          value={basicForm.address_region}
+          onChange={handleBasicChange}
+          fullWidth
+        />
+      </Grid>
+      <Grid item xs={12} md={3}>
+        <TextField
+          label="País"
+          name="address_country"
+          value={basicForm.address_country}
+          onChange={handleBasicChange}
+          fullWidth
+        />
+      </Grid>
+      <Grid item xs={12} md={3}>
+        <TextField
+          label="Código postal"
+          name="address_postal_code"
+          value={basicForm.address_postal_code}
+          onChange={handleBasicChange}
+          fullWidth
+        />
+      </Grid>
     </Grid>
   );
 
@@ -630,13 +754,37 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         <Typography variant="body2" color="text.secondary">
           {listing?.plan_details?.name || 'Sin plan asignado'}
         </Typography>
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2">Contacto operativo</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {listing?.contact_name || '—'} · {listing?.contact_phone || 'Teléfono pendiente'}
+        </Typography>
+        {listing?.contact_email && (
+          <Typography variant="body2" color="text.secondary">{listing.contact_email}</Typography>
+        )}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2">Dirección de grabación</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {[listing?.address_line1, listing?.address_line2].filter(Boolean).join(', ') || 'Dirección pendiente'}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {[listing?.address_city, listing?.address_region, listing?.address_country]
+            .filter(Boolean)
+            .join(', ') || 'Completa ciudad y país para coordinar el vuelo.'}
+        </Typography>
       </Paper>
       <Box>
         <StatusBar status={listing?.status_bar} />
       </Box>
       {!requirements.can_submit && (
         <Alert severity="warning">
-          {requirements.has_boundary ? 'Faltan documentos aprobados para continuar.' : 'Dibuja y guarda el polígono del terreno para continuar.'}
+          {!requirements.has_boundary
+            ? 'Dibuja y guarda el polígono del terreno para continuar.'
+            : !requirements.has_contact
+            ? 'Agrega un nombre y teléfono de contacto para coordinar el vuelo.'
+            : !requirements.has_address
+            ? 'Completa la dirección principal para orientar al piloto.'
+            : 'Faltan documentos aprobados para continuar.'}
           {!!requirements.missing_documents?.length && (
             <Box component="span"> Documentos pendientes: {requirements.missing_documents.map((code) => DOCUMENT_LABEL_MAP[code] || code).join(', ')}.</Box>
           )}
