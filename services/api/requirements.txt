@@ -52,3 +52,4 @@ Pillow==11.3.0
 
 # Development tools (remove in production if needed)
 django-debug-toolbar==4.2.0
+pytest-django==4.8.0

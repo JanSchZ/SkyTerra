@@ -532,6 +532,28 @@ class PropertySerializer(serializers.ModelSerializer):
     def get_workflow_timeline(self, obj):
         return _serialize_timeline_payload(obj.build_workflow_timeline())
 
+    def _clean_publication_status(self, validated_data, *, creating=False):
+        """Ensure publication_status can only be controlled by staff users."""
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+
+        if not user or not user.is_authenticated or not user.is_staff:
+            # Non-staff users should never override the status manually.
+            validated_data.pop('publication_status', None)
+            if creating:
+                # Preserve the model default when creating new records.
+                validated_data.setdefault('publication_status', Property.PUBLICATION_STATUS_CHOICES[0][0])
+
+        return validated_data
+
+    def create(self, validated_data):
+        validated_data = self._clean_publication_status(validated_data, creating=True)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data = self._clean_publication_status(validated_data, creating=False)
+        return super().update(instance, validated_data)
+
 class PropertyListSerializer(serializers.ModelSerializer):
     """Serializer para listar propiedades con menos detalles"""
     image_count = serializers.IntegerField(source='image_count_annotation', read_only=True)
