@@ -100,10 +100,73 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [timeSlotDraft, setTimeSlotDraft] = useState({ day: '', from: '', to: '' });
   const [accessNotes, setAccessNotes] = useState('');
   const [pendingBoundary, setPendingBoundary] = useState(null);
+  const [boundaryTouched, setBoundaryTouched] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, severity: 'success', message: '' });
 
+  const normalizeBoundary = useCallback((rawBoundary) => {
+    if (!rawBoundary) return null;
+
+    const geojsonFeature = rawBoundary.geojson && rawBoundary.geojson.type === 'Feature'
+      ? rawBoundary.geojson
+      : rawBoundary.type === 'Feature'
+        ? rawBoundary
+        : rawBoundary.coordinates
+          ? {
+              type: 'Feature',
+              properties: rawBoundary.properties || {},
+              geometry: {
+                type: 'Polygon',
+                coordinates: rawBoundary.coordinates
+              }
+            }
+          : null;
+
+    if (!geojsonFeature || geojsonFeature.geometry?.type !== 'Polygon') {
+      return null;
+    }
+
+    let areaHa = Number.isFinite(rawBoundary.areaHa) ? rawBoundary.areaHa : Number.isFinite(rawBoundary.area)
+      ? rawBoundary.area
+      : null;
+    if (!Number.isFinite(areaHa)) {
+      try {
+        areaHa = turf.area(geojsonFeature) / 10000;
+      } catch (error) {
+        console.error('normalizeBoundary: unable to compute area', error);
+        areaHa = null;
+      }
+    }
+
+    let center = Array.isArray(rawBoundary.center) && rawBoundary.center.length === 2 ? rawBoundary.center : null;
+    if (!center) {
+      try {
+        center = turf.center(geojsonFeature)?.geometry?.coordinates || null;
+      } catch (error) {
+        console.error('normalizeBoundary: unable to compute centroid', error);
+      }
+    }
+
+    return {
+      geojson: geojsonFeature,
+      areaHa: Number.isFinite(areaHa) ? areaHa : null,
+      center,
+    };
+  }, []);
+
   const currentDocuments = useMemo(() => listing?.documents ?? [], [listing]);
+  const savedBoundary = useMemo(
+    () => normalizeBoundary(listing?.boundary_polygon),
+    [listing?.boundary_polygon, normalizeBoundary]
+  );
+  const boundaryAreaHa = useMemo(() => {
+    if (pendingBoundary?.areaHa) return pendingBoundary.areaHa;
+    if (savedBoundary?.areaHa) return savedBoundary.areaHa;
+    return null;
+  }, [pendingBoundary, savedBoundary]);
+  const hasSavedBoundary = Boolean(savedBoundary?.geojson);
+  const hasPendingBoundary = Boolean(pendingBoundary?.geojson);
+  const canSaveBoundary = hasPendingBoundary && (boundaryTouched || !hasSavedBoundary);
 
   const showMessage = useCallback((message, severity = 'success') => {
     setSnackbar({ open: true, severity, message });
@@ -151,11 +214,14 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       setAccessNotes(data.access_notes || '');
       setTimeSlots(Array.isArray(data.preferred_time_windows) ? data.preferred_time_windows : []);
       if (data.boundary_polygon) {
-        setPendingBoundary(data.boundary_polygon);
+        setPendingBoundary(normalizeBoundary(data.boundary_polygon));
+      } else {
+        setPendingBoundary(null);
       }
+      setBoundaryTouched(false);
       return data;
     },
-    []
+    [normalizeBoundary]
   );
 
   useEffect(() => {
@@ -265,36 +331,70 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   };
 
   const handleBoundaryUpdate = useCallback((feature) => {
-    setPendingBoundary(feature);
-  }, []);
+    if (feature?.isInitial) {
+      setBoundaryTouched(false);
+    } else {
+      setBoundaryTouched(Boolean(feature));
+    }
+    setPendingBoundary(normalizeBoundary(feature));
+  }, [normalizeBoundary]);
+
+  const handleRecenterOnBoundary = useCallback(() => {
+    const center = pendingBoundary?.center || savedBoundary?.center;
+    if (mapInstance && center?.length === 2) {
+      try {
+        mapInstance.flyTo({ center, zoom: 16, duration: 1000 });
+      } catch (error) {
+        console.error('handleRecenterOnBoundary: unable to flyTo center', error);
+        mapInstance.setCenter(center);
+        mapInstance.setZoom(16);
+      }
+    }
+  }, [mapInstance, pendingBoundary, savedBoundary]);
 
   const saveBoundary = async () => {
     if (!listingId) {
       showMessage('Guarda primero la información básica.', 'warning');
       return;
     }
-    if (!pendingBoundary) {
+    if (!pendingBoundary?.geojson) {
       showMessage('Dibuja un polígono antes de guardar.', 'warning');
       return;
     }
     try {
       setSaving(true);
-      const centroid = turf.centroid(pendingBoundary)?.geometry?.coordinates;
-      const area = turf.area(pendingBoundary);
-      const sizeHa = area ? Number((area / 10000).toFixed(2)) : undefined;
+      let centroid = pendingBoundary.center;
+      if (!centroid || centroid.length !== 2) {
+        try {
+          centroid = turf.center(pendingBoundary.geojson)?.geometry?.coordinates || null;
+        } catch (error) {
+          console.error('saveBoundary: unable to compute centroid', error);
+        }
+      }
+
+      let areaHa = Number.isFinite(pendingBoundary.areaHa) ? pendingBoundary.areaHa : null;
+      if (!Number.isFinite(areaHa)) {
+        try {
+          areaHa = turf.area(pendingBoundary.geojson) / 10000;
+        } catch (error) {
+          console.error('saveBoundary: unable to compute area', error);
+        }
+      }
+
       const payload = {
-        boundary_polygon: pendingBoundary,
+        boundary_polygon: pendingBoundary.geojson,
       };
       if (centroid?.length === 2) {
         payload.longitude = centroid[0];
         payload.latitude = centroid[1];
       }
-      if (sizeHa && Number.isFinite(sizeHa)) {
-        payload.size = sizeHa;
+      if (Number.isFinite(areaHa)) {
+        payload.size = Number(areaHa.toFixed(2));
       }
       await marketplaceService.updateProperty(listingId, payload);
       await loadListing(listingId);
       showMessage('Ubicación guardada correctamente.');
+      setBoundaryTouched(false);
       setActiveStep((prev) => prev + 1);
     } catch (error) {
       console.error('Error saving boundary', error);
@@ -625,45 +725,80 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     </Stack>
   );
 
-  const renderBoundaryStep = () => (
-    <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        Dibuja el polígono que representa la propiedad. Ajusta tanto como necesites y asegúrate que el área sea representativa.
-      </Typography>
-      <Box sx={{ position: 'relative', height: 400, borderRadius: 2, overflow: 'hidden' }}>
-        <Map
-          initialViewState={{
-            latitude: listing?.latitude || -33.4489,
-            longitude: listing?.longitude || -70.6693,
-            zoom: listing?.boundary_polygon ? 15 : 4,
-          }}
-          mapboxAccessToken={config.mapbox.accessToken}
-          mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-          style={{ width: '100%', height: '100%' }}
-          onLoad={(event) => setMapInstance(event.target)}
-        >
-          <NavigationControl position="top-right" />
-          {mapInstance && (
-            <PropertyBoundaryDraw
-              map={mapInstance}
-              onBoundariesUpdate={handleBoundaryUpdate}
-              existingBoundaries={listing?.boundary_polygon}
-            />
-          )}
-        </Map>
-      </Box>
-      <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
-        <Box>
-          <Typography variant="body2" color="text.secondary">
-            Área estimada: {pendingBoundary ? `${(turf.area(pendingBoundary) / 10000).toFixed(2)} ha` : listing?.size ? `${listing.size} ha` : '—'}
-          </Typography>
+  const renderBoundaryStep = () => {
+    const areaLabel = boundaryAreaHa ? `${boundaryAreaHa.toFixed(2)} ha` : listing?.size ? `${listing.size} ha` : '—';
+    const statusSeverity = boundaryTouched ? 'info' : hasSavedBoundary ? 'success' : 'warning';
+    const statusMessage = boundaryTouched
+      ? 'Tienes cambios sin guardar. Cuando estés conforme, presiona “Guardar polígono”.'
+      : hasSavedBoundary
+        ? 'El polígono guardado se mostrará a los operadores y administradores.'
+        : 'Aún no has definido un polígono. Dibuja el perímetro para continuar.';
+
+    return (
+      <Stack spacing={2}>
+        <Alert severity={statusSeverity} variant="outlined">
+          {statusMessage}
+        </Alert>
+        <Typography variant="body2" color="text.secondary">
+          Traza el contorno completo de la propiedad sobre el mapa satelital. Puedes modificar puntos, deshacer el último vértice o borrar todo en cualquier momento.
+        </Typography>
+        <Box sx={{ position: 'relative', height: { xs: 360, md: 420 }, borderRadius: 2, overflow: 'hidden', boxShadow: 3 }}>
+          <Map
+            initialViewState={{
+              latitude: listing?.latitude || savedBoundary?.center?.[1] || -33.4489,
+              longitude: listing?.longitude || savedBoundary?.center?.[0] || -70.6693,
+              zoom: hasSavedBoundary ? 15 : 4,
+            }}
+            mapboxAccessToken={config.mapbox.accessToken}
+            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            style={{ width: '100%', height: '100%' }}
+            onLoad={(event) => setMapInstance(event.target)}
+          >
+            <NavigationControl position="top-right" />
+            {mapInstance && (
+              <PropertyBoundaryDraw
+                map={mapInstance}
+                onBoundariesUpdate={handleBoundaryUpdate}
+                existingBoundaries={pendingBoundary?.geojson || savedBoundary?.geojson || listing?.boundary_polygon}
+              />
+            )}
+          </Map>
         </Box>
-        <Button variant="contained" onClick={saveBoundary} disabled={saving}>
-          Guardar polígono
-        </Button>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+        >
+          <Stack spacing={0.5}>
+            <Typography variant="subtitle2">Área estimada</Typography>
+            <Typography variant="body1" fontWeight="bold">{areaLabel}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {hasPendingBoundary
+                ? 'Calculada automáticamente a partir del polígono dibujado.'
+                : 'Se actualizará cuando guardes un polígono.'}
+            </Typography>
+          </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+            <Button
+              variant="outlined"
+              onClick={handleRecenterOnBoundary}
+              disabled={!mapInstance || (!hasPendingBoundary && !hasSavedBoundary)}
+            >
+              Recentrar mapa
+            </Button>
+            <Button
+              variant="contained"
+              onClick={saveBoundary}
+              disabled={saving || !canSaveBoundary}
+            >
+              Guardar polígono
+            </Button>
+          </Stack>
+        </Stack>
       </Stack>
-    </Stack>
-  );
+    );
+  };
 
   const renderPreferencesStep = () => (
     <Stack spacing={3}>
