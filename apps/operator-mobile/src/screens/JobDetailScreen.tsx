@@ -215,19 +215,25 @@ const JobDetailScreen = () => {
     try {
       setRequirementLoadingId(requirement.id);
       const updated = await updateRequirementStatus(job.id, requirement.id, nextValue);
+      const updatedFields: Partial<OperatorJobRequirement> = updated ?? {};
       setJob((previous) => {
         if (!previous) return previous;
-        const requirements = previous.requirements?.map((item) =>
-          item.id === requirement.id
-            ? {
-                ...item,
-                ...updated,
-                is_complete: updated?.is_complete ?? nextValue,
-                completed_at:
-                  updated?.completed_at ?? (nextValue ? new Date().toISOString() : null),
-              }
-            : item
-        );
+        const requirements = previous.requirements?.map((item) => {
+          if (item.id !== requirement.id) {
+            return item;
+          }
+
+          const isComplete = updatedFields.is_complete ?? nextValue;
+          const completedAt =
+            updatedFields.completed_at ?? (isComplete ? new Date().toISOString() : null);
+
+          return {
+            ...item,
+            ...updatedFields,
+            is_complete: isComplete,
+            completed_at: completedAt,
+          };
+        });
         return { ...previous, requirements };
       });
     } catch (error) {
