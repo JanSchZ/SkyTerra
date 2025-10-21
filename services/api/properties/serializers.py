@@ -19,6 +19,8 @@ from .models import (
     Job,
     JobOffer,
     JobTimelineEvent,
+    WORKFLOW_NODE_LABELS,
+    WORKFLOW_SUBSTATE_DEFINITIONS,
 )
 import json
 from payments.models import Subscription

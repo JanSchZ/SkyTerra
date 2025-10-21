@@ -18,6 +18,51 @@ from support_tickets.models import Ticket
 
 from .serializers import UserSerializer  # Import the new serializer
 
+
+def _serialize_actor(actor):
+    """Return a JSON-serializable representation of an actor."""
+    if not actor:
+        return None
+
+    if isinstance(actor, dict):
+        return actor
+
+    try:
+        return {
+            'id': getattr(actor, 'id', None),
+            'username': getattr(actor, 'username', None),
+            'email': getattr(actor, 'email', None),
+            'first_name': getattr(actor, 'first_name', None),
+            'last_name': getattr(actor, 'last_name', None),
+            'full_name': actor.get_full_name() if hasattr(actor, 'get_full_name') else None,
+        }
+    except Exception:
+        return None
+
+
+def _serialize_timeline_payload(timeline):
+    serialized = []
+    for entry in timeline or []:
+        entry_copy = entry.copy()
+
+        events = []
+        for event in entry.get('events', []):
+            event_copy = event.copy()
+            event_copy['actor'] = _serialize_actor(event.get('actor'))
+            events.append(event_copy)
+        entry_copy['events'] = events
+
+        current_event = entry.get('current_event')
+        if current_event:
+            current_copy = current_event.copy()
+            current_copy['actor'] = _serialize_actor(current_event.get('actor'))
+            entry_copy['current_event'] = current_copy
+        else:
+            entry_copy['current_event'] = None
+
+        serialized.append(entry_copy)
+    return serialized
+
 User = get_user_model()
 
 class AdminDashboardSummaryView(APIView):
@@ -50,12 +95,13 @@ class AdminDashboardSummaryView(APIView):
             if property_instance.workflow_alerts:
                 alerts_total += len(property_instance.workflow_alerts)
 
-            timeline = property_instance.build_workflow_timeline()
+            timeline = _serialize_timeline_payload(property_instance.build_workflow_timeline())
             active_entry = next((entry for entry in timeline if entry.get('state') == 'active'), None)
             last_entry = timeline[-1] if timeline else None
             stage_entry = active_entry or last_entry
 
             if stage_entry and (property_instance.workflow_node != 'live' or stage_entry.get('state') != 'done'):
+                last_event = stage_entry.get('current_event')
                 properties_in_progress.append({
                     'id': property_instance.id,
                     'name': property_instance.name,
@@ -67,7 +113,7 @@ class AdminDashboardSummaryView(APIView):
                     'stage_state': stage_entry.get('state'),
                     'stage_duration_hours': stage_entry.get('duration_hours'),
                     'stage_duration_days': stage_entry.get('duration_days'),
-                    'last_event': stage_entry.get('current_event'),
+                    'last_event': last_event,
                     'timeline': timeline,
                 })
 
