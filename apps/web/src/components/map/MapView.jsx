@@ -383,6 +383,12 @@ const MapView = forwardRef(({
             }
             return normalized;
           });
+          return;
+        }
+
+        if (data?.has_boundary === false || !data?.boundary_polygon) {
+          completed = true;
+          setPropertyBoundaries(null);
         }
       })
       .catch((err) => {
