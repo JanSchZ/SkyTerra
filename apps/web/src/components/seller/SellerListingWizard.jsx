@@ -6,10 +6,14 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  Checkbox,
   FormControl,
+  FormControlLabel,
+  FormHelperText,
   Grid,
   IconButton,
   InputLabel,
+  InputAdornment,
   MenuItem,
   Paper,
   Select,
@@ -96,12 +100,60 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [listing, setListing] = useState(null);
   const [listingId, setListingId] = useState(initialListingId);
   const [basicForm, setBasicForm] = useState(initialBasicForm);
+  const [basicErrors, setBasicErrors] = useState({});
+  const [touchedFields, setTouchedFields] = useState({});
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotDraft, setTimeSlotDraft] = useState({ day: '', from: '', to: '' });
   const [accessNotes, setAccessNotes] = useState('');
   const [pendingBoundary, setPendingBoundary] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, severity: 'success', message: '' });
+
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('es-CL', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      }),
+    []
+  );
+
+  const validateBasicForm = useCallback((formState) => {
+    const errors = {};
+    const requiresSalePrice = formState.listing_type === 'sale' || formState.listing_type === 'both';
+    const requiresRentPrice = formState.listing_type === 'rent' || formState.listing_type === 'both';
+
+    if (!formState.name?.trim()) errors.name = 'Ingresa un nombre descriptivo.';
+    if (!formState.plan) errors.plan = 'Selecciona un plan.';
+    if (!formState.type?.trim()) errors.type = 'Define el tipo de terreno.';
+
+    if (requiresSalePrice && (!formState.price || Number(formState.price) <= 0)) {
+      errors.price = 'Indica el precio de venta referencial.';
+    }
+
+    if (!formState.size || Number(formState.size) <= 0) {
+      errors.size = 'Ingresa el tamaño aproximado en hectáreas.';
+    }
+
+    if (requiresRentPrice && (!formState.rent_price || Number(formState.rent_price) <= 0)) {
+      errors.rent_price = 'Indica el precio de arriendo estimado.';
+    }
+
+    if (!formState.contact_name?.trim()) errors.contact_name = 'Ingresa la persona de contacto.';
+    if (!formState.contact_phone?.trim()) errors.contact_phone = 'Ingresa un número de contacto.';
+
+    if (!formState.address_line1?.trim()) errors.address_line1 = 'Completa la dirección principal.';
+    if (!formState.address_city?.trim()) errors.address_city = 'Indica la ciudad o localidad.';
+    if (!formState.address_region?.trim()) errors.address_region = 'Indica la región o estado.';
+    if (!formState.address_country?.trim()) errors.address_country = 'Indica el país.';
+
+    return errors;
+  }, []);
+
+  const markTouched = useCallback((field) => {
+    setTouchedFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  }, []);
 
   const currentDocuments = useMemo(() => listing?.documents ?? [], [listing]);
 
@@ -122,12 +174,14 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       if (!id) {
         setListing(null);
         setBasicForm(initialBasicForm);
+        setBasicErrors({});
+        setTouchedFields({});
         return null;
       }
       const data = await marketplaceService.fetchProperty(id);
       setListing(data);
       setListingId(data.id);
-      setBasicForm({
+      const nextFormState = {
         name: data.name || '',
         type: data.type || '',
         description: data.description || '',
@@ -147,7 +201,10 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         address_region: data.address_region || '',
         address_country: data.address_country || '',
         address_postal_code: data.address_postal_code || '',
-      });
+      };
+      setBasicForm(nextFormState);
+      setBasicErrors(validateBasicForm(nextFormState));
+      setTouchedFields({});
       setAccessNotes(data.access_notes || '');
       setTimeSlots(Array.isArray(data.preferred_time_windows) ? data.preferred_time_windows : []);
       if (data.boundary_polygon) {
@@ -155,7 +212,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       }
       return data;
     },
-    []
+    [validateBasicForm]
   );
 
   useEffect(() => {
@@ -165,7 +222,11 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         setLoading(true);
         const [plansData] = await Promise.all([loadPlans(), listingId ? loadListing(listingId) : Promise.resolve(null)]);
         if (!listingId && plansData?.length) {
-          setBasicForm((prev) => ({ ...prev, plan: prev.plan || plansData[0].id }));
+          setBasicForm((prev) => {
+            const updated = { ...prev, plan: prev.plan || plansData[0].id };
+            setBasicErrors(validateBasicForm(updated));
+            return updated;
+          });
         }
       } catch (error) {
         console.error('Error bootstrapping wizard', error);
@@ -178,14 +239,38 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     return () => {
       isMounted = false;
     };
-  }, [listingId, loadPlans, loadListing, showMessage]);
+  }, [listingId, loadPlans, loadListing, showMessage, validateBasicForm]);
 
   const handleBasicChange = (event) => {
     const { name, value } = event.target;
-    setBasicForm((prev) => ({ ...prev, [name]: value }));
+    setBasicForm((prev) => {
+      const updated = { ...prev, [name]: value };
+      setBasicErrors(validateBasicForm(updated));
+      return updated;
+    });
+  };
+
+  const handleCheckboxChange = (event) => {
+    const { name, checked } = event.target;
+    setBasicForm((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleBasicSubmit = async () => {
+    const errors = validateBasicForm(basicForm);
+    setBasicErrors(errors);
+
+    if (Object.keys(errors).length) {
+      setTouchedFields((prev) => ({
+        ...prev,
+        ...Object.keys(errors).reduce((acc, key) => {
+          acc[key] = true;
+          return acc;
+        }, {}),
+      }));
+      showMessage('Completa los campos obligatorios antes de continuar.', 'warning');
+      return;
+    }
+
     const payload = {
       name: basicForm.name,
       type: basicForm.type,
@@ -273,7 +358,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       showMessage('Guarda primero la información básica.', 'warning');
       return;
     }
-    if (!pendingBoundary) {
+    if (!pendingBoundary || !pendingBoundary.geometry) {
       showMessage('Dibuja un polígono antes de guardar.', 'warning');
       return;
     }
@@ -370,197 +455,325 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     setActiveStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const renderBasicStep = () => (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Nombre del terreno"
-          name="name"
-          value={basicForm.name}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <FormControl fullWidth>
-          <InputLabel id="plan-label">Plan</InputLabel>
-          <Select
-            labelId="plan-label"
-            label="Plan"
-            name="plan"
-            value={basicForm.plan}
-            onChange={handleBasicChange}
-          >
-            {plans.map((plan) => (
-              <MenuItem key={plan.id} value={plan.id}>
-                {plan.name} — ${plan.price}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField label="Tipo (ej: Terreno agrícola)" name="type" value={basicForm.type} onChange={handleBasicChange} fullWidth />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Precio (USD)"
-          name="price"
-          type="number"
-          value={basicForm.price}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Tamaño (hectáreas)"
-          name="size"
-          type="number"
-          value={basicForm.size}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <FormControl fullWidth>
-          <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
-          <Select
-            labelId="listing-type-label"
-            label="Tipo de publicación"
-            name="listing_type"
-            value={basicForm.listing_type}
-            onChange={handleBasicChange}
-          >
-            <MenuItem value="sale">Venta</MenuItem>
-            <MenuItem value="rent">Arriendo</MenuItem>
-            <MenuItem value="both">Venta y arriendo</MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
-      {(basicForm.listing_type === 'rent' || basicForm.listing_type === 'both') && (
-        <Grid item xs={12} md={4}>
-          <TextField
-            label="Precio arriendo"
-            name="rent_price"
-            type="number"
-            value={basicForm.rent_price}
-            onChange={handleBasicChange}
-            fullWidth
-          />
-        </Grid>
-      )}
-      <Grid item xs={12}>
-        <TextField
-          label="Descripción"
-          name="description"
-          value={basicForm.description}
-          onChange={handleBasicChange}
-          multiline
-          minRows={4}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <Typography variant="subtitle1" sx={{ mt: 1 }}>Contacto operativo</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Estos datos se comparten con los operadores una vez que la publicación es aprobada.
-        </Typography>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Nombre de contacto"
-          name="contact_name"
-          value={basicForm.contact_name}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Correo de contacto"
-          name="contact_email"
-          type="email"
-          value={basicForm.contact_email}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Teléfono de contacto"
-          name="contact_phone"
-          value={basicForm.contact_phone}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <Typography variant="subtitle1" sx={{ mt: 2 }}>Dirección de la publicación</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Informa el punto de encuentro para el piloto. Puedes complementar con referencias en las notas de acceso.
-        </Typography>
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Dirección principal"
-          name="address_line1"
-          value={basicForm.address_line1}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Detalle adicional (interior, lote, etc.)"
-          name="address_line2"
-          value={basicForm.address_line2}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="Ciudad"
-          name="address_city"
-          value={basicForm.address_city}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="Región / Estado"
-          name="address_region"
-          value={basicForm.address_region}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="País"
-          name="address_country"
-          value={basicForm.address_country}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="Código postal"
-          name="address_postal_code"
-          value={basicForm.address_postal_code}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-    </Grid>
-  );
+  const renderBasicStep = () => {
+    const requiresRentPrice = basicForm.listing_type === 'rent' || basicForm.listing_type === 'both';
+    const requiresSalePrice = basicForm.listing_type === 'sale' || basicForm.listing_type === 'both';
+
+    return (
+      <Stack spacing={4}>
+        <Box>
+          <Typography variant="h6">Información del terreno</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Cuéntanos qué estás vendiendo o arrendando. Estos datos se mostrarán a los potenciales compradores.
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Nombre del terreno"
+                name="name"
+                value={basicForm.name}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('name')}
+                error={touchedFields.name && Boolean(basicErrors.name)}
+                helperText={touchedFields.name && basicErrors.name}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth error={touchedFields.plan && Boolean(basicErrors.plan)}>
+                <InputLabel id="plan-label">Plan</InputLabel>
+                <Select
+                  labelId="plan-label"
+                  label="Plan"
+                  name="plan"
+                  value={basicForm.plan}
+                  onChange={handleBasicChange}
+                  onBlur={() => markTouched('plan')}
+                >
+                  {plans.map((plan) => (
+                    <MenuItem key={plan.id} value={plan.id}>
+                      {plan.name} — {currencyFormatter.format(plan.price)}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {touchedFields.plan && basicErrors.plan && <FormHelperText>{basicErrors.plan}</FormHelperText>}
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Tipo de propiedad"
+                name="type"
+                value={basicForm.type}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('type')}
+                error={touchedFields.type && Boolean(basicErrors.type)}
+                helperText={touchedFields.type && basicErrors.type ? basicErrors.type : 'Ejemplo: Lote agrícola, parcela, etc.'}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Precio de venta"
+                name="price"
+                type="number"
+                value={basicForm.price}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('price')}
+                error={requiresSalePrice && touchedFields.price && Boolean(basicErrors.price)}
+                helperText={
+                  requiresSalePrice && touchedFields.price && basicErrors.price
+                    ? basicErrors.price
+                    : requiresSalePrice
+                      ? 'Monto referencial en dólares.'
+                      : 'Se calculará automáticamente si solo arriendas.'
+                }
+                fullWidth
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">US$</InputAdornment>,
+                }}
+                disabled={!requiresSalePrice}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Tamaño (hectáreas)"
+                name="size"
+                type="number"
+                value={basicForm.size}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('size')}
+                error={touchedFields.size && Boolean(basicErrors.size)}
+                helperText={
+                  touchedFields.size && basicErrors.size
+                    ? basicErrors.size
+                    : 'Utiliza decimales si es necesario (ej: 1.25).'
+                }
+                fullWidth
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">ha</InputAdornment>,
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
+                <Select
+                  labelId="listing-type-label"
+                  label="Tipo de publicación"
+                  name="listing_type"
+                  value={basicForm.listing_type}
+                  onChange={handleBasicChange}
+                >
+                  <MenuItem value="sale">Venta</MenuItem>
+                  <MenuItem value="rent">Arriendo</MenuItem>
+                  <MenuItem value="both">Venta y arriendo</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {requiresRentPrice && (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Precio de arriendo"
+                  name="rent_price"
+                  type="number"
+                  value={basicForm.rent_price}
+                  onChange={handleBasicChange}
+                  onBlur={() => markTouched('rent_price')}
+                  error={touchedFields.rent_price && Boolean(basicErrors.rent_price)}
+                  helperText={
+                    touchedFields.rent_price && basicErrors.rent_price
+                      ? basicErrors.rent_price
+                      : 'Ingresa el valor mensual en dólares.'
+                  }
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">US$</InputAdornment>,
+                  }}
+                />
+              </Grid>
+            )}
+            <Grid item xs={12}>
+              <TextField
+                label="Descripción"
+                name="description"
+                value={basicForm.description}
+                onChange={handleBasicChange}
+                multiline
+                minRows={4}
+                fullWidth
+                placeholder="Cuenta qué hace especial a la propiedad, accesos, cultivos, etc."
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Stack spacing={0.5}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(basicForm.has_water)}
+                      onChange={handleCheckboxChange}
+                      name="has_water"
+                    />
+                  }
+                  label="Cuenta con acceso a agua"
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Incluye riego, pozo, ríos u otras fuentes relevantes.
+                </Typography>
+              </Stack>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Stack spacing={0.5}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(basicForm.has_views)}
+                      onChange={handleCheckboxChange}
+                      name="has_views"
+                    />
+                  }
+                  label="Tiene vistas destacadas"
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Marca esta opción si la propiedad cuenta con miradores o paisajes atractivos.
+                </Typography>
+              </Stack>
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Divider />
+
+        <Box>
+          <Typography variant="h6">Contacto operativo</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Esta información solo se comparte con operadores aprobados para coordinar la visita.
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Nombre de contacto"
+                name="contact_name"
+                value={basicForm.contact_name}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('contact_name')}
+                error={touchedFields.contact_name && Boolean(basicErrors.contact_name)}
+                helperText={touchedFields.contact_name && basicErrors.contact_name}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Correo de contacto"
+                name="contact_email"
+                type="email"
+                value={basicForm.contact_email}
+                onChange={handleBasicChange}
+                fullWidth
+                placeholder="nombre@empresa.com"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Teléfono de contacto"
+                name="contact_phone"
+                value={basicForm.contact_phone}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('contact_phone')}
+                error={touchedFields.contact_phone && Boolean(basicErrors.contact_phone)}
+                helperText={touchedFields.contact_phone && basicErrors.contact_phone}
+                fullWidth
+                required
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Divider />
+
+        <Box>
+          <Typography variant="h6">Ubicación de referencia</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Indica el punto donde se reunirá el piloto. Más detalles se pueden agregar en las notas de acceso.
+          </Typography>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Dirección principal"
+                name="address_line1"
+                value={basicForm.address_line1}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('address_line1')}
+                error={touchedFields.address_line1 && Boolean(basicErrors.address_line1)}
+                helperText={touchedFields.address_line1 && basicErrors.address_line1}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Detalle adicional (lote, parcela, etc.)"
+                name="address_line2"
+                value={basicForm.address_line2}
+                onChange={handleBasicChange}
+                fullWidth
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="Ciudad / Localidad"
+                name="address_city"
+                value={basicForm.address_city}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('address_city')}
+                error={touchedFields.address_city && Boolean(basicErrors.address_city)}
+                helperText={touchedFields.address_city && basicErrors.address_city}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="Región / Estado"
+                name="address_region"
+                value={basicForm.address_region}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('address_region')}
+                error={touchedFields.address_region && Boolean(basicErrors.address_region)}
+                helperText={touchedFields.address_region && basicErrors.address_region}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="País"
+                name="address_country"
+                value={basicForm.address_country}
+                onChange={handleBasicChange}
+                onBlur={() => markTouched('address_country')}
+                error={touchedFields.address_country && Boolean(basicErrors.address_country)}
+                helperText={touchedFields.address_country && basicErrors.address_country}
+                fullWidth
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="Código postal"
+                name="address_postal_code"
+                value={basicForm.address_postal_code}
+                onChange={handleBasicChange}
+                fullWidth
+              />
+            </Grid>
+          </Grid>
+        </Box>
+      </Stack>
+    );
+  };
 
   const renderDocumentsStep = () => (
     <Stack spacing={2}>
@@ -628,7 +841,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const renderBoundaryStep = () => (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
-        Dibuja el polígono que representa la propiedad. Ajusta tanto como necesites y asegúrate que el área sea representativa.
+        Dibuja el polígono que representa la propiedad. Ajusta tantos vértices como necesites y guarda para continuar.
       </Typography>
       <Box sx={{ position: 'relative', height: 400, borderRadius: 2, overflow: 'hidden' }}>
         <Map
@@ -655,7 +868,17 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
         <Box>
           <Typography variant="body2" color="text.secondary">
-            Área estimada: {pendingBoundary ? `${(turf.area(pendingBoundary) / 10000).toFixed(2)} ha` : listing?.size ? `${listing.size} ha` : '—'}
+            Área estimada: {
+              pendingBoundary
+                ? `${Number(
+                    pendingBoundary?.properties?.area_ha ?? turf.area(pendingBoundary) / 10000
+                  ).toFixed(2)} ha`
+                : listing?.boundary_polygon?.properties?.area_ha
+                  ? `${Number(listing.boundary_polygon.properties.area_ha).toFixed(2)} ha`
+                  : listing?.size
+                    ? `${listing.size} ha`
+                    : '—'
+            }
           </Typography>
         </Box>
         <Button variant="contained" onClick={saveBoundary} disabled={saving}>

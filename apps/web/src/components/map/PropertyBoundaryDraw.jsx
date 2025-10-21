@@ -2,9 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Box, Button, Typography, Paper, Stack } from '@mui/material';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import PolylineIcon from '@mui/icons-material/Polyline';
 import DeleteIcon from '@mui/icons-material/Delete';
-import UndoIcon from '@mui/icons-material/Undo';
 import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
 import * as turf from '@turf/turf';
@@ -14,6 +12,38 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
   const [area, setArea] = useState(0);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
   const [hasExistingBoundaries, setHasExistingBoundaries] = useState(false);
+
+  const emitBoundaryUpdate = (feature) => {
+    if (!onBoundariesUpdate) return;
+
+    if (!feature) {
+      onBoundariesUpdate(null);
+      return;
+    }
+
+    const clonedFeature = {
+      type: 'Feature',
+      geometry: feature.geometry,
+      properties: {
+        ...(feature.properties || {}),
+      },
+    };
+
+    try {
+      const calculatedArea = turf.area(feature);
+      const areaInHectares = calculatedArea / 10000;
+      clonedFeature.properties.area_ha = Number(areaInHectares.toFixed(4));
+
+      const centroid = turf.center(feature)?.geometry?.coordinates;
+      if (Array.isArray(centroid)) {
+        clonedFeature.properties.center = centroid;
+      }
+    } catch (error) {
+      console.error('PropertyBoundaryDraw: unable to enrich feature metadata', error);
+    }
+
+    onBoundariesUpdate(clonedFeature);
+  };
 
   useEffect(() => {
     if (!map) return;
@@ -131,34 +161,27 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
     map.addControl(draw);
     drawRef.current = draw;
 
-    if (existingBoundaries && existingBoundaries.type === 'Feature' && existingBoundaries.geometry && existingBoundaries.geometry.type === 'Polygon') {
-      draw.add(existingBoundaries);
+    if (existingBoundaries) {
+      const featureToAdd = existingBoundaries.type === 'Feature'
+        ? existingBoundaries
+        : {
+            id: 'existing-boundary',
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: existingBoundaries.coordinates,
+            },
+          };
+
       try {
-        const existingArea = turf.area(existingBoundaries);
+        draw.add(featureToAdd);
+        const existingArea = turf.area(featureToAdd);
         const areaInHectares = existingArea / 10000;
         setArea(areaInHectares);
         setHasExistingBoundaries(true);
-      } catch (e) {
-        console.error("Error calculating area for existing boundaries:", e);
-      }
-    } else if (existingBoundaries && existingBoundaries.coordinates) {
-      const polygonFeature = {
-        id: 'existing-boundary',
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Polygon',
-          coordinates: existingBoundaries.coordinates
-        }
-      };
-      draw.add(polygonFeature);
-      try {
-        const existingArea = turf.area(polygonFeature);
-        const areaInHectares = existingArea / 10000;
-        setArea(areaInHectares);
-        setHasExistingBoundaries(true);
-      } catch(e) {
-        console.error("Error calculating area for legacy existing boundaries:", e);
+      } catch (error) {
+        console.error('PropertyBoundaryDraw: failed to bootstrap existing polygon', error);
       }
     }
 
@@ -210,40 +233,24 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
           setArea(areaInHectares);
           setHasExistingBoundaries(true);
 
-          const centerPoint = turf.center(polygonFeature);
-          const centerCoords = centerPoint.geometry.coordinates;
-
-          if (onBoundariesUpdate) {
-            onBoundariesUpdate({
-              coordinates: polygonFeature.geometry.coordinates,
-              area: areaInHectares,
-              center: centerCoords,
-              geojson: polygonFeature
-            });
-          }
+          emitBoundaryUpdate(polygonFeature);
         } else {
           setArea(0);
-          if (onBoundariesUpdate) {
-            const currentFeatures = drawRef.current.getAll();
-            if (currentFeatures.features.length === 0) {
-                onBoundariesUpdate(null);
-                setHasExistingBoundaries(false);
-            }
+          const currentFeatures = drawRef.current.getAll();
+          if (currentFeatures.features.length === 0) {
+            emitBoundaryUpdate(null);
+            setHasExistingBoundaries(false);
           }
         }
       } else {
         setArea(0);
         setHasExistingBoundaries(false);
-        if (onBoundariesUpdate) {
-          onBoundariesUpdate(null);
-        }
+        emitBoundaryUpdate(null);
       }
     } catch (error) {
       console.error("Error in calculateArea with turf:", error, "Data:", data?.features?.[0]);
       setArea(0);
-      if (onBoundariesUpdate) {
-        onBoundariesUpdate(null);
-      }
+      emitBoundaryUpdate(null);
     }
   };
 
@@ -286,17 +293,8 @@ const PropertyBoundaryDraw = ({ map, onBoundariesUpdate, existingBoundaries, com
       const data = drawRef.current.getAll();
       if (data.features.length > 0) {
         const polygon = data.features[0];
-        const area = turf.area(polygon);
-        const areaInHectares = area / 10000;
-        
-        const center = turf.center(polygon).geometry.coordinates;
-        
-        onBoundariesUpdate({
-          coordinates: polygon.geometry.coordinates,
-          area: areaInHectares,
-          center: center,
-          geojson: polygon
-        });
+
+        emitBoundaryUpdate(polygon);
 
         // Poner el polígono en modo "static" para que quede visible
         try {
