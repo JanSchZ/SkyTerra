@@ -7,6 +7,9 @@ import {
   CircularProgress,
   Divider,
   FormControl,
+  FormHelperText,
+  FormControlLabel,
+  FormGroup,
   Grid,
   IconButton,
   InputLabel,
@@ -18,12 +21,14 @@ import {
   Step,
   StepLabel,
   Stepper,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UploadIcon from '@mui/icons-material/Upload';
 import DeleteIcon from '@mui/icons-material/Delete';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
 import Map from 'react-map-gl';
 import { NavigationControl } from 'react-map-gl';
 import * as turf from '@turf/turf';
@@ -32,6 +37,7 @@ import marketplaceService from '../../services/marketplaceService.js';
 import StatusBar from './StatusBar.jsx';
 import PropertyBoundaryDraw from '../map/PropertyBoundaryDraw.jsx';
 import config from '../../config/environment';
+import { normalizeBoundary, calculateAreaHectares } from '../../utils/boundary.js';
 
 const steps = [
   { key: 'basic', label: 'Datos de la propiedad' },
@@ -96,18 +102,124 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [listing, setListing] = useState(null);
   const [listingId, setListingId] = useState(initialListingId);
   const [basicForm, setBasicForm] = useState(initialBasicForm);
+  const [basicErrors, setBasicErrors] = useState({});
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotDraft, setTimeSlotDraft] = useState({ day: '', from: '', to: '' });
   const [accessNotes, setAccessNotes] = useState('');
   const [pendingBoundary, setPendingBoundary] = useState(null);
+  const [boundaryDraft, setBoundaryDraft] = useState(null);
+  const [boundaryDirty, setBoundaryDirty] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, severity: 'success', message: '' });
 
   const currentDocuments = useMemo(() => listing?.documents ?? [], [listing]);
 
+  const savedBoundary = useMemo(() => {
+    if (boundaryDraft) return boundaryDraft;
+    return normalizeBoundary(listing?.boundary_polygon);
+  }, [boundaryDraft, listing]);
+
+  const boundaryAreaHa = useMemo(() => {
+    if (savedBoundary?.area != null) return savedBoundary.area;
+    const numericSize = Number.parseFloat(listing?.size);
+    return Number.isFinite(numericSize) ? numericSize : null;
+  }, [savedBoundary, listing]);
+
   const showMessage = useCallback((message, severity = 'success') => {
     setSnackbar({ open: true, severity, message });
   }, []);
+
+  const clearBasicError = useCallback((name) => {
+    setBasicErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  }, []);
+
+  const validateEmail = (value) => {
+    if (!value) return true;
+    return /^[\w.!#$%&'*+/=?^`{|}~-]+@[\w-]+(\.[\w-]+)+$/i.test(value.trim());
+  };
+
+  const parseNumber = (value) => {
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  };
+
+  const validateBasicForm = useCallback(() => {
+    const errors = {};
+    const trimmedName = basicForm.name.trim();
+    const trimmedType = basicForm.type.trim();
+    const trimmedContactName = basicForm.contact_name.trim();
+    const trimmedContactPhone = basicForm.contact_phone.trim();
+    const trimmedAddressLine1 = basicForm.address_line1.trim();
+    const trimmedCity = basicForm.address_city.trim();
+    const trimmedRegion = basicForm.address_region.trim();
+    const trimmedCountry = basicForm.address_country.trim();
+
+    if (!trimmedName) {
+      errors.name = 'Ingresa un nombre descriptivo para la propiedad.';
+    }
+
+    if (!trimmedType) {
+      errors.type = 'Define el tipo de propiedad.';
+    }
+
+    if (!basicForm.plan) {
+      errors.plan = 'Selecciona un plan activo antes de continuar.';
+    }
+
+    const priceValue = parseNumber(basicForm.price);
+    const rentPriceValue = parseNumber(basicForm.rent_price);
+    const sizeValue = parseNumber(basicForm.size);
+    const listingType = basicForm.listing_type;
+    const includesSale = listingType === 'sale' || listingType === 'both';
+    const includesRent = listingType === 'rent' || listingType === 'both';
+
+    if (includesSale && (priceValue == null || priceValue <= 0)) {
+      errors.price = 'Define el precio de venta.';
+    }
+
+    if (includesRent && (rentPriceValue == null || rentPriceValue <= 0)) {
+      errors.rent_price = 'Define el valor de arriendo mensual.';
+    }
+
+    if (sizeValue == null || sizeValue <= 0) {
+      errors.size = 'Ingresa el tamaño en hectáreas.';
+    }
+
+    if (!trimmedContactName) {
+      errors.contact_name = 'Indica quién coordinará las visitas.';
+    }
+
+    if (!trimmedContactPhone) {
+      errors.contact_phone = 'Agrega un teléfono o WhatsApp válido.';
+    }
+
+    if (basicForm.contact_email && !validateEmail(basicForm.contact_email)) {
+      errors.contact_email = 'El correo electrónico no tiene un formato válido.';
+    }
+
+    if (!trimmedAddressLine1) {
+      errors.address_line1 = 'Describe la dirección principal o punto de referencia.';
+    }
+
+    if (!trimmedCity) {
+      errors.address_city = 'Indica la ciudad o comuna.';
+    }
+
+    if (!trimmedRegion) {
+      errors.address_region = 'Define la región/estado.';
+    }
+
+    if (!trimmedCountry) {
+      errors.address_country = 'Selecciona el país.';
+    }
+
+    return errors;
+  }, [basicForm]);
 
   const closeSnackbar = useCallback(() => setSnackbar((prev) => ({ ...prev, open: false })), []);
 
@@ -122,6 +234,10 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       if (!id) {
         setListing(null);
         setBasicForm(initialBasicForm);
+        setBasicErrors({});
+        setBoundaryDraft(null);
+        setPendingBoundary(null);
+        setBoundaryDirty(false);
         return null;
       }
       const data = await marketplaceService.fetchProperty(id);
@@ -150,9 +266,10 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       });
       setAccessNotes(data.access_notes || '');
       setTimeSlots(Array.isArray(data.preferred_time_windows) ? data.preferred_time_windows : []);
-      if (data.boundary_polygon) {
-        setPendingBoundary(data.boundary_polygon);
-      }
+      const normalizedBoundary = normalizeBoundary(data.boundary_polygon);
+      setPendingBoundary(normalizedBoundary?.geojson || null);
+      setBoundaryDraft(normalizedBoundary);
+      setBoundaryDirty(false);
       return data;
     },
     []
@@ -182,18 +299,50 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
 
   const handleBasicChange = (event) => {
     const { name, value } = event.target;
-    setBasicForm((prev) => ({ ...prev, [name]: value }));
+    clearBasicError(name);
+    setBasicForm((prev) => {
+      if (name === 'listing_type') {
+        return {
+          ...prev,
+          [name]: value,
+          rent_price: value === 'sale' ? '' : prev.rent_price,
+        };
+      }
+      return { ...prev, [name]: value };
+    });
+  };
+
+  const handleBasicSwitchChange = (event) => {
+    const { name, checked } = event.target;
+    clearBasicError(name);
+    setBasicForm((prev) => ({ ...prev, [name]: checked }));
   };
 
   const handleBasicSubmit = async () => {
+    const errors = validateBasicForm();
+    if (Object.keys(errors).length) {
+      setBasicErrors(errors);
+      showMessage('Revisa los campos obligatorios antes de continuar.', 'warning');
+      return;
+    }
+
+    setBasicErrors({});
+
+    const listingType = basicForm.listing_type;
+    const includesSale = listingType === 'sale' || listingType === 'both';
+    const includesRent = listingType === 'rent' || listingType === 'both';
+    const priceValue = parseNumber(basicForm.price) ?? 0;
+    const rentPriceValue = parseNumber(basicForm.rent_price) ?? 0;
+    const sizeValue = parseNumber(basicForm.size) ?? 0;
+
     const payload = {
       name: basicForm.name,
       type: basicForm.type,
-      description: basicForm.description,
-      price: Number(basicForm.price || 0),
-      size: Number(basicForm.size || 0),
-      listing_type: basicForm.listing_type,
-      rent_price: basicForm.listing_type !== 'sale' ? Number(basicForm.rent_price || 0) : null,
+      description: basicForm.description?.trim() || '',
+      price: includesSale ? priceValue : 0,
+      size: sizeValue,
+      listing_type: listingType,
+      rent_price: includesRent ? rentPriceValue : null,
       plan: basicForm.plan || null,
       has_water: Boolean(basicForm.has_water),
       has_views: Boolean(basicForm.has_views),
@@ -264,38 +413,82 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     }
   };
 
-  const handleBoundaryUpdate = useCallback((feature) => {
-    setPendingBoundary(feature);
+  const handleBoundaryUpdate = useCallback((boundary) => {
+    const normalized = normalizeBoundary(boundary);
+    setPendingBoundary(normalized?.geojson || null);
+    setBoundaryDraft(normalized || null);
+    setBoundaryDirty(true);
   }, []);
+
+  useEffect(() => {
+    if (!mapInstance || boundaryDirty) return;
+    const feature = savedBoundary?.geojson;
+    if (!feature) return;
+    try {
+      const [minLng, minLat, maxLng, maxLat] = turf.bbox(feature);
+      if ([minLng, minLat, maxLng, maxLat].every((value) => Number.isFinite(value))) {
+        mapInstance.fitBounds(
+          [
+            [minLng, minLat],
+            [maxLng, maxLat],
+          ],
+          { padding: 60, duration: 800 }
+        );
+      }
+    } catch (error) {
+      console.error('Error ajustando el mapa al polígono', error);
+    }
+  }, [mapInstance, savedBoundary, boundaryDirty]);
+
+  const recenterOnBoundary = useCallback(() => {
+    if (!mapInstance) return;
+    const feature = savedBoundary?.geojson;
+    if (!feature) return;
+    try {
+      const [minLng, minLat, maxLng, maxLat] = turf.bbox(feature);
+      if ([minLng, minLat, maxLng, maxLat].every((value) => Number.isFinite(value))) {
+        mapInstance.fitBounds(
+          [
+            [minLng, minLat],
+            [maxLng, maxLat],
+          ],
+          { padding: 60, duration: 500 }
+        );
+      }
+    } catch (error) {
+      console.error('No fue posible recentrar el mapa en el polígono', error);
+    }
+  }, [mapInstance, savedBoundary]);
 
   const saveBoundary = async () => {
     if (!listingId) {
       showMessage('Guarda primero la información básica.', 'warning');
       return;
     }
-    if (!pendingBoundary) {
+    const feature = boundaryDraft?.geojson || pendingBoundary;
+    if (!feature) {
       showMessage('Dibuja un polígono antes de guardar.', 'warning');
       return;
     }
     try {
       setSaving(true);
-      const centroid = turf.centroid(pendingBoundary)?.geometry?.coordinates;
-      const area = turf.area(pendingBoundary);
-      const sizeHa = area ? Number((area / 10000).toFixed(2)) : undefined;
+      const centroid = boundaryDraft?.center || turf.centroid(feature)?.geometry?.coordinates;
+      const area = calculateAreaHectares(boundaryDraft || feature);
       const payload = {
-        boundary_polygon: pendingBoundary,
+        boundary_polygon: feature,
       };
       if (centroid?.length === 2) {
         payload.longitude = centroid[0];
         payload.latitude = centroid[1];
       }
-      if (sizeHa && Number.isFinite(sizeHa)) {
-        payload.size = sizeHa;
+      if (area && Number.isFinite(area)) {
+        payload.size = Number(area.toFixed(2));
       }
       await marketplaceService.updateProperty(listingId, payload);
       await loadListing(listingId);
       showMessage('Ubicación guardada correctamente.');
       setActiveStep((prev) => prev + 1);
+      setBoundaryDirty(false);
     } catch (error) {
       console.error('Error saving boundary', error);
       showMessage('No fue posible guardar el polígono.', 'error');
@@ -309,7 +502,46 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       showMessage('Completa día y rangos horarios antes de agregar.', 'warning');
       return;
     }
-    setTimeSlots((prev) => [...prev, { ...timeSlotDraft }]);
+
+    const parseTime = (value) => {
+      const [hours, minutes] = value.split(':').map((segment) => Number.parseInt(segment, 10));
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+      return hours * 60 + minutes;
+    };
+
+    const fromMinutes = parseTime(timeSlotDraft.from);
+    const toMinutes = parseTime(timeSlotDraft.to);
+
+    if (fromMinutes == null || toMinutes == null) {
+      showMessage('Usa formato horario HH:MM.', 'warning');
+      return;
+    }
+
+    if (toMinutes <= fromMinutes) {
+      showMessage('La hora de término debe ser posterior a la de inicio.', 'warning');
+      return;
+    }
+
+    const duplicate = timeSlots.some(
+      (slot) =>
+        slot.day === timeSlotDraft.day &&
+        slot.from === timeSlotDraft.from &&
+        slot.to === timeSlotDraft.to
+    );
+
+    if (duplicate) {
+      showMessage('Ese bloque horario ya está agregado.', 'info');
+      return;
+    }
+
+    const nextSlots = [...timeSlots, { ...timeSlotDraft }];
+    nextSlots.sort((a, b) => {
+      const dayComparison = a.day.localeCompare(b.day);
+      if (dayComparison !== 0) return dayComparison;
+      return a.from.localeCompare(b.from);
+    });
+
+    setTimeSlots(nextSlots);
     setTimeSlotDraft({ day: '', from: '', to: '' });
   };
 
@@ -370,197 +602,283 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     setActiveStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const renderBasicStep = () => (
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Nombre del terreno"
-          name="name"
-          value={basicForm.name}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <FormControl fullWidth>
-          <InputLabel id="plan-label">Plan</InputLabel>
-          <Select
-            labelId="plan-label"
-            label="Plan"
-            name="plan"
-            value={basicForm.plan}
-            onChange={handleBasicChange}
-          >
-            {plans.map((plan) => (
-              <MenuItem key={plan.id} value={plan.id}>
-                {plan.name} — ${plan.price}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField label="Tipo (ej: Terreno agrícola)" name="type" value={basicForm.type} onChange={handleBasicChange} fullWidth />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Precio (USD)"
-          name="price"
-          type="number"
-          value={basicForm.price}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Tamaño (hectáreas)"
-          name="size"
-          type="number"
-          value={basicForm.size}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <FormControl fullWidth>
-          <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
-          <Select
-            labelId="listing-type-label"
-            label="Tipo de publicación"
-            name="listing_type"
-            value={basicForm.listing_type}
-            onChange={handleBasicChange}
-          >
-            <MenuItem value="sale">Venta</MenuItem>
-            <MenuItem value="rent">Arriendo</MenuItem>
-            <MenuItem value="both">Venta y arriendo</MenuItem>
-          </Select>
-        </FormControl>
-      </Grid>
-      {(basicForm.listing_type === 'rent' || basicForm.listing_type === 'both') && (
-        <Grid item xs={12} md={4}>
-          <TextField
-            label="Precio arriendo"
-            name="rent_price"
-            type="number"
-            value={basicForm.rent_price}
-            onChange={handleBasicChange}
-            fullWidth
-          />
+  const renderBasicStep = () => {
+    const includesRent = basicForm.listing_type === 'rent' || basicForm.listing_type === 'both';
+    const includesSale = basicForm.listing_type === 'sale' || basicForm.listing_type === 'both';
+
+    return (
+      <Stack spacing={4}>
+        <Box>
+          <Typography variant="h6">Información general</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Cuéntanos sobre el terreno para que el equipo de operadores y los compradores entiendan de inmediato su potencial.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Nombre del terreno"
+              name="name"
+              value={basicForm.name}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.name)}
+              helperText={basicErrors.name || 'Por ejemplo: "Campo Los Boldos" o "Parcela en Lago Ranco"'}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth error={Boolean(basicErrors.plan)}>
+              <InputLabel id="plan-label">Plan</InputLabel>
+              <Select
+                labelId="plan-label"
+                label="Plan"
+                name="plan"
+                value={basicForm.plan}
+                onChange={handleBasicChange}
+              >
+                {plans.map((plan) => (
+                  <MenuItem key={plan.id} value={plan.id}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Typography fontWeight={500}>{plan.name}</Typography>
+                      <Chip size="small" label={`$${plan.price}`} color="primary" variant="outlined" />
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText error={Boolean(basicErrors.plan)}>
+                {basicErrors.plan || 'El plan define la visibilidad, reportes y soporte que recibes.'}
+              </FormHelperText>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Tipo de propiedad"
+              name="type"
+              value={basicForm.type}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.type)}
+              helperText={basicErrors.type || 'Ejemplos: terreno agrícola, parcela urbanizada, predio forestal.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Precio de venta (USD)"
+              name="price"
+              type="number"
+              value={basicForm.price}
+              onChange={handleBasicChange}
+              fullWidth
+              required={includesSale}
+              error={Boolean(basicErrors.price)}
+              helperText={basicErrors.price || (includesSale ? 'Indica el precio total solicitado.' : 'Solo visible si habilitas venta.')}
+              InputProps={{ inputProps: { min: 0, step: 100 } }}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Tamaño (hectáreas)"
+              name="size"
+              type="number"
+              value={basicForm.size}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.size)}
+              helperText={basicErrors.size || 'Redondea a dos decimales si es necesario.'}
+              InputProps={{ inputProps: { min: 0, step: 0.01 } }}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
+              <Select
+                labelId="listing-type-label"
+                label="Tipo de publicación"
+                name="listing_type"
+                value={basicForm.listing_type}
+                onChange={handleBasicChange}
+              >
+                <MenuItem value="sale">Venta</MenuItem>
+                <MenuItem value="rent">Arriendo</MenuItem>
+                <MenuItem value="both">Venta y arriendo</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          {includesRent && (
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Precio de arriendo mensual (USD)"
+                name="rent_price"
+                type="number"
+                value={basicForm.rent_price}
+                onChange={handleBasicChange}
+                fullWidth
+                required
+                error={Boolean(basicErrors.rent_price)}
+                helperText={basicErrors.rent_price || 'Si arriendas por temporada, acláralo en la descripción.'}
+                InputProps={{ inputProps: { min: 0, step: 50 } }}
+              />
+            </Grid>
+          )}
+          <Grid item xs={12}>
+            <TextField
+              label="Descripción"
+              name="description"
+              value={basicForm.description}
+              onChange={handleBasicChange}
+              fullWidth
+              multiline
+              minRows={4}
+              helperText="Resalta atributos únicos, accesos, servidumbres y potencial de uso."
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <FormGroup row>
+              <FormControlLabel
+                control={<Switch checked={Boolean(basicForm.has_water)} onChange={handleBasicSwitchChange} name="has_water" />}
+                label="Cuenta con acceso a agua"
+              />
+              <FormControlLabel
+                control={<Switch checked={Boolean(basicForm.has_views)} onChange={handleBasicSwitchChange} name="has_views" />}
+                label="Tiene vistas destacadas"
+              />
+            </FormGroup>
+          </Grid>
         </Grid>
-      )}
-      <Grid item xs={12}>
-        <TextField
-          label="Descripción"
-          name="description"
-          value={basicForm.description}
-          onChange={handleBasicChange}
-          multiline
-          minRows={4}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <Typography variant="subtitle1" sx={{ mt: 1 }}>Contacto operativo</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Estos datos se comparten con los operadores una vez que la publicación es aprobada.
-        </Typography>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Nombre de contacto"
-          name="contact_name"
-          value={basicForm.contact_name}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Correo de contacto"
-          name="contact_email"
-          type="email"
-          value={basicForm.contact_email}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <TextField
-          label="Teléfono de contacto"
-          name="contact_phone"
-          value={basicForm.contact_phone}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <Typography variant="subtitle1" sx={{ mt: 2 }}>Dirección de la publicación</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Informa el punto de encuentro para el piloto. Puedes complementar con referencias en las notas de acceso.
-        </Typography>
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Dirección principal"
-          name="address_line1"
-          value={basicForm.address_line1}
-          onChange={handleBasicChange}
-          fullWidth
-          required
-        />
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Detalle adicional (interior, lote, etc.)"
-          name="address_line2"
-          value={basicForm.address_line2}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="Ciudad"
-          name="address_city"
-          value={basicForm.address_city}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="Región / Estado"
-          name="address_region"
-          value={basicForm.address_region}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="País"
-          name="address_country"
-          value={basicForm.address_country}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <TextField
-          label="Código postal"
-          name="address_postal_code"
-          value={basicForm.address_postal_code}
-          onChange={handleBasicChange}
-          fullWidth
-        />
-      </Grid>
-    </Grid>
-  );
+
+        <Divider />
+
+        <Box>
+          <Typography variant="h6">Contacto operativo</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Estos datos permiten coordinar al piloto de SkyTerra y responder a potenciales compradores.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <TextField
+              label="Nombre del contacto"
+              name="contact_name"
+              value={basicForm.contact_name}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.contact_name)}
+              helperText={basicErrors.contact_name || 'Persona que abrirá el campo o atenderá visitas.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              label="Correo del contacto"
+              name="contact_email"
+              value={basicForm.contact_email}
+              onChange={handleBasicChange}
+              fullWidth
+              error={Boolean(basicErrors.contact_email)}
+              helperText={basicErrors.contact_email || 'Usaremos este correo para enviar confirmaciones y reportes.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              label="Teléfono o WhatsApp"
+              name="contact_phone"
+              value={basicForm.contact_phone}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.contact_phone)}
+              helperText={basicErrors.contact_phone || 'Incluye código de país. Ej: +56 9 1234 5678.'}
+            />
+          </Grid>
+        </Grid>
+
+        <Divider />
+
+        <Box>
+          <Typography variant="h6">Ubicación y referencias</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Indica la dirección base y cualquier detalle que ayude al operador a llegar sin contratiempos.
+          </Typography>
+        </Box>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Dirección o punto de referencia"
+              name="address_line1"
+              value={basicForm.address_line1}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.address_line1)}
+              helperText={basicErrors.address_line1 || 'Puedes usar coordenadas o una descripción clara si no existe dirección formal.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Detalle adicional (interior, lote, portón...)"
+              name="address_line2"
+              value={basicForm.address_line2}
+              onChange={handleBasicChange}
+              fullWidth
+              helperText="Información opcional para llegar sin perder tiempo."
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Ciudad / Comuna"
+              name="address_city"
+              value={basicForm.address_city}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.address_city)}
+              helperText={basicErrors.address_city || 'Es clave para programar al operador local.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Región / Estado"
+              name="address_region"
+              value={basicForm.address_region}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.address_region)}
+              helperText={basicErrors.address_region || 'Indica la división administrativa correspondiente.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="País"
+              name="address_country"
+              value={basicForm.address_country}
+              onChange={handleBasicChange}
+              fullWidth
+              required
+              error={Boolean(basicErrors.address_country)}
+              helperText={basicErrors.address_country || 'Si recibes visitas internacionales, esto ayuda a los pilotos.'}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <TextField
+              label="Código postal"
+              name="address_postal_code"
+              value={basicForm.address_postal_code}
+              onChange={handleBasicChange}
+              fullWidth
+              helperText="Opcional, pero útil para notificaciones y logística."
+            />
+          </Grid>
+        </Grid>
+      </Stack>
+    );
+  };
 
   const renderDocumentsStep = () => (
     <Stack spacing={2}>
@@ -625,45 +943,88 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     </Stack>
   );
 
-  const renderBoundaryStep = () => (
-    <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        Dibuja el polígono que representa la propiedad. Ajusta tanto como necesites y asegúrate que el área sea representativa.
-      </Typography>
-      <Box sx={{ position: 'relative', height: 400, borderRadius: 2, overflow: 'hidden' }}>
-        <Map
-          initialViewState={{
-            latitude: listing?.latitude || -33.4489,
-            longitude: listing?.longitude || -70.6693,
-            zoom: listing?.boundary_polygon ? 15 : 4,
-          }}
-          mapboxAccessToken={config.mapbox.accessToken}
-          mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-          style={{ width: '100%', height: '100%' }}
-          onLoad={(event) => setMapInstance(event.target)}
-        >
-          <NavigationControl position="top-right" />
-          {mapInstance && (
-            <PropertyBoundaryDraw
-              map={mapInstance}
-              onBoundariesUpdate={handleBoundaryUpdate}
-              existingBoundaries={listing?.boundary_polygon}
-            />
-          )}
-        </Map>
-      </Box>
-      <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
-        <Box>
-          <Typography variant="body2" color="text.secondary">
-            Área estimada: {pendingBoundary ? `${(turf.area(pendingBoundary) / 10000).toFixed(2)} ha` : listing?.size ? `${listing.size} ha` : '—'}
-          </Typography>
+  const renderBoundaryStep = () => {
+    const hasBoundary = Boolean(savedBoundary?.geojson);
+    const hasDraft = Boolean(boundaryDraft?.geojson || pendingBoundary);
+    const areaLabel =
+      boundaryAreaHa != null
+        ? `${boundaryAreaHa.toFixed(2)} ha`
+        : listing?.size
+          ? `${Number(listing.size).toFixed(2)} ha`
+          : '—';
+    const statusSeverity = boundaryDirty ? 'info' : hasBoundary ? 'success' : 'warning';
+    const statusMessage = boundaryDirty
+      ? 'Tienes cambios sin guardar. Presiona "Guardar polígono" para actualizar la publicación.'
+      : hasBoundary
+        ? 'El polígono guardado será usado para programar al operador.'
+        : 'Dibuja los límites del terreno para continuar.';
+    const initialLatitude = savedBoundary?.latitude ?? listing?.latitude ?? -33.4489;
+    const initialLongitude = savedBoundary?.longitude ?? listing?.longitude ?? -70.6693;
+    const initialZoom = hasBoundary ? 16 : listing?.boundary_polygon ? 15 : 4;
+
+    return (
+      <Stack spacing={3}>
+        <Alert severity={statusSeverity} variant="outlined">
+          {statusMessage}
+        </Alert>
+        <Typography variant="body2" color="text.secondary">
+          Dibuja el polígono que representa la propiedad. Ajusta tanto como necesites y asegúrate de que el área sea representativa.
+        </Typography>
+        <Box sx={{ position: 'relative', height: 420, borderRadius: 2, overflow: 'hidden' }}>
+          <Map
+            initialViewState={{
+              latitude: initialLatitude,
+              longitude: initialLongitude,
+              zoom: initialZoom,
+            }}
+            mapboxAccessToken={config.mapbox.accessToken}
+            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            style={{ width: '100%', height: '100%' }}
+            onLoad={(event) => setMapInstance(event.target)}
+          >
+            <NavigationControl position="top-right" />
+            {mapInstance && (
+              <PropertyBoundaryDraw
+                map={mapInstance}
+                onBoundariesUpdate={handleBoundaryUpdate}
+                existingBoundaries={savedBoundary?.geojson || listing?.boundary_polygon}
+              />
+            )}
+          </Map>
         </Box>
-        <Button variant="contained" onClick={saveBoundary} disabled={saving}>
-          Guardar polígono
-        </Button>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+        >
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              Área estimada: {areaLabel}
+            </Typography>
+            {listing?.size && boundaryAreaHa != null && Math.abs(boundaryAreaHa - Number(listing.size)) > 0.5 && (
+              <Typography variant="caption" color="text.secondary">
+                Tamaño registrado en ficha: {Number(listing.size).toFixed(2)} ha.
+              </Typography>
+            )}
+          </Box>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<MyLocationIcon />}
+              onClick={recenterOnBoundary}
+              disabled={!hasBoundary || !mapInstance}
+            >
+              Recentrar mapa
+            </Button>
+            <Button variant="contained" onClick={saveBoundary} disabled={saving || !hasDraft}>
+              Guardar polígono
+            </Button>
+          </Stack>
+        </Stack>
       </Stack>
-    </Stack>
-  );
+    );
+  };
 
   const renderPreferencesStep = () => (
     <Stack spacing={3}>
@@ -674,22 +1035,29 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         </Typography>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <TextField
-            label="Fecha (YYYY-MM-DD)"
+            label="Fecha"
+            type="date"
             value={timeSlotDraft.day}
             onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, day: event.target.value }))}
             fullWidth
+            InputLabelProps={{ shrink: true }}
+            helperText="Selecciona el día disponible."
           />
           <TextField
-            label="Desde (HH:MM)"
+            label="Desde"
+            type="time"
             value={timeSlotDraft.from}
             onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, from: event.target.value }))}
             fullWidth
+            InputLabelProps={{ shrink: true }}
           />
           <TextField
-            label="Hasta (HH:MM)"
+            label="Hasta"
+            type="time"
             value={timeSlotDraft.to}
             onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, to: event.target.value }))}
             fullWidth
+            InputLabelProps={{ shrink: true }}
           />
           <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTimeSlot}>
             Agregar
@@ -732,6 +1100,18 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       has_boundary: Boolean(listing?.boundary_polygon),
       can_submit: false,
     };
+
+    const hasContact = Boolean(listing?.contact_name && listing?.contact_phone);
+    const hasAddress = Boolean(
+      listing?.address_line1 &&
+        listing?.address_country &&
+        listing?.address_region &&
+        listing?.address_city
+    );
+    const missingDocuments = Array.isArray(requirements.missing_documents)
+      ? requirements.missing_documents
+      : [];
+    const canSubmit = Boolean(requirements.can_submit && hasContact && hasAddress && requirements.has_boundary);
 
     return (
     <Stack spacing={3}>
@@ -776,17 +1156,17 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       <Box>
         <StatusBar status={listing?.status_bar} />
       </Box>
-      {!requirements.can_submit && (
+      {!canSubmit && (
         <Alert severity="warning">
           {!requirements.has_boundary
             ? 'Dibuja y guarda el polígono del terreno para continuar.'
-            : !requirements.has_contact
+            : !hasContact
             ? 'Agrega un nombre y teléfono de contacto para coordinar el vuelo.'
-            : !requirements.has_address
+            : !hasAddress
             ? 'Completa la dirección principal para orientar al piloto.'
             : 'Faltan documentos aprobados para continuar.'}
-          {!!requirements.missing_documents?.length && (
-            <Box component="span"> Documentos pendientes: {requirements.missing_documents.map((code) => DOCUMENT_LABEL_MAP[code] || code).join(', ')}.</Box>
+          {!!missingDocuments.length && (
+            <Box component="span"> Documentos pendientes: {missingDocuments.map((code) => DOCUMENT_LABEL_MAP[code] || code).join(', ')}.</Box>
           )}
         </Alert>
       )}
@@ -819,7 +1199,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         <Button variant="outlined" onClick={() => navigate('/dashboard')}>
           Volver al panel
         </Button>
-        <Button variant="contained" color="primary" onClick={handleSubmitForReview} disabled={saving || !listingId || !requirements.can_submit}>
+        <Button variant="contained" color="primary" onClick={handleSubmitForReview} disabled={saving || !listingId || !canSubmit}>
           Enviar a revisión
         </Button>
       </Stack>
