@@ -20,15 +20,17 @@ import re
 import hashlib
 import logging
 import traceback
+import tempfile
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
-from django.utils._os import safe_join
 import mimetypes
 import os
 import uuid
 import zipfile
 import shutil
+from django.core.files import File
+from django.core.files.storage import default_storage
 
 from .models import (
     Property,
@@ -657,6 +659,44 @@ class TourViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status='active').exclude(url__isnull=True).exclude(url='')
         return qs
 
+    def _delete_storage_prefix(self, prefix: str) -> None:
+        normalized = (prefix or '').strip('/')
+        if not normalized:
+            return
+
+        stack = [normalized]
+        visited = set()
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            lookup = current if current.endswith('/') else f"{current}/"
+            try:
+                dirs, files = default_storage.listdir(lookup)
+            except (FileNotFoundError, NotImplementedError):
+                dirs, files = [], []
+
+            for file_name in files:
+                try:
+                    default_storage.delete(f"{lookup}{file_name}")
+                except Exception:
+                    logger.warning("No se pudo eliminar %s del storage", f"{lookup}{file_name}", exc_info=True)
+            for dir_name in dirs:
+                stack.append(f"{lookup}{dir_name}".rstrip('/'))
+
+        try:
+            default_storage.delete(normalized)
+        except Exception:
+            pass
+
+        try:
+            local_path = default_storage.path(normalized)
+        except (AttributeError, NotImplementedError, ValueError):
+            local_path = None
+        if local_path and os.path.isdir(local_path):
+            shutil.rmtree(local_path, ignore_errors=True)
+
     def perform_create(self, serializer):
         package_file = serializer.validated_data.pop('package_file')
         prop = serializer.validated_data.get('property')
@@ -679,14 +719,16 @@ class TourViewSet(viewsets.ModelViewSet):
         # Validación de tamaño removida - permitir archivos de cualquier tamaño
 
         tour_uuid = uuid.uuid4()
-        tour_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
-        
+        storage_prefix = os.path.join('tours', str(tour_uuid)).replace('\\', '/')
+        stored_files: list[str] = []
+        tmp_root = tempfile.mkdtemp(prefix=f"tour-{tour_uuid}-")
+        tour_dir = os.path.join(tmp_root, 'extracted')
+        os.makedirs(tour_dir, exist_ok=True)
+
         try:
-            os.makedirs(tour_dir, exist_ok=True)
-            
-            package_path = os.path.join(tour_dir, package_file.name)
-            
-            # Guardar archivo con validación de escritura
+            package_path = os.path.join(tmp_root, package_file.name)
+
+            # Guardar archivo temporalmente con validación de escritura
             try:
                 with open(package_path, 'wb+') as destination:
                     for chunk in package_file.chunks():
@@ -828,35 +870,61 @@ class TourViewSet(viewsets.ModelViewSet):
                     'package_file': f"Error accediendo al archivo de entrada '{html_entry}': {str(e)}"
                 })
 
+            # Subir archivos al storage backend
+            for root_dir, _dirs, files in os.walk(tour_dir):
+                for fname in files:
+                    abs_path = os.path.join(root_dir, fname)
+                    rel_path = os.path.relpath(abs_path, tour_dir).replace('\\', '/')
+                    storage_path = f"{storage_prefix}/{rel_path}".replace('//', '/')
+                    with open(abs_path, 'rb') as fh:
+                        if default_storage.exists(storage_path):
+                            default_storage.delete(storage_path)
+                        default_storage.save(storage_path, File(fh))
+                    stored_files.append(storage_path)
+
             instance = serializer.save(
                 url=tour_url,
-                package_path=os.path.join('tours', str(tour_uuid)),
+                package_path=storage_prefix,
                 type='package',
                 status='active',
                 tour_id=tour_uuid
             )
 
-            logger.info(f"Tour {instance.id} procesado exitosamente: {len(entry_files)} archivos de entrada encontrados, usando {html_entry}")
+            logger.info(
+                f"Tour {instance.id} procesado exitosamente: {len(entry_files)} archivos de entrada, "
+                f"{len(stored_files)} archivos almacenados en {storage_prefix}, usando {html_entry}"
+            )
 
             # Asegurar un solo tour por propiedad: eliminar anteriores
-            deleted_count = Tour.objects.filter(property=instance.property).exclude(id=instance.id).count()
-            if deleted_count > 0:
-                Tour.objects.filter(property=instance.property).exclude(id=instance.id).delete()
-                logger.info(f"Eliminados {deleted_count} tours anteriores de la propiedad {instance.property.id}")
+            old_tours = list(Tour.objects.filter(property=instance.property).exclude(id=instance.id))
+            if old_tours:
+                for previous in old_tours:
+                    if previous.package_path:
+                        self._delete_storage_prefix(previous.package_path)
+                Tour.objects.filter(id__in=[tour.id for tour in old_tours]).delete()
+                logger.info(
+                    "Eliminados %s tours anteriores de la propiedad %s",
+                    len(old_tours),
+                    instance.property.id,
+                )
 
         except serializers.ValidationError:
             # Limpiar en caso de error de validación
-            if os.path.exists(tour_dir):
-                shutil.rmtree(tour_dir)
+            for path in stored_files:
+                if default_storage.exists(path):
+                    default_storage.delete(path)
             raise
         except Exception as e:
             # Limpiar en caso de cualquier otro error
-            if os.path.exists(tour_dir):
-                shutil.rmtree(tour_dir)
+            for path in stored_files:
+                if default_storage.exists(path):
+                    default_storage.delete(path)
             logger.error(f"Error inesperado procesando tour: {e}", exc_info=True)
             raise serializers.ValidationError({
                 'package_file': f"Error interno procesando el tour: {str(e)}"
             })
+        finally:
+            shutil.rmtree(tmp_root, ignore_errors=True)
 
     @action(detail=False, methods=['get'], url_path=r'content/(?P<tour_uuid>[^/]+)/(?P<subpath>.*)', permission_classes=[permissions.AllowAny])
     def serve_content(self, request, tour_uuid=None, subpath=''):
@@ -875,28 +943,32 @@ class TourViewSet(viewsets.ModelViewSet):
             if not tour:
                 return Response({'detail': 'Tour no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
-            base_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
-            # Normalizar separadores y prevenir traversal
-            subpath = subpath.replace('..', '').lstrip('/').replace('\\', '/')
-            try:
-                full_path = safe_join(base_dir, subpath)
-            except Exception:
+            storage_base = (tour.package_path or os.path.join('tours', str(tour_uuid))).replace('\\', '/')
+            storage_base = storage_base.strip('/')
+
+            normalized = (subpath or '').replace('\\', '/')
+            parts = [segment for segment in normalized.split('/') if segment not in ('', '.')]
+            if any(segment == '..' for segment in parts):
                 return Response({'detail': 'Ruta no permitida'}, status=status.HTTP_404_NOT_FOUND)
 
-            if not os.path.isfile(full_path):
+            storage_path = storage_base
+            if parts:
+                storage_path = f"{storage_base}/{ '/'.join(parts) }"
+
+            if not default_storage.exists(storage_path):
                 return Response({'detail': 'Archivo no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Detectar content-type
-            ctype, _ = mimetypes.guess_type(full_path)
+            # Intentar derivar content-type a partir del path
+            ctype, _ = mimetypes.guess_type(storage_path)
             # Evitar descarga de .php: no ejecutamos PHP, pero podemos servirlo como HTML estático
-            if not ctype or os.path.splitext(full_path)[1].lower() == '.php':
+            if not ctype or os.path.splitext(storage_path)[1].lower() == '.php':
                 ctype = 'text/html'
 
-            # Usar FileResponse para transmitir el archivo
             from django.http import FileResponse
-            resp = FileResponse(open(full_path, 'rb'), content_type=ctype)
+            file_handle = default_storage.open(storage_path, 'rb')
+            resp = FileResponse(file_handle, content_type=ctype)
             # Sugerir nombre del archivo
-            resp["Content-Disposition"] = f"inline; filename=\"{os.path.basename(full_path)}\""
+            resp["Content-Disposition"] = f"inline; filename=\"{os.path.basename(storage_path)}\""
             # Establecer una CSP permisiva SOLO para este contenido (no global)
             frame_ancestors = ' '.join(getattr(settings, 'CSP_FRAME_ANCESTORS', ("'self'",)))
             csp_value = (

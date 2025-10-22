@@ -259,7 +259,7 @@ export const uploadPilotDocument = async (
     type: payload.file.mimeType ?? 'application/pdf',
   } as unknown as Blob);
 
-  const { data } = await api.post('/api/pilot-profiles/documents/', form, {
+  const { data } = await api.post('/api/pilot-documents/', form, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

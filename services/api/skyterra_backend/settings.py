@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 import dj_database_url
 
@@ -100,6 +101,27 @@ SITE_ID = 1
 _client_url_env = os.getenv('CLIENT_URL', 'http://localhost:5173,http://localhost:3000')
 CLIENT_URLS = [url.strip() for url in _client_url_env.split(',') if url.strip()]
 CLIENT_URL = CLIENT_URLS[0] if CLIENT_URLS else 'http://localhost:3000'
+
+
+def _derive_wildcard_sources(urls: list[str]) -> set[str]:
+    wildcards: set[str] = set()
+    for raw_url in urls:
+        try:
+            parsed = urlparse(raw_url)
+        except Exception:
+            continue
+        if not parsed.scheme or not parsed.hostname:
+            continue
+        host = parsed.hostname.lstrip('.')
+        # Para dominios tipo sub.sub.dominio, usa el dominio base para wildcard
+        parts = host.split('.')
+        if len(parts) >= 2:
+            base_host = '.'.join(parts[-2:])
+            wildcards.add(f"{parsed.scheme}://*.{base_host}")
+    return wildcards
+
+
+CLIENT_URL_WILDCARDS = _derive_wildcard_sources(CLIENT_URLS)
 
 # Configuración de dj-rest-auth
 # Ensure cookie security matches environment (secure in prod, not in dev)
@@ -519,7 +541,10 @@ else:
     # En producción permitir solo mismo origen; use CSP para whitelistar orígenes adicionales
     X_FRAME_OPTIONS = 'SAMEORIGIN'
 # Simple CSP allow-list for frames
-CSP_FRAME_ANCESTORS = tuple(["'self'", 'https://www.youtube.com', *CLIENT_URLS])
+_frame_ancestor_sources = {"'self'", 'https://www.youtube.com'}
+_frame_ancestor_sources.update(CLIENT_URLS)
+_frame_ancestor_sources.update(CLIENT_URL_WILDCARDS)
+CSP_FRAME_ANCESTORS = tuple(sorted(_frame_ancestor_sources))
 SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
 
 # allauth settings for social authentication (Google, Apple, Twitter)
