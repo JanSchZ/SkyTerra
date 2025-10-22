@@ -5,6 +5,52 @@ const cloneCoordinates = (coordinates) => {
   return coordinates.map((ring) => (Array.isArray(ring) ? ring.map((point) => [...point]) : []));
 };
 
+const parseMaybeJSON = (value) => {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const normalizePolygonRings = (feature) => {
+  if (!feature?.geometry || feature.geometry.type !== 'Polygon') {
+    return feature;
+  }
+
+  const normalizedCoordinates = (feature.geometry.coordinates || []).map((ring) => {
+    if (!Array.isArray(ring) || ring.length === 0) {
+      return [];
+    }
+
+    const normalizedRing = ring.map((point) => (Array.isArray(point) ? [...point] : []));
+    const first = normalizedRing[0];
+    const last = normalizedRing[normalizedRing.length - 1];
+
+    if (
+      !Array.isArray(first) ||
+      first.length < 2 ||
+      !Array.isArray(last) ||
+      last.length < 2 ||
+      (first[0] === last[0] && first[1] === last[1])
+    ) {
+      return normalizedRing;
+    }
+
+    return [...normalizedRing, [...first]];
+  });
+
+  return {
+    type: 'Feature',
+    properties: { ...(feature.properties || {}) },
+    geometry: {
+      type: 'Polygon',
+      coordinates: normalizedCoordinates,
+    },
+  };
+};
+
 const asFeature = (boundary) => {
   if (!boundary) return null;
 
@@ -55,6 +101,56 @@ const asFeature = (boundary) => {
         coordinates: cloneCoordinates(boundary),
       },
     };
+  }
+
+  return null;
+};
+
+const ensureFeature = (candidate) => {
+  const parsed = parseMaybeJSON(candidate);
+  const feature = asFeature(parsed ?? candidate);
+  if (!feature) return null;
+  if (feature.geometry?.type === 'Polygon') {
+    return normalizePolygonRings(feature);
+  }
+  return feature;
+};
+
+const toFeaturePolygon = (boundary) => {
+  if (!boundary) return null;
+
+  const directFeature = ensureFeature(boundary);
+  if (directFeature) return directFeature;
+
+  if (boundary.type === 'FeatureCollection' && Array.isArray(boundary.features)) {
+    for (const featureCandidate of boundary.features) {
+      const feature = ensureFeature(featureCandidate);
+      if (feature) return feature;
+    }
+  }
+
+  if (boundary.geojson) {
+    const feature = ensureFeature(boundary.geojson);
+    if (feature) return feature;
+  }
+
+  if (boundary.feature) {
+    const feature = ensureFeature(boundary.feature);
+    if (feature) return feature;
+  }
+
+  if (Array.isArray(boundary.coordinates)) {
+    return ensureFeature({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: boundary.coordinates },
+    });
+  }
+
+  if (Array.isArray(boundary)) {
+    return ensureFeature({
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: boundary },
+    });
   }
 
   return null;
@@ -174,4 +270,4 @@ const areBoundaryCoordinatesEqual = (first, second) => {
   }
 };
 
-export { asFeature, normalizeBoundary, buildBoundaryEvent, areBoundaryCoordinatesEqual };
+export { asFeature, toFeaturePolygon, normalizeBoundary, buildBoundaryEvent, areBoundaryCoordinatesEqual };

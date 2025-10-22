@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import AppLogo from './AppLogo';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme, ThemeColors } from '@theme';
@@ -42,6 +43,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ title, subtitle, footer, childr
             <LinearGradient colors={accentBlob} style={[styles.blob, styles.blobTwo]} />
           </View>
           <View style={styles.card}>
+            <AppLogo width={200} height={52} />
             <Text style={styles.title}>{title}</Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             <View style={styles.body}>{children}</View>

@@ -39,8 +39,8 @@ echo "🔐 Usando variables de $ENV_FILE (API_URL=$(grep '^API_URL' "$ENV_FILE" 
 
 export APP_ENV=production
 
-echo "🧹 Limpiando proyecto nativo..."
-npx expo prebuild --clean --platform android --no-install
+echo "🧹 Sincronizando proyecto nativo..."
+npx expo prebuild --platform android --no-install
 
 echo "🛠  Escribiendo android/local.properties con sdk.dir=$SDK_PATH"
 cat > android/local.properties <<EOF

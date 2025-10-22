@@ -230,8 +230,9 @@ const ProfileScreen = () => {
       if (picker.type !== 'success' || !picker.assets || !picker.assets.length) {
         setUploadingType(null);
         setDocumentStates((prev) => {
-          const { [type]: _discard, ...rest } = prev;
-          return rest;
+          const next = { ...prev };
+          delete next[type];
+          return next;
         });
         return;
       }

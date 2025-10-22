@@ -66,8 +66,8 @@ try {
 
     $env:APP_ENV = "production"
     try {
-        Write-Host "🧹 Limpiando proyecto nativo..." -ForegroundColor Cyan
-        npx expo prebuild --clean --platform android --no-install
+        Write-Host "🧹 Sincronizando proyecto nativo..." -ForegroundColor Cyan
+        npx expo prebuild --platform android --no-install
 
         $localProperties = @(
             "sdk.dir=$sdkPath"

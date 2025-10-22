@@ -15,7 +15,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.skyterra.operators"
     },
     "android": {
       "package": "com.skyterra.operators",
