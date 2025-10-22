@@ -14,6 +14,7 @@ Thumbs.db
 *.env.production.local
 local_settings.py
 apps/operator-mobile/android/gradle.properties.local
+apps/operator-mobile/google-maps.properties
 
 # Python
 __pycache__/

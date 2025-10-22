@@ -92,15 +92,16 @@ npm run start
 - Habilita en Google Cloud: "Maps SDK for Android" (y opcionalmente Places/Directions si las usas). Activa facturación.
 - Restringe la key a paquete `com.skyterra.operators` + SHA‑1 (obtén con `cd apps/operator-mobile/android && ./gradlew signingReport`).
 - No la subas al repo. Entrégala al build así:
-  1. **Recomendado**: crea `apps/operator-mobile/android/gradle.properties.local` con `GOOGLE_MAPS_API_KEY=AIza...` (el archivo está gitignored).
-  2. Variable de entorno puntual:
+  1. **Recomendado**: crea `apps/operator-mobile/google-maps.properties` con `GOOGLE_MAPS_API_KEY=AIza...` (gitignored y no se borra al hacer `expo prebuild --clean`).
+  2. Archivo dentro de `android`: `apps/operator-mobile/android/gradle.properties.local` (si limpias el proyecto, cópialo otra vez).
+  3. Variable de entorno puntual:
      ```bash
      cd apps/operator-mobile/android
      GOOGLE_MAPS_API_KEY=AIza... ./gradlew assembleDebug
      # o assembleRelease
      ```
-  3. Global en tu máquina: `~/.gradle/gradle.properties` → `GOOGLE_MAPS_API_KEY=AIza...`.
-  4. EAS/CI: define el secreto `GOOGLE_MAPS_API_KEY`.
+  4. Global en tu máquina: `~/.gradle/gradle.properties` → `GOOGLE_MAPS_API_KEY=AIza...`.
+  5. EAS/CI: define el secreto `GOOGLE_MAPS_API_KEY`.
 
 El manifest ya incluye el placeholder (`com.google.android.geo.API_KEY`); si la clave falta, Gradle aborta con el mensaje “Falta la API key de Google Maps… pídesela a Jan”.
 
