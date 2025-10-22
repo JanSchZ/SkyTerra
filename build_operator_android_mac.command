@@ -47,9 +47,52 @@ cat > android/local.properties <<EOF
 sdk.dir=$SDK_PATH
 EOF
 
+echo "🎨 Actualizando launcher icons light/dark..."
+remove_png_icons() {
+  for dir in "$APP_DIR"/android/app/src/main/res/mipmap-*; do
+    rm -f "$dir"/ic_launcher*.png
+  done
+}
+
+generate_icons_for_variant() {
+  local variant_dir=$1
+  local source=$2
+
+  for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+    if [ "$density" = "mdpi" ]; then
+      fg=108
+      base=48
+    elif [ "$density" = "hdpi" ]; then
+      fg=162
+      base=72
+    elif [ "$density" = "xhdpi" ]; then
+      fg=216
+      base=96
+    elif [ "$density" = "xxhdpi" ]; then
+      fg=324
+      base=144
+    else
+      fg=432
+      base=192
+    fi
+
+    target_dir="$APP_DIR/android/app/src/main/res/$variant_dir-$density"
+    [ -d "$target_dir" ] || mkdir -p "$target_dir"
+
+    npx sharp-cli -i "$source" -o "$target_dir/ic_launcher_foreground.webp" resize "$fg" "$fg" --fit contain --background "rgba(0,0,0,0)"
+    for name in ic_launcher ic_launcher_round; do
+      npx sharp-cli -i "$source" -o "$target_dir/$name.webp" resize "$base" "$base" --fit contain --background "rgba(0,0,0,0)"
+    done
+  done
+}
+
+remove_png_icons
+generate_icons_for_variant "mipmap" "$APP_DIR/assets/Logo_Skyterra_negro.png"
+generate_icons_for_variant "mipmap-night" "$APP_DIR/assets/Logo_skyterra_blanco.png"
+
 echo "🏗  Ejecutando Gradle assembleRelease..."
 pushd android >/dev/null
-./gradlew clean assembleRelease
+./gradlew assembleRelease
 popd >/dev/null
 
 unset APP_ENV

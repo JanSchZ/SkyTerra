@@ -74,10 +74,47 @@ try {
         )
         $localProperties | Out-File -FilePath "android\local.properties" -Encoding ascii
 
+        Write-Host "🎨 Actualizando launcher icons light/dark..." -ForegroundColor Cyan
+
+        $mipmapDirs = Get-ChildItem "android\app\src\main\res" -Directory -Filter "mipmap*" -ErrorAction SilentlyContinue
+        foreach ($dir in $mipmapDirs) {
+            Get-ChildItem $dir.FullName -Filter "ic_launcher*.png" -ErrorAction SilentlyContinue | Remove-Item -Force
+        }
+
+        function Invoke-IconGeneration {
+            param(
+                [string]$VariantPrefix,
+                [string]$SourceImage
+            )
+
+            foreach ($density in @("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")) {
+                switch ($density) {
+                    "mdpi"   { $fg = 108; $base = 48 }
+                    "hdpi"   { $fg = 162; $base = 72 }
+                    "xhdpi"  { $fg = 216; $base = 96 }
+                    "xxhdpi" { $fg = 324; $base = 144 }
+                    default  { $fg = 432; $base = 192 }
+                }
+
+                $targetDir = Join-Path "android\app\src\main\res" "$VariantPrefix-$density"
+                if (-not (Test-Path $targetDir)) {
+                    New-Item -ItemType Directory -Path $targetDir | Out-Null
+                }
+
+                npx sharp-cli -i $SourceImage -o (Join-Path $targetDir "ic_launcher_foreground.webp") resize $fg $fg --fit contain --background "rgba(0,0,0,0)"
+                foreach ($name in @("ic_launcher", "ic_launcher_round")) {
+                    npx sharp-cli -i $SourceImage -o (Join-Path $targetDir "$name.webp") resize $base $base --fit contain --background "rgba(0,0,0,0)"
+                }
+            }
+        }
+
+        Invoke-IconGeneration -VariantPrefix "mipmap" -SourceImage (Join-Path $AppDir "assets\Logo_Skyterra_negro.png")
+        Invoke-IconGeneration -VariantPrefix "mipmap-night" -SourceImage (Join-Path $AppDir "assets\Logo_skyterra_blanco.png")
+
         Write-Host "🏗  Ejecutando Gradle assembleRelease..." -ForegroundColor Green
         Push-Location (Join-Path $AppDir "android")
         try {
-            .\gradlew.bat clean assembleRelease
+            .\gradlew.bat assembleRelease
         }
         finally {
             Pop-Location
