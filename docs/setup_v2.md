@@ -100,10 +100,20 @@ npm run start
      GOOGLE_MAPS_API_KEY=AIza... ./gradlew assembleDebug
      # o assembleRelease
      ```
-  4. Global en tu máquina: `~/.gradle/gradle.properties` → `GOOGLE_MAPS_API_KEY=AIza...`.
-  5. EAS/CI: define el secreto `GOOGLE_MAPS_API_KEY`.
+ 4. Global en tu máquina: `~/.gradle/gradle.properties` → `GOOGLE_MAPS_API_KEY=AIza...`.
+ 5. EAS/CI: define el secreto `GOOGLE_MAPS_API_KEY`.
 
 El manifest ya incluye el placeholder (`com.google.android.geo.API_KEY`); si la clave falta, Gradle aborta con el mensaje “Falta la API key de Google Maps… pídesela a Jan”.
+
+### 4.2 Build nativo Android (launcher icon light/dark)
+- Usa los scripts de la raíz (`build_operator_android_mac.command`, `build_operator_android_windows.ps1`) para generar el APK.
+- Ambos scripts ejecutan `expo prebuild` (sin `--clean`) y **regeneran los iconos adaptativos** después:
+  - Se eliminan los `ic_launcher*.png` que Expo vuelve a crear.
+  - Se corren conversiones con `npx sharp-cli` para producir únicamente `.webp` en todas las densidades (`mipmap-*/mipmap-night-*`).
+  - Esto mantiene el logo negro para tema claro y el logo blanco para tema oscuro sin conflictos de recursos duplicados.
+- Requisito: dejar los assets en `apps/operator-mobile/assets/Logo_Skyterra_negro.png` y `Logo_skyterra_blanco.png`. Sharp se descarga on-demand vía `npx`, no requiere instalación global.
+- Si se necesita ejecutar `expo prebuild --clean`, repetir el paso de regeneración (o correr el script completo) porque Expo volverá a escribir los iconos por defecto.
+- Nota: `apps/operator-mobile/android/gradle.properties` tiene `newArchEnabled=false` temporalmente para evitar fallos de CMake con la New Architecture. Si más adelante se habilita (`true`), asegurarse de que el pipeline de codegen genere las carpetas JNI antes del clean.
 
 ## 5. App Android oficial (apps/android)
 1. Definir tokens Mapbox (servicio y runtime). Agregar en `~/.gradle/gradle.properties` o copiar `apps/android/gradle.properties.example` a `apps/android/gradle.properties`:
