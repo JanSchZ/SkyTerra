@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+} from 'react';
 import axios from 'axios';
 import {
   signIn,
@@ -35,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [preferredName, setPreferredName] = useState<string | null>(null);
+  const autoLoginPromiseRef = useRef<Promise<boolean> | null>(null);
 
   useEffect(() => {
     const loadName = async () => {
@@ -117,7 +126,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await clearStoredTokens();
       setUser(null);
       setLoading(false);
-      const restored = await attemptStoredCredentialLogin();
+      if (!autoLoginPromiseRef.current) {
+        autoLoginPromiseRef.current = attemptStoredCredentialLogin().finally(() => {
+          autoLoginPromiseRef.current = null;
+        });
+      }
+      const restored = await autoLoginPromiseRef.current;
       if (!restored) {
         setInitializing(false);
       }
@@ -195,6 +209,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await clearStoredTokens();
     await clearStoredCredentials();
     await clearPreferredName();
+    autoLoginPromiseRef.current = null;
     setUser(null);
     setPreferredName(null);
   }, []);

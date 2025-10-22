@@ -35,7 +35,7 @@ import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import LandingV2 from './components/ui/LandingV2';
-import AppHeader from './components/ui/AppHeader.jsx';
+import LogoSkyterra from './assets/Logo_skyterra_blanco.png';
 
 import CompareView from './components/property/CompareView';
 import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
@@ -785,7 +785,6 @@ function App() {
         path="/" 
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
-            <AppHeader />
             <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
           </motion.div>
         } 
@@ -918,29 +917,50 @@ function App() {
                   width: '100%',
                 }}
               >
-                <Typography
-                  variant={isMobile ? "h6" : "h5"}
-                  component="div"
+                <Box
                   onClick={() => navigate('/')}
-                  sx={(theme)=>({
-                    color: theme.palette.common.white,
-                    fontFamily: 'Helvetica, Arial, sans-serif',
-                    fontWeight: 400,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: isMobile ? 1 : 1.5,
                     cursor: 'pointer',
                     userSelect: 'none',
                     paddingRight: 2,
                     paddingLeft: isMobile ? 1 : 3,
-                    transition: 'color 0.3s ease-in-out',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.35)',
+                    textDecoration: 'none',
+                    transition: 'transform 0.25s ease, opacity 0.25s ease',
                     '&:hover': {
-                      color: '#ffffff',
-                    }
-                  })}
+                      transform: 'translateY(-1px)',
+                      opacity: 0.9,
+                    },
+                  }}
                 >
-                  SKYTERRA
-                </Typography>
+                  <Box
+                    component="img"
+                    src={LogoSkyterra}
+                    alt="Skyterra"
+                    sx={{
+                      height: isMobile ? 38 : 52,
+                      width: 'auto',
+                      filter: 'drop-shadow(0 6px 18px rgba(0,0,0,0.45))',
+                    }}
+                  />
+                  <Typography
+                    variant={isMobile ? 'h6' : 'h5'}
+                    component="span"
+                    sx={(theme) => ({
+                      color: theme.palette.common.white,
+                      fontFamily: 'Helvetica, Arial, sans-serif',
+                      fontWeight: 500,
+                      letterSpacing: { xs: '0.08em', md: '0.12em' },
+                      textTransform: 'uppercase',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.35)',
+                      lineHeight: 1,
+                    })}
+                  >
+                    SKYTERRA
+                  </Typography>
+                </Box>
 
                 <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', px: isMobile ? 1 : 2 }}>
                   <Box sx={{ width: '100%', maxWidth: '700px' }}> {/* This ensures AISearchBar keeps its width */}

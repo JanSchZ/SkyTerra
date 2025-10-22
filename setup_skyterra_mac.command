@@ -182,7 +182,7 @@ if [[ -d "$OPERATOR_DIR" ]]; then
     pushd "$OPERATOR_DIR" >/dev/null 2>&1 || true
     if [[ "$PWD" == "$OPERATOR_DIR" ]]; then
     run_step "Instalar dependencias app Operadores" npm install --legacy-peer-deps
-        add_manual "Define 'apiUrl' en apps/operator-mobile/app.config.ts apuntando a http://localhost:8000 o a tu dominio. Luego ejecuta: npx expo start"
+        add_manual "Define API_URL en apps/operator-mobile/.env.development (por ejemplo http://localhost:8000) o ajusta 'apiUrl' en app.config.ts. Luego ejecuta: npx expo start"
     fi
     popd >/dev/null 2>&1 || true
 else

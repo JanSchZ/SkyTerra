@@ -74,43 +74,64 @@ const DashboardScreen = () => {
   const [showTour, setShowTour] = useState(false);
   const hasRequestedProfileName = useRef(false);
 
-  const load = useCallback(async (refreshOnly = false) => {
-    if (!refreshOnly) {
-      setLoading(true);
-    }
-    setRefreshing(refreshOnly);
-    setError(null);
-    try {
-      const [profileData, invites, jobs] = await Promise.all([
-        fetchPilotProfile(),
-        listAvailableJobs(),
-        listPilotJobs(),
-      ]);
-      setProfile(profileData);
-      setIsAvailable(profileData.is_available);
-      setAvailableOffers(invites);
-      setPilotJobs(jobs);
-    } catch (err) {
-      console.error('Dashboard load error', err);
-      setError('No pudimos sincronizar tu panel. Desliza hacia abajo para reintentar.');
-    } finally {
+  const load = useCallback(
+    async (refreshOnly = false) => {
+      if (!user) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+      if (!refreshOnly) {
+        setLoading(true);
+      }
+      setRefreshing(refreshOnly);
+      setError(null);
+      try {
+        const [profileData, invites, jobs] = await Promise.all([
+          fetchPilotProfile(),
+          listAvailableJobs(),
+          listPilotJobs(),
+        ]);
+        setProfile(profileData);
+        setIsAvailable(profileData.is_available);
+        setAvailableOffers(invites);
+        setPilotJobs(jobs);
+      } catch (err) {
+        console.error('Dashboard load error', err);
+        setError('No pudimos sincronizar tu panel. Desliza hacia abajo para reintentar.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [user]
+  );
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      setAvailableOffers([]);
+      setPilotJobs([]);
       setLoading(false);
       setRefreshing(false);
+      setError(null);
+      return;
     }
-  }, []);
-
-  useEffect(() => {
     load();
-  }, [load]);
+  }, [load, user]);
 
   useEffect(() => {
+    if (!user) {
+      hasRequestedProfileName.current = false;
+      return;
+    }
     if (!initializing && !preferredName && !hasRequestedProfileName.current) {
       hasRequestedProfileName.current = true;
       refreshUser().catch((err) => {
         console.warn('Dashboard refresh user failed', err);
       });
     }
-  }, [initializing, preferredName, refreshUser]);
+  }, [initializing, preferredName, refreshUser, user]);
 
   useEffect(() => {
     const checkTour = async () => {

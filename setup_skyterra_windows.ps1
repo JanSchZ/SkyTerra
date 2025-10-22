@@ -232,7 +232,7 @@ if ((Test-Path $OperatorDir) -and $npmAvailable) {
             Pop-Location
         }
     }
-    Add-Manual "Define 'apiUrl' en apps\\operator-mobile\\app.config.ts para apuntar al backend (por ejemplo http://localhost:8000) y ejecuta 'npx expo start' para probar la app."
+    Add-Manual "Define API_URL en apps\\operator-mobile\\.env.development (por ejemplo http://localhost:8000) o ajusta 'apiUrl' en app.config.ts y ejecuta 'npx expo start' para probar la app."
 } elseif (Test-Path $OperatorDir) {
     Add-Manual "No se pudieron instalar dependencias de operadores porque npm no esta disponible."
 } else {

@@ -11,6 +11,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from dj_rest_auth.views import LoginView
 from dj_rest_auth.registration.views import RegisterView
+from dj_rest_auth.app_settings import api_settings as dj_rest_auth_settings
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -18,6 +19,34 @@ class OperatorLoginView(LoginView):
     """Mobile operator login that skips CSRF validation, returns JWT tokens only."""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        # Expo clients persist tokens manually, so ensure they remain in the JSON body
+        # even when dj-rest-auth is configured to rely on HttpOnly cookies.
+        if response.status_code == 200 and isinstance(response.data, (dict, list)):
+            data = dict(response.data)
+
+            access = data.get('access') or data.get('access_token')
+            refresh = data.get('refresh') or data.get('refresh_token')
+
+            access_cookie_name = dj_rest_auth_settings.JWT_AUTH_COOKIE
+            refresh_cookie_name = dj_rest_auth_settings.JWT_AUTH_REFRESH_COOKIE
+
+            if not access and access_cookie_name and access_cookie_name in response.cookies:
+                cookie = response.cookies[access_cookie_name]
+                data['access'] = cookie.value
+                data['access_token'] = cookie.value
+
+            if not refresh and refresh_cookie_name and refresh_cookie_name in response.cookies:
+                cookie = response.cookies[refresh_cookie_name]
+                data['refresh'] = cookie.value
+                data['refresh_token'] = cookie.value
+
+            response.data = data
+
+        return response
 
 
 @method_decorator(csrf_exempt, name='dispatch')

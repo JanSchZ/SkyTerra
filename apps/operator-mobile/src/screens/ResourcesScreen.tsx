@@ -69,7 +69,7 @@ const ResourcesScreen = () => {
             </Text>
           </View>
 
-          <View style={styles.callout}>
+          <TouchableOpacity style={styles.callout} activeOpacity={0.9} onPress={() => navigation.navigate('Jobs')}>
             <View style={styles.calloutIcon}>
               <Ionicons name="cloud-upload-outline" size={20} color={colors.primaryOn} />
             </View>
@@ -79,10 +79,8 @@ const ResourcesScreen = () => {
                 Sube fotografías, videos y archivos ZIP directo desde el detalle del trabajo en curso.
               </Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Jobs')}>
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Guías operativas</Text>
