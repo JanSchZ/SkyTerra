@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { AnimatePresence, motion } from 'framer-motion';
 import MapView from '../map/MapView';
+import AISearchBar from './AISearchBar';
 
 const HERO_ORBIT_VIEW = {
   longitude: -70,
@@ -19,6 +20,12 @@ export default function LandingV2({
   heroVisible = true,
   onExplore,
   onMapReady,
+  onSearch,
+  onLocationSearch,
+  onSearchStart,
+  onSearchComplete,
+  searchQuery,
+  onQueryChange,
 }) {
   const filters = useMemo(() => externalFilters || {}, [externalFilters]);
   const appliedFilters = useMemo(() => externalAppliedFilters || {}, [externalAppliedFilters]);
@@ -128,6 +135,7 @@ export default function LandingV2({
               embedded={heroVisible}
               height={heroVisible ? '100%' : undefined}
               enableIdleRotation={!heroVisible}
+              forceContinuousRotation={heroVisible}
               onLoad={handleMapReady}
             />
           </Box>
@@ -187,20 +195,9 @@ export default function LandingV2({
                     clipPath: heroClipPath,
                     WebkitClipPath: heroClipPath,
                     background:
-                      'radial-gradient(circle at 48% 52%, rgba(255,255,255,0.48) 0%, rgba(255,255,255,0.12) 55%, rgba(15,23,42,0) 100%)',
-                    boxShadow: '0 28px 70px rgba(15,23,42,0.18)',
-                  }}
-                />
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    clipPath: heroClipPath,
-                    WebkitClipPath: heroClipPath,
-                    background:
-                      'radial-gradient(circle at 68% 45%, rgba(59,130,246,0.28) 0%, rgba(59,130,246,0) 72%)',
+                      'radial-gradient(circle at 68% 45%, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0) 72%)',
                     filter: 'blur(22px)',
-                    opacity: 0.7,
+                    opacity: 0.6,
                   }}
                 />
                 <Box
@@ -230,17 +227,17 @@ export default function LandingV2({
             >
               <Box
                 sx={{
-                  maxWidth: '1200px',
+                  maxWidth: { xs: '100%', md: '1200px' },
                   width: '100%',
                   mx: 'auto',
                   display: 'flex',
-                  flexDirection: { xs: 'column', md: 'row' },
-                  alignItems: { xs: 'flex-start', md: 'center' },
-                  gap: { xs: 5, md: 10 },
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: { xs: 5, md: 6 },
                 }}
               >
-                <Box sx={{ flex: 1, minWidth: { xs: '100%', md: 'auto' } }}>
-                  <Stack spacing={{ xs: 3, md: 4 }}>
+                <Box sx={{ maxWidth: { xs: '100%', md: '520px' } }}>
+                  <Stack spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
                     <Typography
                       component="h1"
                       sx={{
@@ -258,7 +255,7 @@ export default function LandingV2({
                       sx={{
                         fontSize: { xs: '1.05rem', md: '1.15rem' },
                         color: 'rgba(15,23,42,0.68)',
-                        maxWidth: { xs: '90%', md: '420px' },
+                        maxWidth: { xs: '100%', md: '420px' },
                         fontWeight: 400,
                       }}
                     >
@@ -290,7 +287,34 @@ export default function LandingV2({
                   </Stack>
                 </Box>
 
-                <Box sx={{ flex: 1, display: { xs: 'none', md: 'block' } }} />
+                <AnimatePresence>
+                  {heroVisible && (
+                    <Box
+                      component={motion.div}
+                      layoutId="global-search-bar"
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                      sx={{
+                        width: '100%',
+                        maxWidth: '100%',
+                        pointerEvents: 'auto',
+                      }}
+                    >
+                      <AISearchBar
+                        onSearch={onSearch}
+                        onLocationSearch={onLocationSearch}
+                        onSearchStart={onSearchStart}
+                        onSearchComplete={onSearchComplete}
+                        variant="hero"
+                        placeholder="Buscar terrenos..."
+                        value={searchQuery}
+                        onQueryChange={onQueryChange}
+                      />
+                    </Box>
+                  )}
+                </AnimatePresence>
               </Box>
             </Box>
           </Box>
