@@ -108,7 +108,7 @@ export const clearPreferredName = async () => SecureStore.deleteItemAsync(PREFER
 const rawClient = axios.create({
   baseURL: apiBaseUrl,
   timeout: 15000,
-  withCredentials: true,
+  withCredentials: false,
 });
 
 const refreshAccessToken = async (): Promise<string | null> => {
@@ -147,7 +147,7 @@ const queueRefresh = () => {
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
-  withCredentials: true,
+  withCredentials: false,
   timeout: 15000,
 });
 
@@ -249,7 +249,7 @@ export const signIn = async (payload: SignInPayload): Promise<SignInResult> => {
       submission.login_identifier = loginIdentifier;
     }
 
-    const { data } = await rawClient.post('/api/auth/login/', submission);
+    const { data } = await rawClient.post('/api/auth/operator/login/', submission);
     const tokens: SignInTokens = {
       access: data?.access ?? data?.access_token,
       refresh: data?.refresh ?? data?.refresh_token,
@@ -304,7 +304,7 @@ export const signUp = async (payload: SignUpPayload): Promise<SignUpResult> => {
     Object.entries(submission).filter(([, value]) => value !== undefined && value !== '')
   );
 
-  const { data } = await rawClient.post('/api/auth/registration/', body);
+  const { data } = await rawClient.post('/api/auth/operator/registration/', body);
 
   const tokens: SignInTokens = {
     access: data?.access ?? data?.access_token,

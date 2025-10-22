@@ -8,6 +8,22 @@ from .serializers import UserDetailsSerializer
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from dj_rest_auth.views import LoginView
+from dj_rest_auth.registration.views import RegisterView
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class OperatorLoginView(LoginView):
+    """Mobile operator login that skips CSRF validation, returns JWT tokens only."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class OperatorRegisterView(RegisterView):
+    """Mobile operator registration without CSRF requirement."""
+    permission_classes = [permissions.AllowAny]
 
 def get_southern_chile_properties(request):
     regions = ['Los Lagos', 'Aysén', 'Magallanes']  # Add more if needed based on the script
