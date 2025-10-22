@@ -35,6 +35,7 @@ import Dashboard from './components/ui/Dashboard';
 import AISearchBar from './components/ui/AISearchBar';
 import AISuggestionPanel from './components/ui/AISuggestionPanel';
 import LandingV2 from './components/ui/LandingV2';
+import AppHeader from './components/ui/AppHeader.jsx';
 
 import CompareView from './components/property/CompareView';
 import PropertyApprovalPage from './components/adminV2/PropertyApprovalPage.jsx';
@@ -784,6 +785,7 @@ function App() {
         path="/" 
         element={
           <motion.div initial="initial" animate="in" exit="out" variants={pageVariants} transition={pageTransition}>
+            <AppHeader />
             <MapView ref={mapRef} appliedFilters={aiAppliedFilters} filters={{}} initialData={initialPropertiesData} />
           </motion.div>
         } 
