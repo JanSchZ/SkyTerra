@@ -14,17 +14,19 @@ import {
   Button,
   CircularProgress,
   Alert,
-  IconButton,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Divider,
+  InputAdornment,
   Stack,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterAltOffIcon from '@mui/icons-material/FilterAltOffOutlined';
 import { styled } from '@mui/material/styles';
 import { adminService } from '../../services/api';
 
@@ -91,20 +93,30 @@ const AdminTicketsPage = () => {
   const [assignUpdating, setAssignUpdating] = useState(false);
   const [staffUsers, setStaffUsers] = useState([]);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [assignedFilter, setAssignedFilter] = useState('all');
+  const [draggedTicketId, setDraggedTicketId] = useState(null);
+  const [dragOverStatus, setDragOverStatus] = useState(null);
+  const [boardError, setBoardError] = useState('');
 
-  const loadTickets = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  const loadTickets = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const { results } = await adminService.fetchTickets({ pageSize: 200 });
       setTickets(results);
       setLastRefresh(new Date());
+      setError('');
     } catch (err) {
       console.error('Error loading tickets', err);
       setError(err?.message || 'No se pudieron cargar los tickets.');
       setTickets([]);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -204,13 +216,55 @@ const AdminTicketsPage = () => {
     }
   };
 
+  const filteredTickets = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return tickets.filter((ticket) => {
+      if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) {
+        return false;
+      }
+      if (assignedFilter === 'unassigned' && ticket.assigned_to_user_id) {
+        return false;
+      }
+      if (
+        assignedFilter !== 'all' &&
+        assignedFilter !== 'unassigned' &&
+        ticket.assigned_to_user_id !== Number(assignedFilter)
+      ) {
+        return false;
+      }
+      if (!query) return true;
+      const haystack = `${ticket.subject || ''} ${ticket.description || ''} ${ticket.user || ''}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [tickets, priorityFilter, assignedFilter, searchTerm]);
+
+  const filtersActive = useMemo(
+    () => Boolean(searchTerm.trim() || priorityFilter !== 'all' || assignedFilter !== 'all'),
+    [searchTerm, priorityFilter, assignedFilter]
+  );
+
+  const filteredCount = filteredTickets.length;
+  const totalTickets = tickets.length;
+
+  const assigneeOptions = useMemo(
+    () =>
+      staffUsers.map((staff) => ({
+        id: staff.id,
+        label:
+          staff.first_name || staff.last_name
+            ? `${staff.first_name || ''} ${staff.last_name || ''}`.trim()
+            : staff.email || staff.username || `Usuario ${staff.id}`,
+      })),
+    [staffUsers]
+  );
+
   const groupedTickets = useMemo(() => {
     const groups = statusOrder.reduce((acc, item) => {
       acc[item.key] = [];
       return acc;
     }, {});
 
-    tickets.forEach((ticket) => {
+    filteredTickets.forEach((ticket) => {
       if (groups[ticket.status]) {
         groups[ticket.status].push(ticket);
       } else {
@@ -218,13 +272,86 @@ const AdminTicketsPage = () => {
       }
     });
     return groups;
-  }, [tickets]);
+  }, [filteredTickets]);
+
+  const handleDragStart = (event, ticketId) => {
+    setDraggedTicketId(ticketId);
+    setBoardError('');
+    event.dataTransfer.setData('text/plain', String(ticketId));
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTicketId(null);
+    setDragOverStatus(null);
+  };
+
+  const handleDragEnter = (status) => {
+    setDragOverStatus(status);
+  };
+
+  const handleDragLeave = (status) => {
+    setDragOverStatus((current) => (current === status ? null : current));
+  };
+
+  const handleDrop = async (event, targetStatus) => {
+    event.preventDefault();
+    const data = event.dataTransfer.getData('text/plain');
+    const ticketId = Number(data);
+    if (!ticketId || Number.isNaN(ticketId)) {
+      handleDragEnd();
+      return;
+    }
+    const ticket = tickets.find((item) => item.id === ticketId);
+    if (!ticket || ticket.status === targetStatus) {
+      handleDragEnd();
+      return;
+    }
+
+    handleDragEnd();
+    const previousStatus = ticket.status;
+    setTickets((current) =>
+      current.map((item) => (item.id === ticketId ? { ...item, status: targetStatus } : item))
+    );
+
+    try {
+      await adminService.updateTicket(ticketId, { status: targetStatus });
+      if (dialogOpen && selectedTicket?.id === ticketId) {
+        setSelectedTicket((current) => (current ? { ...current, status: targetStatus } : current));
+      }
+      await loadTickets({ silent: true });
+    } catch (err) {
+      console.error('Error moviendo ticket', err);
+      setBoardError('No se pudo mover el ticket. Intenta nuevamente.');
+      setTickets((current) =>
+        current.map((item) => (item.id === ticketId ? { ...item, status: previousStatus } : item))
+      );
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setPriorityFilter('all');
+    setAssignedFilter('all');
+  };
 
   const renderTicketCard = (ticket) => {
     const createdAt = new Date(ticket.created_at);
     const userInitial = ticket.user?.charAt(0)?.toUpperCase() ?? '?';
+    const isDragging = draggedTicketId === ticket.id;
+    const handleCardClick = () => {
+      if (draggedTicketId !== null) return;
+      handleOpenDialog(ticket);
+    };
     return (
-      <StyledCard key={ticket.id} onClick={() => handleOpenDialog(ticket)}>
+      <StyledCard
+        key={ticket.id}
+        onClick={handleCardClick}
+        draggable
+        onDragStart={(event) => handleDragStart(event, ticket.id)}
+        onDragEnd={handleDragEnd}
+        sx={{ opacity: isDragging ? 0.6 : 1 }}
+      >
         <Stack direction="row" spacing={1.5} alignItems="center">
           <Avatar
             sx={{
@@ -292,7 +419,7 @@ const AdminTicketsPage = () => {
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
-            onClick={loadTickets}
+            onClick={() => loadTickets()}
             disabled={loading}
           >
             Actualizar
@@ -306,6 +433,91 @@ const AdminTicketsPage = () => {
         </Alert>
       )}
 
+      <Stack
+        direction={{ xs: 'column', lg: 'row' }}
+        spacing={2}
+        alignItems={{ xs: 'stretch', lg: 'center' }}
+        justifyContent="space-between"
+        sx={{ mb: 3 }}
+      >
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          sx={{ flexWrap: 'wrap' }}
+        >
+          <TextField
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Buscar por asunto, descripción o cliente…"
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ width: { xs: '100%', md: 320 } }}
+          />
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 160 } }}>
+            <InputLabel id="priority-filter-label">Prioridad</InputLabel>
+            <Select
+              labelId="priority-filter-label"
+              label="Prioridad"
+              value={priorityFilter}
+              onChange={(event) => setPriorityFilter(event.target.value)}
+            >
+              <MenuItem value="all">Todas</MenuItem>
+              <MenuItem value="urgent">Urgente</MenuItem>
+              <MenuItem value="high">Alta</MenuItem>
+              <MenuItem value="medium">Media</MenuItem>
+              <MenuItem value="low">Baja</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 200 } }}>
+            <InputLabel id="assigned-filter-label">Asignado</InputLabel>
+            <Select
+              labelId="assigned-filter-label"
+              label="Asignado"
+              value={assignedFilter}
+              onChange={(event) => setAssignedFilter(event.target.value)}
+            >
+              <MenuItem value="all">Todos</MenuItem>
+              <MenuItem value="unassigned">Sin asignar</MenuItem>
+              {assigneeOptions.map((option) => (
+                <MenuItem key={option.id} value={String(option.id)}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+          sx={{ justifyContent: { xs: 'flex-start', lg: 'flex-end' } }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Mostrando {filteredCount} de {totalTickets} tickets
+          </Typography>
+          <Button
+            variant="text"
+            startIcon={<FilterAltOffIcon />}
+            onClick={handleClearFilters}
+            disabled={!filtersActive}
+          >
+            Limpiar
+          </Button>
+        </Stack>
+      </Stack>
+
+      {boardError && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          {boardError}
+        </Alert>
+      )}
+
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
           <CircularProgress />
@@ -314,10 +526,34 @@ const AdminTicketsPage = () => {
         <Grid container spacing={3}>
           {statusOrder.map(({ key, label }) => (
             <Grid item xs={12} md={6} lg={4} key={key}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                {label}
-              </Typography>
-              <Stack spacing={2}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  {label}
+                </Typography>
+                <Chip label={groupedTickets[key]?.length || 0} size="small" />
+              </Stack>
+              <Stack
+                spacing={2}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => handleDrop(event, key)}
+                onDragEnter={() => handleDragEnter(key)}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    handleDragLeave(key);
+                  }
+                }}
+                sx={{
+                  p: 1,
+                  minHeight: 180,
+                  borderRadius: 2,
+                  border:
+                    dragOverStatus === key
+                      ? '1px dashed rgba(59,130,246,0.5)'
+                      : '1px dashed rgba(148,163,184,0.25)',
+                  backgroundColor: dragOverStatus === key ? 'rgba(59,130,246,0.08)' : 'transparent',
+                  transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                }}
+              >
                 {groupedTickets[key]?.length
                   ? groupedTickets[key].map(renderTicketCard)
                   : (

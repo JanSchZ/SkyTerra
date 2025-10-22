@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -17,6 +18,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
 import { propertyService, tourService } from '../../services/api';
 import UploadTourDialog from '../tours/UploadTourDialog';
 import WorkflowTimeline from '../ui/WorkflowTimeline.jsx';
@@ -36,6 +38,8 @@ const QUICK_ACTIONS = [
   { key: 'ready_for_publish', label: 'Listo para publicar', nodes: ['post'] },
   { key: 'published', label: 'Publicar en Skyterra', nodes: ['post', 'live'] },
 ];
+
+const STAGE_FILTERS = new Set(['review', 'approved', 'pilot', 'post', 'live']);
 
 const getCurrentStage = (timeline = []) => {
   const active = timeline.find((item) => item.state === 'active');
@@ -62,15 +66,37 @@ const formatDuration = (stage) => {
 };
 
 function PropertyManagementPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stageParam = searchParams.get('stage');
+  const focusParam = searchParams.get('focus');
+  const normalizedStage = stageParam && STAGE_FILTERS.has(stageParam) ? stageParam : 'all';
+  const focus = focusParam === 'sla' ? 'sla' : null;
+
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(normalizedStage);
+  const [sortModel, setSortModel] = useState(() =>
+    focus === 'sla' ? [{ field: 'current_stage', sort: 'desc' }] : []
+  );
   const [refreshToggle, setRefreshToggle] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [tours, setTours] = useState([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [timelineLoading, setTimelineLoading] = useState(false);
+
+  useEffect(() => {
+    if (normalizedStage !== statusFilter) {
+      setStatusFilter(normalizedStage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedStage]);
+
+  useEffect(() => {
+    if (focus === 'sla') {
+      setSortModel([{ field: 'current_stage', sort: 'desc' }]);
+    }
+  }, [focus]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,6 +109,15 @@ function PropertyManagementPage() {
       const list = data.results || data;
       const formatted = list.map((p) => {
         const stage = getCurrentStage(p.workflow_timeline);
+        const expectedHours =
+          stage?.expected_hours ??
+          (stage?.expected_days != null ? stage.expected_days * 24 : null);
+        const durationHours =
+          stage?.duration_hours ??
+          (stage?.duration_days != null ? stage.duration_days * 24 : null);
+        const slaBreach =
+          stage?.sla_breached ??
+          (expectedHours != null && durationHours != null ? durationHours > expectedHours : false);
         return {
           id: p.id,
           name: p.name,
@@ -93,6 +128,9 @@ function PropertyManagementPage() {
           workflow_node_label: WORKFLOW_STAGE_LABELS[p.workflow_node] || p.workflow_node,
           timeline: p.workflow_timeline,
           current_stage: stage,
+          expectedHours,
+          durationHours,
+          slaBreach,
         };
       });
       setRows(formatted);
@@ -136,6 +174,19 @@ function PropertyManagementPage() {
     }
   };
 
+  const handleFilterChange = (event) => {
+    const value = event.target.value;
+    setStatusFilter(value);
+    const nextParams = new URLSearchParams(searchParams);
+    if (value === 'all') {
+      nextParams.delete('stage');
+    } else {
+      nextParams.set('stage', value);
+    }
+    nextParams.delete('focus');
+    setSearchParams(nextParams, { replace: true });
+  };
+
   const columns = [
     { field: 'id', headerName: 'ID', width: 90 },
     { field: 'name', headerName: 'Nombre', flex: 1 },
@@ -153,6 +204,11 @@ function PropertyManagementPage() {
       headerName: 'Días en etapa',
       width: 140,
       valueGetter: ({ row }) => formatDuration(row.current_stage),
+      sortComparator: (v1, v2, cellParams1, cellParams2) => {
+        const a = cellParams1?.row?.durationHours ?? 0;
+        const b = cellParams2?.row?.durationHours ?? 0;
+        return a - b;
+      },
     },
     {
       field: 'actions',
@@ -195,13 +251,29 @@ function PropertyManagementPage() {
         Administrar Propiedades
       </Typography>
 
+      {focus === 'sla' && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Priorizando publicaciones fuera de SLA. Ordenamos por mayor tiempo en etapa para atender los casos críticos primero.
+        </Alert>
+      )}
+
+      {statusFilter !== 'all' && (
+        <Chip
+          label={`Filtro activo: ${WORKFLOW_STAGE_LABELS[statusFilter] || statusFilter}`}
+          size="small"
+          color="primary"
+          variant="outlined"
+          sx={{ mb: 2 }}
+        />
+      )}
+
       <FormControl sx={{ minWidth: 220, mb: 2 }} size="small">
         <InputLabel id="status-filter-label">Filtrar por etapa</InputLabel>
         <Select
           labelId="status-filter-label"
           value={statusFilter}
           label="Filtrar por etapa"
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={handleFilterChange}
         >
           <MenuItem value="all">Todas</MenuItem>
           <MenuItem value="review">En revisión</MenuItem>
@@ -219,10 +291,16 @@ function PropertyManagementPage() {
           sx={{
             '& .MuiDataGrid-columnHeaders': { backgroundColor: 'rgba(0,0,0,0.02)' },
             '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(0,0,0,0.01)' },
+            '& .MuiDataGrid-row.sla-breach': { backgroundColor: 'rgba(255,193,7,0.08)' },
+            '& .MuiDataGrid-row.sla-breach:hover': { backgroundColor: 'rgba(255,193,7,0.16)' },
             border: 'none',
           }}
           pageSizeOptions={[10, 25, 50]}
           autoHeight
+          sortModel={sortModel}
+          onSortModelChange={(model) => setSortModel(model)}
+          getRowClassName={(params) => (params.row.slaBreach ? 'sla-breach' : '')}
+          disableRowSelectionOnClick
           initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
           localeText={{ noRowsLabel: 'No se encontraron propiedades' }}
         />

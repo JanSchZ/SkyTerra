@@ -1,26 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import SearchIcon from '@mui/icons-material/Search';
 import DashboardIcon from '@mui/icons-material/DashboardRounded';
 import ListAltIcon from '@mui/icons-material/ListAltRounded';
 import AssessmentIcon from '@mui/icons-material/AssessmentRounded';
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import SettingsIcon from '@mui/icons-material/SettingsRounded';
 import LiveHelpIcon from '@mui/icons-material/LiveHelpOutlined';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
-import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import LocalOfferIcon from '@mui/icons-material/LocalOfferOutlined';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import './adminDashboard.css';
 import { authService } from '../../services/api';
 
 const NAV_PRIMARY = [
   { label: 'Panel', path: '/admin/dashboard', icon: <DashboardIcon fontSize="small" /> },
-  { label: 'Propiedades', path: '/admin/properties', icon: <ListAltIcon fontSize="small" /> },
+  { label: 'Aprobaciones', path: '/admin/approvals', icon: <FactCheckIcon fontSize="small" /> },
+  { label: 'Publicaciones', path: '/admin/properties', icon: <ListAltIcon fontSize="small" /> },
   { label: 'Analítica', path: '/admin/analytics', icon: <AssessmentIcon fontSize="small" /> },
-  { label: 'Proyectos', path: '/admin/projects', icon: <FolderOutlinedIcon fontSize="small" /> },
+  { label: 'Tickets', path: '/admin/tickets', icon: <SupportAgentIcon fontSize="small" /> },
+  { label: 'IA', path: '/admin/ai-management', icon: <SmartToyOutlinedIcon fontSize="small" /> },
   { label: 'Equipo', path: '/admin/users', icon: <PeopleAltOutlinedIcon fontSize="small" /> },
   { label: 'Cupones', path: '/admin/coupons', icon: <LocalOfferIcon fontSize="small" /> },
 ];
@@ -28,13 +30,6 @@ const NAV_PRIMARY = [
 const NAV_SECONDARY = [
   { label: 'Settings', path: '/admin/settings', icon: <SettingsIcon fontSize="small" /> },
   { label: 'Help Center', path: '/admin/help', icon: <LiveHelpIcon fontSize="small" /> },
-];
-
-const NAV_DOCUMENTS = [
-  { label: 'Biblioteca de datos', path: '/admin/documents/data-library' },
-  { label: 'Reportes', path: '/admin/documents/reports' },
-  { label: 'Asistente IA', path: '/admin/documents/assistant' },
-  { label: 'Más', path: '/admin/documents/more' },
 ];
 
 const AdminLayout = () => {
@@ -115,22 +110,6 @@ const AdminLayout = () => {
           </div>
         </div>
 
-        <div className="admin-nav-section">
-          <div className="admin-nav-title">Documents</div>
-          <div className="admin-doc-list">
-            {NAV_DOCUMENTS.map((item) => (
-              <NavLink
-                key={item.label}
-                to={item.path}
-                className={({ isActive }) => `admin-doc-link${isActive ? ' active' : ''}`}
-                onClick={closeSidebar}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </div>
-        </div>
-
         <div className="admin-nav-section" style={{ marginTop: 'auto' }}>
           <div className="admin-nav-title">Account</div>
           <div className="admin-nav-item" style={{ padding: 14, gap: 14 }}>
@@ -181,7 +160,7 @@ const AdminLayout = () => {
             </div>
           </div>
           <div className="admin-header-meta">
-            <span className="admin-header-breadcrumb">Documentos · Inteligencia</span>
+            <span className="admin-header-breadcrumb">Operaciones · Moderación</span>
           </div>
           <div className="admin-header-actions" />
         </header>

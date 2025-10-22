@@ -9,9 +9,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   Grid,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -22,13 +26,13 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import RefreshIcon from '@mui/icons-material/RefreshOutlined';
-import TimelineIcon from '@mui/icons-material/Timeline';
 import FlightIcon from '@mui/icons-material/FlightTakeoff';
 import CameraIcon from '@mui/icons-material/PhotoCamera';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
-import PersonOffIcon from '@mui/icons-material/PersonOffOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 import { propertyService } from '../../services/api';
 import WorkflowTimeline from '../ui/WorkflowTimeline.jsx';
@@ -43,6 +47,13 @@ const WORKFLOW_STAGE_LABELS = {
 
 const WORKFLOW_ORDER = ['review', 'approved', 'pilot', 'post', 'live'];
 
+const AUTO_REFRESH_OPTIONS = [
+  { label: 'Manual', value: 0 },
+  { label: '30 segundos', value: 30_000 },
+  { label: '1 minuto', value: 60_000 },
+  { label: '5 minutos', value: 300_000 },
+];
+
 const formatNumber = (value) => Number(value || 0).toLocaleString('es-CL');
 
 const formatDuration = (hours) => {
@@ -53,29 +64,54 @@ const formatDuration = (hours) => {
 };
 
 const AdminDashboardPage = () => {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [autoRefreshMs, setAutoRefreshMs] = useState(60_000);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const loadSummary = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  const loadSummary = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const response = await propertyService.getAdminSummary();
       setSummary(response);
+      setError('');
     } catch (err) {
       console.error('Error loading admin summary', err);
       setError('No fue posible cargar el resumen operativo.');
     } finally {
-      setLoading(false);
+      setLastUpdated(new Date());
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     loadSummary();
   }, [loadSummary]);
+
+  useEffect(() => {
+    if (!autoRefreshMs) return undefined;
+    const id = setInterval(() => {
+      loadSummary({ silent: true });
+    }, autoRefreshMs);
+    return () => clearInterval(id);
+  }, [autoRefreshMs, loadSummary]);
+
+  const formattedLastUpdated = useMemo(
+    () => (lastUpdated ? lastUpdated.toLocaleTimeString('es-CL') : null),
+    [lastUpdated]
+  );
+
+  const handleAutoRefreshChange = (event) => {
+    setAutoRefreshMs(Number(event.target.value));
+  };
 
   const workflowCounts = summary?.workflow_counts || {};
   const stageStats = summary?.stage_duration_stats || {};
@@ -112,37 +148,39 @@ const AdminDashboardPage = () => {
   const metricCards = useMemo(
     () => [
       {
-        label: 'Pilotos disponibles',
-        value: formatNumber(pilotsApproved),
-        icon: <FlightIcon fontSize="small" />, 
-        helper: 'Pilotos aprobados con disponibilidad activa.',
+        key: 'review',
+        label: 'Pendientes de revisión',
+        value: formatNumber(summary?.pending_properties ?? 0),
+        icon: <FactCheckIcon fontSize="small" />,
+        helper: 'Publicaciones esperando aprobación inicial.',
+        to: '/admin/approvals?stage=review',
       },
       {
-        label: 'Pilotos sin disponibilidad',
-        value: formatNumber(pilotsInactive),
-        icon: <PersonOffIcon fontSize="small" />,
-        helper: 'Pilotos aprobados sin disponibilidad activa.',
-      },
-      {
+        key: 'pilot',
         label: 'Operaciones en terreno',
         value: formatNumber(summary?.active_jobs ?? 0),
-        icon: <TimelineIcon fontSize="small" />, 
+        icon: <FlightIcon fontSize="small" />,
         helper: 'Trabajos invitando, asignados o agendados.',
+        to: '/admin/approvals?stage=pilot',
       },
       {
+        key: 'post',
         label: 'Postproducción en curso',
         value: formatNumber(summary?.postproduction_jobs ?? 0),
-        icon: <CameraIcon fontSize="small" />, 
+        icon: <CameraIcon fontSize="small" />,
         helper: 'Material recibido, en QC o edición.',
+        to: '/admin/approvals?stage=post',
       },
       {
+        key: 'alerts',
         label: 'Alertas activas',
         value: formatNumber(summary?.alerts_total ?? 0),
-        icon: <WarningAmberIcon fontSize="small" />, 
+        icon: <WarningAmberIcon fontSize="small" />,
         helper: 'Alertas visibles para el equipo administrador.',
+        to: '/admin/tickets?status=new',
       },
     ],
-    [summary, pilotsApproved, pilotsInactive]
+    [summary]
   );
 
   const workflowCards = useMemo(
@@ -151,8 +189,34 @@ const AdminDashboardPage = () => {
         key,
         label: WORKFLOW_STAGE_LABELS[key] || key,
         value: formatNumber(workflowCounts[key] ?? 0),
+        to: `/admin/approvals?stage=${key}`,
       })),
     [workflowCounts]
+  );
+
+  const handleCardAction = useCallback(
+    (destination) => {
+      if (!destination) return;
+      navigate(destination);
+    },
+    [navigate]
+  );
+
+  const navigateToApprovals = useCallback(
+    (stage, extra = {}) => {
+      const params = new URLSearchParams();
+      if (stage) params.set('stage', stage);
+      Object.entries(extra).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.set(key, String(value));
+        }
+      });
+      navigate({
+        pathname: '/admin/approvals',
+        search: params.toString() ? `?${params.toString()}` : '',
+      });
+    },
+    [navigate]
   );
 
   const handleOpenDetail = (property) => {
@@ -169,7 +233,12 @@ const AdminDashboardPage = () => {
     <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
       <Container maxWidth="xl">
         <Stack spacing={4}>
-          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={2}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            justifyContent="space-between"
+            alignItems={{ xs: 'flex-start', md: 'center' }}
+            spacing={2}
+          >
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 700 }}>
                 Panel operativo Skyterra
@@ -178,9 +247,34 @@ const AdminDashboardPage = () => {
                 Sincroniza a vendedores, administradores y pilotos con una vista única del workflow.
               </Typography>
             </Box>
-            <IconButton onClick={loadSummary} disabled={loading}>
-              <RefreshIcon className={loading ? 'spin' : ''} />
-            </IconButton>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              sx={{ width: { xs: '100%', md: 'auto' } }}
+            >
+              <Typography variant="caption" color="text.secondary" sx={{ minWidth: 'max-content' }}>
+                Actualizado {formattedLastUpdated ?? 'cargando...'}
+              </Typography>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="auto-refresh-label">Auto-actualizar</InputLabel>
+                <Select
+                  labelId="auto-refresh-label"
+                  value={autoRefreshMs}
+                  label="Auto-actualizar"
+                  onChange={handleAutoRefreshChange}
+                >
+                  {AUTO_REFRESH_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <IconButton onClick={() => loadSummary()} disabled={loading}>
+                <RefreshIcon className={loading ? 'spin' : ''} />
+              </IconButton>
+            </Stack>
           </Stack>
 
           {error && <Alert severity="error">{error}</Alert>}
@@ -188,7 +282,33 @@ const AdminDashboardPage = () => {
           <Grid container spacing={2}>
             {metricCards.map((card) => (
               <Grid item xs={12} sm={6} md={3} lg={3} key={card.label}>
-                <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)', height: '100%' }}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 3,
+                    borderRadius: 2,
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    height: '100%',
+                    cursor: card.to ? 'pointer' : 'default',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    '&:hover': card.to
+                      ? {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 10px 26px rgba(15, 23, 42, 0.12)',
+                        }
+                      : {},
+                  }}
+                  onClick={() => handleCardAction(card.to)}
+                  onKeyDown={(event) => {
+                    if (!card.to) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleCardAction(card.to);
+                    }
+                  }}
+                  role={card.to ? 'button' : undefined}
+                  tabIndex={card.to ? 0 : undefined}
+                >
                   <Stack spacing={1}>
                     <Stack direction="row" spacing={1} alignItems="center">
                       {card.icon}
@@ -293,26 +413,64 @@ const AdminDashboardPage = () => {
 
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
             <Stack spacing={2}>
-              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Distribución por etapa
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Publicaciones por hito del workflow (review -> live).
-                  </Typography>
-                </Box>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <SupportAgentIcon fontSize="small" color="action" />
-                  <Typography variant="caption" color="text.secondary">
-                    {formatNumber(summary?.pending_properties ?? 0)} publicaciones esperando revisión manual.
-                  </Typography>
+                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Distribución por etapa
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Publicaciones por hito del workflow (review -> live).
+                    </Typography>
+                  </Box>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ cursor: 'pointer', userSelect: 'none' }}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigateToApprovals('review')}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        navigateToApprovals('review');
+                      }
+                    }}
+                  >
+                    <SupportAgentIcon fontSize="small" color="action" />
+                    <Typography variant="caption" color="text.secondary">
+                      {formatNumber(summary?.pending_properties ?? 0)} publicaciones esperando revisión manual.
+                    </Typography>
+                  </Stack>
                 </Stack>
               </Stack>
               <Grid container spacing={2}>
                 {workflowCards.map((item) => (
                   <Grid item xs={12} sm={6} md={4} lg={2} key={item.key}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px dashed rgba(0,0,0,0.12)', textAlign: 'center' }}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: '1px dashed rgba(0,0,0,0.12)',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)',
+                        },
+                      }}
+                      onClick={() => handleCardAction(item.to)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleCardAction(item.to);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
                       <Typography variant="subtitle2" color="text.secondary">
                         {item.label}
                       </Typography>
@@ -364,6 +522,13 @@ const AdminDashboardPage = () => {
                     label={`${WORKFLOW_STAGE_LABELS[item.key] || item.key}: ${item.breaches} fuera de SLA`}
                     color={item.breaches > 0 ? 'warning' : 'default'}
                     variant={item.breaches > 0 ? 'filled' : 'outlined'}
+                    clickable={item.breaches > 0}
+                    onClick={
+                      item.breaches > 0
+                        ? () => navigateToApprovals(item.key, { focus: 'sla' })
+                        : undefined
+                    }
+                    sx={{ cursor: item.breaches > 0 ? 'pointer' : 'default' }}
                   />
                 ))}
               </Stack>

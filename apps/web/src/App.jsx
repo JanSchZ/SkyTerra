@@ -809,6 +809,7 @@ function App() {
       <Route path="/admin" element={<StaffRoute user={user} element={<AdminLayout />} />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
+        <Route path="approvals" element={<PropertyApprovalPage />} />
         <Route path="properties" element={<AdminDetailedPropertiesPage />} />
         <Route path="analytics" element={<AdminAnalyticsPage />} />
         {/** Eliminado: Gestión de tours ahora vive dentro de Propiedades */}
@@ -1031,7 +1032,9 @@ function App() {
                           {(user?.is_staff
                             ? [
                                 <MenuItem key="admin-dashboard" onClick={() => { navigate('/admin/dashboard'); closeUserMenu(); }} sx={{ color: 'white' }}>Admin Dashboard</MenuItem>,
-                                <MenuItem key="admin-properties" onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Aprobar Propiedades</MenuItem>,
+                                <MenuItem key="admin-approvals" onClick={() => { navigate('/admin/approvals'); closeUserMenu(); }} sx={{ color: 'white' }}>Moderación</MenuItem>,
+                                <MenuItem key="admin-properties" onClick={() => { navigate('/admin/properties'); closeUserMenu(); }} sx={{ color: 'white' }}>Catálogo</MenuItem>,
+                                <MenuItem key="admin-analytics" onClick={() => { navigate('/admin/analytics'); closeUserMenu(); }} sx={{ color: 'white' }}>Analítica</MenuItem>,
                                 <MenuItem key="admin-tickets" onClick={() => { navigate('/admin/tickets'); closeUserMenu(); }} sx={{ color: 'white' }}>Tickets de Soporte</MenuItem>,
                                 <MenuItem key="admin-users" onClick={() => { navigate('/admin/users'); closeUserMenu(); }} sx={{ color: 'white' }}>Gestionar Usuarios</MenuItem>,
                                 <MenuItem key="admin-sam" onClick={() => { navigate('/admin/ai-management'); closeUserMenu(); }} sx={{ color: 'white' }}>Sam</MenuItem>,
