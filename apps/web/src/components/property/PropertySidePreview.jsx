@@ -103,20 +103,44 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
           style={{ position: 'absolute', top: 116, left: 18, zIndex: 1300 }}
         >
           <Paper
-            elevation={10}
+            elevation={0}
             sx={{
               width: 360,
               p: 2.4,
-              borderRadius: 3,
               display: 'flex',
               flexDirection: 'column',
               gap: 1.8,
-              background: 'radial-gradient(120% 120% at -10% -20%, rgba(25,35,52,0.94) 0%, rgba(12,17,27,0.88) 100%)',
+              position: 'relative',
+              overflow: 'hidden',
               color: '#f8fafc',
-              border: '1px solid rgba(148,163,184,0.18)',
-              boxShadow: '0 24px 48px rgba(8,12,20,0.6)',
-              backdropFilter: 'blur(18px)',
-              WebkitBackdropFilter: 'blur(18px)',
+              borderRadius: '16px',
+              backgroundColor: 'rgba(20, 22, 30, 0.42)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              boxShadow: '0 26px 60px rgba(6, 12, 24, 0.55)',
+              backdropFilter: 'blur(18px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                background: 'radial-gradient(40% 50% at 0% 0%, rgba(56,189,248,0.32) 0%, rgba(56,189,248,0) 70%), radial-gradient(55% 45% at 80% 85%, rgba(16,185,129,0.28) 0%, rgba(16,185,129,0) 72%)',
+                opacity: 0.85,
+                zIndex: 0,
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                inset: 0,
+                pointerEvents: 'none',
+                background: 'linear-gradient(140deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.02) 45%, rgba(15,23,42,0.35) 100%)',
+                mixBlendMode: 'screen',
+                zIndex: 0,
+              },
+              '& > *': {
+                position: 'relative',
+                zIndex: 1,
+              },
             }}
           >
             <Box

@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, Counter
 from statistics import mean, median
 
 from django.contrib.auth import get_user_model
@@ -78,6 +78,11 @@ class AdminDashboardSummaryView(APIView):
             Property.objects.select_related('plan', 'owner')
             .prefetch_related('status_history')
             .order_by('-created_at')
+        )
+        pilot_profiles = list(
+            PilotProfile.objects.select_related('user').prefetch_related(
+                'assigned_jobs__property'
+            )
         )
 
         workflow_nodes = [node for node, _ in Property.WORKFLOW_NODE_CHOICES]
@@ -199,7 +204,46 @@ class AdminDashboardSummaryView(APIView):
 
         active_jobs = Job.objects.filter(status__in=['inviting', 'assigned', 'scheduling', 'scheduled', 'shooting']).count()
         postproduction_jobs = Job.objects.filter(status__in=['uploading', 'received', 'qc', 'editing', 'preview_ready', 'ready_for_publish']).count()
-        pilots_available = PilotProfile.objects.filter(status='approved', is_available=True).count()
+
+        pilot_status_counts = Counter(profile.status for profile in pilot_profiles)
+        pilots_available = sum(1 for profile in pilot_profiles if profile.status == 'approved' and profile.is_available)
+        pilots_unavailable = sum(1 for profile in pilot_profiles if profile.status == 'approved' and not profile.is_available)
+        pilot_region_activity = defaultdict(lambda: {'available': 0, 'unavailable': 0})
+
+        for profile in pilot_profiles:
+            assigned_jobs_manager = getattr(profile, 'assigned_jobs', None)
+            assigned_jobs = assigned_jobs_manager.all() if assigned_jobs_manager is not None else []
+            regions = {
+                job.property.address_region
+                for job in assigned_jobs
+                if getattr(job, 'property', None) and job.property.address_region
+            }
+            if not regions:
+                regions = {'Sin region'}
+            availability_key = 'available' if profile.status == 'approved' and profile.is_available else 'unavailable'
+            for region in regions:
+                pilot_region_activity[region][availability_key] += 1
+
+        pilot_summary = {
+            'total': len(pilot_profiles),
+            'status_counts': dict(pilot_status_counts),
+            'availability': {
+                'available': pilots_available,
+                'unavailable': pilots_unavailable,
+            },
+            'region_activity': [
+                {
+                    'region': region,
+                    'available': counts['available'],
+                    'unavailable': counts['unavailable'],
+                }
+                for region, counts in sorted(
+                    pilot_region_activity.items(),
+                    key=lambda item: item[1]['available'] + item[1]['unavailable'],
+                    reverse=True,
+                )
+            ],
+        }
 
         return Response({
             'pending_properties': pending_properties,
@@ -218,6 +262,7 @@ class AdminDashboardSummaryView(APIView):
             'active_jobs': active_jobs,
             'postproduction_jobs': postproduction_jobs,
             'pilots_available': pilots_available,
+            'pilot_summary': pilot_summary,
         })
 
 class AdminUserListView(ListAPIView):

@@ -10,10 +10,9 @@ import SettingsIcon from '@mui/icons-material/SettingsRounded';
 import LiveHelpIcon from '@mui/icons-material/LiveHelpOutlined';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
-import AddCircleIcon from '@mui/icons-material/AddCircle';
-import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
+import LocalOfferIcon from '@mui/icons-material/LocalOfferOutlined';
 import './adminDashboard.css';
 import { authService } from '../../services/api';
 
@@ -23,6 +22,7 @@ const NAV_PRIMARY = [
   { label: 'Analítica', path: '/admin/analytics', icon: <AssessmentIcon fontSize="small" /> },
   { label: 'Proyectos', path: '/admin/projects', icon: <FolderOutlinedIcon fontSize="small" /> },
   { label: 'Equipo', path: '/admin/users', icon: <PeopleAltOutlinedIcon fontSize="small" /> },
+  { label: 'Cupones', path: '/admin/coupons', icon: <LocalOfferIcon fontSize="small" /> },
 ];
 
 const NAV_SECONDARY = [
@@ -84,22 +84,6 @@ const AdminLayout = () => {
         <div className="admin-nav-section">
           <div className="admin-nav-title">Main</div>
           <div className="admin-nav-list">
-            <button
-              type="button"
-              className="admin-nav-item"
-              style={{ justifyContent: 'space-between', background: '#101010', color: '#ffffff' }}
-              onClick={closeSidebar}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span className="nav-icon" style={{ background: '#ffffff', color: '#101010' }}>
-                  <AddCircleIcon fontSize="small" />
-                </span>
-                Acción rápida
-              </span>
-              <span className="nav-icon" style={{ width: 34, height: 34, background: '#ffffff', color: '#101010' }}>
-                <MailOutlineIcon fontSize="small" />
-              </span>
-            </button>
             {NAV_PRIMARY.map((item) => (
               <NavLink
                 key={item.label}

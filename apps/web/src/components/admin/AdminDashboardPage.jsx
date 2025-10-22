@@ -27,6 +27,7 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import FlightIcon from '@mui/icons-material/FlightTakeoff';
 import CameraIcon from '@mui/icons-material/PhotoCamera';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import PersonOffIcon from '@mui/icons-material/PersonOffOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 import { propertyService } from '../../services/api';
@@ -45,8 +46,8 @@ const WORKFLOW_ORDER = ['review', 'approved', 'pilot', 'post', 'live'];
 const formatNumber = (value) => Number(value || 0).toLocaleString('es-CL');
 
 const formatDuration = (hours) => {
-  if (hours == null) return '—';
-  if (hours >= 48) return `${(hours / 24).toFixed(1)} días`;
+  if (hours == null) return '--';
+  if (hours >= 48) return `${(hours / 24).toFixed(1)} dias`;
   if (hours >= 1) return `${hours.toFixed(1)} h`;
   return `${Math.round(hours * 60)} min`;
 };
@@ -79,6 +80,19 @@ const AdminDashboardPage = () => {
   const workflowCounts = summary?.workflow_counts || {};
   const stageStats = summary?.stage_duration_stats || {};
   const propertiesInProgress = summary?.properties_in_progress || [];
+  const pilotSummary = summary?.pilot_summary || null;
+  const pilotStatusLabels = {
+    approved: 'Aprobado',
+    pending: 'Pendiente',
+    rejected: 'Rechazado',
+    suspended: 'Suspendido',
+  };
+  const pilotAvailability = pilotSummary?.availability || {};
+  const pilotStatusCounts = pilotSummary?.status_counts || {};
+  const pilotRegionActivity = pilotSummary?.region_activity || [];
+  const pilotsApproved = pilotAvailability?.available ?? summary?.pilots_available ?? 0;
+  const pilotsInactive = pilotAvailability?.unavailable ?? 0;
+  const pilotsTotal = pilotSummary?.total ?? (pilotsApproved + pilotsInactive);
 
   const stageDurationData = useMemo(
     () =>
@@ -99,9 +113,15 @@ const AdminDashboardPage = () => {
     () => [
       {
         label: 'Pilotos disponibles',
-        value: formatNumber(summary?.pilots_available ?? 0),
+        value: formatNumber(pilotsApproved),
         icon: <FlightIcon fontSize="small" />, 
         helper: 'Pilotos aprobados con disponibilidad activa.',
+      },
+      {
+        label: 'Pilotos sin disponibilidad',
+        value: formatNumber(pilotsInactive),
+        icon: <PersonOffIcon fontSize="small" />,
+        helper: 'Pilotos aprobados sin disponibilidad activa.',
       },
       {
         label: 'Operaciones en terreno',
@@ -122,7 +142,7 @@ const AdminDashboardPage = () => {
         helper: 'Alertas visibles para el equipo administrador.',
       },
     ],
-    [summary]
+    [summary, pilotsApproved, pilotsInactive]
   );
 
   const workflowCards = useMemo(
@@ -167,7 +187,7 @@ const AdminDashboardPage = () => {
 
           <Grid container spacing={2}>
             {metricCards.map((card) => (
-              <Grid item xs={12} sm={6} md={3} key={card.label}>
+              <Grid item xs={12} sm={6} md={3} lg={3} key={card.label}>
                 <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)', height: '100%' }}>
                   <Stack spacing={1}>
                     <Stack direction="row" spacing={1} alignItems="center">
@@ -188,6 +208,89 @@ const AdminDashboardPage = () => {
             ))}
           </Grid>
 
+          {pilotSummary && (
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
+              <Stack spacing={3}>
+                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Cobertura de operadores
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Distribucion de pilotos aprobados por disponibilidad y regiones con actividad reciente.
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={3} alignItems="center">
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">Pilotos totales</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatNumber(pilotsTotal)}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">Con disponibilidad</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatNumber(pilotsApproved)}</Typography>
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">Sin disponibilidad</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700 }}>{formatNumber(pilotsInactive)}</Typography>
+                    </Box>
+                  </Stack>
+                </Stack>
+
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {Object.entries(pilotStatusCounts).map(([status, count]) => (
+                    <Chip
+                      key={status}
+                      label={`${pilotStatusLabels[status] || status}: ${formatNumber(count)}`}
+                      color={status === 'approved' ? 'success' : status === 'pending' ? 'warning' : 'default'}
+                      variant={status === 'approved' ? 'filled' : 'outlined'}
+                      size="small"
+                    />
+                  ))}
+                </Stack>
+
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Regiones con operadores asignados
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {pilotRegionActivity.length === 0 && (
+                      <Grid item xs={12}>
+                        <Typography variant="body2" color="text.secondary">
+                          Aun no registramos actividad regional suficiente. Los pilotos sin historial aparecen como "Sin region".
+                        </Typography>
+                      </Grid>
+                    )}
+                    {pilotRegionActivity.slice(0, 9).map((entry) => (
+                      <Grid item xs={12} sm={6} md={4} key={entry.region}>
+                        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px solid rgba(0,0,0,0.06)', height: '100%' }}>
+                          <Stack spacing={1}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              {entry.region}
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                              <Chip
+                                label={`Activos: ${formatNumber(entry.available || 0)}`}
+                                color="success"
+                                variant="outlined"
+                                size="small"
+                              />
+                              <Chip
+                                label={`Sin disp.: ${formatNumber(entry.unavailable || 0)}`}
+                                color="default"
+                                variant="outlined"
+                                size="small"
+                              />
+                            </Stack>
+                          </Stack>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              </Stack>
+            </Paper>
+          )}
+
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
             <Stack spacing={2}>
               <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
@@ -196,7 +299,7 @@ const AdminDashboardPage = () => {
                     Distribución por etapa
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Publicaciones por hito del workflow (review → live).
+                    Publicaciones por hito del workflow (review -> live).
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center">
