@@ -118,14 +118,21 @@ const AdminUsersListPage = () => {
       align: 'center',
       headerAlign: 'center',
     },
-    { 
-      field: 'dateJoined', 
-      headerName: 'Fecha de ingreso', 
-      minWidth: 190, 
-      valueGetter: (params) => params.value ? new Date(params.value) : null,
-      valueFormatter: (params) => params.value
-        ? params.value.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
-        : '—',
+    {
+      field: 'dateJoined',
+      headerName: 'Fecha de ingreso',
+      minWidth: 190,
+      valueGetter: (params) => {
+        const raw = params?.value ?? null;
+        if (!raw) return null;
+        const d = new Date(raw);
+        return Number.isNaN(d.getTime()) ? null : d;
+      },
+      valueFormatter: (params) => {
+        const v = params?.value;
+        if (!v || !(v instanceof Date)) return '—';
+        return v.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+      },
     },
   ], []);
 
@@ -157,6 +164,7 @@ const AdminUsersListPage = () => {
             rowsPerPageOptions={[10, 25, 50, 100]}
             checkboxSelection
             disableSelectionOnClick
+            autoHeight
             components={{
               Toolbar: GridToolbar,
             }}

@@ -413,35 +413,34 @@ const AdminDashboardPage = () => {
 
           <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)' }}>
             <Stack spacing={2}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Distribución por etapa
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Publicaciones por hito del workflow (review -> live).
-                    </Typography>
-                  </Box>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    sx={{ cursor: 'pointer', userSelect: 'none' }}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigateToApprovals('review')}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        navigateToApprovals('review');
-                      }
-                    }}
-                  >
-                    <SupportAgentIcon fontSize="small" color="action" />
-                    <Typography variant="caption" color="text.secondary">
-                      {formatNumber(summary?.pending_properties ?? 0)} publicaciones esperando revisión manual.
-                    </Typography>
-                  </Stack>
+              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Distribución por etapa
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Publicaciones por hito del workflow (review -> live).
+                  </Typography>
+                </Box>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ cursor: 'pointer', userSelect: 'none' }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigateToApprovals('review')}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigateToApprovals('review');
+                    }
+                  }}
+                >
+                  <SupportAgentIcon fontSize="small" color="action" />
+                  <Typography variant="caption" color="text.secondary">
+                    {formatNumber(summary?.pending_properties ?? 0)} publicaciones esperando revisión manual.
+                  </Typography>
                 </Stack>
               </Stack>
               <Grid container spacing={2}>

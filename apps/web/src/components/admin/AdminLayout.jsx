@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/DashboardRounded';
 import ListAltIcon from '@mui/icons-material/ListAltRounded';
 import AssessmentIcon from '@mui/icons-material/AssessmentRounded';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import SettingsIcon from '@mui/icons-material/SettingsRounded';
-import LiveHelpIcon from '@mui/icons-material/LiveHelpOutlined';
 import LogoutIcon from '@mui/icons-material/LogoutRounded';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
@@ -22,14 +21,13 @@ const NAV_PRIMARY = [
   { label: 'Publicaciones', path: '/admin/properties', icon: <ListAltIcon fontSize="small" /> },
   { label: 'Analítica', path: '/admin/analytics', icon: <AssessmentIcon fontSize="small" /> },
   { label: 'Tickets', path: '/admin/tickets', icon: <SupportAgentIcon fontSize="small" /> },
-  { label: 'IA', path: '/admin/ai-management', icon: <SmartToyOutlinedIcon fontSize="small" /> },
+  { label: 'Sam', path: '/admin/ai-management', icon: <SmartToyOutlinedIcon fontSize="small" /> },
   { label: 'Equipo', path: '/admin/users', icon: <PeopleAltOutlinedIcon fontSize="small" /> },
   { label: 'Cupones', path: '/admin/coupons', icon: <LocalOfferIcon fontSize="small" /> },
 ];
 
 const NAV_SECONDARY = [
   { label: 'Settings', path: '/admin/settings', icon: <SettingsIcon fontSize="small" /> },
-  { label: 'Help Center', path: '/admin/help', icon: <LiveHelpIcon fontSize="small" /> },
 ];
 
 const AdminLayout = () => {
@@ -42,7 +40,6 @@ const AdminLayout = () => {
     }
   };
 
-  const year = useMemo(() => new Date().getFullYear(), []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -63,18 +60,17 @@ const AdminLayout = () => {
 
   const toggleSidebar = () => setSidebarOpen((open) => !open);
   const closeSidebar = () => setSidebarOpen(false);
+  const handleNavItemClick = () => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 1100) {
+      closeSidebar();
+    }
+  };
   const rootClassName = `admin-shell ${sidebarOpen ? 'sidebar-open' : ''}`.trim();
 
   return (
     <div className={rootClassName}>
       <aside className="admin-shell-sidebar">
-        <a href="#" className="admin-logo-link" aria-label="SkyTerra home">
-          <span className="admin-logo-mark">ST</span>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>SkyTerra Ops</div>
-            <div style={{ fontSize: 12, color: 'rgba(16,16,16,0.45)' }}>Admin Suite {year}</div>
-          </div>
-        </a>
+        <div className="admin-logo-spacer" aria-hidden="true" />
 
         <div className="admin-nav-section">
           <div className="admin-nav-title">Main</div>
@@ -84,7 +80,7 @@ const AdminLayout = () => {
                 key={item.label}
                 to={item.path}
                 className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}
-                onClick={closeSidebar}
+                onClick={handleNavItemClick}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span>{item.label}</span>
@@ -101,7 +97,7 @@ const AdminLayout = () => {
                 key={item.label}
                 to={item.path}
                 className={({ isActive }) => `admin-nav-item${isActive ? ' active' : ''}`}
-                onClick={closeSidebar}
+                onClick={handleNavItemClick}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span>{item.label}</span>

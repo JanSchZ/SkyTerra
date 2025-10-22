@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DataGrid } from '@mui/x-data-grid';
 import {
   Alert,
@@ -10,18 +10,19 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
+  IconButton,
   Paper,
-  Select,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import { propertyService, tourService } from '../../services/api';
 import UploadTourDialog from '../tours/UploadTourDialog';
 import WorkflowTimeline from '../ui/WorkflowTimeline.jsx';
+import RefreshIcon from '@mui/icons-material/RefreshOutlined';
 
 const WORKFLOW_STAGE_LABELS = {
   review: 'En revisión',
@@ -40,6 +41,17 @@ const QUICK_ACTIONS = [
 ];
 
 const STAGE_FILTERS = new Set(['review', 'approved', 'pilot', 'post', 'live']);
+
+const STAGE_OPTIONS = [
+  { value: 'all', label: 'Todas' },
+  { value: 'review', label: 'En revisión' },
+  { value: 'approved', label: 'Aprobadas' },
+  { value: 'pilot', label: 'Operación piloto' },
+  { value: 'post', label: 'Postproducción' },
+  { value: 'live', label: 'Publicadas' },
+];
+
+const formatNumber = (value) => Number(value || 0).toLocaleString('es-CL');
 
 const getCurrentStage = (timeline = []) => {
   const active = timeline.find((item) => item.state === 'active');
@@ -76,7 +88,7 @@ function PropertyManagementPage() {
   const [rows, setRows] = useState([]);
   const [statusFilter, setStatusFilter] = useState(normalizedStage);
   const [sortModel, setSortModel] = useState(() =>
-    focus === 'sla' ? [{ field: 'current_stage', sort: 'desc' }] : []
+    focus === 'sla' ? [{ field: 'durationHours', sort: 'desc' }] : []
   );
   const [refreshToggle, setRefreshToggle] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -94,7 +106,7 @@ function PropertyManagementPage() {
 
   useEffect(() => {
     if (focus === 'sla') {
-      setSortModel([{ field: 'current_stage', sort: 'desc' }]);
+      setSortModel([{ field: 'durationHours', sort: 'desc' }]);
     }
   }, [focus]);
 
@@ -118,12 +130,23 @@ function PropertyManagementPage() {
         const slaBreach =
           stage?.sla_breached ??
           (expectedHours != null && durationHours != null ? durationHours > expectedHours : false);
+        const lastEvent = p.last_event || null;
+        const lastEventLabel =
+          lastEvent?.substate_label ||
+          lastEvent?.substate ||
+          stage?.label ||
+          stage?.name ||
+          WORKFLOW_STAGE_LABELS[p.workflow_node] ||
+          '—';
+        const lastEventMessage = lastEvent?.message || '';
         return {
           id: p.id,
           name: p.name,
           owner: p.owner_details?.username || p.owner_username || p.owner || '—',
+          ownerEmail: p.owner_email || '',
           price: p.price,
           size: p.size,
+          planName: p.plan_name || '—',
           workflow_node: p.workflow_node,
           workflow_node_label: WORKFLOW_STAGE_LABELS[p.workflow_node] || p.workflow_node,
           timeline: p.workflow_timeline,
@@ -131,6 +154,10 @@ function PropertyManagementPage() {
           expectedHours,
           durationHours,
           slaBreach,
+          stageState: stage?.state || null,
+          lastEventLabel,
+          lastEventMessage,
+          lastEventAt: lastEvent?.created_at ? new Date(lastEvent.created_at) : null,
         };
       });
       setRows(formatted);
@@ -145,6 +172,54 @@ function PropertyManagementPage() {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, refreshToggle]);
+
+  const stageCounts = useMemo(() => {
+    const base = {
+      review: 0,
+      approved: 0,
+      pilot: 0,
+      post: 0,
+      live: 0,
+    };
+    rows.forEach((row) => {
+      const key = row.workflow_node;
+      if (key) {
+        base[key] = (base[key] || 0) + 1;
+      }
+    });
+    return base;
+  }, [rows]);
+
+  const totalRows = rows.length;
+  const slaAlerts = useMemo(() => rows.reduce((acc, row) => acc + (row.slaBreach ? 1 : 0), 0), [rows]);
+
+  const metrics = useMemo(
+    () => [
+      {
+        label: 'Publicaciones activas',
+        value: totalRows,
+        helper: 'Workflow en curso dentro de la consola.',
+      },
+      {
+        label: 'Fuera de SLA',
+        value: slaAlerts,
+        helper: 'Requieren seguimiento prioritario.',
+      },
+      {
+        label: 'En revisión',
+        value: stageCounts.review || 0,
+        helper: 'Pendientes de moderación inicial.',
+      },
+      {
+        label: 'Postproducción',
+        value: stageCounts.post || 0,
+        helper: 'Esperando material final o pulido.',
+      },
+    ],
+    [totalRows, slaAlerts, stageCounts]
+  );
+
+  const handleManualRefresh = () => setRefreshToggle((v) => !v);
 
   const handleTransition = async (propertyId, substate) => {
     try {
@@ -174,8 +249,8 @@ function PropertyManagementPage() {
     }
   };
 
-  const handleFilterChange = (event) => {
-    const value = event.target.value;
+  const handleStageChange = (_, value) => {
+    if (value === null) return;
     setStatusFilter(value);
     const nextParams = new URLSearchParams(searchParams);
     if (value === 'all') {
@@ -187,37 +262,112 @@ function PropertyManagementPage() {
     setSearchParams(nextParams, { replace: true });
   };
 
+  const activeFilterLabel = statusFilter !== 'all' ? WORKFLOW_STAGE_LABELS[statusFilter] : null;
+
   const columns = [
-    { field: 'id', headerName: 'ID', width: 90 },
-    { field: 'name', headerName: 'Nombre', flex: 1 },
-    { field: 'owner', headerName: 'Propietario', width: 160 },
     {
-      field: 'workflow_node',
-      headerName: 'Etapa',
-      width: 160,
+      field: 'name',
+      headerName: 'Propiedad',
+      flex: 1.2,
+      minWidth: 260,
       renderCell: ({ row }) => (
-        <Chip label={row.workflow_node_label} color={row.current_stage?.state === 'active' ? 'primary' : 'default'} size="small" />
+        <Stack spacing={0.5}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            {row.name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {row.owner}
+          </Typography>
+          {row.ownerEmail && (
+            <Typography variant="caption" color="text.secondary">
+              {row.ownerEmail}
+            </Typography>
+          )}
+        </Stack>
       ),
     },
     {
-      field: 'current_stage',
-      headerName: 'Días en etapa',
-      width: 140,
-      valueGetter: ({ row }) => formatDuration(row.current_stage),
-      sortComparator: (v1, v2, cellParams1, cellParams2) => {
-        const a = cellParams1?.row?.durationHours ?? 0;
-        const b = cellParams2?.row?.durationHours ?? 0;
-        return a - b;
+      field: 'planName',
+      headerName: 'Plan',
+      minWidth: 160,
+      valueGetter: (params) => {
+        const row = params?.row;
+        return row?.planName || '—';
       },
+    },
+    {
+      field: 'workflow_node',
+      headerName: 'Etapa',
+      minWidth: 200,
+      renderCell: ({ row }) => (
+        <Stack spacing={0.5}>
+          <Chip
+            label={row.workflow_node_label}
+            color={row.current_stage?.state === 'active' ? 'primary' : 'default'}
+            size="small"
+          />
+          {row.current_stage?.label && (
+            <Typography variant="caption" color="text.secondary">
+              {row.current_stage.label}
+            </Typography>
+          )}
+        </Stack>
+      ),
+    },
+    {
+      field: 'durationHours',
+      headerName: 'Tiempo en etapa',
+      minWidth: 180,
+      valueGetter: (params) => {
+        const row = params?.row;
+        return row?.durationHours ?? 0;
+      },
+      sortComparator: (a, b) => (a ?? 0) - (b ?? 0),
+      renderCell: ({ row }) => (
+        <Stack spacing={0.5}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {formatDuration(row.current_stage)}
+          </Typography>
+          {row.slaBreach && <Chip label="Fuera de SLA" size="small" color="warning" variant="outlined" />}
+        </Stack>
+      ),
+    },
+    {
+      field: 'lastEventLabel',
+      headerName: 'Último evento',
+      flex: 1,
+      minWidth: 240,
+      renderCell: ({ row }) => (
+        <Stack spacing={0.5}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {row.lastEventLabel || 'Sin novedades'}
+          </Typography>
+          {row.lastEventMessage && (
+            <Tooltip title={row.lastEventMessage} placement="top">
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {row.lastEventMessage}
+              </Typography>
+            </Tooltip>
+          )}
+          {row.lastEventAt instanceof Date && !Number.isNaN(row.lastEventAt.getTime()) && (
+            <Typography variant="caption" color="text.secondary">
+              {row.lastEventAt.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })}
+            </Typography>
+          )}
+        </Stack>
+      ),
     },
     {
       field: 'actions',
       headerName: 'Acciones',
-      width: 360,
+      minWidth: 320,
+      sortable: false,
+      filterable: false,
       renderCell: (params) => {
-        const availableActions = QUICK_ACTIONS.filter((action) => action.nodes.includes(params.row.workflow_node));
+        const row = params.row || {};
+        const availableActions = QUICK_ACTIONS.filter((action) => action.nodes.includes(row.workflow_node));
         return (
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
             {availableActions.map((action) => (
               <Button
                 key={action.key}
@@ -246,65 +396,139 @@ function PropertyManagementPage() {
   }
 
   return (
-    <Box>
-      <Typography variant="h5" gutterBottom>
-        Administrar Propiedades
-      </Typography>
-
-      {focus === 'sla' && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Priorizando publicaciones fuera de SLA. Ordenamos por mayor tiempo en etapa para atender los casos críticos primero.
-        </Alert>
-      )}
-
-      {statusFilter !== 'all' && (
-        <Chip
-          label={`Filtro activo: ${WORKFLOW_STAGE_LABELS[statusFilter] || statusFilter}`}
-          size="small"
-          color="primary"
-          variant="outlined"
-          sx={{ mb: 2 }}
-        />
-      )}
-
-      <FormControl sx={{ minWidth: 220, mb: 2 }} size="small">
-        <InputLabel id="status-filter-label">Filtrar por etapa</InputLabel>
-        <Select
-          labelId="status-filter-label"
-          value={statusFilter}
-          label="Filtrar por etapa"
-          onChange={handleFilterChange}
+    <Box sx={{ py: 3 }}>
+      <Stack spacing={3}>
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          spacing={2}
         >
-          <MenuItem value="all">Todas</MenuItem>
-          <MenuItem value="review">En revisión</MenuItem>
-          <MenuItem value="approved">Publicación aprobada</MenuItem>
-          <MenuItem value="pilot">Operación con piloto</MenuItem>
-          <MenuItem value="post">Postproducción</MenuItem>
-          <MenuItem value="live">Publicadas</MenuItem>
-        </Select>
-      </FormControl>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              Consola de Aprobaciones
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Supervisión y acciones rápidas para publicaciones en workflow.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Tooltip title="Actualizar listado">
+              <span>
+                <IconButton onClick={handleManualRefresh} disabled={loading}>
+                  <RefreshIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Stack>
 
-      <Paper elevation={0} sx={{ height: 600, width: '100%', borderRadius: 2, border: '1px solid rgba(0,0,0,0.08)', p: 1 }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
+        <Box
           sx={{
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: 'rgba(0,0,0,0.02)' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(0,0,0,0.01)' },
-            '& .MuiDataGrid-row.sla-breach': { backgroundColor: 'rgba(255,193,7,0.08)' },
-            '& .MuiDataGrid-row.sla-breach:hover': { backgroundColor: 'rgba(255,193,7,0.16)' },
-            border: 'none',
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'repeat(1, minmax(0, 1fr))',
+              sm: 'repeat(2, minmax(0, 1fr))',
+              md: 'repeat(4, minmax(0, 1fr))',
+            },
+            gap: 2,
           }}
-          pageSizeOptions={[10, 25, 50]}
-          autoHeight
-          sortModel={sortModel}
-          onSortModelChange={(model) => setSortModel(model)}
-          getRowClassName={(params) => (params.row.slaBreach ? 'sla-breach' : '')}
-          disableRowSelectionOnClick
-          initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-          localeText={{ noRowsLabel: 'No se encontraron propiedades' }}
-        />
-      </Paper>
+        >
+          {metrics.map((metric) => (
+            <Paper
+              key={metric.label}
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 2,
+                border: '1px solid rgba(0,0,0,0.08)',
+                height: '100%',
+              }}
+            >
+              <Stack spacing={0.5}>
+                <Typography variant="caption" color="text.secondary">
+                  {metric.label}
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                  {formatNumber(metric.value)}
+                </Typography>
+                {metric.helper && (
+                  <Typography variant="caption" color="text.secondary">
+                    {metric.helper}
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+          ))}
+        </Box>
+
+        {focus === 'sla' && (
+          <Alert severity="warning">
+            Priorizando publicaciones fuera de SLA. Ordenamos por mayor tiempo en etapa para atender los casos críticos primero.
+          </Alert>
+        )}
+
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={2}
+          alignItems={{ xs: 'flex-start', md: 'center' }}
+          justifyContent="space-between"
+        >
+          <ToggleButtonGroup
+            exclusive
+            color="primary"
+            size="small"
+            value={statusFilter}
+            onChange={handleStageChange}
+            sx={{ flexWrap: 'wrap' }}
+          >
+            {STAGE_OPTIONS.map((option) => (
+              <ToggleButton key={option.value} value={option.value} sx={{ textTransform: 'none', px: 2 }}>
+                {option.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+          <Stack direction="row" spacing={1} alignItems="center">
+            {activeFilterLabel && (
+              <Chip label={`Filtro: ${activeFilterLabel}`} size="small" color="primary" variant="outlined" />
+            )}
+            {focus === 'sla' && (
+              <Chip label="Prioridad SLA" size="small" color="warning" variant="outlined" />
+            )}
+          </Stack>
+        </Stack>
+
+        <Paper
+          elevation={0}
+          sx={{
+            width: '100%',
+            borderRadius: 2,
+            border: '1px solid rgba(0,0,0,0.08)',
+            p: 1,
+            overflowX: 'auto',
+          }}
+        >
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            sx={{
+              width: '100%',
+              '& .MuiDataGrid-columnHeaders': { backgroundColor: 'rgba(0,0,0,0.02)' },
+              '& .MuiDataGrid-row:hover': { backgroundColor: 'rgba(0,0,0,0.01)' },
+              border: 'none',
+              minWidth: '720px',
+            }}
+            pageSizeOptions={[10, 25, 50]}
+            autoHeight
+            getRowHeight={() => 'auto'}
+            sortModel={sortModel}
+            onSortModelChange={(model) => setSortModel(model)}
+            disableRowSelectionOnClick
+            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+            localeText={{ noRowsLabel: 'No se encontraron propiedades' }}
+          />
+        </Paper>
+      </Stack>
 
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Detalles de Propiedad</DialogTitle>
