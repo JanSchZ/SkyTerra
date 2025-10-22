@@ -19,8 +19,8 @@ command -v osascript >/dev/null 2>&1 || err "Este script requiere 'osascript', q
 [ -d "$FRONTEND_DIR" ] || err "El directorio del frontend no se encontró en '$FRONTEND_DIR'."
 [ -f "$VENVDIR" ] || err "El entorno virtual no se encontró en '$BACKEND_DIR/.venv'. Ejecuta 'python3 -m venv .venv' y luego instala las dependencias."
 
-BACKEND_CMD=$(printf "cd %q && source .venv/bin/activate && export DEBUG=True CLIENT_URL=http://localhost:3000 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 JWT_COOKIE_SECURE=False ALLOWED_HOSTS=localhost,127.0.0.1,192.168.3.39 && python manage.py runserver 0.0.0.0:8000" "$BACKEND_DIR")
-FRONTEND_CMD=$(printf "cd %q && npm run dev -- --port 3000" "$FRONTEND_DIR")
+BACKEND_CMD=$(printf "cd %q && source .venv/bin/activate && export DEBUG=True CLIENT_URL=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000 CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000 JWT_COOKIE_SECURE=False ALLOWED_HOSTS=localhost,127.0.0.1,192.168.3.39 && python manage.py runserver 0.0.0.0:8000" "$BACKEND_DIR")
+FRONTEND_CMD=$(printf "cd %q && npm run dev -- --port 5173" "$FRONTEND_DIR")
 if [ -d "$OPERATOR_DIR" ]; then
     OPERATOR_CMD=$(printf "cd %q && APP_ENV=development npx expo start" "$OPERATOR_DIR")
 else
@@ -56,5 +56,5 @@ if [ -d "$OPERATOR_DIR" ]; then
     echo "App Operadores: $OPERATOR_DIR"
 fi
 echo "Para detenerlos, cierre las ventanas o ejecute 'killall python' 'killall node' y 'killall expo'."
-echo "Abriendo frontend en http://localhost:3000 …"
-open http://localhost:3000 >/dev/null 2>&1 || true
+echo "Abriendo frontend en http://localhost:5173 …"
+open http://localhost:5173 >/dev/null 2>&1 || true

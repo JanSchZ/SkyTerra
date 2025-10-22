@@ -27,7 +27,7 @@ IF NOT EXIST ".venv\Scripts\activate" (
 
 REM La opción "start" abre el comando en una nueva ventana y permite que el script continúe.
 REM Backend: fijamos variables de entorno para CORS/CSRF y puertos locales.
-start "SkyTerra Backend" cmd /k "set DEBUG=True && set CLIENT_URL=http://localhost:3000 && set CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 && set CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000 && set JWT_COOKIE_SECURE=False && .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000"
+start "SkyTerra Backend" cmd /k "set DEBUG=True && set CLIENT_URL=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000 && set CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000 && set CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000 && set JWT_COOKIE_SECURE=False && .\.venv\Scripts\python.exe manage.py runserver 0.0.0.0:8000"
 
 REM Dar un momento para que el backend inicie (opcional, ajusta según sea necesario)
 timeout /t 5 /nobreak
@@ -41,7 +41,7 @@ IF NOT EXIST "%FRONTEND_DIR%" (
     exit /b 1
 )
 REM Frontend: si no existe .env, forzamos la API base a 8000 para evitar CORS.
-start "SkyTerra Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm.cmd run dev -- --port 3000"
+start "SkyTerra Frontend" cmd /k "cd /d "%FRONTEND_DIR%" && npm.cmd run dev -- --port 5173"
 
 REM Iniciar app de operadores si existe
 IF EXIST "%OPERATOR_DIR%" (
@@ -57,4 +57,4 @@ IF EXIST "%OPERATOR_DIR%" (
     echo SkyTerra ha sido iniciado. Se abrieron ventanas para backend y frontend.
     echo (No se encontro apps\operator-mobile; omitiendo app de operadores.)
 )
-echo Visita http://localhost:3000 en tu navegador y conecta un dispositivo con la app Expo (npx expo start).
+echo Visita http://localhost:5173 en tu navegador y conecta un dispositivo con la app Expo (npx expo start).

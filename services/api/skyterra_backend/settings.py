@@ -96,8 +96,10 @@ INSTALLED_APPS = [
 
 SITE_ID = 1
 
-# URL del cliente para redirecciones (ej. desde Stripe)
-CLIENT_URL = os.getenv('CLIENT_URL', 'http://localhost:3000')
+# URL(s) del cliente para redirecciones (ej. desde Stripe) y políticas CSP
+_client_url_env = os.getenv('CLIENT_URL', 'http://localhost:5173,http://localhost:3000')
+CLIENT_URLS = [url.strip() for url in _client_url_env.split(',') if url.strip()]
+CLIENT_URL = CLIENT_URLS[0] if CLIENT_URLS else 'http://localhost:3000'
 
 # Configuración de dj-rest-auth
 # Ensure cookie security matches environment (secure in prod, not in dev)
@@ -517,8 +519,7 @@ else:
     # En producción permitir solo mismo origen; use CSP para whitelistar orígenes adicionales
     X_FRAME_OPTIONS = 'SAMEORIGIN'
 # Simple CSP allow-list for frames
-client_url = os.getenv('CLIENT_URL', 'http://localhost:3000')
-CSP_FRAME_ANCESTORS = ("'self'", "https://www.youtube.com", client_url)
+CSP_FRAME_ANCESTORS = tuple(["'self'", 'https://www.youtube.com', *CLIENT_URLS])
 SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
 
 # allauth settings for social authentication (Google, Apple, Twitter)

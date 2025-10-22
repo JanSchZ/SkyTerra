@@ -898,7 +898,7 @@ class TourViewSet(viewsets.ModelViewSet):
             # Sugerir nombre del archivo
             resp["Content-Disposition"] = f"inline; filename=\"{os.path.basename(full_path)}\""
             # Establecer una CSP permisiva SOLO para este contenido (no global)
-            client = getattr(settings, 'CLIENT_URL', 'http://localhost:3000')
+            frame_ancestors = ' '.join(getattr(settings, 'CSP_FRAME_ANCESTORS', ("'self'",)))
             csp_value = (
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://player.vimeo.com; "
@@ -907,7 +907,7 @@ class TourViewSet(viewsets.ModelViewSet):
                 "media-src 'self' data: blob:; "
                 "font-src 'self' data:; "
                 "connect-src 'self' https://www.youtube.com https://player.vimeo.com; "
-                f"frame-ancestors 'self' {client}; "
+                f"frame-ancestors {frame_ancestors}; "
                 "frame-src 'self' https://www.youtube.com https://player.vimeo.com; "
                 "object-src 'none'"
             )
