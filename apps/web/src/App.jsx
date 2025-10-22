@@ -968,6 +968,12 @@ function App() {
               heroVisible={landingHeroVisible}
               onExplore={handleExplore}
               onMapReady={handleMapReady}
+              onSearch={handleAISearch}
+              onLocationSearch={handleLocationSearch}
+              onSearchStart={handleSearchStart}
+              onSearchComplete={handleSearchComplete}
+              searchQuery={searchQuery}
+              onQueryChange={setSearchQuery}
             />
           </motion.div>
         }
@@ -1326,42 +1332,6 @@ function App() {
               </Box>
               {/* Removed AppliedFiltersDisplay to keep filters internal and invisible to user */}
             </Box>
-          )}
-
-          {location.pathname === '/' && (
-            <AnimatePresence>
-              {landingHeroVisible && (
-                <Box
-                  component={motion.div}
-                  key="landing-hero-search"
-                  layoutId="global-search-bar"
-                  initial={{ opacity: 0, y: 40 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                  sx={{
-                    position: 'fixed',
-                    bottom: { xs: 32, sm: 48, md: 68 },
-                    right: { xs: '50%', md: 'clamp(72px, 12vw, 180px)' },
-                    transform: { xs: 'translateX(50%)', md: 'none' },
-                    width: { xs: 'min(92vw, 660px)', md: 'clamp(340px, 28vw, 420px)' },
-                    zIndex: 1600,
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  <AISearchBar
-                    onSearch={handleAISearch}
-                    onLocationSearch={handleLocationSearch}
-                    onSearchStart={handleSearchStart}
-                    onSearchComplete={handleSearchComplete}
-                    placeholder="Buscar terrenos..."
-                    variant="hero"
-                    value={searchQuery}
-                    onQueryChange={setSearchQuery}
-                  />
-                </Box>
-              )}
-            </AnimatePresence>
           )}
 
           {/* Overlay de transición de navegación */}

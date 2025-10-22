@@ -134,6 +134,9 @@ const safePropertiesAccess = (properties, callback) => {
   return callback(validProperties);
 };
 
+const HERO_ROTATION_SPEED_DEG_PER_SEC = 3;
+const IDLE_ROTATION_SPEED_DEG_PER_SEC = 40;
+
 const MapView = forwardRef(({
   filters,
   appliedFilters,
@@ -144,6 +147,7 @@ const MapView = forwardRef(({
   onLoad,
   disableIntroAnimation = false,
   enableIdleRotation = true,
+  forceContinuousRotation = false,
   embedded = false,
   height: embeddedHeight,
   onLocationSelect,
@@ -1262,6 +1266,19 @@ const MapView = forwardRef(({
     }
   }, [onLoad]);
 
+  useEffect(() => {
+    if (forceContinuousRotation) {
+      if (isMapLoaded) {
+        setIsRotating(true);
+      }
+      return;
+    }
+
+    if (!enableIdleRotation) {
+      setIsRotating(false);
+    }
+  }, [forceContinuousRotation, enableIdleRotation, isMapLoaded]);
+
   // Listeners globales para pausar/reanudar rotación con interacción real del usuario
   useEffect(() => {
     if (!isMapLoaded || !mapRef.current) return;
@@ -1311,7 +1328,8 @@ const MapView = forwardRef(({
 
   // Rotación suave del globo a velocidad constante
   useEffect(() => {
-    if (!enableIdleRotation) {
+    const rotationAllowed = enableIdleRotation || forceContinuousRotation;
+    if (!rotationAllowed) {
       if (rotationFrameId.current) {
         cancelAnimationFrame(rotationFrameId.current);
         rotationFrameId.current = null;
@@ -1319,7 +1337,10 @@ const MapView = forwardRef(({
       rotationPrevTimeRef.current = null;
       return;
     }
-    const ROTATION_DEG_PER_SEC = 40; // velocidad alta para que se note claramente
+
+    const rotationSpeed = forceContinuousRotation
+      ? HERO_ROTATION_SPEED_DEG_PER_SEC
+      : IDLE_ROTATION_SPEED_DEG_PER_SEC;
 
     const step = (timestamp) => {
       if (!mapRef.current || !isRotating || userInteractedRef.current) {
@@ -1335,7 +1356,7 @@ const MapView = forwardRef(({
       rotationPrevTimeRef.current = timestamp;
 
       // Rotar linealmente; permitir que el usuario interrumpa libremente (movestart listener pausa)
-      map.setBearing(map.getBearing() + ROTATION_DEG_PER_SEC * deltaSec);
+      map.setBearing(map.getBearing() + rotationSpeed * deltaSec);
       rotationFrameId.current = requestAnimationFrame(step);
     };
 
@@ -1352,7 +1373,7 @@ const MapView = forwardRef(({
       rotationFrameId.current = null;
       rotationPrevTimeRef.current = null;
     };
-  }, [isRotating, enableIdleRotation]);
+  }, [isRotating, enableIdleRotation, forceContinuousRotation]);
 
   // Prefetch tours when zoom is moderate
   const prefetchToursInViewport = useCallback(async () => {
