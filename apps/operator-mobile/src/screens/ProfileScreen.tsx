@@ -55,10 +55,37 @@ const DRONE_MODELS = [
   'DJI Mavic 4 Pro',
   'DJI Inspire 2',
   'DJI Inspire 3',
-  'DJI Matrice 30',
-  'DJI Matrice 300 RTK',
-  'DJI Matrice 350 RTK',
 ];
+
+const resolvePickedAsset = (
+  picker: Awaited<ReturnType<typeof DocumentPicker.getDocumentAsync>>
+): DocumentPicker.DocumentPickerAsset | null => {
+  if (!picker) {
+    return null;
+  }
+
+  if ('canceled' in picker) {
+    if (picker.canceled || !picker.assets?.length) {
+      return null;
+    }
+    return picker.assets[0] ?? null;
+  }
+
+  const legacyResult = picker as unknown as {
+    type?: string;
+    assets?: DocumentPicker.DocumentPickerAsset[];
+  };
+
+  if (legacyResult.type !== 'success') {
+    return null;
+  }
+
+  if (Array.isArray(legacyResult.assets) && legacyResult.assets.length) {
+    return legacyResult.assets[0] ?? null;
+  }
+
+  return legacyResult as unknown as DocumentPicker.DocumentPickerAsset;
+};
 
 const extractFileName = (url?: string | null) => {
   if (!url) return null;
@@ -72,7 +99,7 @@ const extractFileName = (url?: string | null) => {
 };
 
 const ProfileScreen = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, preferredName } = useAuth();
   const [profile, setProfile] = useState<PilotProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,13 +132,26 @@ const ProfileScreen = () => {
     portfolio_url: '',
   });
 
+  const legalName = useMemo(() => {
+    if (preferredName?.trim()) {
+      return preferredName.trim();
+    }
+    const first = user?.first_name?.trim();
+    const last = user?.last_name?.trim();
+    const parts = [first, last].filter((part): part is string => Boolean(part && part.length));
+    if (parts.length) {
+      return parts.join(' ');
+    }
+    return '';
+  }, [preferredName, user?.first_name, user?.last_name]);
+
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchPilotProfile();
       setProfile(data);
       setForm({
-        display_name: data.display_name ?? '',
+        display_name: data.display_name ?? legalName,
         phone_number: data.phone_number ?? '',
         base_city: data.base_city ?? '',
         coverage_radius_km:
@@ -133,7 +173,7 @@ const ProfileScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [legalName]);
 
   useEffect(() => {
     loadProfile();
@@ -148,13 +188,25 @@ const ProfileScreen = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const coverageRadiusValue = useMemo(() => {
-    const numeric = Number(form.coverage_radius_km);
-    if (!Number.isFinite(numeric) || numeric <= 0) {
-      return 50;
-    }
-    return Math.min(Math.max(Math.round(numeric), 5), 200);
-  }, [form.coverage_radius_km]);
+  const sliderBounds = { min: 5, max: 200 };
+
+  const clampCoverageRadius = useCallback(
+    (value: number) => {
+      if (!Number.isFinite(value) || value <= 0) {
+        return 50;
+      }
+      return Math.min(Math.max(Math.round(value), sliderBounds.min), sliderBounds.max);
+    },
+    [sliderBounds.min, sliderBounds.max]
+  );
+
+  const [coverageRadiusValue, setCoverageRadiusValue] = useState<number>(50);
+
+  useEffect(() => {
+    const parsed = Number(form.coverage_radius_km);
+    const normalized = clampCoverageRadius(parsed);
+    setCoverageRadiusValue((prev) => (prev === normalized ? prev : normalized));
+  }, [clampCoverageRadius, form.coverage_radius_km]);
 
   const handleThemeChange = async (nextMode: ThemeMode) => {
     if (mode === nextMode) {
@@ -174,8 +226,6 @@ const ProfileScreen = () => {
   };
 
   const placeholderColor = isDark ? 'rgba(148,163,184,0.65)' : 'rgba(100,116,139,0.55)';
-
-  const sliderBounds = { min: 5, max: 200 };
 
   const handleSave = async () => {
     setError(null);
@@ -197,7 +247,9 @@ const ProfileScreen = () => {
 
       const updated = await updatePilotProfile(payload);
       setProfile(updated);
-      await persistPreferredName(updated.display_name ?? form.display_name.trim());
+      const nextPreferredName =
+        updated.display_name ?? form.display_name.trim() || legalName || null;
+      await persistPreferredName(nextPreferredName);
       setLocation(
         typeof updated.location_latitude === 'number' && typeof updated.location_longitude === 'number'
           ? { latitude: updated.location_latitude, longitude: updated.location_longitude }
@@ -227,7 +279,9 @@ const ProfileScreen = () => {
         multiple: false,
       });
 
-      if (picker.type !== 'success' || !picker.assets || !picker.assets.length) {
+      const asset = resolvePickedAsset(picker);
+
+      if (!asset) {
         setUploadingType(null);
         setDocumentStates((prev) => {
           const next = { ...prev };
@@ -237,7 +291,6 @@ const ProfileScreen = () => {
         return;
       }
 
-      const asset = picker.assets[0];
       const response = await uploadPilotDocument({
         type,
         file: {
@@ -305,7 +358,9 @@ const ProfileScreen = () => {
             <View style={styles.headerCard}>
               <View style={styles.headerRow}>
                 <View>
-                  <Text style={styles.headerTitle}>{form.display_name || user?.first_name || 'Tu perfil'}</Text>
+                  <Text style={styles.headerTitle}>
+                    {form.display_name?.trim() || legalName || 'Tu perfil'}
+                  </Text>
                   <Text style={styles.headerSubtitle}>{user?.email}</Text>
                 </View>
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -386,7 +441,14 @@ const ProfileScreen = () => {
                   <Text style={styles.label}>Radio de cobertura (km)</Text>
                   <TextInput
                     value={form.coverage_radius_km}
-                    onChangeText={(value) => handleChange('coverage_radius_km', value.replace(/[^0-9]/g, ''))}
+                    onChangeText={(value) => {
+                      const sanitized = value.replace(/[^0-9]/g, '');
+                      handleChange('coverage_radius_km', sanitized);
+                      if (sanitized) {
+                        const normalized = clampCoverageRadius(Number(sanitized));
+                        setCoverageRadiusValue((prev) => (prev === normalized ? prev : normalized));
+                      }
+                    }}
                     placeholder="50"
                     placeholderTextColor={placeholderColor}
                     style={styles.input}
@@ -395,7 +457,14 @@ const ProfileScreen = () => {
                   <View style={styles.sliderContainer}>
                     <Slider
                       value={coverageRadiusValue}
-                      onValueChange={(value) => handleChange('coverage_radius_km', String(Math.round(value)))}
+                      onValueChange={(value) => {
+                        const normalized = clampCoverageRadius(value);
+                        setCoverageRadiusValue((prev) => (prev === normalized ? prev : normalized));
+                        const asString = String(normalized);
+                        if (form.coverage_radius_km !== asString) {
+                          handleChange('coverage_radius_km', asString);
+                        }
+                      }}
                       minimumValue={sliderBounds.min}
                       maximumValue={sliderBounds.max}
                       step={5}
