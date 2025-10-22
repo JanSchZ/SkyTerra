@@ -44,6 +44,9 @@ const themeModeOptions: Array<{ value: ThemeMode; label: string; description: st
   { value: 'auto', label: 'Automático', description: 'Se adapta a la configuración del sistema.' },
 ];
 
+const SLIDER_BOUNDS = { min: 5, max: 200 } as const;
+const DEFAULT_COVERAGE_RADIUS = 50;
+
 const DRONE_MODELS = [
   'DJI Mini 3 Pro',
   'DJI Mini 4 Pro',
@@ -55,9 +58,6 @@ const DRONE_MODELS = [
   'DJI Mavic 4 Pro',
   'DJI Inspire 2',
   'DJI Inspire 3',
-  'DJI Matrice 30',
-  'DJI Matrice 300 RTK',
-  'DJI Matrice 350 RTK',
 ];
 
 const extractFileName = (url?: string | null) => {
@@ -93,6 +93,7 @@ const ProfileScreen = () => {
   >({});
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coverageRadius, setCoverageRadius] = useState<number>(DEFAULT_COVERAGE_RADIUS);
 
   const [form, setForm] = useState({
     display_name: '',
@@ -105,13 +106,22 @@ const ProfileScreen = () => {
     portfolio_url: '',
   });
 
+  const clampCoverageRadius = useCallback((value: number) => {
+    return Math.min(Math.max(Math.round(value), SLIDER_BOUNDS.min), SLIDER_BOUNDS.max);
+  }, []);
+
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchPilotProfile();
+      const fallbackDisplayName = [data.user?.first_name, data.user?.last_name]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      const normalizedDisplayName = data.display_name?.trim();
       setProfile(data);
       setForm({
-        display_name: data.display_name ?? '',
+        display_name: normalizedDisplayName?.length ? normalizedDisplayName : fallbackDisplayName,
         phone_number: data.phone_number ?? '',
         base_city: data.base_city ?? '',
         coverage_radius_km:
@@ -127,13 +137,18 @@ const ProfileScreen = () => {
           ? { latitude: data.location_latitude, longitude: data.location_longitude }
           : null
       );
+      if (typeof data.coverage_radius_km === 'number') {
+        setCoverageRadius(clampCoverageRadius(data.coverage_radius_km));
+      } else {
+        setCoverageRadius(DEFAULT_COVERAGE_RADIUS);
+      }
     } catch (err) {
       console.error('Profile load error', err);
       setError('No pudimos cargar tu perfil. Intenta nuevamente.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clampCoverageRadius]);
 
   useEffect(() => {
     loadProfile();
@@ -148,13 +163,16 @@ const ProfileScreen = () => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const coverageRadiusValue = useMemo(() => {
-    const numeric = Number(form.coverage_radius_km);
-    if (!Number.isFinite(numeric) || numeric <= 0) {
-      return 50;
+  useEffect(() => {
+    if (!form.coverage_radius_km) {
+      setCoverageRadius(DEFAULT_COVERAGE_RADIUS);
+      return;
     }
-    return Math.min(Math.max(Math.round(numeric), 5), 200);
-  }, [form.coverage_radius_km]);
+    const numeric = Number(form.coverage_radius_km);
+    if (Number.isFinite(numeric)) {
+      setCoverageRadius(clampCoverageRadius(numeric));
+    }
+  }, [clampCoverageRadius, form.coverage_radius_km]);
 
   const handleThemeChange = async (nextMode: ThemeMode) => {
     if (mode === nextMode) {
@@ -174,8 +192,6 @@ const ProfileScreen = () => {
   };
 
   const placeholderColor = isDark ? 'rgba(148,163,184,0.65)' : 'rgba(100,116,139,0.55)';
-
-  const sliderBounds = { min: 5, max: 200 };
 
   const handleSave = async () => {
     setError(null);
@@ -226,8 +242,35 @@ const ProfileScreen = () => {
         copyToCacheDirectory: true,
         multiple: false,
       });
+      const normalizedPicker = picker as Awaited<ReturnType<typeof DocumentPicker.getDocumentAsync>> & {
+        type?: string;
+        assets?: DocumentPicker.DocumentPickerAsset[];
+        canceled?: boolean;
+        uri?: string;
+        name?: string;
+        mimeType?: string;
+        size?: number;
+      };
+      const assets = Array.isArray(normalizedPicker.assets) ? normalizedPicker.assets : [];
+      const wasCancelled =
+        normalizedPicker.canceled === true ||
+        (typeof normalizedPicker.type === 'string' && normalizedPicker.type !== 'success');
 
-      if (picker.type !== 'success' || !picker.assets || !picker.assets.length) {
+      let asset: DocumentPicker.DocumentPickerAsset | null = null;
+      if (!wasCancelled) {
+        if (assets.length) {
+          asset = assets[0];
+        } else if (typeof normalizedPicker.uri === 'string') {
+          asset = {
+            uri: normalizedPicker.uri,
+            name: normalizedPicker.name ?? `${type}.pdf`,
+            mimeType: normalizedPicker.mimeType ?? acceptedTypes[0] ?? 'application/pdf',
+            size: normalizedPicker.size,
+          } as DocumentPicker.DocumentPickerAsset;
+        }
+      }
+
+      if (wasCancelled) {
         setUploadingType(null);
         setDocumentStates((prev) => {
           const next = { ...prev };
@@ -237,7 +280,16 @@ const ProfileScreen = () => {
         return;
       }
 
-      const asset = picker.assets[0];
+      if (!asset) {
+        const message = 'No pudimos leer el archivo seleccionado. Intenta nuevamente.';
+        setError(message);
+        setDocumentStates((prev) => ({
+          ...prev,
+          [type]: { status: 'error', message },
+        }));
+        setUploadingType(null);
+        return;
+      }
       const response = await uploadPilotDocument({
         type,
         file: {
@@ -291,6 +343,23 @@ const ProfileScreen = () => {
     return `${approved}/${DOCUMENT_TOTAL} documentos aprobados`;
   }, [profile?.documents]);
 
+  const registeredFullName = useMemo(() => {
+    const fromProfile = [profile?.user?.first_name, profile?.user?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    if (fromProfile.length) {
+      return fromProfile;
+    }
+    const fromAuth = [user?.first_name, user?.last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    return fromAuth;
+  }, [profile?.user?.first_name, profile?.user?.last_name, user?.first_name, user?.last_name]);
+
+  const headerDisplayName = form.display_name?.trim() || registeredFullName || 'Tu perfil';
+
   return (
     <LinearGradient colors={backgroundGradient} style={styles.gradient}>
       <StatusBar style={colors.statusBarStyle} backgroundColor={backgroundGradient[0]} />
@@ -305,7 +374,7 @@ const ProfileScreen = () => {
             <View style={styles.headerCard}>
               <View style={styles.headerRow}>
                 <View>
-                  <Text style={styles.headerTitle}>{form.display_name || user?.first_name || 'Tu perfil'}</Text>
+                  <Text style={styles.headerTitle}>{headerDisplayName}</Text>
                   <Text style={styles.headerSubtitle}>{user?.email}</Text>
                 </View>
                 <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -349,7 +418,7 @@ const ProfileScreen = () => {
             <View style={styles.formCard}>
               <Text style={styles.sectionTitle}>Datos personales</Text>
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Nombre</Text>
+                <Text style={styles.label}>Nombre del piloto</Text>
                 <TextInput
                   value={form.display_name}
                   onChangeText={(value) => handleChange('display_name', value)}
@@ -386,26 +455,57 @@ const ProfileScreen = () => {
                   <Text style={styles.label}>Radio de cobertura (km)</Text>
                   <TextInput
                     value={form.coverage_radius_km}
-                    onChangeText={(value) => handleChange('coverage_radius_km', value.replace(/[^0-9]/g, ''))}
+                    onChangeText={(value) => {
+                      const sanitized = value.replace(/[^0-9]/g, '');
+                      handleChange('coverage_radius_km', sanitized);
+                      if (!sanitized) {
+                        setCoverageRadius(DEFAULT_COVERAGE_RADIUS);
+                        return;
+                      }
+                      const numeric = Number(sanitized);
+                      if (Number.isFinite(numeric) && numeric >= SLIDER_BOUNDS.min) {
+                        setCoverageRadius(clampCoverageRadius(numeric));
+                      }
+                    }}
                     placeholder="50"
                     placeholderTextColor={placeholderColor}
                     style={styles.input}
                     keyboardType="number-pad"
+                    onBlur={() => {
+                      if (!form.coverage_radius_km) {
+                        handleChange('coverage_radius_km', String(coverageRadius));
+                        return;
+                      }
+                      const numeric = Number(form.coverage_radius_km);
+                      if (Number.isFinite(numeric)) {
+                        const clamped = clampCoverageRadius(numeric);
+                        if (clamped !== numeric) {
+                          handleChange('coverage_radius_km', String(clamped));
+                        }
+                        setCoverageRadius(clamped);
+                      }
+                    }}
                   />
                   <View style={styles.sliderContainer}>
                     <Slider
-                      value={coverageRadiusValue}
-                      onValueChange={(value) => handleChange('coverage_radius_km', String(Math.round(value)))}
-                      minimumValue={sliderBounds.min}
-                      maximumValue={sliderBounds.max}
+                      value={coverageRadius}
+                      onValueChange={(value) => {
+                        const next = clampCoverageRadius(value);
+                        setCoverageRadius(next);
+                        handleChange('coverage_radius_km', String(next));
+                      }}
+                      minimumValue={SLIDER_BOUNDS.min}
+                      maximumValue={SLIDER_BOUNDS.max}
                       step={5}
                       thumbTintColor={isDark ? colors.surface : colors.primary}
                       minimumTrackTintColor={colors.primary}
                       maximumTrackTintColor={colors.cardBorder}
                     />
                     <View style={styles.sliderLabels}>
-                      <Text style={styles.sliderValue}>{coverageRadiusValue} km</Text>
-                      <Text style={styles.sliderAssist}>Rango {sliderBounds.min}–{sliderBounds.max} km</Text>
+                      <Text style={styles.sliderValue}>{coverageRadius} km</Text>
+                      <Text style={styles.sliderAssist}>
+                        Rango {SLIDER_BOUNDS.min}–{SLIDER_BOUNDS.max} km
+                      </Text>
                     </View>
                   </View>
                 </View>
