@@ -12,7 +12,9 @@ import {
   DialogTitle,
   IconButton,
   Paper,
+  Snackbar,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -33,11 +35,51 @@ const WORKFLOW_STAGE_LABELS = {
 };
 
 const QUICK_ACTIONS = [
-  { key: 'changes_requested', label: 'Solicitar correcciones', nodes: ['review', 'approved'] },
-  { key: 'approved_for_shoot', label: 'Aprobar y enviar a pilotos', nodes: ['review'] },
-  { key: 'received', label: 'Marcar material recibido', nodes: ['pilot', 'post'] },
-  { key: 'ready_for_publish', label: 'Listo para publicar', nodes: ['post'] },
-  { key: 'published', label: 'Publicar en Skyterra', nodes: ['post', 'live'] },
+  {
+    key: 'changes_requested',
+    label: 'Solicitar correcciones',
+    nodes: ['review', 'approved'],
+    requiresMessage: true,
+    confirmLabel: 'Solicitar correcciones',
+    successMessage: 'Solicitaste correcciones al vendedor.',
+    helperText: 'Describe con claridad qué debe ajustar el vendedor. Se enviará junto con la notificación.',
+    description: 'Envía una notificación al vendedor con los ajustes que debe realizar.',
+  },
+  {
+    key: 'approved_for_shoot',
+    label: 'Aprobar y enviar a pilotos',
+    nodes: ['review'],
+    allowMessage: true,
+    defaultMessage: 'Publicación aprobada. Preparar agenda de vuelo con pilotos.',
+    confirmLabel: 'Enviar a pilotos',
+    successMessage: 'La publicación fue enviada al equipo de pilotos.',
+    helperText: 'Puedes añadir notas para el equipo de producción (opcional).',
+    description: 'Crea automáticamente la orden de producción y avisa al equipo de pilotos.',
+  },
+  {
+    key: 'received',
+    label: 'Marcar material recibido',
+    nodes: ['pilot', 'post'],
+    confirmLabel: 'Confirmar recepción',
+    successMessage: 'El material quedó marcado como recibido.',
+    description: 'Confirma que ya recibiste el material grabado por los pilotos.',
+  },
+  {
+    key: 'ready_for_publish',
+    label: 'Listo para publicar',
+    nodes: ['post'],
+    confirmLabel: 'Marcar como listo',
+    successMessage: 'La publicación quedó lista para lanzar.',
+    description: 'Marca la publicación como lista para programación en la web.',
+  },
+  {
+    key: 'published',
+    label: 'Publicar en Skyterra',
+    nodes: ['post', 'live'],
+    confirmLabel: 'Publicar',
+    successMessage: 'La propiedad ahora está publicada en SkyTerra.',
+    description: 'Publica inmediatamente la propiedad en el catálogo de SkyTerra.',
+  },
 ];
 
 const STAGE_FILTERS = new Set(['review', 'approved', 'pilot', 'post', 'live']);
@@ -96,6 +138,19 @@ function PropertyManagementPage() {
   const [tours, setTours] = useState([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [timelineLoading, setTimelineLoading] = useState(false);
+  const [actionDialog, setActionDialog] = useState({
+    open: false,
+    action: null,
+    property: null,
+    message: '',
+    loading: false,
+    submitAttempted: false,
+  });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: 'success',
+    message: '',
+  });
 
   useEffect(() => {
     if (normalizedStage !== statusFilter) {
@@ -109,6 +164,78 @@ function PropertyManagementPage() {
       setSortModel([{ field: 'durationHours', sort: 'desc' }]);
     }
   }, [focus]);
+
+  const resetActionDialog = () => {
+    setActionDialog({
+      open: false,
+      action: null,
+      property: null,
+      message: '',
+      loading: false,
+      submitAttempted: false,
+    });
+  };
+
+  const openActionDialog = (property, action) => {
+    setActionDialog({
+      open: true,
+      action,
+      property,
+      message: action.defaultMessage || '',
+      loading: false,
+      submitAttempted: false,
+    });
+  };
+
+  const closeActionDialog = () => {
+    if (actionDialog.loading) return;
+    resetActionDialog();
+  };
+
+  const handleActionMessageChange = (event) => {
+    const value = event.target.value;
+    setActionDialog((prev) => ({
+      ...prev,
+      message: value,
+      submitAttempted: false,
+    }));
+  };
+
+  const handleConfirmAction = async () => {
+    if (!actionDialog.action || !actionDialog.property) return;
+    const { action, property, message } = actionDialog;
+    const trimmedMessage = message.trim();
+
+    if (action.requiresMessage && !trimmedMessage) {
+      setActionDialog((prev) => ({ ...prev, submitAttempted: true }));
+      return;
+    }
+
+    try {
+      setActionDialog((prev) => ({ ...prev, loading: true }));
+      await propertyService.transitionWorkflow(property.id, action.key, trimmedMessage || undefined);
+      setSnackbar({
+        open: true,
+        severity: 'success',
+        message: action.successMessage || 'Estado actualizado correctamente.',
+      });
+      resetActionDialog();
+      setRefreshToggle((v) => !v);
+    } catch (err) {
+      console.error(err);
+      setActionDialog((prev) => ({ ...prev, loading: false }));
+      setSnackbar({
+        open: true,
+        severity: 'error',
+        message: err?.message || 'No fue posible actualizar el flujo.',
+      });
+    }
+  };
+
+  const handleSnackbarClose = (_, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -131,14 +258,29 @@ function PropertyManagementPage() {
           stage?.sla_breached ??
           (expectedHours != null && durationHours != null ? durationHours > expectedHours : false);
         const lastEvent = p.last_event || null;
-        const lastEventLabel =
-          lastEvent?.substate_label ||
-          lastEvent?.substate ||
-          stage?.label ||
-          stage?.name ||
-          WORKFLOW_STAGE_LABELS[p.workflow_node] ||
-          '—';
-        const lastEventMessage = lastEvent?.message || '';
+        const workflowNodeLabel = WORKFLOW_STAGE_LABELS[p.workflow_node] || p.workflow_node;
+        const substateLabel = stage?.label || stage?.name || '';
+        const normalize = (value) => (typeof value === 'string' ? value.trim() : '');
+        const normalizedStage = normalize(workflowNodeLabel).toLowerCase();
+        const normalizedSubstate = normalize(substateLabel).toLowerCase();
+        let eventLabelCandidate = normalize(lastEvent?.substate_label || lastEvent?.substate || '');
+        if (eventLabelCandidate) {
+          const normalizedEvent = eventLabelCandidate.toLowerCase();
+          if (
+            normalizedEvent === normalizedStage ||
+            (normalizedSubstate && normalizedEvent === normalizedSubstate)
+          ) {
+            eventLabelCandidate = '';
+          }
+        }
+        const rawEventMessage = lastEvent?.message || '';
+        if (!eventLabelCandidate) {
+          eventLabelCandidate = normalize(rawEventMessage);
+        }
+        const lastEventLabel = eventLabelCandidate || 'Sin novedades';
+        const trimmedMessage = normalize(rawEventMessage);
+        const lastEventMessage =
+          trimmedMessage && trimmedMessage !== eventLabelCandidate ? rawEventMessage : '';
         return {
           id: p.id,
           name: p.name,
@@ -148,9 +290,10 @@ function PropertyManagementPage() {
           size: p.size,
           planName: p.plan_name || '—',
           workflow_node: p.workflow_node,
-          workflow_node_label: WORKFLOW_STAGE_LABELS[p.workflow_node] || p.workflow_node,
+          workflow_node_label: workflowNodeLabel,
           timeline: p.workflow_timeline,
           current_stage: stage,
+          substateLabel,
           expectedHours,
           durationHours,
           slaBreach,
@@ -221,15 +364,6 @@ function PropertyManagementPage() {
 
   const handleManualRefresh = () => setRefreshToggle((v) => !v);
 
-  const handleTransition = async (propertyId, substate) => {
-    try {
-      await propertyService.transitionWorkflow(propertyId, substate);
-      setRefreshToggle((v) => !v);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const openDetailDialog = async (propertyId) => {
     setTimelineLoading(true);
     try {
@@ -299,20 +433,26 @@ function PropertyManagementPage() {
       field: 'workflow_node',
       headerName: 'Etapa',
       minWidth: 200,
-      renderCell: ({ row }) => (
-        <Stack spacing={0.5}>
-          <Chip
-            label={row.workflow_node_label}
-            color={row.current_stage?.state === 'active' ? 'primary' : 'default'}
-            size="small"
-          />
-          {row.current_stage?.label && (
-            <Typography variant="caption" color="text.secondary">
-              {row.current_stage.label}
-            </Typography>
-          )}
-        </Stack>
-      ),
+      renderCell: ({ row }) => {
+        const stageLabel = row.workflow_node_label || '—';
+        const substate = row.substateLabel || '';
+        const shouldShowSubstate =
+          !!substate && substate.trim().toLowerCase() !== stageLabel.trim().toLowerCase();
+        return (
+          <Stack spacing={0.5}>
+            <Chip
+              label={stageLabel}
+              color={row.current_stage?.state === 'active' ? 'primary' : 'default'}
+              size="small"
+            />
+            {shouldShowSubstate && (
+              <Typography variant="caption" color="text.secondary">
+                Subestado: {substate}
+              </Typography>
+            )}
+          </Stack>
+        );
+      },
     },
     {
       field: 'durationHours',
@@ -372,8 +512,9 @@ function PropertyManagementPage() {
               <Button
                 key={action.key}
                 variant={action.key === 'approved_for_shoot' ? 'contained' : 'outlined'}
+                color={action.key === 'changes_requested' ? 'warning' : 'primary'}
                 size="small"
-                onClick={() => handleTransition(params.id, action.key)}
+                onClick={() => openActionDialog(params.row, action)}
               >
                 {action.label}
               </Button>
@@ -386,6 +527,23 @@ function PropertyManagementPage() {
       },
     },
   ];
+
+  const selectedAction = actionDialog.action;
+  const dialogProperty = actionDialog.property;
+  const showMessageField = Boolean(
+    selectedAction && (selectedAction.requiresMessage || selectedAction.allowMessage)
+  );
+  const messageError = Boolean(
+    selectedAction?.requiresMessage && actionDialog.submitAttempted && !actionDialog.message.trim()
+  );
+  const dialogHelperText = messageError
+    ? 'Debes ingresar un mensaje para continuar.'
+    : selectedAction?.helperText;
+  const confirmLabel = selectedAction?.confirmLabel || 'Confirmar';
+  const dialogStageLabel = dialogProperty?.workflow_node_label || '—';
+  const dialogSubstateLabel = dialogProperty?.substateLabel || '';
+  const showDialogSubstateChip = Boolean(dialogSubstateLabel) &&
+    dialogSubstateLabel.trim().toLowerCase() !== dialogStageLabel.trim().toLowerCase();
 
   if (loading) {
     return (
@@ -530,6 +688,65 @@ function PropertyManagementPage() {
         </Paper>
       </Stack>
 
+      <Dialog open={actionDialog.open} onClose={closeActionDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>{selectedAction?.label || 'Confirmar acción'}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            {selectedAction?.description && (
+              <Typography variant="body2" color="text.secondary">
+                {selectedAction.description}
+              </Typography>
+            )}
+            {dialogProperty && (
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.02)' }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {dialogProperty.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {dialogProperty.owner}
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap' }}>
+                  <Chip size="small" label={dialogStageLabel} />
+                  {showDialogSubstateChip && (
+                    <Chip size="small" variant="outlined" label={dialogSubstateLabel} />
+                  )}
+                </Stack>
+              </Paper>
+            )}
+            {showMessageField && (
+              <TextField
+                autoFocus
+                multiline
+                minRows={3}
+                label={selectedAction?.requiresMessage ? 'Mensaje para el vendedor' : 'Notas (opcional)'}
+                placeholder={selectedAction?.defaultMessage || selectedAction?.placeholder}
+                value={actionDialog.message}
+                onChange={handleActionMessageChange}
+                error={messageError}
+                helperText={dialogHelperText}
+                fullWidth
+              />
+            )}
+            {!showMessageField && selectedAction?.helperText && (
+              <Typography variant="body2" color="text.secondary">
+                {selectedAction.helperText}
+              </Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeActionDialog} disabled={actionDialog.loading}>
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirmAction} variant="contained" disabled={actionDialog.loading}>
+            {actionDialog.loading ? 'Guardando…' : confirmLabel}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>Detalles de Propiedad</DialogTitle>
         <DialogContent dividers>
@@ -589,6 +806,17 @@ function PropertyManagementPage() {
           if (selectedProperty) openDetailDialog(selectedProperty.id);
         }}
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
