@@ -12,12 +12,14 @@ import LocalOfferIcon from '@mui/icons-material/LocalOfferOutlined';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import FlightTakeoffIcon from '@mui/icons-material/FlightTakeoff';
 import './adminDashboard.css';
 import { authService } from '../../services/api';
 
 const NAV_PRIMARY = [
   { label: 'Panel', path: '/admin/dashboard', icon: <DashboardIcon fontSize="small" /> },
   { label: 'Aprobaciones', path: '/admin/approvals', icon: <FactCheckIcon fontSize="small" /> },
+  { label: 'Operators', path: '/admin/operators', icon: <FlightTakeoffIcon fontSize="small" /> },
   { label: 'Publicaciones', path: '/admin/properties', icon: <ListAltIcon fontSize="small" /> },
   { label: 'Analítica', path: '/admin/analytics', icon: <AssessmentIcon fontSize="small" /> },
   { label: 'Tickets', path: '/admin/tickets', icon: <SupportAgentIcon fontSize="small" /> },
