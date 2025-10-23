@@ -58,6 +58,7 @@ import Login from './components/auth/Login';
 import SignUp from './components/auth/SignUp';
 import './App.css';
 import SavedAndRecent from './components/ui/SavedAndRecent';
+import SkyTerraPreloader from './components/ui/SkyTerraPreloader';
 
 export const ThemeModeContext = React.createContext({
   toggleThemeMode: () => {},
@@ -855,11 +856,7 @@ function App() {
   };
 
   if (loadingAuth) {
-    return (
-      <Box sx={(theme)=>({ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: theme.palette.background.default })}>
-        <CircularProgress />
-      </Box>
-    );
+    return <SkyTerraPreloader />;
   }
 
   const pageVariants = {
