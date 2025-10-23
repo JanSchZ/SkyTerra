@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Avatar,
@@ -11,26 +11,28 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  Grid,
   IconButton,
+  FormControl,
+  InputLabel,
+  Select,
   Link,
   List,
   ListItem,
-  ListItemSecondaryAction,
   ListItemText,
   MenuItem,
   Paper,
+  Rating,
   Snackbar,
   Stack,
   TextField,
   Tooltip,
   Typography,
+  Grid,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
-import Map, { Layer, Marker, NavigationControl, Source } from 'react-map-gl';
+import Map, { Layer, NavigationControl, Source } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import * as turf from '@turf/turf';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -265,13 +267,29 @@ const AdminOperatorsPage = () => {
   const [jobsError, setJobsError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [documentDialog, setDocumentDialog] = useState({ open: false, document: null });
-  const [viewState, setViewState] = useState({
-    longitude: -70.6693,
-    latitude: -33.4489,
-    zoom: 4.5,
-    pitch: 0,
-    bearing: 0,
-  });
+  const mapRef = useRef(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [documentStatusSaving, setDocumentStatusSaving] = useState(() => new Set());
+  const [jobRatingDrafts, setJobRatingDrafts] = useState({});
+  const [jobRatingNotes, setJobRatingNotes] = useState({});
+  const [jobRatingSaving, setJobRatingSaving] = useState(() => new Set());
+  const mapToken = config.mapbox?.accessToken;
+
+  const refreshOperatorDetails = useCallback(
+    async (pilotId) => {
+      if (!pilotId) {
+        return;
+      }
+      try {
+        const detail = await operatorService.fetchOperator(pilotId);
+        setOperators((prev) => prev.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)));
+        setActiveOperator((prev) => (prev && prev.id === detail.id ? { ...prev, ...detail } : prev));
+      } catch (error) {
+        console.error('Error refreshing operator detail', error);
+      }
+    },
+    [setOperators, setActiveOperator]
+  );
 
   const applyDocumentUpdate = useCallback((updatedDoc) => {
     const pilotId = getDocumentPilotId(updatedDoc);
@@ -431,27 +449,35 @@ const AdminOperatorsPage = () => {
   }, [operatorsWithCoords]);
 
   useEffect(() => {
-    if (!activeOperator && operatorsWithCoords.length > 0) {
-      setViewState(initialMapView);
+    if (!mapReady) {
+      return;
     }
-  }, [activeOperator, operatorsWithCoords, initialMapView]);
+    const mapInstance = mapRef.current;
+    const map = mapInstance?.getMap?.();
+    if (!map) {
+      return;
+    }
 
-  useEffect(() => {
-    if (!activeOperator) {
+    if (activeOperator) {
+      const lat = ensureNumber(activeOperator.location_latitude);
+      const lon = ensureNumber(activeOperator.location_longitude);
+      if (lat === null || lon === null) {
+        return;
+      }
+      const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : 8;
+      map.flyTo({
+        center: [lon, lat],
+        zoom: currentZoom < 8 ? 8 : currentZoom,
+        duration: 800,
+      });
       return;
     }
-    const lat = ensureNumber(activeOperator.location_latitude);
-    const lon = ensureNumber(activeOperator.location_longitude);
-    if (lat === null || lon === null) {
-      return;
+
+    if (operatorsWithCoords.length > 0) {
+      const { longitude, latitude, zoom } = initialMapView;
+      map.flyTo({ center: [longitude, latitude], zoom, duration: 800 });
     }
-    setViewState((prev) => ({
-      ...prev,
-      latitude: lat,
-      longitude: lon,
-      zoom: prev.zoom < 8 ? 8 : prev.zoom,
-    }));
-  }, [activeOperator?.id, activeOperator?.location_latitude, activeOperator?.location_longitude]);
+  }, [mapReady, activeOperator?.id, activeOperator?.location_latitude, activeOperator?.location_longitude, operatorsWithCoords, initialMapView]);
 
   const summary = useMemo(() => {
     const total = operators.length;
@@ -459,7 +485,7 @@ const AdminOperatorsPage = () => {
     const approved = operators.filter((operator) => operator.status === 'approved').length;
     const pendingDocs = operators.reduce((acc, operator) => {
       const docs = Array.isArray(operator.documents)
-        ? operator.documents.filter((doc) => doc.status === 'pending')
+        ? operator.documents.filter((doc) => doc.status !== 'approved' || doc.is_expired)
         : [];
       return acc + docs.length;
     }, 0);
@@ -518,6 +544,14 @@ const AdminOperatorsPage = () => {
     [operators]
   );
 
+  const rowSelectionModel = useMemo(() => {
+    const ids = new Set();
+    if (selectedOperatorId !== null && selectedOperatorId !== undefined) {
+      ids.add(selectedOperatorId);
+    }
+    return { type: 'include', ids };
+  }, [selectedOperatorId]);
+
   const columns = useMemo(
     () => [
       {
@@ -569,7 +603,8 @@ const AdminOperatorsPage = () => {
         headerName: 'Radio (km)',
         minWidth: 130,
         valueFormatter: (params) => {
-          const value = Number(params.value);
+          const valueRaw = params?.value;
+          const value = Number(valueRaw);
           return Number.isFinite(value) && value > 0 ? `${Math.round(value)} km` : '—';
         },
       },
@@ -578,13 +613,13 @@ const AdminOperatorsPage = () => {
         headerName: 'Dron',
         flex: 1,
         minWidth: 180,
-        valueGetter: (params) => params.value || '—',
+        valueGetter: (params) => params?.value || params?.row?.drone_model || '—',
       },
       {
         field: 'last_heartbeat_at',
         headerName: 'Última señal',
         minWidth: 200,
-        valueFormatter: (params) => formatDateTime(params.value),
+        valueFormatter: (params) => formatDateTime(params?.value),
       },
     ],
     []
@@ -592,11 +627,12 @@ const AdminOperatorsPage = () => {
 
   const handleRowSelection = useCallback(
     (selectionModel) => {
-      const [first] = selectionModel;
-      if (!first) {
+      const ids = selectionModel?.ids;
+      if (!(ids instanceof Set) || ids.size === 0) {
         return;
       }
-      const operator = operators.find((item) => item.id === first);
+      const firstSelectedId = ids.values().next().value;
+      const operator = operators.find((item) => item.id === firstSelectedId);
       if (operator) {
         handleSelectOperator(operator);
       }
@@ -622,6 +658,7 @@ const AdminOperatorsPage = () => {
       try {
         const updated = await operatorService.updateDocument(document.id, payload);
         applyDocumentUpdate(updated);
+        await refreshOperatorDetails(getDocumentPilotId(updated));
         setFeedback({ type: 'success', message: 'Documento actualizado correctamente.' });
         setDocumentDialog({ open: false, document: null });
       } catch (error) {
@@ -629,14 +666,133 @@ const AdminOperatorsPage = () => {
         throw error;
       }
     },
-    [documentDialog.document, applyDocumentUpdate]
+    [documentDialog.document, applyDocumentUpdate, refreshOperatorDetails]
   );
 
   const handleDocumentDialogClose = useCallback(() => {
     setDocumentDialog({ open: false, document: null });
   }, []);
 
+  const handleDocumentStatusChange = useCallback(
+    async (document, nextStatus) => {
+      if (!document || !nextStatus || document.status === nextStatus) {
+        return;
+      }
+      setDocumentStatusSaving((prev) => {
+        const next = new Set(prev);
+        next.add(document.id);
+        return next;
+      });
+      try {
+        const updated = await operatorService.updateDocument(document.id, { status: nextStatus });
+        applyDocumentUpdate(updated);
+        await refreshOperatorDetails(getDocumentPilotId(updated));
+        setFeedback({ type: 'success', message: 'Estado de documento actualizado correctamente.' });
+      } catch (error) {
+        console.error('Error updating document status', error);
+        const message = error?.response?.data?.detail || error?.message || 'No pudimos actualizar el estado del documento.';
+        setFeedback({ type: 'error', message });
+      } finally {
+        setDocumentStatusSaving((prev) => {
+          const next = new Set(prev);
+          next.delete(document.id);
+          return next;
+        });
+      }
+    },
+    [applyDocumentUpdate, refreshOperatorDetails]
+  );
+
   const handleFeedbackClose = useCallback(() => setFeedback(null), []);
+
+  useEffect(() => {
+    setJobRatingDrafts(() => {
+      const next = {};
+      jobs.forEach((job) => {
+        next[job.id] = job.pilot_rating ?? null;
+      });
+      return next;
+    });
+    setJobRatingNotes(() => {
+      const next = {};
+      jobs.forEach((job) => {
+        next[job.id] = job.pilot_review_notes ?? '';
+      });
+      return next;
+    });
+  }, [jobs]);
+
+  useEffect(() => {
+    if (!mapToken) {
+      setMapReady(false);
+    }
+  }, [mapToken]);
+
+  const handleJobRatingChange = useCallback((jobId, value) => {
+    setJobRatingDrafts((prev) => ({ ...prev, [jobId]: value ?? null }));
+  }, []);
+
+  const handleJobRatingNoteChange = useCallback((jobId, value) => {
+    setJobRatingNotes((prev) => ({ ...prev, [jobId]: value }));
+  }, []);
+
+  const handleJobRatingSubmit = useCallback(
+    async (jobId) => {
+      const rating = jobRatingDrafts[jobId];
+      if (typeof rating !== 'number' || rating <= 0) {
+        setFeedback({ type: 'error', message: 'Selecciona una calificación antes de guardar.' });
+        return;
+      }
+      setJobRatingSaving((prev) => {
+        const next = new Set(prev);
+        next.add(jobId);
+        return next;
+      });
+      try {
+        const notes = jobRatingNotes[jobId]?.trim() || null;
+        const updated = await operatorService.rateOperator(jobId, { rating, notes });
+        setJobs((prev) => prev.map((job) => (job.id === updated.id ? { ...job, ...updated } : job)));
+        if (updated.assigned_pilot) {
+          setActiveOperator((prev) => (prev && prev.id === updated.assigned_pilot.id ? { ...prev, ...updated.assigned_pilot } : prev));
+          setOperators((prev) =>
+            prev.map((operator) =>
+              operator.id === updated.assigned_pilot.id ? { ...operator, ...updated.assigned_pilot } : operator
+            )
+          );
+        }
+        setFeedback({ type: 'success', message: 'Calificación guardada correctamente.' });
+      } catch (error) {
+        console.error('Error rating operator', error);
+        const message = error?.response?.data?.error || error?.message || 'No pudimos guardar la calificación.';
+        setFeedback({ type: 'error', message });
+      } finally {
+        setJobRatingSaving((prev) => {
+          const next = new Set(prev);
+          next.delete(jobId);
+          return next;
+        });
+      }
+    },
+    [jobRatingDrafts, jobRatingNotes]
+  );
+
+  const handleCoverageClick = useCallback(
+    (event) => {
+      const feature = event?.features?.find((item) => item?.properties?.id !== undefined);
+      if (!feature) {
+        return;
+      }
+      const operatorId = Number(feature.properties.id);
+      if (!Number.isFinite(operatorId)) {
+        return;
+      }
+      const operator = operators.find((item) => item.id === operatorId);
+      if (operator) {
+        handleSelectOperator(operator);
+      }
+    },
+    [operators, handleSelectOperator]
+  );
 
   const mapFillLayer = useMemo(() => (
     {
@@ -675,8 +831,6 @@ const AdminOperatorsPage = () => {
     }
   ), []);
 
-  const mapToken = config.mapbox?.accessToken;
-
   const selectedDocuments = Array.isArray(activeOperator?.documents) ? activeOperator.documents : [];
 
   const jobItems = jobs;
@@ -706,10 +860,43 @@ const AdminOperatorsPage = () => {
         <Alert severity="error">{operatorsError}</Alert>
       ) : null}
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} lg={7}>
-          <Paper sx={{ p: 2, height: 400, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
+      <Grid container spacing={3} sx={{ mt: 1 }}>
+        <Grid container xs={12} spacing={2}>
+          {summaryCards.map((card) => (
+            <Grid xs={12} sm={6} md={3} key={card.title}>
+              <Paper sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
+                <Stack spacing={1.2}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {card.icon}
+                    <Typography variant="subtitle2" color="text.secondary">
+                      {card.title}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {card.value}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {card.description}
+                  </Typography>
+                </Stack>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+
+        <Grid xs={12}>
+          <Paper
+            sx={{
+              p: 2.5,
+              borderRadius: 3,
+              height: { xs: '58vh', md: '68vh', xl: '74vh' },
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              mt: 1,
+            }}
+          >
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 Cobertura geográfica
               </Typography>
@@ -717,17 +904,30 @@ const AdminOperatorsPage = () => {
                 <InfoIcon fontSize="small" color="action" />
               </Tooltip>
             </Stack>
-            <Box sx={{ flex: 1, borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+            <Box
+              sx={{
+                flex: 1,
+                borderRadius: 2,
+                overflow: 'hidden',
+                position: 'relative',
+                height: '100%',
+                minHeight: { xs: 380, md: 0 },
+              }}
+            >
               {!mapToken ? (
                 <Alert severity="warning" sx={{ height: '100%', alignItems: 'center', justifyContent: 'center' }}>
                   Falta configurar VITE_MAPBOX_ACCESS_TOKEN para visualizar el mapa.
                 </Alert>
               ) : (
                 <Map
+                  ref={mapRef}
+                  reuseMaps
+                  initialViewState={initialMapView}
                   mapboxAccessToken={mapToken}
                   mapStyle={config.mapbox?.style || 'mapbox://styles/mapbox/light-v11'}
-                  viewState={viewState}
-                  onMove={(event) => setViewState(event.viewState)}
+                  interactiveLayerIds={[mapFillLayer.id]}
+                  onClick={handleCoverageClick}
+                  onLoad={() => setMapReady(true)}
                   style={{ width: '100%', height: '100%' }}
                 >
                   <NavigationControl position="bottom-right" />
@@ -737,105 +937,49 @@ const AdminOperatorsPage = () => {
                       <Layer {...mapLineLayer} />
                     </Source>
                   ) : null}
-                  {operatorsWithCoords.map((operator) => {
-                    const lat = ensureNumber(operator.location_latitude);
-                    const lon = ensureNumber(operator.location_longitude);
-                    if (lat === null || lon === null) {
-                      return null;
-                    }
-                    const isSelected = operator.id === selectedOperatorId;
-                    const markerColor = operator.is_available ? theme.palette.success.main : theme.palette.error.main;
-                    const borderColor = isSelected ? theme.palette.common.white : theme.palette.grey[900];
-                    return (
-                      <Marker key={operator.id} latitude={lat} longitude={lon} anchor="bottom">
-                        <Tooltip
-                          title={`${computeOperatorName(operator)} • ${operator.coverage_radius_km ? `${operator.coverage_radius_km} km` : 'Radio sin definir'}`}
-                          arrow
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={() => handleSelectOperator(operator)}
-                            sx={{
-                              p: 0.5,
-                              backgroundColor: markerColor,
-                              border: `2px solid ${borderColor}`,
-                              color: theme.palette.common.white,
-                              '&:hover': { backgroundColor: markerColor },
-                            }}
-                          >
-                            <LocationOnIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Marker>
-                    );
-                  })}
                 </Map>
               )}
             </Box>
           </Paper>
         </Grid>
 
-        <Grid item xs={12} lg={5}>
-          <Grid container spacing={2}>
-            {summaryCards.map((card) => (
-              <Grid item xs={12} sm={6} key={card.title}>
-                <Paper sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
-                  <Stack spacing={1.2}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      {card.icon}
-                      <Typography variant="subtitle2" color="text.secondary">
-                        {card.title}
-                      </Typography>
-                    </Stack>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {card.value}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {card.description}
-                    </Typography>
-                  </Stack>
-                </Paper>
-              </Grid>
-            ))}
+        <Grid container xs={12} spacing={3} alignItems="stretch">
+          <Grid xs={12} md={8}>
+            <Paper sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Operadores disponibles
+              </Typography>
+              <DataGrid
+                rows={rows}
+                columns={columns}
+                autoHeight
+                density="comfortable"
+                disableRowSelectionOnClick
+                hideFooterSelectedRowCount
+                loading={operatorsLoading}
+                pageSizeOptions={[10, 25, 50]}
+                initialState={{
+                  pagination: {
+                    paginationModel: { pageSize: 10 },
+                  },
+                }}
+                rowSelectionModel={rowSelectionModel}
+                onRowSelectionModelChange={handleRowSelection}
+                onRowClick={handleRowClick}
+                sx={{
+                  '& .MuiDataGrid-cell': { borderBottom: `1px solid ${theme.palette.divider}` },
+                  '& .MuiDataGrid-columnHeaders': {
+                    backgroundColor: theme.palette.action.hover,
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    fontWeight: 600,
+                  },
+                }}
+              />
+            </Paper>
           </Grid>
-        </Grid>
 
-        <Grid item xs={12} lg={7}>
-          <Paper sx={{ p: 2.5, borderRadius: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-              Operadores disponibles
-            </Typography>
-            <DataGrid
-              rows={rows}
-              columns={columns}
-              autoHeight
-              density="comfortable"
-              disableRowSelectionOnClick
-              hideFooterSelectedRowCount
-              loading={operatorsLoading}
-              pageSizeOptions={[10, 25, 50]}
-              initialState={{
-                pagination: {
-                  paginationModel: { pageSize: 10 },
-                },
-              }}
-              rowSelectionModel={selectedOperatorId ? [selectedOperatorId] : []}
-              onRowSelectionModelChange={handleRowSelection}
-              onRowClick={handleRowClick}
-              sx={{
-                '& .MuiDataGrid-cell': { borderBottom: `1px solid ${theme.palette.divider}` },
-                '& .MuiDataGrid-columnHeaders': {
-                  backgroundColor: theme.palette.action.hover,
-                  borderBottom: `1px solid ${theme.palette.divider}`,
-                  fontWeight: 600,
-                },
-              }}
-            />
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} lg={5}>
-          <Paper sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Grid xs={12} md={4}>
+            <Paper sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
             {activeOperator ? (
               <>
                 <Stack direction="row" spacing={2} alignItems="center">
@@ -873,7 +1017,7 @@ const AdminOperatorsPage = () => {
                 </Stack>
 
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
                       Teléfono
                     </Typography>
@@ -881,15 +1025,7 @@ const AdminOperatorsPage = () => {
                       {activeOperator.phone_number || '—'}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Typography variant="caption" color="text.secondary">
-                      Ciudad base
-                    </Typography>
-                    <Typography variant="body2">
-                      {activeOperator.base_city || '—'}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
                       Dron principal
                     </Typography>
@@ -897,7 +1033,7 @@ const AdminOperatorsPage = () => {
                       {activeOperator.drone_model || '—'}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
                       Años de experiencia
                     </Typography>
@@ -907,7 +1043,7 @@ const AdminOperatorsPage = () => {
                         : '—'}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
                       Última señal
                     </Typography>
@@ -915,7 +1051,7 @@ const AdminOperatorsPage = () => {
                       {formatDateTime(activeOperator.last_heartbeat_at)}
                     </Typography>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
                       Sitio web
                     </Typography>
@@ -927,7 +1063,7 @@ const AdminOperatorsPage = () => {
                       <Typography variant="body2">—</Typography>
                     )}
                   </Grid>
-                  <Grid item xs={12}>
+                  <Grid xs={12}>
                     <Typography variant="caption" color="text.secondary">
                       Portafolio
                     </Typography>
@@ -940,7 +1076,7 @@ const AdminOperatorsPage = () => {
                     )}
                   </Grid>
                   {activeOperator.notes ? (
-                    <Grid item xs={12}>
+                    <Grid xs={12}>
                       <Typography variant="caption" color="text.secondary">
                         Notas internas
                       </Typography>
@@ -971,20 +1107,33 @@ const AdminOperatorsPage = () => {
                           label: document.status,
                           color: 'default',
                         };
+                        const statusLabel = document.status_label || meta.label || 'En revisión';
+                        const isExpired = Boolean(document.is_expired);
+                        const documentSaving = documentStatusSaving.has(document.id);
+                        const statusChipColor = isExpired ? 'error' : meta.color;
                         return (
                           <React.Fragment key={document.id}>
-                            <ListItem alignItems="flex-start">
+                            <ListItem
+                              alignItems="flex-start"
+                              sx={{
+                                flexDirection: { xs: 'column', sm: 'row' },
+                                gap: { xs: 1.5, sm: 2 },
+                                alignItems: { xs: 'flex-start', sm: 'center' },
+                              }}
+                            >
                               <ListItemText
+                                primaryTypographyProps={{ component: 'div' }}
+                                secondaryTypographyProps={{ component: 'div' }}
                                 primary={DOCUMENT_TYPE_LABELS[document.doc_type] || document.doc_type}
                                 secondary={
                                   <Stack spacing={0.5}>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <Chip size="small" label={meta.label} color={meta.color} variant="outlined" />
+                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                      <Chip size="small" label={statusLabel} color={statusChipColor} variant="outlined" />
                                       {document.expires_at ? (
                                         <Chip
                                           size="small"
                                           variant="outlined"
-                                          label={`Vence ${formatDateTime(document.expires_at).split(' ')[0]}`}
+                                          label={isExpired ? 'Documento vencido' : `Vence ${formatDateTime(document.expires_at).split(' ')[0]}`}
                                         />
                                       ) : null}
                                     </Stack>
@@ -996,7 +1145,28 @@ const AdminOperatorsPage = () => {
                                   </Stack>
                                 }
                               />
-                              <ListItemSecondaryAction>
+                              <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={1}
+                                alignItems={{ xs: 'stretch', sm: 'center' }}
+                                sx={{ width: { xs: '100%', sm: 'auto' } }}
+                              >
+                                <FormControl size="small" sx={{ minWidth: 160 }}>
+                                  <InputLabel id={`doc-status-${document.id}`}>Estado</InputLabel>
+                                  <Select
+                                    labelId={`doc-status-${document.id}`}
+                                    label="Estado"
+                                    value={document.status}
+                                    onChange={(event) => handleDocumentStatusChange(document, event.target.value)}
+                                    disabled={documentSaving}
+                                  >
+                                    {DOCUMENT_STATUS_OPTIONS.map((option) => (
+                                      <MenuItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
                                 <Tooltip title="Descargar documento original">
                                   <span>
                                     <IconButton
@@ -1005,7 +1175,7 @@ const AdminOperatorsPage = () => {
                                       href={document.file_url || document.file || '#'}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      disabled={!document.file_url && !document.file}
+                                      disabled={(!document.file_url && !document.file) || documentSaving}
                                       size="small"
                                     >
                                       <CloudDownloadIcon fontSize="small" />
@@ -1015,11 +1185,12 @@ const AdminOperatorsPage = () => {
                                 <Button
                                   size="small"
                                   onClick={() => setDocumentDialog({ open: true, document })}
-                                  sx={{ ml: 1 }}
+                                  disabled={documentSaving}
                                 >
                                   Revisar
                                 </Button>
-                              </ListItemSecondaryAction>
+                                {documentSaving ? <CircularProgress size={18} /> : null}
+                              </Stack>
                             </ListItem>
                             <Divider component="li" />
                           </React.Fragment>
@@ -1047,12 +1218,20 @@ const AdminOperatorsPage = () => {
                     <List dense disablePadding>
                       {jobItems.map((job) => {
                         const links = extractLinksFromJob(job);
+                        const ratingValue = jobRatingDrafts[job.id] ?? null;
+                        const ratingSaving = jobRatingSaving.has(job.id);
+                        const notesValue = jobRatingNotes[job.id] ?? '';
                         return (
                           <React.Fragment key={job.id}>
-                            <ListItem alignItems="flex-start">
+                            <ListItem
+                              alignItems="flex-start"
+                              sx={{ flexDirection: 'column', gap: 1.5, alignItems: 'stretch' }}
+                            >
                               <ListItemText
+                                primaryTypographyProps={{ component: 'div' }}
+                                secondaryTypographyProps={{ component: 'div' }}
                                 primary={
-                                  <Stack direction="row" spacing={1} alignItems="center">
+                                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                       {job.property_details?.name || `Trabajo #${job.id}`}
                                     </Typography>
@@ -1061,10 +1240,18 @@ const AdminOperatorsPage = () => {
                                       color={jobStatusColor(job.status)}
                                       label={job.status_label || job.status}
                                     />
+                                    {typeof job.pilot_rating === 'number' ? (
+                                      <Chip
+                                        size="small"
+                                        color="success"
+                                        label={`Rating: ${job.pilot_rating.toFixed(1)}`}
+                                        variant="outlined"
+                                      />
+                                    ) : null}
                                   </Stack>
                                 }
                                 secondary={
-                                  <Stack spacing={0.5}>
+                                  <Stack spacing={0.75}>
                                     <Typography variant="caption" color="text.secondary">
                                       {job.scheduled_start
                                         ? `Agendado ${formatDateTime(job.scheduled_start)}`
@@ -1095,6 +1282,46 @@ const AdminOperatorsPage = () => {
                                   </Stack>
                                 }
                               />
+                              <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={1}
+                                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                                sx={{ width: '100%' }}
+                              >
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <Rating
+                                    value={typeof ratingValue === 'number' ? ratingValue : null}
+                                    precision={0.5}
+                                    onChange={(_, newValue) => handleJobRatingChange(job.id, newValue)}
+                                    disabled={ratingSaving}
+                                  />
+                                  <Typography variant="caption" color="text.secondary">
+                                    {typeof ratingValue === 'number'
+                                      ? `${ratingValue.toFixed(1)} / 5`
+                                      : 'Sin calificar'}
+                                  </Typography>
+                                </Stack>
+                                <TextField
+                                  size="small"
+                                  label="Notas internas (opcional)"
+                                  value={notesValue}
+                                  onChange={(event) => handleJobRatingNoteChange(job.id, event.target.value)}
+                                  multiline
+                                  minRows={2}
+                                  maxRows={4}
+                                  sx={{ flex: 1, minWidth: 200 }}
+                                  disabled={ratingSaving}
+                                />
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  onClick={() => handleJobRatingSubmit(job.id)}
+                                  disabled={ratingSaving || typeof ratingValue !== 'number' || ratingValue <= 0}
+                                >
+                                  {ratingSaving ? 'Guardando…' : 'Guardar calificación'}
+                                </Button>
+                                {ratingSaving ? <CircularProgress size={20} /> : null}
+                              </Stack>
                             </ListItem>
                             <Divider component="li" />
                           </React.Fragment>
