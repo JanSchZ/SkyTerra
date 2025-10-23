@@ -178,9 +178,9 @@ if ($pythonOk -and (Test-Path $BackendDir)) {
             Run-Step "Aplicar migraciones Django" $migrationBlock
         }
 
-        Run-Step "Sembrar plan por defecto" {
-            & $VenvPython (Join-Path $BackendDir 'manage.py') shell --command "from properties.models import ListingPlan; ListingPlan.objects.get_or_create(key='standard', defaults={'name':'Standard','price':0,'entitlements':{'pilot_payout':0},'sla_hours':{'review':24,'post':72}}); print('Plan seed OK')"
-        }
+        # Run-Step "Sembrar plan por defecto" {
+        #     & $VenvPython (Join-Path $BackendDir 'manage.py') shell --command "from properties.models import ListingPlan; ListingPlan.objects.get_or_create(key='standard', defaults={'name':'Standard','price':0,'entitlements':{'pilot_payout':0},'sla_hours':{'review':24,'post':72}}); print('Plan seed OK')"
+        # }
 
         if ($env:ADMIN_EMAIL -and $env:ADMIN_PASSWORD) {
             Run-Step "Crear/actualizar superusuario admin" {

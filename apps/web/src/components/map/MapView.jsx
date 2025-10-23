@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useContext, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { Box, Typography, Paper, Button, CircularProgress, IconButton, Snackbar, Alert, Fab, Chip, TextField, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
 import { propertyService, tourService, usePropertyService } from '../../services/api';
-import Map, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
+import MapGL, { NavigationControl, Popup, Source, Layer, AttributionControl, Marker } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import * as turf from '@turf/turf';
 import EditIcon from '@mui/icons-material/Edit';
@@ -40,6 +40,49 @@ const propertiesToGeoJSON = (properties) => {
   return { type: 'FeatureCollection', features };
 };
 
+// Function to transform properties with boundaries to GeoJSON polygons
+const boundariesToGeoJSON = (properties) => {
+  const validProperties = Array.isArray(properties) ? properties : [];
+  const features = [];
+  for (const prop of validProperties) {
+    // Skip if no boundary
+    if (!prop.boundary_polygon || prop.has_boundary === false) continue;
+    
+    try {
+      let coordinates = null;
+      
+      // Handle different boundary formats
+      if (typeof prop.boundary_polygon === 'string') {
+        const parsed = JSON.parse(prop.boundary_polygon);
+        coordinates = parsed.coordinates || parsed;
+      } else if (prop.boundary_polygon.coordinates) {
+        coordinates = prop.boundary_polygon.coordinates;
+      } else if (Array.isArray(prop.boundary_polygon)) {
+        coordinates = prop.boundary_polygon;
+      }
+      
+      // Validate coordinates structure
+      if (!coordinates || !Array.isArray(coordinates)) continue;
+      
+      features.push({
+        type: 'Feature',
+        properties: { 
+          id: prop.id,
+          name: prop.name,
+          propertyId: prop.id
+        },
+        geometry: { 
+          type: 'Polygon', 
+          coordinates: coordinates 
+        }
+      });
+    } catch (e) {
+      console.warn(`Failed to parse boundary for property ${prop.id}:`, e);
+    }
+  }
+  return { type: 'FeatureCollection', features };
+};
+
 // Helper function to ensure safe array operations
 const ensureArray = (value) => Array.isArray(value) ? value : [];
 
@@ -74,6 +117,7 @@ const MapView = forwardRef(({
   // Estados
   const [properties, setProperties] = useState([]);
   const [propertiesGeoJSON, setPropertiesGeoJSON] = useState(propertiesToGeoJSON([]));
+  const [boundariesGeoJSON, setBoundariesGeoJSON] = useState(boundariesToGeoJSON([]));
   const [usingDemoData, setUsingDemoData] = useState(false);
   const [loading, setLoading] = useState(!initialData);
   const [refreshing, setRefreshing] = useState(false);
@@ -188,6 +232,7 @@ const MapView = forwardRef(({
   const applyDemoFallback = useCallback(() => {
     setProperties(demoMapProperties);
     setPropertiesGeoJSON(propertiesToGeoJSON(demoMapProperties));
+    setBoundariesGeoJSON(boundariesToGeoJSON(demoMapProperties));
     setTotalProperties(demoMapProperties.length);
     setCurrentPage(1);
     setHasNextPage(false);
@@ -207,18 +252,82 @@ const MapView = forwardRef(({
     });
   }, [setSnackbar]);
 
+  // Boundary animation states - simplified to avoid flicker
+  const boundaryAnimationTimeoutsRef = useRef(new Map());
+  const animatedBoundariesRef = useRef(new Set());
+
+  // Animate boundary appearance with smooth dissolve - simplified version
+  const animateBoundaryAppearance = useCallback((boundaryId) => {
+    // Skip if this boundary is already animating or has been animated
+    if (animatedBoundariesRef.current.has(boundaryId)) {
+      return;
+    }
+    
+    // Mark this boundary as animating
+    animatedBoundariesRef.current.add(boundaryId);
+
+    // Clear any existing timeout for this boundary
+    const existingTimeout = boundaryAnimationTimeoutsRef.current.get(boundaryId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Set initial opacity to 0 in feature properties
+    setPropertyBoundaries(prev => {
+      if (prev && prev.id === boundaryId) {
+        return {
+          ...prev,
+          feature: {
+            ...prev.feature,
+            properties: {
+              ...prev.feature.properties,
+              opacity: 0
+            }
+          }
+        };
+      }
+      return prev;
+    });
+
+    // After a brief delay, set opacity to 1 (Mapbox will handle smooth transition)
+    const timeoutId = setTimeout(() => {
+      setPropertyBoundaries(prev => {
+        if (prev && prev.id === boundaryId) {
+          return {
+            ...prev,
+            feature: {
+              ...prev.feature,
+              properties: {
+                ...prev.feature.properties,
+                opacity: 1
+              }
+            }
+          };
+        }
+        return prev;
+      });
+      boundaryAnimationTimeoutsRef.current.delete(boundaryId);
+    }, 100); // Slightly longer delay for smoother appearance
+    
+    boundaryAnimationTimeoutsRef.current.set(boundaryId, timeoutId);
+  }, []);
+
   useEffect(() => {
     const normalized = normalizeBoundary(initialGeoJsonBoundary);
     setPropertyBoundaries((prev) => {
       if (!normalized && !prev) {
         return prev;
       }
-      if (normalized && prev && prev.geojson === normalized.geojson) {
+      if (normalized && prev && prev.id === normalized.id) {
         return prev;
+      }
+      if (normalized) {
+        // Don't trigger animation on initial load
+        return normalized;
       }
       return normalized;
     });
-  }, [initialGeoJsonBoundary]);
+  }, [initialGeoJsonBoundary, animateBoundaryAppearance]);
 
   useEffect(() => {
     forceMapResize();
@@ -258,13 +367,22 @@ const MapView = forwardRef(({
   const [sidePanelProperty, setSidePanelProperty] = useState(null);
 
   useEffect(() => {
-    if (!sidePanelProperty) return;
+    if (!sidePanelProperty) {
+      // Clear boundary when no property is selected
+      setPropertyBoundaries(null);
+      // Clear the animated boundaries cache to allow re-animation
+      animatedBoundariesRef.current.clear();
+      return;
+    }
     const normalized = normalizeBoundary(sidePanelProperty.boundary_polygon);
     if (normalized) {
       setPropertyBoundaries((prev) => {
-        if (prev && prev.geojson === normalized.geojson) {
+        // Only update if it's a different boundary
+        if (prev && prev.id === normalized.id) {
           return prev;
         }
+        // New boundary, trigger animation
+        animateBoundaryAppearance(normalized.id);
         return normalized;
       });
       return;
@@ -272,7 +390,7 @@ const MapView = forwardRef(({
     if (sidePanelProperty?.has_boundary === false) {
       setPropertyBoundaries(null);
     }
-  }, [sidePanelProperty?.boundary_polygon, sidePanelProperty?.has_boundary, sidePanelProperty]);
+  }, [sidePanelProperty?.boundary_polygon, sidePanelProperty?.has_boundary, sidePanelProperty, animateBoundaryAppearance]);
 
   useEffect(() => {
     const propertyId = sidePanelProperty?.id;
@@ -291,9 +409,11 @@ const MapView = forwardRef(({
         if (normalized) {
           completed = true;
           setPropertyBoundaries((prev) => {
-            if (prev && prev.geojson === normalized.geojson) {
+            if (prev && prev.id === normalized.id) {
               return prev;
             }
+            // New boundary, trigger animation
+            animateBoundaryAppearance(normalized.id);
             return normalized;
           });
           return;
@@ -509,7 +629,7 @@ const MapView = forwardRef(({
   const mapStyle = config.mapbox.style;
   
   // Mostrar popups solo cuando el usuario está lo suficientemente cerca
-  const POPUP_MIN_ZOOM = 10; // umbral a partir del cual se habilitan los popups por hover
+  const POPUP_MIN_ZOOM = 8; // umbral a partir del cual se habilitan los popups por hover
   
   useEffect(() => {
     // console.log('🎨 Usando estilo SkyTerra Custom (Minimal Fog)');
@@ -524,6 +644,7 @@ const MapView = forwardRef(({
     if (initialData && Array.isArray(initialData.results) && initialData.results.length > 0) {
       setProperties(initialData.results);
       setPropertiesGeoJSON(propertiesToGeoJSON(initialData.results));
+      setBoundariesGeoJSON(boundariesToGeoJSON(initialData.results));
       setTotalProperties(initialData.count || initialData.results.length || 0);
       setCurrentPage(1);
       setHasNextPage(Boolean(initialData.next));
@@ -581,6 +702,12 @@ const MapView = forwardRef(({
         const newProperties = pageToFetch === 1 ? data.results : [...existingProperties, ...data.results];
         return propertiesToGeoJSON(newProperties);
       });
+      // Update boundaries GeoJSON
+      setBoundariesGeoJSON(currentBoundaries => {
+        const existingProperties = currentBoundaries?.features?.map(f => f.properties) || [];
+        const newProperties = pageToFetch === 1 ? data.results : [...existingProperties, ...data.results];
+        return boundariesToGeoJSON(newProperties);
+      });
 
       setTotalProperties(data.count);
       setCurrentPage(pageToFetch);
@@ -625,6 +752,7 @@ const MapView = forwardRef(({
       setLoading(false); 
       setProperties([]);
       setPropertiesGeoJSON(propertiesToGeoJSON([]));
+      setBoundariesGeoJSON(boundariesToGeoJSON([]));
       setHasNextPage(false);
       setCurrentPage(1);
       setTotalProperties(0); // Ensure totalProperties is reset
@@ -762,7 +890,12 @@ const MapView = forwardRef(({
       if (!editable) {
         const normalizedBoundary = normalizeBoundary(property.boundary_polygon);
         setPropertyBoundaries((prev) => {
-          if (normalizedBoundary) {
+          if (normalizedBoundary && (!prev || prev.id !== normalizedBoundary.id)) {
+            // New boundary, trigger animation
+            animateBoundaryAppearance(normalizedBoundary.id);
+            if (normalizedBoundary) {
+              forceMapResize();
+            }
             return normalizedBoundary;
           }
           if (property?.has_boundary === false) {
@@ -770,9 +903,6 @@ const MapView = forwardRef(({
           }
           return prev;
         });
-        if (normalizedBoundary) {
-          forceMapResize();
-        }
       }
 
       return true;
@@ -817,7 +947,7 @@ const MapView = forwardRef(({
     if (map && !isNaN(lat) && !isNaN(lon)) {
       map.flyTo({
         center: [lon, lat],
-        zoom: 14.5, // Zoom menos agresivo y más natural
+        zoom: 13.5, // Zoom más temprano para ver polígonos
         pitch: 0,
         bearing: 0,
         duration: 3500, // Duración más larga para suavidad
@@ -1309,7 +1439,7 @@ const MapView = forwardRef(({
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
     const zoom = map.getZoom();
-    if (zoom < 11) return; // solo si estamos relativamente cerca
+    if (zoom < 9) return; // prefetch más temprano
 
     // Obtener propiedades visibles
     const bounds = map.getBounds();
@@ -1341,6 +1471,74 @@ const MapView = forwardRef(({
     });
   }, [properties, tourCache]);
 
+  // Prefetch boundaries when zoom is moderate
+  const prefetchBoundariesInViewport = useCallback(async () => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    const zoom = map.getZoom();
+    if (zoom < 8) return; // prefetch boundaries más temprano que tours
+
+    const bounds = map.getBounds();
+    const idsToPrefetch = properties
+      .filter(p => {
+        // Solo propiedades que no tienen boundary cargado y están en viewport
+        const hasBoundary = p.boundary_polygon || p.has_boundary === false;
+        const inViewport = p.longitude != null && p.latitude != null &&
+          bounds.contains([p.longitude, p.latitude]);
+        return !hasBoundary && inViewport && !attemptedBoundaryFetchRef.current.has(p.id);
+      })
+      .slice(0, 10) // límite para evitar excesos
+      .map(p => p.id);
+
+    if (idsToPrefetch.length === 0) return;
+
+    // Marcar como intentados para evitar múltiples fetches
+    idsToPrefetch.forEach(id => attemptedBoundaryFetchRef.current.add(id));
+
+    // Prefetch en paralelo pero con límite de concurrencia
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < idsToPrefetch.length; i += BATCH_SIZE) {
+      const batch = idsToPrefetch.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(async (propertyId) => {
+          try {
+            const data = await propertyService.getProperty(propertyId);
+            if (data?.boundary_polygon) {
+              const normalized = normalizeBoundary(data.boundary_polygon);
+              if (normalized) {
+                setPropertyBoundaries((prev) => {
+                  if (prev && prev.id === normalized.id) {
+                    return prev;
+                  }
+                  // New boundary, trigger animation
+                  animateBoundaryAppearance(normalized.id);
+                  return normalized;
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Error prefetching boundary:', e);
+            attemptedBoundaryFetchRef.current.delete(propertyId);
+          }
+        })
+      );
+    }
+  }, [properties]);
+
+  // Cleanup animation timeouts on unmount
+  useEffect(() => {
+    return () => {
+      boundaryAnimationTimeoutsRef.current.forEach(timeoutId => {
+        try {
+          clearTimeout(timeoutId);
+        } catch (e) {
+          // Ignore errors
+        }
+      });
+      boundaryAnimationTimeoutsRef.current.clear();
+    };
+  }, []);
+
   // Infinite scroll logic on map move
   const handleMapMoveEnd = useCallback(() => {
     if (debounceTimeoutRef.current) {
@@ -1364,7 +1562,7 @@ const MapView = forwardRef(({
       }
       // -------------- Seamless zoom-to-tour logic -----------------
       const currentZoom = map.getZoom();
-      if (currentZoom >= 14.5) {
+      if (currentZoom >= 12.5) {
         const center = map.getCenter();
         // Función auxiliar para distancia en metros (Haversine)
         const metersBetween = (lat1, lon1, lat2, lon2) => {
@@ -1388,7 +1586,7 @@ const MapView = forwardRef(({
           }
         });
 
-        const DIST_THRESHOLD = 600; // metros
+        const DIST_THRESHOLD = 1200; // metros (más amplio para carga temprana)
         if (nearest && minDist <= DIST_THRESHOLD && nearest.id !== activeTourPropertyIdRef.current) {
           (async () => {
             try {
@@ -1406,15 +1604,16 @@ const MapView = forwardRef(({
             }
           })();
         }
-      } else if (currentZoom < 13.5 && activeTourUrlRef.current) {
+      } else if (currentZoom < 11.5 && activeTourUrlRef.current) {
         // Alejando: cerrar tour
         setActiveTourUrl(null);
         setActiveTourPropertyId(null);
       }
       //-----------------------------------------------------------
 
-      // Prefetch tours for nearby properties
+      // Prefetch tours and boundaries for nearby properties
       prefetchToursInViewport();
+      prefetchBoundariesInViewport();
 
       if (!loadingMore && hasNextPage && !editable && !loading) {
         // Logica existente de infinite scroll (mantener)
@@ -1427,39 +1626,8 @@ const MapView = forwardRef(({
         handleLoadMore(); // Call the memoized and stable handleLoadMore
       }
     }, 500);
-  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, prefetchToursInViewport, tourCache]);
+  }, [loadingMore, hasNextPage, editable, loading, handleLoadMore, properties, prefetchToursInViewport, prefetchBoundariesInViewport, tourCache]);
 
-  const renderPropertyBoundaries = (property) => {
-    const feature = toFeaturePolygon(property?.boundary_polygon);
-    if (!feature?.geometry?.coordinates) {
-      return null;
-    }
-
-    return (
-      <Source
-        id={`boundary-source-${property.id}`}
-        type="geojson"
-        data={feature}
-      >
-        <Layer
-          id={`boundary-fill-${property.id}`}
-          type="fill"
-          paint={{
-            'fill-color': selectedProperty === property.id ? '#4CAF50' : '#2196F3',
-            'fill-opacity': selectedProperty === property.id ? 0.3 : 0.1,
-          }}
-        />
-        <Layer
-          id={`boundary-line-${property.id}`}
-          type="line"
-          paint={{
-            'line-color': selectedProperty === property.id ? '#4CAF50' : '#2196F3',
-            'line-width': selectedProperty === property.id ? 3 : 2,
-          }}
-        />
-      </Source>
-    );
-  };
 
   const touchOptimizedCircleSizes = {
     base: isTouchDevice ? 8 : 6,
@@ -1494,16 +1662,28 @@ const MapView = forwardRef(({
         16, touchOptimizedStroke.high
       ],
       'circle-stroke-color': '#ffffff',
-      'circle-stroke-opacity': 0.9,
+      'circle-stroke-opacity': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 0.9,
+        11.5, 0.9,
+        12, 0.8,
+        12.5, 0.5,
+        13, 0.2,
+        13.5, 0,
+        14, 0
+      ],
       'circle-opacity': [
         'interpolate',
         ['linear'],
         ['zoom'],
         8, isTouchDevice ? 0.82 : 0.7,
         12, 0.95,
-        14.4, 0.6,
-        15, 0.25,
-        15.5, 0
+        12.5, 0.8,
+        13, 0.5,
+        13.5, 0.15,
+        14, 0
       ]
     }
   };
@@ -1667,7 +1847,7 @@ const MapView = forwardRef(({
 
         const map = mapRef.current;
         const duration = options.duration || 3000;
-        const zoom = options.zoom || 14.5;
+        const zoom = options.zoom || 13.5;
         const lat = parseFloat(prop?.latitude);
         const lon = parseFloat(prop?.longitude);
 
@@ -1862,7 +2042,7 @@ const MapView = forwardRef(({
       
       {/* Mapa siempre visible para que pueda inicializar y disparar 'idle' */}
       {!error && (
-        <Map
+        <MapGL
           ref={mapRef}
           {...viewState}
           onMove={evt => {
@@ -2000,10 +2180,108 @@ const MapView = forwardRef(({
               color="#1E8578"
             />
           )}
-          {!editable && boundaryFeature && (
-            <Source id="boundary-preview" type="geojson" data={boundaryFeature}>
-              <Layer id="boundary-preview-fill" type="fill" paint={{ 'fill-color': '#2E7D32', 'fill-opacity': 0.25 }} />
-              <Layer id="boundary-preview-line" type="line" paint={{ 'line-color': '#2E7D32', 'line-width': 2 }} />
+          {!editable && boundariesGeoJSON && (
+            <Source 
+              id="boundaries-source"
+              type="geojson" 
+              data={boundariesGeoJSON}
+            >
+              <Layer
+                id="boundaries-fill"
+                type="fill"
+                paint={{
+                  'fill-color': '#2E7D32',
+                  'fill-opacity': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    8, 0,
+                    11, 0,
+                    12, 0.05,
+                    12.5, 0.15,
+                    13, 0.25,
+                    14, 0.3
+                  ],
+                  'fill-opacity-transition': {
+                    duration: 800,
+                    delay: 0
+                  }
+                }}
+              />
+              <Layer
+                id="boundaries-line"
+                type="line"
+                paint={{
+                  'line-color': '#2E7D32',
+                  'line-width': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    12, 1,
+                    14, 2,
+                    16, 3
+                  ],
+                  'line-opacity': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    8, 0,
+                    11, 0,
+                    12, 0.3,
+                    12.5, 0.6,
+                    13, 0.9,
+                    14, 1
+                  ],
+                  'line-opacity-transition': {
+                    duration: 800,
+                    delay: 0
+                  }
+                }}
+              />
+            </Source>
+          )}
+          {!editable && boundaryFeature && propertyBoundaries?.id && (
+            <Source 
+              key={`boundary-selected-${propertyBoundaries.id}`}
+              id={`boundary-selected-${propertyBoundaries.id}`} 
+              type="geojson" 
+              data={propertyBoundaries.feature}
+            >
+              <Layer
+                id={`boundary-selected-fill-${propertyBoundaries.id}`}
+                type="fill"
+                paint={{
+                  'fill-color': '#1565C0',
+                  'fill-opacity': [
+                    'case',
+                    ['has', 'opacity'],
+                    ['*', ['get', 'opacity'], 0.35],
+                    0.35
+                  ],
+                  'fill-opacity-transition': {
+                    duration: 600,
+                    delay: 0
+                  }
+                }}
+              />
+              <Layer
+                id={`boundary-selected-line-${propertyBoundaries.id}`}
+                type="line"
+                paint={{
+                  'line-color': '#1565C0',
+                  'line-width': 3,
+                  'line-opacity': [
+                    'case',
+                    ['has', 'opacity'],
+                    ['get', 'opacity'],
+                    1
+                  ],
+                  'line-opacity-transition': {
+                    duration: 600,
+                    delay: 0
+                  }
+                }}
+              />
             </Source>
           )}
           {!editable && propertiesGeoJSON && (
@@ -2104,7 +2382,7 @@ const MapView = forwardRef(({
               </Card>
             </Popup>
           )}
-        </Map>
+        </MapGL>
       )}
 
       <Snackbar 

@@ -14,6 +14,7 @@ from .views import (
     ListingPlanViewSet,
     PilotProfileViewSet,
     PilotDocumentViewSet,
+    PilotDeviceViewSet,
     JobViewSet,
     JobOfferViewSet,
 )
@@ -33,8 +34,10 @@ router.register(r'recording-orders', RecordingOrderViewSet, basename='recordingo
 router.register(r'plans', ListingPlanViewSet, basename='listingplan')
 router.register(r'pilot-profiles', PilotProfileViewSet, basename='pilotprofile')
 router.register(r'pilot-documents', PilotDocumentViewSet, basename='pilotdocument')
+router.register(r'pilot-devices', PilotDeviceViewSet, basename='pilotdevice')
 router.register(r'jobs', JobViewSet, basename='job')
 router.register(r'job-offers', JobOfferViewSet, basename='joboffer')
+# Note: debug endpoint is available at /api/jobs/debug/
 
 # urlpatterns will now only contain router URLs for this app
 urlpatterns = [

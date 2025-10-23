@@ -9,6 +9,7 @@ from .models import (
     PropertyStatusHistory,
     PilotProfile,
     PilotDocument,
+    PilotDevice,
     Job,
     JobOffer,
     JobTimelineEvent,
@@ -95,11 +96,50 @@ class PilotDocumentAdmin(admin.ModelAdmin):
     search_fields = ('pilot__user__username', 'pilot__display_name')
 
 
+@admin.register(PilotDevice)
+class PilotDeviceAdmin(admin.ModelAdmin):
+    list_display = ('pilot', 'device_token', 'device_type', 'is_active', 'created_at')
+    list_filter = ('device_type', 'is_active')
+    search_fields = ('pilot__user__username', 'pilot__display_name', 'device_token')
+
+
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
     list_display = ('id', 'property', 'status', 'assigned_pilot', 'scheduled_start', 'scheduled_end', 'updated_at')
     list_filter = ('status',)
     search_fields = ('property__name', 'assigned_pilot__user__username')
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('debug/', self.debug_view, name='job_debug'),
+        ]
+        return custom_urls + urls
+
+    def debug_view(self, request):
+        from django.shortcuts import render
+        from .models import PilotProfile, Property, Job
+        from django.db.models import Q
+
+        # Get system stats
+        approved_properties = Property.objects.filter(publication_status='approved').count()
+        approved_for_shoot = Property.objects.filter(workflow_substate='approved_for_shoot').count()
+        total_jobs = Job.objects.count()
+        available_pilots = PilotProfile.objects.filter(status='approved', is_available=True).count()
+        properties_with_coords = Property.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True).count()
+
+        context = {
+            'title': 'Job System Debug',
+            'approved_properties': approved_properties,
+            'approved_for_shoot': approved_for_shoot,
+            'total_jobs': total_jobs,
+            'available_pilots': available_pilots,
+            'properties_with_coordinates': properties_with_coords,
+            'recent_jobs': Job.objects.select_related('property', 'assigned_pilot').order_by('-created_at')[:10],
+            'pilots': PilotProfile.objects.select_related('user').filter(status='approved')[:20],
+        }
+        return render(request, 'admin/properties/job_debug.html', context)
 
 
 @admin.register(JobOffer)

@@ -581,9 +581,10 @@ const AdminOperatorsPage = () => {
       {
         field: 'status',
         headerName: 'Estado',
-        minWidth: 150,
+        minWidth: 120,
         renderCell: (params) => {
-          const meta = OPERATOR_STATUS_META[params.value] || { label: params.value, color: 'default' };
+          const status = params.row.status || 'pending';
+          const meta = OPERATOR_STATUS_META[status] || { label: status, color: 'default' };
           return <Chip size="small" label={meta.label} color={meta.color} variant="outlined" />;
         },
       },
@@ -592,7 +593,7 @@ const AdminOperatorsPage = () => {
         headerName: 'Disponibilidad',
         minWidth: 160,
         renderCell: (params) =>
-          params.value ? (
+          params.row.is_available ? (
             <Chip size="small" label="Disponible" color="success" />
           ) : (
             <Chip size="small" label="No disponible" variant="outlined" />
@@ -602,10 +603,9 @@ const AdminOperatorsPage = () => {
         field: 'coverage_radius_km',
         headerName: 'Radio (km)',
         minWidth: 130,
-        valueFormatter: (params) => {
-          const valueRaw = params?.value;
-          const value = Number(valueRaw);
-          return Number.isFinite(value) && value > 0 ? `${Math.round(value)} km` : '—';
+        renderCell: (params) => {
+          const value = params.row.coverage_radius_km || params.row.raw?.coverage_radius_km;
+          return value && value > 0 ? `${Math.round(value)} km` : '—';
         },
       },
       {
@@ -613,13 +613,19 @@ const AdminOperatorsPage = () => {
         headerName: 'Dron',
         flex: 1,
         minWidth: 180,
-        valueGetter: (params) => params?.value || params?.row?.drone_model || '—',
+        renderCell: (params) => {
+          const value = params.row.drone_model || params.row.raw?.drone_model;
+          return value || '—';
+        },
       },
       {
         field: 'last_heartbeat_at',
-        headerName: 'Última señal',
+        headerName: 'Última conexión',
         minWidth: 200,
-        valueFormatter: (params) => formatDateTime(params?.value),
+        renderCell: (params) => {
+          const value = params.row.last_heartbeat_at || params.row.raw?.last_heartbeat_at;
+          return formatDateTime(value);
+        },
       },
     ],
     []
@@ -833,159 +839,186 @@ const AdminOperatorsPage = () => {
 
   const selectedDocuments = Array.isArray(activeOperator?.documents) ? activeOperator.documents : [];
 
-  const jobItems = jobs;
+const jobItems = jobs;
 
   return (
-    <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary }} gutterBottom>
-            Red de Operadores
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Visualiza cobertura, documentos y disponibilidad de pilotos para coordinar la postproducción y asignar nuevas misiones.
-          </Typography>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={loadOperators}
-          disabled={operatorsLoading}
-        >
-          Actualizar
-        </Button>
-      </Stack>
+  <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+      <Box sx={{ flex: 1 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: theme.palette.text.primary }} gutterBottom>
+          Red de Operadores
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Visualiza cobertura, documentos y disponibilidad de pilotos para coordinar la postproducción y asignar nuevas misiones.
+        </Typography>
+      </Box>
+      <Button variant="outlined" startIcon={<RefreshIcon />} onClick={loadOperators} disabled={operatorsLoading}>
+        Actualizar
+      </Button>
+    </Stack>
 
-      {operatorsError ? (
-        <Alert severity="error">{operatorsError}</Alert>
-      ) : null}
+    {operatorsError ? <Alert severity="error">{operatorsError}</Alert> : null}
 
-      <Grid container spacing={3} sx={{ mt: 1 }}>
-        <Grid container xs={12} spacing={2}>
-          {summaryCards.map((card) => (
-            <Grid xs={12} sm={6} md={3} key={card.title}>
-              <Paper sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
-                <Stack spacing={1.2}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    {card.icon}
-                    <Typography variant="subtitle2" color="text.secondary">
-                      {card.title}
-                    </Typography>
-                  </Stack>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {card.value}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {card.description}
-                  </Typography>
-                </Stack>
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
-
-        <Grid xs={12}>
-          <Paper
-            sx={{
-              p: 2.5,
-              borderRadius: 3,
-              height: { xs: '58vh', md: '68vh', xl: '74vh' },
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-              mt: 1,
-            }}
-          >
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-              <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Cobertura geográfica
-              </Typography>
-              <Tooltip title="Visualiza dónde están ubicados los operadores y el radio aproximado que cubren.">
-                <InfoIcon fontSize="small" color="action" />
-              </Tooltip>
-            </Stack>
-            <Box
+    <Grid container spacing={3} sx={{ mt: 1 }}>
+      <Grid xs={12} container spacing={2}>
+        {summaryCards.map((card) => (
+          <Grid xs={12} sm={6} md={3} key={card.title}>
+            <Paper
               sx={{
-                flex: 1,
-                borderRadius: 2,
-                overflow: 'hidden',
-                position: 'relative',
-                height: '100%',
-                minHeight: { xs: 380, md: 0 },
+                p: 2.5,
+                borderRadius: 3,
+                boxSizing: 'border-box',
               }}
             >
-              {!mapToken ? (
-                <Alert severity="warning" sx={{ height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-                  Falta configurar VITE_MAPBOX_ACCESS_TOKEN para visualizar el mapa.
-                </Alert>
-              ) : (
-                <Map
-                  ref={mapRef}
-                  reuseMaps
-                  initialViewState={initialMapView}
-                  mapboxAccessToken={mapToken}
-                  mapStyle={config.mapbox?.style || 'mapbox://styles/mapbox/light-v11'}
-                  interactiveLayerIds={[mapFillLayer.id]}
-                  onClick={handleCoverageClick}
-                  onLoad={() => setMapReady(true)}
-                  style={{ width: '100%', height: '100%' }}
-                >
-                  <NavigationControl position="bottom-right" />
-                  {coverageFeatures.length > 0 ? (
-                    <Source id="operator-coverage" type="geojson" data={coverageGeoJson}>
-                      <Layer {...mapFillLayer} />
-                      <Layer {...mapLineLayer} />
-                    </Source>
-                  ) : null}
-                </Map>
-              )}
-            </Box>
+              <Stack spacing={1.2}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {card.icon}
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {card.title}
+                  </Typography>
+                </Stack>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {card.value}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {card.description}
+                </Typography>
+              </Stack>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+    </Grid>
+
+    <Paper
+      elevation={0}
+      variant="outlined"
+      sx={{
+        px: { xs: 2, md: 3 },
+        py: { xs: 2, md: 3 },
+        borderRadius: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        width: '100%',
+        // Alinearlo a la izquierda dentro del content area (no forzar centrado)
+        mx: 0,
+      }}
+    >
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        justifyContent="space-between"
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Cobertura geográfica
+          </Typography>
+          <Tooltip title="Visualiza dónde están ubicados los operadores y el radio aproximado que cubren.">
+            <InfoIcon fontSize="small" color="action" />
+          </Tooltip>
+        </Stack>
+      </Stack>
+      <Box
+        sx={{
+          borderRadius: 2,
+          overflow: 'hidden',
+          position: 'relative',
+          width: '100%',
+          // Reducir altura en pantallas grandes para que no ocupe tanto espacio
+          height: { xs: '260px', sm: '36vh', md: '48vh', lg: '52vh' },
+          display: 'block',
+          maxHeight: { lg: '720px' },
+        }}
+      >
+        {mapToken ? (
+          <Map
+            ref={mapRef}
+            reuseMaps
+            initialViewState={initialMapView}
+            mapboxAccessToken={mapToken}
+            mapStyle={config.mapbox?.style || 'mapbox://styles/mapbox/light-v11'}
+            interactiveLayerIds={[mapFillLayer.id]}
+            onClick={handleCoverageClick}
+            onLoad={() => setMapReady(true)}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <NavigationControl position="bottom-right" />
+            {coverageFeatures.length > 0 ? (
+              <Source id="operator-coverage" type="geojson" data={coverageGeoJson}>
+                <Layer {...mapFillLayer} />
+                <Layer {...mapLineLayer} />
+              </Source>
+            ) : null}
+          </Map>
+        ) : (
+          <Stack
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              p: 4,
+              gap: 2,
+              bgcolor: 'background.default',
+            }}
+          >
+            <InfoIcon color="info" fontSize="large" />
+            <Typography variant="body2" color="text.secondary">
+              Configura Mapbox para visualizar la cobertura geográfica de los operadores.
+            </Typography>
+          </Stack>
+        )}
+      </Box>
+    </Paper>
+
+    <Grid container spacing={3} alignItems="stretch">
+      <Grid xs={12} md={8}>
+        <Paper sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+            Operadores disponibles
+          </Typography>
+            <DataGrid
+              rows={rows}
+              columns={columns}
+              autoHeight
+              density="comfortable"
+              disableRowSelectionOnClick
+              hideFooterSelectedRowCount
+              loading={operatorsLoading}
+              pageSizeOptions={[10, 25, 50]}
+              initialState={{
+                pagination: {
+                  paginationModel: { pageSize: 10 },
+                },
+              }}
+              rowSelectionModel={rowSelectionModel}
+              onRowSelectionModelChange={handleRowSelection}
+              onRowClick={handleRowClick}
+              sx={{
+                '& .MuiDataGrid-cell': { borderBottom: `1px solid ${theme.palette.divider}` },
+                '& .MuiDataGrid-columnHeaders': {
+                  backgroundColor: theme.palette.action.hover,
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  fontWeight: 600,
+                },
+              }}
+            />
           </Paper>
         </Grid>
 
-        <Grid container xs={12} spacing={3} alignItems="stretch">
-          <Grid xs={12} md={8}>
-            <Paper sx={{ p: 2.5, borderRadius: 3, height: '100%' }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Operadores disponibles
-              </Typography>
-              <DataGrid
-                rows={rows}
-                columns={columns}
-                autoHeight
-                density="comfortable"
-                disableRowSelectionOnClick
-                hideFooterSelectedRowCount
-                loading={operatorsLoading}
-                pageSizeOptions={[10, 25, 50]}
-                initialState={{
-                  pagination: {
-                    paginationModel: { pageSize: 10 },
-                  },
-                }}
-                rowSelectionModel={rowSelectionModel}
-                onRowSelectionModelChange={handleRowSelection}
-                onRowClick={handleRowClick}
-                sx={{
-                  '& .MuiDataGrid-cell': { borderBottom: `1px solid ${theme.palette.divider}` },
-                  '& .MuiDataGrid-columnHeaders': {
-                    backgroundColor: theme.palette.action.hover,
-                    borderBottom: `1px solid ${theme.palette.divider}`,
-                    fontWeight: 600,
-                  },
-                }}
-              />
-            </Paper>
-          </Grid>
-
-          <Grid xs={12} md={4}>
-            <Paper sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
+        <Grid xs={12} md={4}>
+          <Paper sx={{ p: 2.5, borderRadius: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
             {activeOperator ? (
               <>
                 <Stack direction="row" spacing={2} alignItems="center">
                   <Avatar
                     sx={{ width: 56, height: 56 }}
-                    src={`https://api.dicebear.com/7.x/initials/svg?radius=40&seed=${encodeURIComponent(getInitials(computeOperatorName(activeOperator)))}`}
+                    src={`https://api.dicebear.com/7.x/initials/svg?radius=40&seed=${encodeURIComponent(
+                      getInitials(computeOperatorName(activeOperator))
+                    )}`}
                   >
                     {getInitials(computeOperatorName(activeOperator))}
                   </Avatar>
@@ -1001,7 +1034,8 @@ const AdminOperatorsPage = () => {
 
                 <Stack direction="row" spacing={1} flexWrap="wrap">
                   {(() => {
-                    const meta = OPERATOR_STATUS_META[activeOperator.status] || { label: activeOperator.status, color: 'default' };
+                    const meta =
+                      OPERATOR_STATUS_META[activeOperator.status] || { label: activeOperator.status, color: 'default' };
                     return <Chip label={meta.label} color={meta.color} size="small" />;
                   })()}
                   <Chip
@@ -1010,7 +1044,11 @@ const AdminOperatorsPage = () => {
                     size="small"
                   />
                   <Chip
-                    label={`Radio ${activeOperator.coverage_radius_km ? `${Math.round(activeOperator.coverage_radius_km)} km` : 'sin definir'}`}
+                    label={`Radio ${
+                      activeOperator.coverage_radius_km
+                        ? `${Math.round(activeOperator.coverage_radius_km)} km`
+                        : 'sin definir'
+                    }`}
                     size="small"
                     icon={<DoneAllIcon fontSize="small" />}
                   />
@@ -1021,17 +1059,13 @@ const AdminOperatorsPage = () => {
                     <Typography variant="caption" color="text.secondary">
                       Teléfono
                     </Typography>
-                    <Typography variant="body2">
-                      {activeOperator.phone_number || '—'}
-                    </Typography>
+                    <Typography variant="body2">{activeOperator.phone_number || '—'}</Typography>
                   </Grid>
                   <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
                       Dron principal
                     </Typography>
-                    <Typography variant="body2">
-                      {activeOperator.drone_model || '—'}
-                    </Typography>
+                    <Typography variant="body2">{activeOperator.drone_model || '—'}</Typography>
                   </Grid>
                   <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
@@ -1047,9 +1081,7 @@ const AdminOperatorsPage = () => {
                     <Typography variant="caption" color="text.secondary">
                       Última señal
                     </Typography>
-                    <Typography variant="body2">
-                      {formatDateTime(activeOperator.last_heartbeat_at)}
-                    </Typography>
+                    <Typography variant="body2">{formatDateTime(activeOperator.last_heartbeat_at)}</Typography>
                   </Grid>
                   <Grid xs={12} sm={6}>
                     <Typography variant="caption" color="text.secondary">
@@ -1068,7 +1100,12 @@ const AdminOperatorsPage = () => {
                       Portafolio
                     </Typography>
                     {activeOperator.portfolio_url ? (
-                      <Link href={activeOperator.portfolio_url} target="_blank" rel="noopener noreferrer" variant="body2">
+                      <Link
+                        href={activeOperator.portfolio_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="body2"
+                      >
                         {activeOperator.portfolio_url}
                       </Link>
                     ) : (
@@ -1092,11 +1129,7 @@ const AdminOperatorsPage = () => {
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                       Documentos requeridos
                     </Typography>
-                    <Chip
-                      size="small"
-                      color="info"
-                      label={`${selectedDocuments.length} documentos`}
-                    />
+                    <Chip size="small" color="info" label={`${selectedDocuments.length} documentos`} />
                   </Stack>
                   {selectedDocuments.length === 0 ? (
                     <Alert severity="info">Aún no recibimos documentos de este operador.</Alert>
@@ -1133,7 +1166,11 @@ const AdminOperatorsPage = () => {
                                         <Chip
                                           size="small"
                                           variant="outlined"
-                                          label={isExpired ? 'Documento vencido' : `Vence ${formatDateTime(document.expires_at).split(' ')[0]}`}
+                                          label={
+                                            isExpired
+                                              ? 'Documento vencido'
+                                              : `Vence ${formatDateTime(document.expires_at).split(' ')[0]}`
+                                          }
                                         />
                                       ) : null}
                                     </Stack>
@@ -1235,11 +1272,7 @@ const AdminOperatorsPage = () => {
                                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                       {job.property_details?.name || `Trabajo #${job.id}`}
                                     </Typography>
-                                    <Chip
-                                      size="small"
-                                      color={jobStatusColor(job.status)}
-                                      label={job.status_label || job.status}
-                                    />
+                                    <Chip size="small" color={jobStatusColor(job.status)} label={job.status_label || job.status} />
                                     {typeof job.pilot_rating === 'number' ? (
                                       <Chip
                                         size="small"
@@ -1334,29 +1367,29 @@ const AdminOperatorsPage = () => {
             ) : (
               <Alert severity="info">Selecciona un operador para ver su detalle.</Alert>
             )}
-          </Paper>
+            </Paper>
         </Grid>
       </Grid>
 
-      <DocumentReviewDialog
-        open={documentDialog.open}
-        document={documentDialog.document}
-        onClose={handleDocumentDialogClose}
-        onSubmit={handleDocumentDialogSubmit}
-      />
+    <DocumentReviewDialog
+      open={documentDialog.open}
+      document={documentDialog.document}
+      onClose={handleDocumentDialogClose}
+      onSubmit={handleDocumentDialogSubmit}
+    />
 
-      <Snackbar
-        open={Boolean(feedback)}
-        autoHideDuration={5000}
-        onClose={handleFeedbackClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        {feedback ? (
-          <Alert onClose={handleFeedbackClose} severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
-            {feedback.message}
-          </Alert>
-        ) : null}
-      </Snackbar>
+    <Snackbar
+      open={Boolean(feedback)}
+      autoHideDuration={5000}
+      onClose={handleFeedbackClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    >
+      {feedback ? (
+        <Alert onClose={handleFeedbackClose} severity={feedback.type} variant="filled" sx={{ width: '100%' }}>
+          {feedback.message}
+        </Alert>
+      ) : null}
+    </Snackbar>
     </Box>
   );
 };

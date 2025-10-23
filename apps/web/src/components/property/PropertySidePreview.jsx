@@ -114,7 +114,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
               overflow: 'hidden',
               color: '#f8fafc',
               borderRadius: '16px',
-              backgroundColor: 'rgba(20, 22, 30, 0.42)',
+              backgroundColor: 'rgba(8, 10, 15, 0.46)',
               border: '1px solid rgba(255,255,255,0.18)',
               boxShadow: '0 26px 60px rgba(6, 12, 24, 0.55)',
               backdropFilter: 'blur(18px) saturate(140%)',
@@ -124,8 +124,8 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                 position: 'absolute',
                 inset: 0,
                 pointerEvents: 'none',
-                background: 'radial-gradient(40% 50% at 0% 0%, rgba(56,189,248,0.32) 0%, rgba(56,189,248,0) 70%), radial-gradient(55% 45% at 80% 85%, rgba(16,185,129,0.28) 0%, rgba(16,185,129,0) 72%)',
-                opacity: 0.85,
+                background: 'radial-gradient(40% 50% at 0% 0%, rgba(56,189,248,0.18) 0%, rgba(56,189,248,0) 70%), radial-gradient(55% 45% at 80% 85%, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0) 72%)',
+                opacity: 0.6,
                 zIndex: 0,
               },
               '&::after': {
@@ -133,7 +133,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                 position: 'absolute',
                 inset: 0,
                 pointerEvents: 'none',
-                background: 'linear-gradient(140deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.02) 45%, rgba(15,23,42,0.35) 100%)',
+                background: 'linear-gradient(140deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.01) 45%, rgba(15,23,42,0.4) 100%)',
                 mixBlendMode: 'screen',
                 zIndex: 0,
               },
@@ -154,14 +154,42 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
               }}
             >
               {previewUrl ? (
-                <iframe
-                  src={previewUrl}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 'none', display: 'block' }}
-                  allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
-                  title="Tour Preview"
-                />
+                <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+                  <iframe
+                    src={previewUrl}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 'none', display: 'block' }}
+                    allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
+                    title="Tour Preview"
+                    onLoad={(e) => {
+                      // Hide loading overlay when iframe loads
+                      const overlay = e.target.parentNode.querySelector('.tour-loading-overlay');
+                      if (overlay) {
+                        overlay.style.opacity = '0';
+                      }
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(0,0,0,0.7)',
+                      opacity: 1,
+                      transition: 'opacity 0.3s ease',
+                      pointerEvents: 'none',
+                      zIndex: 2,
+                    }}
+                    className="tour-loading-overlay"
+                  >
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                      Cargando tour...
+                    </Typography>
+                  </Box>
+                </Box>
               ) : property?.images?.length > 0 ? (
                 <CardMedia
                   component="img"
@@ -192,24 +220,6 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                   background: 'linear-gradient(180deg, rgba(10,14,22,0.05) 0%, rgba(10,14,22,0.78) 72%, rgba(10,14,22,0.92) 100%)',
                 }}
               />
-              {typeBadgeLabel && (
-                <Chip
-                  label={typeBadgeLabel}
-                  size="small"
-                  sx={{
-                    position: 'absolute',
-                    top: 14,
-                    left: 14,
-                    backgroundColor: 'rgba(16,185,129,0.2)',
-                    color: '#bbf7d0',
-                    borderRadius: '999px',
-                    fontWeight: 500,
-                    textTransform: 'capitalize',
-                    border: '1px solid rgba(45,212,191,0.35)',
-                    backdropFilter: 'blur(8px)',
-                  }}
-                />
-              )}
               <Box sx={{ position: 'absolute', top: 12, right: 12, display: 'flex', gap: 1 }}>
                 <IconButton
                   onClick={toggleSave}
@@ -288,10 +298,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
               </Box>
               {property.plusvalia_score !== undefined && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4 }}>
-                  <CircularPlusvalia value={Number(property.plusvalia_score)} size={60} strokeWidth={6} />
-                  <Typography variant="caption" sx={{ color: 'rgba(148,163,184,0.85)' }}>
-                    Plusvalia
-                  </Typography>
+                  <CircularPlusvalia value={Number(property.plusvalia_score)} size={60} strokeWidth={6} tooltipLabel="Plusvalía score" />
                 </Box>
               )}
             </Box>
@@ -345,16 +352,16 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                 textTransform: 'none',
                 fontWeight: 600,
                 py: 1.05,
-                background: 'rgba(15,23,42,0.82)',
+                background: 'rgba(15,23,42,0.35)',
                 color: 'rgba(248,250,252,0.95)',
-                boxShadow: '0 18px 34px rgba(0,0,0,0.28)',
-                border: '1px solid rgba(148,163,184,0.35)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+                border: '1px solid rgba(148,163,184,0.25)',
+                backdropFilter: 'blur(12px) saturate(120%)',
+                WebkitBackdropFilter: 'blur(12px) saturate(120%)',
                 transition: 'all 0.25s ease',
                 '&:hover': {
-                  background: 'rgba(15,23,42,0.95)',
-                  boxShadow: '0 22px 40px rgba(0,0,0,0.38)',
+                  background: 'rgba(15,23,42,0.45)',
+                  boxShadow: '0 16px 32px rgba(0,0,0,0.2)',
                   transform: 'translateY(-1px)',
                 },
               }}

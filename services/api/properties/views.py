@@ -33,6 +33,7 @@ import shutil
 from django.core.files import File
 from django.core.files.storage import default_storage
 from django.db import transaction
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from .models import (
     Property,
@@ -48,6 +49,7 @@ from .models import (
     PropertyStatusHistory,
     PilotProfile,
     PilotDocument,
+    PilotDevice,
     Job,
     JobOffer,
     JobTimelineEvent,
@@ -73,6 +75,7 @@ from .serializers import (
     PropertyStatusBarSerializer,
     PilotProfileSerializer,
     PilotDocumentSerializer,
+    PilotDeviceSerializer,
     JobSerializer,
     JobOfferSerializer,
 )
@@ -583,6 +586,11 @@ class PropertyViewSet(viewsets.ModelViewSet):
         try:
             property_instance.publication_status = new_status
             property_instance.save(update_fields=['publication_status', 'updated_at'])
+
+            # Si se aprueba la propiedad, cambiar el workflow_substate para activar creación de job
+            if new_status == 'approved' and property_instance.workflow_substate not in ['approved_for_shoot', 'inviting', 'assigned']:
+                property_instance.transition_to('approved_for_shoot', actor=request.user,
+                    message='Propiedad aprobada - iniciando búsqueda de piloto', commit=True)
 
             # Notificar al dueño del cambio de estado
             try:
@@ -1286,6 +1294,12 @@ class PropertyDocumentViewSet(viewsets.ModelViewSet):
         if not document.property.documents.filter(status__in=['pending', 'rejected']).exists():
             document.property.publication_status = 'approved'
             document.property.save()
+
+            # Cambiar el workflow_substate para activar creación de job
+            if document.property.workflow_substate not in ['approved_for_shoot', 'inviting', 'assigned']:
+                document.property.transition_to('approved_for_shoot', actor=request.user,
+                    message='Propiedad aprobada - iniciando búsqueda de piloto', commit=True)
+
             send_property_status_email(document.property)
 
         return Response({'detail': 'Documento aprobado.'}, status=status.HTTP_200_OK)
@@ -1418,30 +1432,33 @@ class PilotDocumentViewSet(viewsets.ModelViewSet):
         pilot_profile = getattr(self.request.user, 'pilot_profile', None)
         if not pilot_profile:
             raise PermissionDenied('Solo operadores pueden subir documentos.')
-        serializer.save(pilot=pilot_profile, status='pending', reviewed_by=None, reviewed_at=None)
+        document = serializer.save(pilot=pilot_profile, status='pending', reviewed_by=None, reviewed_at=None)
+        pilot = PilotProfile.objects.prefetch_related('documents').get(pk=document.pilot_id)
+        pilot.update_compliance_status()
 
     def perform_update(self, serializer):
         user = self.request.user
         pilot_profile = getattr(user, 'pilot_profile', None)
+        document = None
         if user.is_staff:
             status_value = serializer.validated_data.get('status', serializer.instance.status)
-            serializer.save(
+            document = serializer.save(
                 status=status_value,
                 reviewed_by=user,
                 reviewed_at=timezone.now(),
             )
-            return
-
-        if pilot_profile:
-            serializer.save(
+        elif pilot_profile:
+            document = serializer.save(
                 pilot=pilot_profile,
                 status='pending',
                 reviewed_by=None,
                 reviewed_at=None,
             )
-            return
+        else:
+            raise PermissionDenied('No autorizado.')
 
-        raise PermissionDenied('No autorizado.')
+        pilot = PilotProfile.objects.prefetch_related('documents').get(pk=document.pilot_id)
+        pilot.update_compliance_status()
 
 
 class JobViewSet(viewsets.ModelViewSet):
@@ -1472,7 +1489,13 @@ class JobViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return qs.none()
+
+        # Ensure pilot profile exists
         pilot_profile = getattr(user, 'pilot_profile', None)
+        if not pilot_profile:
+            from .models import PilotProfile
+            pilot_profile, created = PilotProfile.objects.get_or_create(user=user)
+            logger.info(f"Created pilot profile for user {user.username} in get_queryset")
 
         if user.is_staff:
             filtered_qs = qs
@@ -1498,22 +1521,108 @@ class JobViewSet(viewsets.ModelViewSet):
     def available(self, request):
         pilot_profile = getattr(request.user, 'pilot_profile', None)
         if not pilot_profile:
-            return Response([], status=status.HTTP_200_OK)
-        qs = Job.objects.select_related(
+            # Create pilot profile if it doesn't exist
+            from .models import PilotProfile
+            pilot_profile, created = PilotProfile.objects.get_or_create(user=request.user)
+            if created:
+                logger.info(f"Created new pilot profile for user {request.user.username}")
+            else:
+                logger.info(f"Using existing pilot profile for user {request.user.username}")
+
+        logger.info(f"Fetching available jobs for pilot {pilot_profile.id} (status: {pilot_profile.status}, available: {pilot_profile.is_available})")
+
+        # Get all jobs for this pilot (both assigned and with offers)
+        all_pilot_jobs = Job.objects.select_related(
             'property',
             'plan',
         ).prefetch_related(
             'offers',
             'offers__pilot',
         ).filter(
+            Q(assigned_pilot=pilot_profile) | Q(offers__pilot=pilot_profile)
+        ).distinct()
+
+        logger.info(f"Found {all_pilot_jobs.count()} total jobs for pilot")
+
+        # Filter to only pending offers
+        qs = all_pilot_jobs.filter(
             offers__pilot=pilot_profile,
             offers__status='pending'
         ).distinct()
+
+        logger.info(f"Found {qs.count()} jobs with pending offers")
+
         job_list = list(qs)
         for job in job_list:
             job.expire_pending_offers(auto=True)
+
         serializer = self.get_serializer(job_list, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='debug', permission_classes=[permissions.IsAuthenticated])
+    def debug(self, request):
+        """Endpoint de diagnóstico para verificar el estado del sistema de jobs."""
+        from .models import PilotProfile, Property, Job
+
+        pilot_profile = getattr(request.user, 'pilot_profile', None)
+        if not pilot_profile:
+            from .models import PilotProfile
+            pilot_profile, created = PilotProfile.objects.get_or_create(user=request.user)
+
+        # Estado del piloto
+        pilot_info = {
+            'id': pilot_profile.id,
+            'status': pilot_profile.status,
+            'is_available': pilot_profile.is_available,
+            'location_latitude': pilot_profile.location_latitude,
+            'location_longitude': pilot_profile.location_longitude,
+            'coverage_radius_km': pilot_profile.coverage_radius_km,
+        }
+
+        # Propiedades aprobadas
+        approved_properties = Property.objects.filter(publication_status='approved').count()
+
+        # Propiedades en approved_for_shoot
+        approved_for_shoot = Property.objects.filter(workflow_substate='approved_for_shoot').count()
+
+        # Jobs totales
+        total_jobs = Job.objects.count()
+
+        # Jobs del piloto
+        pilot_jobs = Job.objects.filter(
+            Q(assigned_pilot=pilot_profile) | Q(offers__pilot=pilot_profile)
+        ).distinct().count()
+
+        # Ofertas del piloto
+        pilot_offers = Job.objects.filter(offers__pilot=pilot_profile).distinct().count()
+
+        # Ofertas pendientes específicas del piloto
+        pending_offers = Job.objects.filter(
+            offers__pilot=pilot_profile,
+            offers__status='pending'
+        ).distinct().count()
+
+        # Pilotos disponibles
+        available_pilots = PilotProfile.objects.filter(status='approved', is_available=True).count()
+
+        # Propiedades con coordenadas
+        properties_with_coords = Property.objects.exclude(
+            latitude__isnull=True
+        ).exclude(longitude__isnull=True).count()
+
+        return Response({
+            'pilot': pilot_info,
+            'system': {
+                'approved_properties': approved_properties,
+                'approved_for_shoot': approved_for_shoot,
+                'total_jobs': total_jobs,
+                'pilot_jobs': pilot_jobs,
+                'pilot_offers': pilot_offers,
+                'pending_offers': pending_offers,
+                'available_pilots': available_pilots,
+                'properties_with_coordinates': properties_with_coords,
+            }
+        })
 
     def retrieve(self, request, *args, **kwargs):
         job = self.get_object()
@@ -1585,6 +1694,45 @@ class JobViewSet(viewsets.ModelViewSet):
         if not (user.is_staff or (pilot_profile and job.assigned_pilot_id == pilot_profile.id)):
             raise PermissionDenied('Solo el piloto asignado puede finalizar la grabación.')
         job.transition('finished', actor=user, message=request.data.get('message', 'Grabación finalizada'), metadata={'source': 'pilot_app'})
+        serializer = self.get_serializer(job)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='rate-operator', permission_classes=[permissions.IsAdminUser])
+    def rate_operator(self, request, pk=None):
+        job = self.get_object()
+        if not job.assigned_pilot_id:
+            return Response({'error': 'Este trabajo no tiene un operador asignado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rating_raw = request.data.get('rating')
+        if rating_raw is None:
+            return Response({'error': 'rating es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            rating_decimal = Decimal(str(rating_raw))
+        except (InvalidOperation, TypeError):
+            return Response({'error': 'rating debe ser un número válido entre 1 y 5.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if rating_decimal < 1 or rating_decimal > 5:
+            return Response({'error': 'rating debe estar entre 1 y 5.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rating_decimal = rating_decimal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        notes = (request.data.get('notes') or '').strip()
+
+        job.pilot_rating = rating_decimal
+        job.pilot_review_notes = notes
+        job.save(update_fields=['pilot_rating', 'pilot_review_notes', 'updated_at'])
+
+        JobTimelineEvent.objects.create(
+            job=job,
+            kind='pilot_rating',
+            message='Calificación del operador actualizada por el equipo.',
+            metadata={'rating': float(rating_decimal), 'notes': notes},
+            actor=request.user,
+        )
+
+        if job.assigned_pilot:
+            job.assigned_pilot.recalculate_rating()
+
         serializer = self.get_serializer(job)
         return Response(serializer.data)
 
@@ -1931,3 +2079,25 @@ def process_tour_package_async(tour_id: int, source_key: str, storage_prefix: st
 
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)
+
+
+class PilotDeviceViewSet(viewsets.ModelViewSet):
+    """Gestión de dispositivos móviles para notificaciones push."""
+    serializer_class = PilotDeviceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Solo el piloto puede ver sus propios dispositivos
+        return PilotDevice.objects.filter(pilot__user=self.request.user)
+
+    def perform_create(self, serializer):
+        # El piloto se infiere del usuario autenticado
+        pilot = PilotProfile.objects.get(user=self.request.user)
+        serializer.save(pilot=pilot)
+
+    def get_permissions(self):
+        """
+        Solo el piloto puede gestionar sus dispositivos.
+        Los administradores no pueden gestionar dispositivos de pilotos.
+        """
+        return [permissions.IsAuthenticated()]

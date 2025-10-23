@@ -115,8 +115,7 @@ const PropertyCard = ({ property }) => {
         )}
         {typeof property.plusvalia_score === 'number' && (
           <Box sx={{ mt: 1, display:'flex', alignItems:'center', gap:1 }}>
-            <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} />
-            <Typography variant="caption" sx={{ color:'text.secondary' }}>Plusvalía</Typography>
+            <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} tooltipLabel="Plusvalía score" />
           </Box>
         )}
         <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap'}}>

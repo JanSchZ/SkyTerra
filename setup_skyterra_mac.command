@@ -147,8 +147,8 @@ if [[ -d "$BACKEND_DIR" ]]; then
             run_step "Aplicar migraciones Django" "${MIGRATE_CMD[@]}"
         fi
 
-        # Semillas minimas: crear un plan por defecto si no existe
-        run_step "Sembrar plan por defecto" "$VENV_PY" "$BACKEND_DIR/manage.py" shell --command "from properties.models import ListingPlan; ListingPlan.objects.get_or_create(key='standard', defaults={'name':'Standard','price':0,'entitlements':{'pilot_payout':0},'sla_hours':{'review':24,'post':72}}); print('Plan seed OK')"
+        # Semillas minimas: planes de listing ya se crean con el management command
+        # run_step "Sembrar plan por defecto" "$VENV_PY" "$BACKEND_DIR/manage.py" shell --command "from properties.models import ListingPlan; ListingPlan.objects.get_or_create(key='standard', defaults={'name':'Standard','price':0,'entitlements':{'pilot_payout':0},'sla_hours':{'review':24,'post':72}}); print('Plan seed OK')"
 
         # Crear superusuario no interactivo si hay variables ADMIN_* definidas
         if [[ -n "${ADMIN_EMAIL:-}" && -n "${ADMIN_PASSWORD:-}" ]]; then
@@ -200,4 +200,4 @@ else
     log "Revisa los mensajes anteriores para mas detalle."
 fi
 
-log "Listo. Puedes usar ./start_skyterra_mac.command o ./start_skyterra.sh para iniciar los servicios."
+log "Listo. Puedes usar ./start_skyterra_mac.command o ./start_skyterra.sh para iniciar los ser vicios."

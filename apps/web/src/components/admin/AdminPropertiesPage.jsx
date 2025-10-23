@@ -1,15 +1,8 @@
 import React from 'react';
-import { Typography, Box } from '@mui/material';
+import AdminDetailedPropertiesPage from './AdminDetailedPropertiesPage';
 
-const AdminPropertiesPage = () => (
-  <Box>
-    <Typography variant="h4">
-      Gestión de Propiedades
-    </Typography>
-    <Typography variant="body1">
-      Aquí podrás ver, aprobar, rechazar y editar propiedades.
-    </Typography>
-  </Box>
-);
+const AdminPropertiesPage = () => {
+  return <AdminDetailedPropertiesPage />;
+};
 
 export default AdminPropertiesPage; 

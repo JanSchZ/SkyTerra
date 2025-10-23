@@ -113,15 +113,18 @@ export interface PilotDocument {
   id: number;
   doc_type: 'id' | 'license' | 'insurance' | 'drone_registration' | 'background_check' | string;
   status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  status_label?: string;
   uploaded_at?: string | null;
   expires_at?: string | null;
   file_url?: string | null;
+  is_expired?: boolean;
 }
 
 export interface PilotProfile {
   id: number;
   display_name: string;
   status: string;
+  status_label?: string;
   is_available: boolean;
   rating: number;
   score: number;
@@ -241,6 +244,56 @@ export const updatePilotProfile = async (payload: Partial<PilotProfile>): Promis
   );
   const { data } = await api.patch('/api/pilot-profiles/me/', body);
   return data as PilotProfile;
+};
+
+export interface DebugInfo {
+  pilot: {
+    id: number;
+    status: string;
+    is_available: boolean;
+    location_latitude: number | null;
+    location_longitude: number | null;
+    coverage_radius_km: number | null;
+  };
+  system: {
+    approved_properties: number;
+    approved_for_shoot: number;
+    total_jobs: number;
+    pilot_jobs: number;
+    pilot_offers: number;
+    pending_offers: number;
+    available_pilots: number;
+    properties_with_coordinates: number;
+  };
+}
+
+export const getDebugInfo = async (): Promise<DebugInfo> => {
+  const { data } = await api.get('/api/jobs/debug/');
+  return data as DebugInfo;
+};
+
+export interface PilotDevice {
+  id: number;
+  device_token: string;
+  device_type: 'ios' | 'android';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const registerDevice = async (deviceToken: string, deviceType: 'ios' | 'android'): Promise<PilotDevice> => {
+  const { data } = await api.post('/api/pilot-devices/', {
+    device_token: deviceToken,
+    device_type: deviceType,
+  });
+  return data as PilotDevice;
+};
+
+export const updateDeviceStatus = async (deviceId: number, isActive: boolean): Promise<PilotDevice> => {
+  const { data } = await api.patch(`/api/pilot-devices/${deviceId}/`, {
+    is_active: isActive,
+  });
+  return data as PilotDevice;
 };
 
 export interface PilotDocumentUploadPayload {

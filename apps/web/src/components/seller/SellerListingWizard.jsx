@@ -898,7 +898,7 @@ const renderOverviewStep = () => {
           </Box>
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Nombre del terreno"
                 name="name"
@@ -910,7 +910,7 @@ const renderOverviewStep = () => {
                 helperText={formErrors.name || 'Por ejemplo: “Campo Los Boldos” o “Parcela en Lago Ranco”.'}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Tipo de propiedad"
                 name="type"
@@ -922,7 +922,7 @@ const renderOverviewStep = () => {
                 helperText={formErrors.type || 'Ejemplos: terreno agrícola, parcela urbanizada, predio forestal.'}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <FormControl fullWidth>
                 <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
                 <Select
@@ -939,7 +939,7 @@ const renderOverviewStep = () => {
               </FormControl>
             </Grid>
             {includesSale && (
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField
                   label="Precio de venta (USD)"
                   name="price"
@@ -955,7 +955,7 @@ const renderOverviewStep = () => {
               </Grid>
             )}
             {includesRent && (
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField
                   label="Precio de arriendo mensual (USD)"
                   name="rent_price"
@@ -970,7 +970,7 @@ const renderOverviewStep = () => {
                 />
               </Grid>
             )}
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <TextField
                 label="Superficie (hectáreas)"
                 name="size"
@@ -989,7 +989,7 @@ const renderOverviewStep = () => {
           <Divider />
 
           <Grid container spacing={3}>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <TextField
                 label="Descripción"
                 name="description"
@@ -1001,7 +1001,7 @@ const renderOverviewStep = () => {
                 helperText="Resalta atributos únicos, accesos, servidumbres y potencial de uso."
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid xs={12}>
               <FormGroup row>
                 <FormControlLabel
                   control={<Switch checked={Boolean(listingForm.has_water)} onChange={handleSwitchChange} name="has_water" />}
@@ -1160,7 +1160,7 @@ const renderOperationsStep = () => {
           </Box>
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <TextField
                 label="Nombre del contacto"
                 name="contact_name"
@@ -1172,7 +1172,7 @@ const renderOperationsStep = () => {
                 helperText={formErrors.contact_name || 'Persona que abrirá el campo o atenderá visitas.'}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <TextField
                 label="Correo del contacto"
                 name="contact_email"
@@ -1183,7 +1183,7 @@ const renderOperationsStep = () => {
                 helperText={formErrors.contact_email || 'Usaremos este correo para enviar confirmaciones y reportes.'}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid xs={12} md={4}>
               <TextField
                 label="Teléfono o WhatsApp"
                 name="contact_phone"
@@ -1275,7 +1275,7 @@ const renderOperationsStep = () => {
           </Box>
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Dirección o punto de referencia"
                 name="address_line1"
@@ -1287,7 +1287,7 @@ const renderOperationsStep = () => {
                 helperText={formErrors.address_line1 || 'Puedes usar coordenadas o una descripción clara si no existe dirección formal.'}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <TextField
                 label="Detalle adicional (interior, lote, portón...)"
                 name="address_line2"
@@ -1297,7 +1297,7 @@ const renderOperationsStep = () => {
                 helperText="Información opcional para llegar sin perder tiempo."
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid xs={12} md={3}>
               <TextField
                 label="Ciudad / Comuna"
                 name="address_city"
@@ -1309,7 +1309,7 @@ const renderOperationsStep = () => {
                 helperText={formErrors.address_city || 'Es clave para programar al operador local.'}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid xs={12} md={3}>
               <TextField
                 label="Región / Estado"
                 name="address_region"
@@ -1321,7 +1321,7 @@ const renderOperationsStep = () => {
                 helperText={formErrors.address_region || 'Asegura una ubicación precisa para logística y permisos.'}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid xs={12} md={3}>
               <TextField
                 label="País"
                 name="address_country"
@@ -1333,7 +1333,7 @@ const renderOperationsStep = () => {
                 helperText={formErrors.address_country || 'Selecciona el país del predio.'}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid xs={12} md={3}>
               <TextField
                 label="Código postal"
                 name="address_postal_code"
@@ -1502,7 +1502,7 @@ const renderReviewStep = () => {
           <Divider />
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                 Contacto operativo
               </Typography>
@@ -1515,7 +1515,7 @@ const renderReviewStep = () => {
                 </Typography>
               )}
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid xs={12} md={6}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                 Dirección de grabación
               </Typography>
@@ -1714,7 +1714,7 @@ return (
   <Box sx={{ backgroundColor: '#f5f7fb', minHeight: '100vh', py: { xs: 6, md: 8 } }}>
     <Container maxWidth="xl">
       <Grid container spacing={4}>
-        <Grid item xs={12} md={4} lg={3}>
+        <Grid xs={12} md={4} lg={3}>
           <Stack spacing={3}>
             <Paper
               sx={{
@@ -1809,7 +1809,7 @@ return (
           </Stack>
         </Grid>
 
-        <Grid item xs={12} md={8} lg={9}>
+        <Grid xs={12} md={8} lg={9}>
           <Stack spacing={3}>
             <Box>
               <Typography variant="overline" sx={{ letterSpacing: '.16em', color: 'text.secondary' }}>

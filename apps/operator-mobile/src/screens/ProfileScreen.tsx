@@ -82,6 +82,15 @@ const ProfileScreen = () => {
     () => (isDark ? ['#050608', '#0b0d11'] : [colors.background, colors.backgroundAlt]),
     [colors.background, colors.backgroundAlt, isDark]
   );
+  const profileStatusMeta = useMemo(
+    () => ({
+      approved: { label: 'Activo', tone: colors.success },
+      pending: { label: 'En revisión', tone: colors.warning },
+      rejected: { label: 'Rechazado', tone: colors.danger },
+      suspended: { label: 'Suspendido', tone: colors.textSecondary },
+    }),
+    [colors.success, colors.warning, colors.danger, colors.textSecondary]
+  );
   const [themeSaving, setThemeSaving] = useState<ThemeMode | null>(null);
   const [droneSelectorVisible, setDroneSelectorVisible] = useState(false);
 
@@ -197,14 +206,21 @@ const ProfileScreen = () => {
     setSuccess(null);
     setSaving(true);
     try {
+      const displayName = form.display_name.trim();
+      const phone = form.phone_number.trim();
+      const baseCity = form.base_city.trim();
+      const droneModel = form.drone_model.trim();
+      const website = form.website.trim();
+      const portfolio = form.portfolio_url.trim();
+
       const payload: Partial<PilotProfile> = {
-        display_name: form.display_name.trim(),
-        phone_number: form.phone_number.trim() || null,
-        base_city: form.base_city.trim() || null,
-        drone_model: form.drone_model.trim() || null,
+        display_name: displayName,
+        phone_number: phone || '',
+        base_city: baseCity || '',
+        drone_model: droneModel || '',
         experience_years: form.experience_years ? Number(form.experience_years) : null,
-        website: form.website.trim() || null,
-        portfolio_url: form.portfolio_url.trim() || null,
+        website: website || '',
+        portfolio_url: portfolio || '',
         location_latitude: location?.latitude ?? null,
         location_longitude: location?.longitude ?? null,
       };
@@ -351,8 +367,9 @@ const ProfileScreen = () => {
   };
 
   const documentsSummary = useMemo(() => {
-    const approved = profile?.documents?.filter((doc) => doc.status === 'approved').length ?? 0;
-    return `${approved}/${DOCUMENT_TOTAL} documentos aprobados`;
+    const approvedCount =
+      profile?.documents?.filter((doc) => doc.status === 'approved' && !doc.is_expired).length ?? 0;
+    return `${approvedCount}/${DOCUMENT_TOTAL} documentos aprobados`;
   }, [profile?.documents]);
 
   const registeredFullName = useMemo(() => {
@@ -399,9 +416,12 @@ const ProfileScreen = () => {
                 </View>
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Estado</Text>
-                  <Text style={styles.metaValue}>
-                    {profile?.status === 'active' ? 'Activo' : 'En revisión'}
-                  </Text>
+                  {(() => {
+                    const meta = profileStatusMeta[profile?.status ?? 'pending'];
+                    const label = profile?.status_label ?? meta?.label ?? 'En revisión';
+                    const tone = meta?.tone ?? colors.warning;
+                    return <Text style={[styles.metaValue, { color: tone }]}>{label}</Text>;
+                  })()}
                 </View>
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Documentos</Text>
@@ -496,7 +516,7 @@ const ProfileScreen = () => {
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Sitio web</Text>
+                <Text style={styles.label}>Sitio web (opcional)</Text>
                 <TextInput
                   value={form.website}
                   onChangeText={(value) => handleChange('website', value)}
@@ -505,10 +525,11 @@ const ProfileScreen = () => {
                   style={styles.input}
                   autoCapitalize="none"
                 />
+                <Text style={styles.helperText}>Comparte tu sitio web si lo tienes disponible.</Text>
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Portafolio o redes</Text>
+                <Text style={styles.label}>Portafolio o redes (opcional)</Text>
                 <TextInput
                   value={form.portfolio_url}
                   onChangeText={(value) => handleChange('portfolio_url', value)}
@@ -517,6 +538,7 @@ const ProfileScreen = () => {
                   style={styles.input}
                   autoCapitalize="none"
                 />
+                <Text style={styles.helperText}>Puedes dejar este campo en blanco si aún no tienes portafolio.</Text>
               </View>
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -574,6 +596,9 @@ const ProfileScreen = () => {
               {documentBlueprints.map((doc) => {
                 const current = getDocument(doc.type);
                 const statusInfo = current?.status ? statusCopy[current.status] : null;
+                const isExpired = Boolean(current?.is_expired);
+                const statusLabel = current?.status_label ?? statusInfo?.label ?? 'En revisión';
+                const statusTone = isExpired ? statusCopy.expired.tone : statusInfo?.tone ?? colors.warning;
                 const docState = documentStates[doc.type];
                 const fileName = extractFileName(current?.file_url);
                 return (
@@ -591,11 +616,24 @@ const ProfileScreen = () => {
                       </View>
                       {current?.status ? (
                         <View style={styles.documentStatus}>
-                          <Ionicons name="ellipse" size={10} color={statusInfo?.tone ?? colors.warning} />
-                          <Text style={[styles.documentStatusText, { color: statusInfo?.tone ?? colors.warning }]}>
-                            {statusInfo?.label ?? 'En revisión'}
+                          <Ionicons name="ellipse" size={10} color={statusTone} />
+                          <Text style={[styles.documentStatusText, { color: statusTone }]}>
+                            {statusLabel}
                           </Text>
                         </View>
+                      ) : null}
+                      {current?.expires_at ? (
+                        <View style={styles.documentMeta}>
+                          <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                          <Text style={styles.documentMetaText}>
+                            {isExpired
+                              ? `Venció el ${new Date(current.expires_at).toLocaleDateString()}`
+                              : `Vence el ${new Date(current.expires_at).toLocaleDateString()}`}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {isExpired ? (
+                        <Text style={styles.documentWarning}>Actualiza este documento para mantenerte activo.</Text>
                       ) : null}
                       {current?.file_url ? (
                         <TouchableOpacity
@@ -1082,6 +1120,12 @@ const createStyles = (colors: ThemeColors) => {
       fontWeight: '600',
       fontSize: 13,
       color: colors.textSecondary,
+    },
+    documentWarning: {
+      marginTop: 6,
+      color: colors.warning,
+      fontSize: 12,
+      fontWeight: '600',
     },
     documentFile: {
       marginTop: 8,

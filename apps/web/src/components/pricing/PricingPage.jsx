@@ -253,27 +253,7 @@ const PricingPage = () => {
     } else {
       navigate('/checkout', {
         state: {
-          plan: payload
-            ? {
-                ...payload,
-                pricing: payload.pricing || {
-                  totalUF: parseFloat(plan.priceLabel),
-                  breakdown: null,
-                  platformFee: plan.platformFee ?? 0,
-                  discountMultiplier: plan.discountMultiplier ?? 1,
-                },
-                propertyTypes: PROPERTY_TYPES,
-              }
-            : {
-                ...plan,
-                pricing: {
-                  totalUF: parseFloat(plan.priceLabel),
-                  breakdown: null,
-                  platformFee: plan.platformFee ?? 0,
-                  discountMultiplier: plan.discountMultiplier ?? 1,
-                },
-                propertyTypes: PROPERTY_TYPES,
-              },
+          plan: withBackendMetadata(payload || plan),
           listingId: incomingListingId,
           from: origin || 'pricing',
         },

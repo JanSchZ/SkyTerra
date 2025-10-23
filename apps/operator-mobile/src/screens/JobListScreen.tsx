@@ -23,14 +23,13 @@ import { MainTabParamList } from '@navigation/MainTabsNavigator';
 import { useAuth } from '@context/AuthContext';
 import {
   OperatorJob,
-  PilotProfile,
   acceptOffer,
   declineOffer,
-  fetchPilotProfile,
   listAvailableJobs,
   listPilotJobs,
   setAvailability,
   updatePilotProfile,
+  getDebugInfo,
 } from '@services/operatorJobs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, ThemeColors } from '@theme';
@@ -92,14 +91,15 @@ type LoadMode = 'initial' | 'refresh' | 'silent';
 
 const JobListScreen = () => {
   const navigation = useNavigation<JobsScreenNav>();
-  const { signOut } = useAuth();
+  const { signOut, pilotProfile, refreshPilotProfile } = useAuth();
   const [jobs, setJobs] = useState<OperatorJob[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState(true);
-  const [pilotProfile, setPilotProfile] = useState<PilotProfile | null>(null);
   const [activeJob, setActiveJob] = useState<OperatorJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [showDebug, setShowDebug] = useState(false);
   const [radiusDraft, setRadiusDraft] = useState<number>(DEFAULT_RADIUS);
   const [radiusCommitted, setRadiusCommitted] = useState<number>(DEFAULT_RADIUS);
   const [radiusSaving, setRadiusSaving] = useState(false);
@@ -125,17 +125,18 @@ const JobListScreen = () => {
     setError(null);
     setRadiusError(null);
     try {
-      const [profileData, availableJobs, pilotJobs] = await Promise.all([
-        fetchPilotProfile(),
+      // Refresh pilot profile to ensure we have the latest data
+      await refreshPilotProfile();
+
+      const [availableJobs, pilotJobs] = await Promise.all([
         listAvailableJobs(),
         listPilotJobs(),
       ]);
 
-      setPilotProfile(profileData);
-      setIsAvailable(profileData.is_available);
+      setIsAvailable(pilotProfile?.is_available ?? true);
       const serverRadius =
-        typeof profileData.coverage_radius_km === 'number' && profileData.coverage_radius_km > 0
-          ? clampRadius(profileData.coverage_radius_km)
+        typeof pilotProfile?.coverage_radius_km === 'number' && pilotProfile.coverage_radius_km > 0
+          ? clampRadius(pilotProfile.coverage_radius_km)
           : null;
       const radiusValue = serverRadius ?? radiusRef.current ?? DEFAULT_RADIUS;
       radiusRef.current = radiusValue;
@@ -146,6 +147,17 @@ const JobListScreen = () => {
         ['assigned', 'scheduling', 'scheduled', 'shooting'].includes(item.status)
       );
       setActiveJob(nextActive ?? null);
+
+      // Load debug info if no jobs available and no error
+      if (availableJobs.length === 0 && !err) {
+        try {
+          const debug = await getDebugInfo();
+          setDebugInfo(debug);
+          console.log('Debug info:', debug);
+        } catch (debugErr) {
+          console.warn('Could not load debug info:', debugErr);
+        }
+      }
     } catch (err) {
       console.error('Error fetching jobs', err);
       setError('No pudimos cargar los trabajos. Desliza hacia abajo para reintentar.');
@@ -179,7 +191,8 @@ const JobListScreen = () => {
     try {
       const confirmed = await setAvailability(value);
       setIsAvailable(confirmed);
-      setPilotProfile((prev) => (prev ? { ...prev, is_available: confirmed } : prev));
+      // Refresh profile to get updated data
+      await refreshPilotProfile();
       await loadJobs('silent');
     } catch (err) {
       console.warn('No se pudo actualizar la disponibilidad', err);
@@ -199,9 +212,10 @@ const JobListScreen = () => {
     try {
       radiusRef.current = normalized;
       await AsyncStorage.setItem(RADIUS_STORAGE_KEY, String(normalized));
-      const updatedProfile = await updatePilotProfile({ coverage_radius_km: normalized });
+      await updatePilotProfile({ coverage_radius_km: normalized });
       setRadiusCommitted(normalized);
-      setPilotProfile(updatedProfile);
+      // Refresh profile to get updated data
+      await refreshPilotProfile();
       await loadJobs('silent');
     } catch (err) {
       console.warn('No se pudo actualizar el radio de cobertura', err);
@@ -358,6 +372,106 @@ const JobListScreen = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Profile and settings section - outside FlatList for better scrolling */}
+        <View style={styles.sectionSpacing}>
+          <View style={styles.profileCard}>
+            <View style={styles.profileHeader}>
+              <View>
+                <Text style={styles.profileHeading}>Ofertas disponibles</Text>
+                <Text style={styles.profileMetaText}>
+                  {pilotProfile?.display_name ?? 'Completa tu perfil'} · Calificación {scoreLabel}
+                </Text>
+              </View>
+              <View style={styles.availabilityCluster}>
+                <Text style={styles.availabilityText}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
+                <Switch
+                  value={isAvailable}
+                  onValueChange={toggleAvailability}
+                  thumbColor={availabilityThumbColor}
+                  trackColor={availabilityTrackColor}
+                />
+              </View>
+            </View>
+            <View style={styles.statsRow}>
+              <View style={styles.metric}>
+                <Text style={styles.metricLabel}>Ofertas</Text>
+                <Text style={styles.metricValue}>{pendingOffers}</Text>
+              </View>
+              <View style={styles.metric}>
+                <Text style={styles.metricLabel}>Activa</Text>
+                <Text style={styles.metricValue}>{activeJob ? '1' : '0'}</Text>
+              </View>
+              <View style={styles.metric}>
+                <Text style={styles.metricLabel}>Disponibilidad</Text>
+                <Text style={styles.metricValue}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
+              </View>
+            </View>
+            <View style={styles.radiusBlock}>
+              <View style={styles.radiusHeader}>
+                <Text style={styles.radiusTitle}>Radio de trabajo</Text>
+                <View style={styles.radiusValueGroup}>
+                  {radiusSaving ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : null}
+                  <Text style={styles.radiusValue}>{radiusDraft} km</Text>
+                </View>
+              </View>
+              <Text style={styles.radiusHint}>
+                Ajusta tu radio para recibir ofertas cercanas en tiempo real.
+              </Text>
+              <Slider
+                value={radiusDraft}
+                onValueChange={(value) => setRadiusDraft(clampRadius(value))}
+                onSlidingComplete={commitRadius}
+                minimumValue={RADIUS_BOUNDS.min}
+                maximumValue={RADIUS_BOUNDS.max}
+                step={RADIUS_BOUNDS.step}
+                thumbTintColor={isDark ? colors.surface : colors.primary}
+                minimumTrackTintColor={colors.primary}
+                maximumTrackTintColor={colors.cardBorder}
+                disabled={radiusSaving}
+              />
+              <View style={styles.radiusActions}>
+                <TouchableOpacity
+                  style={[styles.radiusButton, decreaseDisabled && styles.radiusButtonDisabled]}
+                  onPress={() => adjustRadius(-RADIUS_BOUNDS.step)}
+                  disabled={decreaseDisabled}
+                >
+                  <Ionicons
+                    name="remove-outline"
+                    size={16}
+                    color={decreaseDisabled ? colors.textMuted : colors.textPrimary}
+                  />
+                  <Text style={styles.radiusButtonText}>-5 km</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.radiusButton, increaseDisabled && styles.radiusButtonDisabled]}
+                  onPress={() => adjustRadius(RADIUS_BOUNDS.step)}
+                  disabled={increaseDisabled}
+                >
+                  <Ionicons
+                    name="add-outline"
+                    size={16}
+                    color={increaseDisabled ? colors.textMuted : colors.textPrimary}
+                  />
+                  <Text style={styles.radiusButtonText}>+5 km</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.radiusAssist}>
+                Rango {RADIUS_BOUNDS.min}–{RADIUS_BOUNDS.max} km
+              </Text>
+              {radiusError ? <Text style={styles.radiusError}>{radiusError}</Text> : null}
+            </View>
+          </View>
+
+          {activeJob ? (
+            <ActiveJobCard
+              job={activeJob}
+              onPress={() => navigation.navigate('JobDetail', { jobId: String(activeJob.id) })}
+            />
+          ) : null}
+        </View>
+
         <FlatList
           data={jobs}
           keyExtractor={(item) => item.id.toString()}
@@ -373,103 +487,6 @@ const JobListScreen = () => {
           renderItem={renderJobCard}
           ListHeaderComponent={
             <View style={styles.sectionSpacing}>
-              <View style={styles.profileCard}>
-                <View style={styles.profileHeader}>
-                  <View>
-                    <Text style={styles.profileHeading}>Ofertas disponibles</Text>
-                    <Text style={styles.profileMetaText}>
-                      {pilotProfile?.display_name ?? 'Completa tu perfil'} · Calificación {scoreLabel}
-                    </Text>
-                  </View>
-                  <View style={styles.availabilityCluster}>
-                    <Text style={styles.availabilityText}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
-                    <Switch
-                      value={isAvailable}
-                      onValueChange={toggleAvailability}
-                      thumbColor={availabilityThumbColor}
-                      trackColor={availabilityTrackColor}
-                    />
-                  </View>
-                </View>
-                <View style={styles.statsRow}>
-                  <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>Ofertas</Text>
-                    <Text style={styles.metricValue}>{pendingOffers}</Text>
-                  </View>
-                  <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>Activa</Text>
-                    <Text style={styles.metricValue}>{activeJob ? '1' : '0'}</Text>
-                  </View>
-                  <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>Disponibilidad</Text>
-                    <Text style={styles.metricValue}>{isAvailable ? 'Operativo' : 'Pausado'}</Text>
-                  </View>
-                </View>
-                <View style={styles.radiusBlock}>
-                  <View style={styles.radiusHeader}>
-                    <Text style={styles.radiusTitle}>Radio de trabajo</Text>
-                    <View style={styles.radiusValueGroup}>
-                      {radiusSaving ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
-                      ) : null}
-                      <Text style={styles.radiusValue}>{radiusDraft} km</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.radiusHint}>
-                    Ajusta tu radio para recibir ofertas cercanas en tiempo real.
-                  </Text>
-                  <Slider
-                    value={radiusDraft}
-                    onValueChange={(value) => setRadiusDraft(clampRadius(value))}
-                    onSlidingComplete={commitRadius}
-                    minimumValue={RADIUS_BOUNDS.min}
-                    maximumValue={RADIUS_BOUNDS.max}
-                    step={RADIUS_BOUNDS.step}
-                    thumbTintColor={isDark ? colors.surface : colors.primary}
-                    minimumTrackTintColor={colors.primary}
-                    maximumTrackTintColor={colors.cardBorder}
-                    disabled={radiusSaving}
-                  />
-                  <View style={styles.radiusActions}>
-                    <TouchableOpacity
-                      style={[styles.radiusButton, decreaseDisabled && styles.radiusButtonDisabled]}
-                      onPress={() => adjustRadius(-RADIUS_BOUNDS.step)}
-                      disabled={decreaseDisabled}
-                    >
-                      <Ionicons
-                        name="remove-outline"
-                        size={16}
-                        color={decreaseDisabled ? colors.textMuted : colors.textPrimary}
-                      />
-                      <Text style={styles.radiusButtonText}>-5 km</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.radiusButton, increaseDisabled && styles.radiusButtonDisabled]}
-                      onPress={() => adjustRadius(RADIUS_BOUNDS.step)}
-                      disabled={increaseDisabled}
-                    >
-                      <Ionicons
-                        name="add-outline"
-                        size={16}
-                        color={increaseDisabled ? colors.textMuted : colors.textPrimary}
-                      />
-                      <Text style={styles.radiusButtonText}>+5 km</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.radiusAssist}>
-                    Rango {RADIUS_BOUNDS.min}–{RADIUS_BOUNDS.max} km
-                  </Text>
-                  {radiusError ? <Text style={styles.radiusError}>{radiusError}</Text> : null}
-                </View>
-              </View>
-
-              {activeJob ? (
-                <ActiveJobCard
-                  job={activeJob}
-                  onPress={() => navigation.navigate('JobDetail', { jobId: String(activeJob.id) })}
-                />
-              ) : null}
-
               {error ? (
                 <View style={styles.errorCard}>
                   <Ionicons name="warning-outline" size={18} color={colors.danger} />
@@ -479,12 +496,30 @@ const JobListScreen = () => {
             </View>
           }
           ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Ionicons name="sparkles-outline" size={22} color={colors.textSecondary} />
-              <Text style={styles.emptyTitle}>Sin ofertas nuevas</Text>
-              <Text style={styles.emptySubtitle}>Mantén la disponibilidad activa para recibir vuelos cercanos.</Text>
+            <View style={styles.sectionSpacing}>
+              {debugInfo && (
+                <View style={styles.debugCard}>
+                  <Text style={styles.debugTitle}>🔍 Información del sistema</Text>
+                  <Text style={styles.debugText}>Piloto: {debugInfo.pilot?.status} ({debugInfo.pilot?.is_available ? 'Disponible' : 'No disponible'})</Text>
+                  <Text style={styles.debugText}>Propiedades aprobadas: {debugInfo.system?.approved_properties}</Text>
+                  <Text style={styles.debugText}>En approved_for_shoot: {debugInfo.system?.approved_for_shoot}</Text>
+                  <Text style={styles.debugText}>Jobs totales: {debugInfo.system?.total_jobs}</Text>
+                  <Text style={styles.debugText}>Jobs del piloto: {debugInfo.system?.pilot_jobs}</Text>
+                  <Text style={styles.debugText}>Ofertas del piloto: {debugInfo.system?.pilot_offers}</Text>
+                  <Text style={styles.debugText}>Ofertas pendientes: {debugInfo.system?.pending_offers}</Text>
+                  <Text style={styles.debugText}>Pilotos disponibles: {debugInfo.system?.available_pilots}</Text>
+                  <Text style={styles.debugText}>Propiedades con coordenadas: {debugInfo.system?.properties_with_coordinates}</Text>
+                </View>
+              )}
+              <View style={styles.emptyCard}>
+                <Ionicons name="sparkles-outline" size={22} color={colors.textSecondary} />
+                <Text style={styles.emptyTitle}>Sin ofertas nuevas</Text>
+                <Text style={styles.emptySubtitle}>Mantén la disponibilidad activa para recibir vuelos cercanos.</Text>
+              </View>
             </View>
           }
+          scrollEnabled={true}
+          bounces={true}
         />
       </SafeAreaView>
     </LinearGradient>
@@ -589,6 +624,7 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: 20,
       paddingBottom: 32,
       gap: 18,
+      paddingTop: 12,
     },
     sectionSpacing: {
       gap: 18,
@@ -863,6 +899,26 @@ const createStyles = (colors: ThemeColors) =>
     errorText: {
       color: colors.textPrimary,
       flex: 1,
+    },
+    debugCard: {
+      borderRadius: 20,
+      padding: 16,
+      backgroundColor: colors.surfaceHighlight,
+      borderWidth: 1,
+      borderColor: colors.warning,
+      gap: 8,
+      marginBottom: 16,
+    },
+    debugTitle: {
+      color: colors.warning,
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    debugText: {
+      color: colors.textPrimary,
+      fontSize: 12,
+      fontFamily: 'monospace',
     },
   });
 

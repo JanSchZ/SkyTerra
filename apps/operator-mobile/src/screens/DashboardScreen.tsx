@@ -22,8 +22,6 @@ import { MainTabParamList } from '@navigation/MainTabsNavigator';
 import { useAuth } from '@context/AuthContext';
 import {
   OperatorJob,
-  PilotProfile,
-  fetchPilotProfile,
   listAvailableJobs,
   listPilotJobs,
 } from '@services/operatorJobs';
@@ -57,8 +55,7 @@ const formatDistance = (value?: number | null) => {
 
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardNavigation>();
-  const { user, preferredName, refreshUser, initializing } = useAuth();
-  const [profile, setProfile] = useState<PilotProfile | null>(null);
+  const { user, preferredName, refreshUser, initializing, pilotProfile, refreshPilotProfile } = useAuth();
   const [availableOffers, setAvailableOffers] = useState<OperatorJob[]>([]);
   const [pilotJobs, setPilotJobs] = useState<OperatorJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,13 +84,14 @@ const DashboardScreen = () => {
       setRefreshing(refreshOnly);
       setError(null);
       try {
-        const [profileData, invites, jobs] = await Promise.all([
-          fetchPilotProfile(),
+        // Refresh pilot profile to ensure we have the latest data
+        await refreshPilotProfile();
+
+        const [invites, jobs] = await Promise.all([
           listAvailableJobs(),
           listPilotJobs(),
         ]);
-        setProfile(profileData);
-        setIsAvailable(profileData.is_available);
+        setIsAvailable(pilotProfile?.is_available ?? true);
         setAvailableOffers(invites);
         setPilotJobs(jobs);
       } catch (err) {
@@ -104,12 +102,11 @@ const DashboardScreen = () => {
         setRefreshing(false);
       }
     },
-    [user]
+    [user, pilotProfile?.is_available, refreshPilotProfile]
   );
 
   useEffect(() => {
     if (!user) {
-      setProfile(null);
       setAvailableOffers([]);
       setPilotJobs([]);
       setLoading(false);
@@ -181,17 +178,17 @@ const DashboardScreen = () => {
   );
 
   const invitesCount = availableOffers.length;
-  const pendingDocuments = profile?.documents?.filter((doc) => doc.status !== 'approved') ?? [];
+  const pendingDocuments = pilotProfile?.documents?.filter((doc) => doc.status !== 'approved') ?? [];
   const summaryMetrics = useMemo(() => {
     const approvedDocs =
-      profile?.documents?.filter((doc) => doc.status === 'approved').length ?? 0;
+      pilotProfile?.documents?.filter((doc) => doc.status === 'approved').length ?? 0;
     return [
       { key: 'invites', label: 'Ofertas', value: String(invitesCount) },
       { key: 'completed', label: 'Completados', value: String(completedCount) },
       {
         key: 'score',
         label: 'Calificación',
-        value: typeof profile?.score === 'number' ? profile.score.toFixed(1) : '—',
+        value: typeof pilotProfile?.score === 'number' ? pilotProfile.score.toFixed(1) : '—',
       },
       {
         key: 'documents',
@@ -199,7 +196,7 @@ const DashboardScreen = () => {
         value: `${approvedDocs}/${DOCUMENT_TOTAL}`,
       },
     ];
-  }, [completedCount, invitesCount, profile?.documents, profile?.score]);
+  }, [completedCount, invitesCount, pilotProfile?.documents, pilotProfile?.score]);
   const offersShowcase = useMemo(() => availableOffers.slice(0, 6), [availableOffers]);
 
   const ongoingSummaryMessage = useMemo(() => {
@@ -237,11 +234,11 @@ const DashboardScreen = () => {
     };
 
     const candidates = [
-      profile?.display_name,
-      joinNames(profile?.user?.first_name, profile?.user?.last_name),
+      pilotProfile?.display_name,
+      joinNames(pilotProfile?.user?.first_name, pilotProfile?.user?.last_name),
       preferredName,
       joinNames(user?.first_name, user?.last_name),
-      profile?.user?.username,
+      pilotProfile?.user?.username,
       user?.username,
     ];
 
@@ -253,10 +250,10 @@ const DashboardScreen = () => {
     return '';
   }, [
     preferredName,
-    profile?.display_name,
-    profile?.user?.first_name,
-    profile?.user?.last_name,
-    profile?.user?.username,
+    pilotProfile?.display_name,
+    pilotProfile?.user?.first_name,
+    pilotProfile?.user?.last_name,
+    pilotProfile?.user?.username,
     user?.first_name,
     user?.last_name,
     user?.username,

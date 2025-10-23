@@ -1,12 +1,15 @@
 import uuid
 import json
-from decimal import Decimal
+import logging
+from decimal import Decimal, ROUND_HALF_UP
 from types import SimpleNamespace
 
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Publicación & workflow configuration (orden general + metadatos básicos)
@@ -291,9 +294,12 @@ class Property(models.Model):
             self.workflow_progress = max(0, min(100, int(percent)))
 
         if substate == 'approved_for_shoot':
+            logger.info(f"Property {self.id} transitioning to approved_for_shoot, creating job")
             try:
                 self.ensure_job(actor=actor, auto_invite=True)
+                logger.info(f"Job created successfully for property {self.id}")
             except Exception as exc:
+                logger.error(f"Error creating job for property {self.id}: {exc}")
                 self.add_alert(
                     'error',
                     'Hubo un problema al preparar la orden de producción. Nuestro equipo ya fue notificado.',
@@ -799,6 +805,8 @@ class PilotProfile(models.Model):
         ('suspended', 'Suspendido'),
     ]
 
+    REQUIRED_DOCUMENT_TYPES = ['id', 'license', 'drone_registration', 'insurance', 'background_check']
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pilot_profile')
     display_name = models.CharField(max_length=120, blank=True)
     phone_number = models.CharField(max_length=32, blank=True)
@@ -826,6 +834,71 @@ class PilotProfile(models.Model):
     def __str__(self):
         return self.display_name or self.user.get_full_name() or self.user.username
 
+    def recalculate_rating(self):
+        """Recalcula el rating promedio del piloto a partir de los trabajos evaluados."""
+        ratings_qs = self.assigned_jobs.filter(pilot_rating__isnull=False).values_list('pilot_rating', flat=True)
+        ratings = [Decimal(str(value)) for value in ratings_qs if value is not None]
+        if ratings:
+            total = sum(ratings)
+            average = total / Decimal(len(ratings))
+            # Mantener el rating entre 0 y 5, redondeado a dos decimales
+            average = max(Decimal('0.00'), min(Decimal('5.00'), average))
+            average = average.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            self.rating = average
+        else:
+            self.rating = Decimal('5.00')
+        self.save(update_fields=['rating', 'updated_at'])
+
+    def _documents_by_type(self):
+        return {doc.doc_type: doc for doc in self.documents.all()}
+
+    def compute_pending_requirements(self):
+        docs_map = self._documents_by_type()
+        labels_map = dict(PilotDocument.DOCUMENT_TYPES)
+        today = timezone.now().date()
+        pending = []
+        for doc_type in self.REQUIRED_DOCUMENT_TYPES:
+            label = labels_map.get(doc_type, doc_type.replace('_', ' ').title())
+            document = docs_map.get(doc_type)
+            if not document:
+                pending.append(f'{label} pendiente de carga')
+                continue
+            if document.expires_at and document.expires_at < today:
+                pending.append(f'{label} vencido')
+                continue
+            if document.status != 'approved':
+                pending.append(f'{label} en revisión')
+        return pending
+
+    def update_compliance_status(self, commit=True):
+        pending = self.compute_pending_requirements()
+        new_status = 'approved' if not pending else 'pending'
+        updates = []
+        if self.status != new_status:
+            self.status = new_status
+            updates.append('status')
+        if updates and commit:
+            updates.append('updated_at')
+            self.save(update_fields=updates)
+        return pending
+
+
+class PilotDevice(models.Model):
+    """Dispositivos móviles registrados para notificaciones push."""
+    pilot = models.ForeignKey(PilotProfile, on_delete=models.CASCADE, related_name='devices')
+    device_token = models.CharField(max_length=255, unique=True, help_text="Token de dispositivo para notificaciones push")
+    device_type = models.CharField(max_length=32, choices=[('ios', 'iOS'), ('android', 'Android')], help_text="Tipo de dispositivo")
+    is_active = models.BooleanField(default=True, help_text="Si el dispositivo está activo para recibir notificaciones")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Dispositivo de Piloto'
+        verbose_name_plural = 'Dispositivos de Pilotos'
+
+    def __str__(self):
+        return f"{self.pilot.user.username} - {self.device_type} ({self.device_token[:20]}...)"
+
 
 class PilotDocument(models.Model):
     """Documentos que debe tener un piloto para operar."""
@@ -834,6 +907,7 @@ class PilotDocument(models.Model):
         ('license', 'Licencia de piloto'),
         ('drone_registration', 'Registro de dron'),
         ('insurance', 'Seguro'),
+        ('background_check', 'Certificado de antecedentes'),
         ('other', 'Otro'),
     ]
 
@@ -912,6 +986,8 @@ class Job(models.Model):
     last_status_change_at = models.DateTimeField(auto_now=True)
     notes = models.TextField(blank=True)
     vendor_instructions = models.TextField(blank=True)
+    pilot_rating = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True)
+    pilot_review_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

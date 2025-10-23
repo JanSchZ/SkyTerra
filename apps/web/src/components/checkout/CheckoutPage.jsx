@@ -367,7 +367,7 @@ const CheckoutPage = () => {
         </Typography>
 
         <Grid container spacing={4} justifyContent="center">
-          <Grid item xs={12} md={6} lg={5}>
+          <Grid xs={12} md={6} lg={5}>
             <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: '#E5E8F1', boxShadow: '0 18px 60px rgba(15, 23, 42, 0.08)' }}>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>Resumen del plan</Typography>
               <Divider sx={{ my: 2 }} />
@@ -458,7 +458,7 @@ const CheckoutPage = () => {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} md={6} lg={5}>
+          <Grid xs={12} md={6} lg={5}>
             <Paper elevation={0} sx={{ p: 4, borderRadius: 4, border: '1px solid', borderColor: '#E5E8F1', boxShadow: '0 18px 60px rgba(15, 23, 42, 0.08)' }}>
               <Typography variant="h5" sx={{ fontWeight: 700 }}>Información de pago</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

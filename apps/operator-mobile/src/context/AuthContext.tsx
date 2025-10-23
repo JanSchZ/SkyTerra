@@ -23,6 +23,8 @@ import {
   persistPreferredName,
   clearPreferredName,
 } from '@services/apiClient';
+import { PilotProfile, fetchPilotProfile } from '@services/operatorJobs';
+import { usePushNotifications } from '@hooks/usePushNotifications';
 
 interface AuthContextValue {
   user: OperatorUser | null;
@@ -33,6 +35,8 @@ interface AuthContextValue {
   signInWithCredentials: (payload: SignInPayload) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshPilotProfile: () => Promise<void>;
+  pilotProfile: PilotProfile | null;
   preferredName: string | null;
 }
 
@@ -43,7 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [preferredName, setPreferredName] = useState<string | null>(null);
+  const [pilotProfile, setPilotProfile] = useState<PilotProfile | null>(null);
   const autoLoginPromiseRef = useRef<Promise<boolean> | null>(null);
+  const { registerForPushNotifications } = usePushNotifications();
 
   useEffect(() => {
     const loadName = async () => {
@@ -88,6 +94,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await persistCredentials(effectivePayload);
         }
         await persistPreferredName(name);
+
+        // Load pilot profile after successful sign in
+        try {
+          const profile = await fetchPilotProfile();
+          setPilotProfile(profile);
+
+          // Register for push notifications after successful sign in
+          try {
+            await registerForPushNotifications();
+          } catch (notificationError) {
+            console.warn('Failed to register for push notifications after sign in', notificationError);
+          }
+        } catch (error) {
+          console.warn('Failed to load pilot profile after sign in', error);
+        }
+
         return true;
       } catch (error) {
         if (options.remember) {
@@ -125,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUnauthorizedHandler(async () => {
       await clearStoredTokens();
       setUser(null);
+      setPilotProfile(null);
       setLoading(false);
       if (!autoLoginPromiseRef.current) {
         autoLoginPromiseRef.current = attemptStoredCredentialLogin().finally(() => {
@@ -156,6 +179,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await persistPreferredName(name);
             }
             authenticated = true;
+
+            // Load pilot profile after successful authentication
+            try {
+              const profile = await fetchPilotProfile();
+              setPilotProfile(profile);
+
+              // Register for push notifications after successful authentication
+              try {
+                await registerForPushNotifications();
+              } catch (notificationError) {
+                console.warn('Failed to register for push notifications during bootstrap', notificationError);
+              }
+            } catch (error) {
+              console.warn('Failed to load pilot profile during bootstrap', error);
+            }
           } catch (error) {
             console.warn('Auth bootstrap fetch user failed', error);
             if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -168,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const restored = await attemptStoredCredentialLogin();
           if (!restored) {
             setUser(null);
+            setPilotProfile(null);
           }
         }
       } catch (error) {
@@ -177,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await clearStoredTokens();
         }
         setUser(null);
+        setPilotProfile(null);
       } finally {
         setInitializing(false);
       }
@@ -205,6 +245,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [computePreferredName]);
 
+  const refreshPilotProfile = useCallback(async () => {
+    try {
+      const profile = await fetchPilotProfile();
+      setPilotProfile(profile);
+    } catch (error) {
+      console.warn('refreshPilotProfile failed', error);
+      throw error;
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await clearStoredTokens();
     await clearStoredCredentials();
@@ -212,11 +262,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     autoLoginPromiseRef.current = null;
     setUser(null);
     setPreferredName(null);
+    setPilotProfile(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, initializing, signInWithCredentials, signOut, refreshUser, preferredName }),
-    [user, loading, initializing, signInWithCredentials, signOut, refreshUser, preferredName]
+    () => ({ user, loading, initializing, signInWithCredentials, signOut, refreshUser, refreshPilotProfile, pilotProfile, preferredName }),
+    [user, loading, initializing, signInWithCredentials, signOut, refreshUser, refreshPilotProfile, pilotProfile, preferredName]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

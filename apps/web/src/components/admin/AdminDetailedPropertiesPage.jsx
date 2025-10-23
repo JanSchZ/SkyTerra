@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, Chip, Avatar, IconButton, Menu, MenuItem, LinearProgress, Dialog, DialogTitle, DialogContent, Button, TextField, List, ListItem, ListItemText, ListItemAvatar, Paper, InputBase, CircularProgress, Alert, FormControl, InputLabel, Select } from '@mui/material';
+import { Box, Typography, Chip, Avatar, IconButton, Menu, MenuItem, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, List, ListItem, ListItemText, ListItemAvatar, Paper, InputBase, CircularProgress, Alert, FormControl, InputLabel, Select } from '@mui/material';
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { styled } from '@mui/material/styles';
 import { propertyService, authService } from '../../services/api';
@@ -74,6 +74,9 @@ const AdminDetailedPropertiesPage = () => {
     const [docsModalOpen, setDocsModalOpen] = useState(false);
     const [statusFilter, setStatusFilter] = useState('');
     const [selectionModel, setSelectionModel] = useState([]);
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [pendingAction, setPendingAction] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
     
     // Estados para datos y búsqueda
     const [properties, setProperties] = useState([]);
@@ -97,6 +100,43 @@ const AdminDetailedPropertiesPage = () => {
     const handleCloseMenu = () => {
         setAnchorEl(null);
         setSelectedProperty(null);
+    };
+
+    const handleApproveProperty = () => {
+        setPendingAction({ type: 'approve', property: selectedProperty });
+        setConfirmDialogOpen(true);
+        handleCloseMenu();
+    };
+
+    const handleRejectProperty = () => {
+        setPendingAction({ type: 'reject', property: selectedProperty });
+        setConfirmDialogOpen(true);
+        handleCloseMenu();
+    };
+
+    const handleConfirmAction = async () => {
+        if (!pendingAction) return;
+
+        setActionLoading(true);
+        try {
+            const status = pendingAction.type === 'approve' ? 'approved' : 'rejected';
+            await propertyService.setPropertyStatus(pendingAction.property.id, status);
+
+            // Recargar las propiedades
+            await loadProperties('', paginationModel.page, paginationModel.pageSize);
+        } catch (error) {
+            console.error('Error changing property status:', error);
+            // Aquí podrías mostrar un mensaje de error al usuario
+        } finally {
+            setActionLoading(false);
+            setConfirmDialogOpen(false);
+            setPendingAction(null);
+        }
+    };
+
+    const handleCancelAction = () => {
+        setConfirmDialogOpen(false);
+        setPendingAction(null);
     };
 
     const handleOpenTourModal = () => {
@@ -424,6 +464,14 @@ const AdminDetailedPropertiesPage = () => {
         >
             <MenuItem onClick={handleOpenTourModal}><TourIcon sx={{mr: 1}}/> Gestionar Tour 360</MenuItem>
             <MenuItem onClick={handleOpenDocsModal}><DescriptionIcon sx={{mr: 1}}/> Ver Documentos</MenuItem>
+            <MenuItem onClick={handleApproveProperty} disabled={selectedProperty?.publication_status === 'approved'}>
+                <CheckCircleOutlineIcon sx={{mr: 1, color: 'success.main'}}/>
+                Aprobar Propiedad
+            </MenuItem>
+            <MenuItem onClick={handleRejectProperty} disabled={selectedProperty?.publication_status === 'rejected'}>
+                <DoNotDisturbOnIcon sx={{mr: 1, color: 'error.main'}}/>
+                Rechazar Propiedad
+            </MenuItem>
         </Menu>
 
         {selectedProperty && (
@@ -458,10 +506,44 @@ const AdminDetailedPropertiesPage = () => {
                         </List>
                     </DialogContent>
                 </Dialog>
+
+                {/* Confirmation Dialog */}
+                <Dialog open={confirmDialogOpen} onClose={handleCancelAction}>
+                    <DialogTitle>
+                        {pendingAction?.type === 'approve' ? 'Confirmar Aprobación' : 'Confirmar Rechazo'}
+                    </DialogTitle>
+                    <DialogContent>
+                        <Typography>
+                            {pendingAction?.type === 'approve'
+                                ? `¿Estás seguro de que deseas aprobar la propiedad "${pendingAction?.property?.name}"?`
+                                : `¿Estás seguro de que deseas rechazar la propiedad "${pendingAction?.property?.name}"?`
+                            }
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            {pendingAction?.type === 'approve'
+                                ? 'La propiedad será aprobada y se iniciará el proceso de búsqueda de pilotos.'
+                                : 'La propiedad será rechazada y no podrá ser publicada.'
+                            }
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleCancelAction} disabled={actionLoading}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleConfirmAction}
+                            variant={pendingAction?.type === 'approve' ? 'contained' : 'contained'}
+                            color={pendingAction?.type === 'approve' ? 'success' : 'error'}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? <CircularProgress size={20} /> : 'Confirmar'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </>
         )}
-        </Box>
-    );
+    </Box>
+);
 };
 
 export default AdminDetailedPropertiesPage;

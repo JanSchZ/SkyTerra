@@ -746,8 +746,7 @@ const PropertyDetails = () => {
                           <TrendingUpIcon sx={{ color: '#c9d1d9', fontSize: '20px' }} />
                         </ListItemIcon>
                         <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
-                          <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} />
-                          <Typography variant="caption" sx={{ color:'#8b949e' }}>Plusvalía</Typography>
+                          <CircularPlusvalia value={Number(property.plusvalia_score)} size={48} strokeWidth={6} tooltipLabel="Plusvalía score" />
                         </Box>
                       </ListItem>
                     )}

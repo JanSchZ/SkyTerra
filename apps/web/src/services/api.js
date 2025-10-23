@@ -1270,6 +1270,23 @@ export const recordingOrderService = {
 // Operator Service (Pilotos)
 // ---------------------
 export const operatorService = {
+  _normalizeJob(job) {
+    if (!job || typeof job !== 'object') {
+      return job;
+    }
+    let pilotRating = null;
+    if (typeof job.pilot_rating === 'number') {
+      pilotRating = job.pilot_rating;
+    } else if (typeof job.pilot_rating === 'string' && job.pilot_rating.trim() !== '') {
+      const parsed = Number(job.pilot_rating);
+      pilotRating = Number.isFinite(parsed) ? parsed : null;
+    }
+    return {
+      ...job,
+      pilot_rating: pilotRating,
+    };
+  },
+
   async listOperators(params = {}) {
     const { data } = await api.get('/pilot-profiles/', { params });
     const rawResults = Array.isArray(data?.results)
@@ -1277,6 +1294,7 @@ export const operatorService = {
       : Array.isArray(data)
         ? data
         : [];
+
 
     const results = rawResults.map((item) => ({
       ...item,
@@ -1331,13 +1349,19 @@ export const operatorService = {
       : Array.isArray(data)
         ? data
         : [];
+    const normalizedResults = results.map((job) => operatorService._normalizeJob(job));
     const count = typeof data?.count === 'number' ? data.count : results.length;
     return {
-      results,
+      results: normalizedResults,
       count,
       next: data?.next ?? null,
       previous: data?.previous ?? null,
     };
+  },
+
+  async rateOperator(jobId, payload = {}) {
+    const { data } = await api.post(`/jobs/${jobId}/rate-operator/`, payload);
+    return operatorService._normalizeJob(data);
   },
 };
 

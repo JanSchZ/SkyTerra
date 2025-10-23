@@ -1,4 +1,5 @@
 import math
+import logging
 from datetime import timedelta
 from typing import List, Tuple, TYPE_CHECKING
 
@@ -6,8 +7,15 @@ from django.apps import apps
 from django.db.models import Prefetch
 from django.utils import timezone
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:  # pragma: no cover
     from .models import Job, JobOffer, PilotProfile
+
+# Importación lazy para evitar dependencias circulares
+def _get_notification_service():
+    from .notification_service import send_job_offers_notifications
+    return send_job_offers_notifications
 
 # Configuración por defecto; puede moverse a settings si se requiere.
 MATCHING_DEFAULTS = {
@@ -72,12 +80,20 @@ def compute_score(pilot: PilotProfile, distance_km: float, radius_km: float) -> 
 def shortlist_pilots(job: "Job", wave: int) -> List[Tuple["PilotProfile", float, float]]:
     """Devuelve pilotos elegibles ordenados (pilot, distancia, score)."""
     property_obj = job.property
+    logger.info(f"Shortlisting pilots for job {job.id} (property: {property_obj.name})")
+
     if property_obj.latitude is None or property_obj.longitude is None:
+        logger.warning(f"Property {property_obj.id} has no coordinates")
         return []
 
     PilotProfile = apps.get_model("properties", "PilotProfile")
     PilotDocument = apps.get_model("properties", "PilotDocument")
     invited_ids = set(job.offers.values_list("pilot_id", flat=True))
+
+    # Count available pilots
+    total_pilots = PilotProfile.objects.filter(status="approved", is_available=True).count()
+    logger.info(f"Total approved and available pilots: {total_pilots}")
+
     base_qs = (
         PilotProfile.objects.filter(status="approved", is_available=True)
         .exclude(id__in=invited_ids)
@@ -85,28 +101,40 @@ def shortlist_pilots(job: "Job", wave: int) -> List[Tuple["PilotProfile", float,
         .prefetch_related(Prefetch("documents", queryset=PilotDocument.objects.all()))
     )
 
+    logger.info(f"Found {base_qs.count()} eligible pilots (excluding already invited)")
+
     radius_km = min(
         MATCHING_DEFAULTS["initial_radius_km"] + (wave - 1) * MATCHING_DEFAULTS["radius_step_km"],
         MATCHING_DEFAULTS["max_radius_km"],
     )
 
     pilots = []
+    pilots_with_coords = 0
+    pilots_in_radius = 0
+
     for pilot in base_qs:
         if pilot.location_latitude is None or pilot.location_longitude is None:
             continue
+
+        pilots_with_coords += 1
         distance_km = haversine_distance_km(
             property_obj.latitude,
             property_obj.longitude,
             pilot.location_latitude,
             pilot.location_longitude,
         )
+
         if distance_km > radius_km:
             continue
+
+        pilots_in_radius += 1
         pilot._prefetched_documents = list(pilot.documents.all())
         if not pilot_is_operational(pilot):
             continue
         score = compute_score(pilot, distance_km, radius_km)
         pilots.append((pilot, distance_km, score))
+
+    logger.info(f"Pilots with coordinates: {pilots_with_coords}, in radius: {pilots_in_radius}, operational: {len(pilots)}")
 
     pilots.sort(key=lambda item: item[2], reverse=True)
     return pilots[: MATCHING_DEFAULTS["invite_count"]]
@@ -114,13 +142,19 @@ def shortlist_pilots(job: "Job", wave: int) -> List[Tuple["PilotProfile", float,
 
 def send_wave(job: "Job", wave: int, actor=None) -> List["JobOffer"]:
     """Genera invitaciones para una ola específica."""
+    logger.info(f"Sending invite wave {wave} for job {job.id} (property: {job.property.name})")
+
     if wave > MATCHING_DEFAULTS["max_waves"]:
+        logger.warning(f"Wave {wave} exceeds max waves {MATCHING_DEFAULTS['max_waves']}")
         return []
 
     JobOffer = apps.get_model("properties", "JobOffer")
     job.expire_pending_offers(auto=False)
     candidates = shortlist_pilots(job, wave)
+    logger.info(f"Found {len(candidates)} pilot candidates for job {job.id}")
+
     if not candidates:
+        logger.warning(f"No pilot candidates found for job {job.id}")
         return []
 
     offers = []
@@ -159,4 +193,14 @@ def send_wave(job: "Job", wave: int, actor=None) -> List["JobOffer"]:
             },
             actor=getattr(actor, "user", actor),
         )
+
+        # Enviar notificaciones push a los pilotos
+        if offers:
+            try:
+                notification_service = _get_notification_service()
+                notification_service(offers)
+            except Exception as notification_error:
+                # No bloquear el flujo por fallos de notificaciones
+                logger.warning(f"Failed to send notifications for job {job.id}: {notification_error}")
+
     return offers

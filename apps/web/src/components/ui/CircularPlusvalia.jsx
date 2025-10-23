@@ -1,13 +1,14 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Tooltip } from '@mui/material';
 import { tokens } from '../../theme/tokens';
 
 /**
  * CircularPlusvalia
  * - Circular gauge 0–100 with value centered (no decimals)
  * - Thick stroke and SkyTerra green color
+ * - Optional tooltip on hover when tooltipLabel is provided
  */
-const CircularPlusvalia = ({ value = 0, size = 56, strokeWidth = 6, color }) => {
+const CircularPlusvalia = ({ value = 0, size = 56, strokeWidth = 6, color, tooltipLabel }) => {
   const safeValue = Math.max(0, Math.min(100, Number.isFinite(Number(value)) ? Number(value) : 0));
   const display = Math.round(safeValue);
   const strokeColor = color || tokens?.colors?.accent || '#1E8578';
@@ -16,7 +17,7 @@ const CircularPlusvalia = ({ value = 0, size = 56, strokeWidth = 6, color }) => 
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - safeValue / 100);
 
-  return (
+  const gaugeContent = (
     <Box sx={{ position: 'relative', width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
         <circle
@@ -56,6 +57,16 @@ const CircularPlusvalia = ({ value = 0, size = 56, strokeWidth = 6, color }) => 
       </Typography>
     </Box>
   );
+
+  if (tooltipLabel) {
+    return (
+      <Tooltip title={tooltipLabel} arrow placement="top">
+        {gaugeContent}
+      </Tooltip>
+    );
+  }
+
+  return gaugeContent;
 };
 
 export default CircularPlusvalia;

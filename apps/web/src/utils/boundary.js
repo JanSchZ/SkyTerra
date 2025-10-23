@@ -198,8 +198,20 @@ const normalizeBoundary = (boundary, overrides = {}) => {
   const feature = asFeature(boundary);
   if (!feature?.geometry?.coordinates?.length) return null;
 
+  // Generate unique ID based on coordinates and properties
+  const coordsString = JSON.stringify(feature.geometry.coordinates);
+  const propsString = JSON.stringify(feature.properties || {});
+  const uniqueId = btoa(coordsString + propsString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+
   const metadata = {
-    feature,
+    id: uniqueId,
+    feature: {
+      ...feature,
+      properties: {
+        ...feature.properties,
+        animationProgress: 1 // Default to fully visible
+      }
+    },
     geojson: feature,
     coordinates: cloneCoordinates(feature.geometry.coordinates || []),
     ...calculateMetrics(feature),

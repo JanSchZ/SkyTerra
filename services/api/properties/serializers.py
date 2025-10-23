@@ -16,6 +16,7 @@ from .models import (
     PropertyStatusHistory,
     PilotProfile,
     PilotDocument,
+    PilotDevice,
     Job,
     JobOffer,
     JobTimelineEvent,
@@ -240,6 +241,8 @@ class TourPackageCreateSerializer(serializers.ModelSerializer):
 
 class PilotDocumentSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    is_expired = serializers.SerializerMethodField()
 
     class Meta:
         model = PilotDocument
@@ -250,13 +253,15 @@ class PilotDocumentSerializer(serializers.ModelSerializer):
             'file',
             'file_url',
             'status',
+            'status_label',
             'notes',
             'expires_at',
+            'is_expired',
             'uploaded_at',
             'reviewed_by',
             'reviewed_at',
         ]
-        read_only_fields = ['uploaded_at', 'reviewed_by', 'reviewed_at', 'pilot']
+        read_only_fields = ['uploaded_at', 'reviewed_by', 'reviewed_at', 'pilot', 'status_label', 'is_expired']
 
     def get_file_url(self, obj):
         request = self.context.get('request') if self.context else None
@@ -267,10 +272,17 @@ class PilotDocumentSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(url)
         return url
 
+    def get_is_expired(self, obj):
+        if not obj.expires_at:
+            return False
+        return obj.expires_at < timezone.now().date()
+
 
 class PilotProfileSerializer(serializers.ModelSerializer):
     user = BasicUserSerializer(read_only=True)
     documents = PilotDocumentSerializer(many=True, read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    pending_requirements = serializers.SerializerMethodField()
 
     class Meta:
         model = PilotProfile
@@ -289,16 +301,35 @@ class PilotProfileSerializer(serializers.ModelSerializer):
             'score',
             'completed_jobs',
             'status',
+            'status_label',
             'is_available',
             'location_latitude',
             'location_longitude',
             'last_heartbeat_at',
             'notes',
             'documents',
+            'pending_requirements',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['rating', 'score', 'completed_jobs', 'last_heartbeat_at', 'created_at', 'updated_at']
+        read_only_fields = ['rating', 'score', 'completed_jobs', 'last_heartbeat_at', 'created_at', 'updated_at', 'pending_requirements', 'status_label']
+        extra_kwargs = {
+            'website': {'required': False, 'allow_blank': True},
+            'portfolio_url': {'required': False, 'allow_blank': True},
+        }
+
+    def get_pending_requirements(self, obj):
+        return obj.compute_pending_requirements()
+
+    def validate_website(self, value):
+        if value is None:
+            return ''
+        return value
+
+    def validate_portfolio_url(self, value):
+        if value is None:
+            return ''
+        return value
 
 
 class JobTimelineEventSerializer(serializers.ModelSerializer):
@@ -389,6 +420,8 @@ class JobSerializer(serializers.ModelSerializer):
             'last_status_change_at',
             'notes',
             'vendor_instructions',
+            'pilot_rating',
+            'pilot_review_notes',
             'timeline',
             'offers',
             'status_bar',
@@ -590,17 +623,23 @@ class PropertyListSerializer(serializers.ModelSerializer):
     owner_details = BasicUserSerializer(source='owner', read_only=True)
     plusvalia_score = serializers.SerializerMethodField()
     workflow_timeline = serializers.SerializerMethodField()
+    boundary_polygon = serializers.JSONField(required=False, allow_null=True)
+    has_boundary = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
         fields = ['id', 'name', 'type', 'price', 'size', 'latitude', 'longitude',
-                 'has_water', 'has_views', 'image_count', 'has_tour',
+                 'has_water', 'has_views', 'image_count', 'has_tour', 'boundary_polygon', 'has_boundary',
                  'publication_status', 'workflow_node', 'workflow_substate', 'workflow_progress', 'workflow_timeline',
                  'owner_details', 'created_at', 'listing_type', 'rent_price', 'rental_terms', 'plusvalia_score']
 
     def get_plusvalia_score(self, obj):
         # Beta/prelanzamiento: visible para todos
         return obj.plusvalia_score
+
+    def get_has_boundary(self, obj):
+        """Check if the property has a boundary polygon"""
+        return obj.boundary_polygon is not None and obj.boundary_polygon != ''
 
     def get_workflow_timeline(self, obj):
         return _serialize_timeline_payload(obj.build_workflow_timeline())
@@ -727,3 +766,18 @@ class RecordingOrderSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data['requested_by'] = request.user
         return super().create(validated_data)
+
+
+class PilotDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PilotDevice
+        fields = [
+            'id',
+            'pilot',
+            'device_token',
+            'device_type',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
