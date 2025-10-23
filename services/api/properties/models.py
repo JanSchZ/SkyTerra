@@ -827,7 +827,6 @@ class PilotDocument(models.Model):
         ('license', 'Licencia de piloto'),
         ('drone_registration', 'Registro de dron'),
         ('insurance', 'Seguro'),
-        ('background_check', 'Certificado de antecedentes'),
         ('other', 'Otro'),
     ]
 
