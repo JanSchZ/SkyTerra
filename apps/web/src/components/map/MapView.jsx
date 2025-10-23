@@ -947,26 +947,32 @@ const MapView = forwardRef(({
     if (map && !isNaN(lat) && !isNaN(lon)) {
       map.flyTo({
         center: [lon, lat],
-        zoom: 17.5, // Zoom muy cercano para ver el polígono/perímetro claramente
+        zoom: 16.5, // Zoom cercano para ver el polígono/perímetro claramente
         pitch: 0,
         bearing: 0,
-        duration: 5500, // Duración más larga para transición suave y cinética
+        duration: 4500, // Duración más larga para transición suave y cinética
         easing: (t) => {
           // Curva de easing muy suave: ease-in-out con aceleración y desaceleración graduales
-          return t < 0.5 
-            ? 4 * t * t * t 
+          return t < 0.5
+            ? 4 * t * t * t
             : 1 - Math.pow(-2 * t + 2, 3) / 2;
         },
         essential: true,
       });
     }
 
-    // Tras terminar la animación, NO abrir el tour automáticamente
-    // Dejar que el usuario explore el polígono y haga zoom manualmente
+    // Tras terminar la animación, abrir el tour automáticamente después de un delay
+    // para permitir que el usuario explore el polígono primero
     setTimeout(() => {
       setNavigatingToTour(false);
-      // El tour se abrirá solo si el usuario hace más zoom (>= 19)
-    }, 5700);
+      // Dar tiempo para que el usuario explore el polígono
+      setTimeout(() => {
+        if (url) {
+          setActiveTourUrl(url);
+          setActiveTourPropertyId(property.id);
+        }
+      }, 1500); // 1.5 segundos para explorar el polígono antes de entrar al tour
+    }, 4700);
   };
 
   const handleMarkerHover = (property) => {
@@ -1561,8 +1567,8 @@ const MapView = forwardRef(({
       }
       // -------------- Seamless zoom-to-tour logic -----------------
       const currentZoom = map.getZoom();
-      // Solo activar tour si el usuario hace zoom MUY cerca (>= 19.5)
-      if (currentZoom >= 19.5) {
+      // Solo activar tour si el usuario hace zoom muy cerca (>= 18.5)
+      if (currentZoom >= 18.5) {
         const center = map.getCenter();
         // Función auxiliar para distancia en metros (Haversine)
         const metersBetween = (lat1, lon1, lat2, lon2) => {
@@ -1586,7 +1592,7 @@ const MapView = forwardRef(({
           }
         });
 
-        const DIST_THRESHOLD = 500; // metros (más cercano para activación intencional)
+        const DIST_THRESHOLD = 800; // metros (más amplio para activación natural)
         if (nearest && minDist <= DIST_THRESHOLD && nearest.id !== activeTourPropertyIdRef.current) {
           (async () => {
             try {
@@ -1604,7 +1610,7 @@ const MapView = forwardRef(({
             }
           })();
         }
-      } else if (currentZoom < 18 && activeTourUrlRef.current) {
+      } else if (currentZoom < 17 && activeTourUrlRef.current) {
         // Alejando: cerrar tour si el usuario hace zoom out
         setActiveTourUrl(null);
         setActiveTourPropertyId(null);
