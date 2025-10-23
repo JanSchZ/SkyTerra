@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Box, IconButton, Typography, CircularProgress, Paper, Drawer, Divider, Chip, Button } from '@mui/material';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Box, IconButton, Typography, CircularProgress, Paper, Drawer, Divider, Chip, Button, Stack, Grid } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
@@ -13,6 +13,8 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tourService, propertyService, favoritesService } from '../../services/api';
+import { formatPrice, formatRentPrice } from '../../utils/formatters';
+import SamPropertyAssistant from './SamPropertyAssistant';
 
 const TourViewer = () => {
   const { tourId } = useParams();
@@ -21,9 +23,24 @@ const TourViewer = () => {
   const [tourData, setTourData] = useState(null);
   const [propertyData, setPropertyData] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [showInfo, setShowInfo] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Listener para detectar cambios en el estado de fullscreen
+  useEffect(() => {
+    const handleFullScreenChange = () => {
+      const active = Boolean(document.fullscreenElement);
+      setIsFullScreen(active);
+      // Auto-mostrar panel de info cuando entramos a fullscreen
+      if (active && propertyData) {
+        setShowInfo(true);
+      }
+    };
+    handleFullScreenChange();
+    document.addEventListener('fullscreenchange', handleFullScreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
+  }, [propertyData]);
 
   useEffect(() => {
     const fetchTourData = async () => {
@@ -100,10 +117,14 @@ const TourViewer = () => {
         console.error(`Error al intentar pantalla completa: ${e.message}`);
       });
       setIsFullScreen(true);
+      if (propertyData) {
+        setShowInfo(true);
+      }
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
         setIsFullScreen(false);
+        setShowInfo(false);
       }
     }
   };
@@ -123,6 +144,46 @@ const TourViewer = () => {
   const handleBack = () => {
     navigate(-1);
   };
+
+  // Calcular dimensiones del panel según el modo fullscreen
+  const topOffset = isFullScreen ? 24 : 96;
+  const bottomOffset = isFullScreen ? 24 : 40;
+  const panelHeight = `calc(100vh - ${topOffset + bottomOffset}px)`;
+
+  // Formatear precio según el tipo de listing
+  const formattedPrice = useMemo(() => {
+    if (!propertyData) return 'Precio no disponible';
+    if (propertyData.listing_type === 'rent') {
+      return propertyData.rent_price ? formatRentPrice(propertyData.rent_price) : 'Arriendo no disponible';
+    }
+    if (propertyData.listing_type === 'both') {
+      const sale = propertyData.price ? formatPrice(propertyData.price) : 'Venta N/D';
+      const rent = propertyData.rent_price ? formatRentPrice(propertyData.rent_price) : 'Arriendo N/D';
+      return `${sale} · ${rent}`;
+    }
+    return propertyData.price ? formatPrice(propertyData.price) : 'Precio no disponible';
+  }, [propertyData]);
+
+  // Formatear superficie
+  const formattedSize = useMemo(() => {
+    if (!propertyData) return '---';
+    const sizeValue = Number(propertyData.size);
+    if (Number.isNaN(sizeValue) || sizeValue <= 0) return '---';
+    return `${sizeValue.toLocaleString('es-ES', { minimumFractionDigits: sizeValue < 10 ? 2 : 1, maximumFractionDigits: 2 })} hectáreas`;
+  }, [propertyData]);
+
+  // Generar tags de la propiedad
+  const propertyTags = useMemo(() => {
+    if (!propertyData) return [];
+    const tags = [];
+    if (propertyData.type) tags.push({ label: propertyData.type, color: 'primary' });
+    if (propertyData.listing_type) {
+      const listingLabel = propertyData.listing_type === 'both' ? 'Venta y arriendo' : propertyData.listing_type;
+      tags.push({ label: listingLabel, color: 'secondary' });
+    }
+    if (propertyData.status) tags.push({ label: propertyData.status, color: 'default' });
+    return tags;
+  }, [propertyData]);
 
   // Construir la URL del tour con autoLoad=true y parámetros adicionales
   const getModifiedTourUrl = () => {
@@ -255,14 +316,20 @@ const TourViewer = () => {
             
             <IconButton 
               onClick={() => setShowInfo(!showInfo)}
+              disabled={!isFullScreen}
               sx={{ 
                 backgroundColor: 'rgba(0,0,0,0.5)', 
                 color: 'white',
                 '&.active': {
                   backgroundColor: 'primary.main'
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  color: 'rgba(255,255,255,0.4)'
                 }
               }}
               className={showInfo ? 'active' : ''}
+              title={isFullScreen ? "Toggle información" : "Panel solo disponible en pantalla completa"}
             >
               <InfoIcon />
             </IconButton>
@@ -293,114 +360,310 @@ const TourViewer = () => {
             )}
           </Box>
           
-          {/* Panel lateral con info */}
+          {/* Panel lateral con info y asistente Sam */}
           <Drawer
             anchor="left"
             variant="persistent"
-            open={showInfo && propertyData}
+            open={showInfo && Boolean(propertyData) && isFullScreen}
+            hideBackdrop
             sx={{
               '& .MuiDrawer-paper': {
-                width: 320,
+                width: { xs: 'calc(100% - 32px)', sm: 380, md: 420 },
+                maxWidth: 440,
                 boxSizing: 'border-box',
-                top: 80,
-                backgroundColor: 'rgba(255,255,255,0.14)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
+                top: topOffset,
+                left: { xs: 16, sm: 24 },
+                bottom: bottomOffset,
+                height: 'auto',
+                padding: '24px',
+                background: 'linear-gradient(140deg, rgba(18,24,38,0.85) 0%, rgba(32,42,62,0.78) 100%)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
                 color: 'white',
-                borderRight: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: '0 16px 16px 0',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.35)'
+                borderRight: 'none',
+                borderRadius: '24px',
+                border: '1px solid rgba(255,255,255,0.18)',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+                overflow: 'hidden',
               },
             }}
           >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
-                {propertyData?.name || 'Propiedad'}
-              </Typography>
-              
-              <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <LocalOfferIcon sx={{ mr: 1 }} />
-                <Typography variant="h6">
-                  ${propertyData?.price?.toLocaleString() || '---'}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <AspectRatioIcon sx={{ mr: 1 }} />
-                <Typography variant="body1">
-                  {propertyData?.size?.toFixed(1) || '---'} hectáreas
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                <RoomIcon sx={{ mr: 1, mt: 0.5 }} />
-                <Typography variant="body2">
-                  {propertyData?.address || 'Ubicación no disponible'}
-                </Typography>
-              </Box>
-              
-              {propertyData?.plusvalia_score && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Plusvalía:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.plusvalia_score}%
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.bedrooms && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Dormitorios:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.bedrooms}
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.bathrooms && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Baños:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.bathrooms}
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.parking_spaces && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Estacionamientos:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.parking_spaces}
-                  </Typography>
-                </Box>
-              )}
-              
-              <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {propertyData?.description || 'Sin descripción disponible'}
-              </Typography>
-              
-              <Button 
-                variant="outlined" 
-                color="primary"
-                startIcon={<HomeIcon />}
-                fullWidth
-                onClick={() => {
-                  localStorage.setItem('skipAutoFlight', 'true');
-                  navigate(`/property/${propertyData?.id}`);
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Asistente Sam */}
+              <SamPropertyAssistant property={propertyData} />
+
+              <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.12)' }} />
+
+              {/* Información de la propiedad */}
+              <Box
+                sx={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  pr: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2.5,
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'rgba(148,163,184,0.35) transparent',
+                  '&::-webkit-scrollbar': {
+                    width: 6,
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: 'rgba(148,163,184,0.38)',
+                    borderRadius: 999,
+                  },
                 }}
-                sx={{ mt: 2 }}
               >
-                Ver detalles completos
-              </Button>
+                {/* Header de propiedad */}
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2, mb: 1 }}>
+                    {propertyData?.name || 'Propiedad sin nombre'}
+                  </Typography>
+                  {propertyTags.length > 0 && (
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                      {propertyTags.map(({ label, color }) => (
+                        <Chip
+                          key={label}
+                          label={label}
+                          size="small"
+                          color={color === 'default' ? 'default' : color}
+                          variant={color === 'default' ? 'outlined' : 'filled'}
+                          sx={{
+                            textTransform: 'capitalize',
+                            backgroundColor: color === 'default' ? 'transparent' : undefined,
+                            borderColor: 'rgba(255,255,255,0.28)',
+                            color: 'rgba(255,255,255,0.85)',
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  )}
+                </Box>
+
+                {/* Grid de información clave con Paper cards */}
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        p: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                      }}
+                    >
+                      <LocalOfferIcon sx={{ opacity: 0.85, fontSize: 28 }} />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="caption" sx={{ opacity: 0.75, display: 'block' }}>
+                          Precio
+                        </Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {formattedPrice}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        p: 1.5,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0.5,
+                        height: '100%',
+                      }}
+                    >
+                      <AspectRatioIcon sx={{ opacity: 0.85, fontSize: 24 }} />
+                      <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                        Superficie
+                      </Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {formattedSize}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  {propertyData?.plusvalia_score !== undefined && propertyData?.plusvalia_score !== null && (
+                    <Grid item xs={6}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          backgroundColor: 'rgba(59,130,246,0.15)',
+                          borderRadius: 2,
+                          p: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.5,
+                          border: '1px solid rgba(59,130,246,0.3)',
+                          height: '100%',
+                        }}
+                      >
+                        <LocalOfferIcon sx={{ opacity: 0.85, fontSize: 24 }} />
+                        <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                          Plusvalía
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          {propertyData.plusvalia_score}%
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
+
+                  {propertyData?.bedrooms && (
+                    <Grid item xs={propertyData?.bathrooms ? 6 : 12}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          backgroundColor: 'rgba(255,255,255,0.08)',
+                          borderRadius: 2,
+                          p: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.5,
+                        }}
+                      >
+                        <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Dormitorios
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {propertyData.bedrooms}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
+
+                  {propertyData?.bathrooms && (
+                    <Grid item xs={propertyData?.bedrooms ? 6 : 12}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          backgroundColor: 'rgba(255,255,255,0.08)',
+                          borderRadius: 2,
+                          p: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.5,
+                        }}
+                      >
+                        <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Baños
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {propertyData.bathrooms}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
+
+                  {propertyData?.parking_spaces && (
+                    <Grid item xs={propertyData?.year_built ? 6 : 12}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          backgroundColor: 'rgba(255,255,255,0.08)',
+                          borderRadius: 2,
+                          p: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.5,
+                        }}
+                      >
+                        <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Estacionamientos
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {propertyData.parking_spaces}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
+
+                  {propertyData?.year_built && (
+                    <Grid item xs={propertyData?.parking_spaces ? 6 : 12}>
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          backgroundColor: 'rgba(255,255,255,0.08)',
+                          borderRadius: 2,
+                          p: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.5,
+                        }}
+                      >
+                        <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Año construcción
+                        </Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {propertyData.year_built}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
+                </Grid>
+
+                {/* Ubicación */}
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                  <RoomIcon sx={{ mt: 0.2, opacity: 0.85 }} />
+                  <Box>
+                    <Typography variant="caption" sx={{ opacity: 0.75, display: 'block', mb: 0.5 }}>
+                      Ubicación
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.9)' }}>
+                      {propertyData?.address || 'Ubicación no disponible'}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
+
+                {/* Descripción */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, opacity: 0.85 }}>
+                    Descripción
+                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', color: 'rgba(226,232,240,0.88)', lineHeight: 1.6 }}>
+                    {propertyData?.description || 'Sin descripción disponible'}
+                  </Typography>
+                </Box>
+
+                {/* Botón para ver detalles completos */}
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<HomeIcon />}
+                  onClick={() => {
+                    localStorage.setItem('skipAutoFlight', 'true');
+                    navigate(`/property/${propertyData?.id}`);
+                  }}
+                  sx={{
+                    mt: 'auto',
+                    alignSelf: 'stretch',
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    py: 1.2,
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(96,165,250,0.85))',
+                    boxShadow: '0 8px 24px rgba(59,130,246,0.35)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, rgba(59,130,246,1), rgba(37,99,235,0.95))',
+                    },
+                  }}
+                  fullWidth
+                >
+                  Ver detalles completos
+                </Button>
+              </Box>
             </Box>
           </Drawer>
           
