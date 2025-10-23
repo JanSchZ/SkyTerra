@@ -4,11 +4,16 @@ import compareService from './api/compareService';
 
 // Configuración dinámica de la URL base
 const getBaseURL = () => {
-  const hostname = window.location.hostname;
-  const origin = window.location.origin;
+  const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  if (typeof window === 'undefined') {
+    return envBase || '/api';
+  }
+
+  const { hostname, origin, protocol, port } = window.location;
 
   if (import.meta.env.MODE === 'development') {
-    console.log('🔍 Detectando entorno:', { hostname, origin, protocol: window.location.protocol, port: window.location.port });
+    console.log('🔍 Detectando entorno:', { hostname, origin, protocol, port });
   }
 
   // 1) Desarrollo local: SIEMPRE usa el proxy de Vite para evitar CORS
@@ -19,17 +24,16 @@ const getBaseURL = () => {
 
   // 2) Si hay VITE_API_BASE_URL definida, úsala siempre en hosts no locales
   //    (evita forzar subdominios api.* cuando no existen)
-  const envBaseEarly = import.meta.env.VITE_API_BASE_URL?.trim();
-  if (envBaseEarly) return envBaseEarly;
+  if (envBase) return envBase;
 
-  // 2) Codespaces
+  // 3) Codespaces
   if (hostname.includes('github.dev') || hostname.includes('codespaces.io')) {
     const backendUrl = origin.replace(/:\d+/, ':8000');
     if (import.meta.env.MODE === 'development') console.log('🚀 Configurando para Codespaces:', `${backendUrl}/api`);
     return `${backendUrl}/api`;
   }
 
-  // 3) app.* → api.*
+  // 4) app.* → api.*
   if (hostname.startsWith('app.')) {
     const backendHost = hostname.replace(/^app\./, 'api.');
     const backendUrl = `https://${backendHost}`;
@@ -37,7 +41,7 @@ const getBaseURL = () => {
     return `${backendUrl}/api`;
   }
 
-  // 4) www.* → api.*
+  // 5) www.* → api.*
   if (hostname.startsWith('www.')) {
     const backendHost = hostname.replace(/^www\./, 'api.');
     const backendUrl = `https://${backendHost}`;
@@ -45,28 +49,68 @@ const getBaseURL = () => {
     return `${backendUrl}/api`;
   }
 
-  // 5) Producción misma raíz o fallback
+  // 6) Producción misma raíz o fallback
   if (import.meta.env.MODE === 'development') console.log('🌐 Producción/Fallback: /api');
   return '/api';
 };
 
 // Crear una instancia con configuración base (regla: en local -> proxy /api)
 const baseURL = getBaseURL();
-  if (import.meta.env.MODE === 'development') console.debug('🔧 API configurada con baseURL:', baseURL);
+if (import.meta.env.MODE === 'development') console.debug('🔧 API configurada con baseURL:', baseURL);
 
 export const api = axios.create({
   baseURL: baseURL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
   withCredentials: true, // Importante para enviar cookies en solicitudes de origen cruzado
   xsrfCookieName: 'csrftoken',
   xsrfHeaderName: 'X-CSRFToken',
 });
 
+const setHeaderValue = (headers, key, value) => {
+  if (!headers) return;
+  if (typeof headers.set === 'function') {
+    headers.set(key, value);
+  } else {
+    headers[key] = value;
+  }
+};
+
+const removeHeaderValue = (headers, key) => {
+  if (!headers) return;
+  if (typeof headers.delete === 'function') {
+    headers.delete(key);
+  } else {
+    delete headers[key];
+  }
+};
+
+const hasHeaderValue = (headers, key) => {
+  if (!headers) return false;
+  if (typeof headers.has === 'function') {
+    return headers.has(key);
+  }
+  if (typeof headers.get === 'function') {
+    const value = headers.get(key);
+    return typeof value !== 'undefined' && value !== null;
+  }
+  const lowerKey = key.toLowerCase();
+  return Object.keys(headers).some((existingKey) => existingKey.toLowerCase() === lowerKey);
+};
+
 // Interceptor para añadir token en las solicitudes
 api.interceptors.request.use(
   config => {
+    const headers = config.headers || {};
+    const hasFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+
+    if (hasFormData) {
+      removeHeaderValue(headers, 'Content-Type');
+      removeHeaderValue(headers, 'content-type');
+    } else if (!hasHeaderValue(headers, 'Content-Type') && !hasHeaderValue(headers, 'content-type')) {
+      setHeaderValue(headers, 'Content-Type', 'application/json');
+    }
+
+    config.headers = headers;
+
     // Adjuntar JWT/CSRF con lógica para endpoints públicos
     try {
       const url = (config.url || '').toString();
