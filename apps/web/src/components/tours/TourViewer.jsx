@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, IconButton, Typography, CircularProgress, Paper, Drawer, Divider, Chip, Button } from '@mui/material';
+import { Box, IconButton, Typography, CircularProgress, Drawer, Divider, Button } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
@@ -13,6 +13,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tourService, propertyService, favoritesService } from '../../services/api';
+import PropertySamAssistant from './PropertySamAssistant';
 
 const TourViewer = () => {
   const { tourId } = useParams();
@@ -21,7 +22,7 @@ const TourViewer = () => {
   const [tourData, setTourData] = useState(null);
   const [propertyData, setPropertyData] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [showInfo, setShowInfo] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -93,6 +94,23 @@ const TourViewer = () => {
     fetchTourData();
   }, [tourId, navigate]);
 
+  useEffect(() => {
+    const handleFullScreenChange = () => {
+      const active = Boolean(document.fullscreenElement);
+      setIsFullScreen(active);
+      setShowInfo(active);
+    };
+    handleFullScreenChange();
+    document.addEventListener('fullscreenchange', handleFullScreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (isFullScreen && propertyData) {
+      setShowInfo(true);
+    }
+  }, [isFullScreen, propertyData]);
+
   // Función para ir a pantalla completa
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -100,10 +118,12 @@ const TourViewer = () => {
         console.error(`Error al intentar pantalla completa: ${e.message}`);
       });
       setIsFullScreen(true);
+      setShowInfo(true);
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
         setIsFullScreen(false);
+        setShowInfo(false);
       }
     }
   };
@@ -253,16 +273,21 @@ const TourViewer = () => {
               {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
             </IconButton>
             
-            <IconButton 
+            <IconButton
               onClick={() => setShowInfo(!showInfo)}
-              sx={{ 
-                backgroundColor: 'rgba(0,0,0,0.5)', 
+              sx={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
                 color: 'white',
                 '&.active': {
                   backgroundColor: 'primary.main'
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  color: 'rgba(255,255,255,0.4)'
                 }
               }}
               className={showInfo ? 'active' : ''}
+              disabled={!isFullScreen}
             >
               <InfoIcon />
             </IconButton>
@@ -297,110 +322,144 @@ const TourViewer = () => {
           <Drawer
             anchor="left"
             variant="persistent"
-            open={showInfo && propertyData}
+            open={Boolean(propertyData) && isFullScreen && showInfo}
+            hideBackdrop
             sx={{
               '& .MuiDrawer-paper': {
-                width: 320,
+                width: { xs: 'calc(100% - 32px)', sm: 360, md: 420 },
+                maxWidth: 420,
                 boxSizing: 'border-box',
-                top: 80,
-                backgroundColor: 'rgba(255,255,255,0.14)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                color: 'white',
-                borderRight: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: '0 16px 16px 0',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.35)'
+                top: { xs: 72, sm: 64 },
+                left: { xs: 16, sm: 24 },
+                bottom: { xs: 16, sm: 24 },
+                borderRadius: '24px',
+                backgroundColor: 'transparent',
+                borderRight: 'none',
+                boxShadow: 'none',
+                overflow: 'visible',
               },
             }}
           >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
-                {propertyData?.name || 'Propiedad'}
-              </Typography>
-              
-              <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <LocalOfferIcon sx={{ mr: 1 }} />
-                <Typography variant="h6">
-                  ${propertyData?.price?.toLocaleString() || '---'}
-                </Typography>
+            <Box
+              sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                background: 'linear-gradient(140deg, rgba(18,24,38,0.78) 0%, rgba(32,42,62,0.72) 100%)',
+                borderRadius: '24px',
+                border: '1px solid rgba(255,255,255,0.18)',
+                backdropFilter: 'blur(18px)',
+                WebkitBackdropFilter: 'blur(18px)',
+                color: 'white',
+                boxShadow: '0 24px 55px rgba(0,0,0,0.38)',
+                p: { xs: 2.5, md: 3 },
+                gap: 2,
+                overflow: 'hidden',
+              }}
+            >
+              <PropertySamAssistant property={propertyData} />
+              <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                    {propertyData?.name || 'Propiedad'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.65)' }}>
+                    ID #{propertyData?.id}
+                  </Typography>
+                </Box>
+                <Divider sx={{ mb: 2, borderColor: 'rgba(255,255,255,0.12)' }} />
+                <Box
+                  sx={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    pr: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5,
+                    '&::-webkit-scrollbar': {
+                      width: 6,
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      backgroundColor: 'rgba(255,255,255,0.18)',
+                      borderRadius: 3,
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LocalOfferIcon sx={{ color: 'rgba(255,255,255,0.85)' }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      ${propertyData?.price?.toLocaleString() || '---'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <AspectRatioIcon sx={{ color: 'rgba(255,255,255,0.85)' }} />
+                    <Typography variant="body1">
+                      {propertyData?.size ? `${propertyData.size.toFixed(1)} hectáreas` : 'Superficie no disponible'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <RoomIcon sx={{ color: 'rgba(255,255,255,0.85)', mt: 0.5 }} />
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                      {propertyData?.address || 'Ubicación no disponible'}
+                    </Typography>
+                  </Box>
+                  {propertyData?.plusvalia_score !== null && propertyData?.plusvalia_score !== undefined && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Plusvalía estimada:
+                      </Typography>
+                      <Typography variant="body1">{propertyData.plusvalia_score}%</Typography>
+                    </Box>
+                  )}
+                  {propertyData?.bedrooms && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Dormitorios:
+                      </Typography>
+                      <Typography variant="body1">{propertyData.bedrooms}</Typography>
+                    </Box>
+                  )}
+                  {propertyData?.bathrooms && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Baños:
+                      </Typography>
+                      <Typography variant="body1">{propertyData.bathrooms}</Typography>
+                    </Box>
+                  )}
+                  {propertyData?.parking_spaces && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Estacionamientos:
+                      </Typography>
+                      <Typography variant="body1">{propertyData.parking_spaces}</Typography>
+                    </Box>
+                  )}
+                  <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-line', color: 'rgba(255,255,255,0.88)' }}>
+                    {propertyData?.description || 'Sin descripción disponible'}
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<HomeIcon />}
+                  onClick={() => {
+                    localStorage.setItem('skipAutoFlight', 'true');
+                    navigate(`/property/${propertyData?.id}`);
+                  }}
+                  sx={{
+                    mt: 3,
+                    borderRadius: '14px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    py: 1.2,
+                  }}
+                  fullWidth
+                >
+                  Ver detalles completos
+                </Button>
               </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <AspectRatioIcon sx={{ mr: 1 }} />
-                <Typography variant="body1">
-                  {propertyData?.size?.toFixed(1) || '---'} hectáreas
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                <RoomIcon sx={{ mr: 1, mt: 0.5 }} />
-                <Typography variant="body2">
-                  {propertyData?.address || 'Ubicación no disponible'}
-                </Typography>
-              </Box>
-              
-              {propertyData?.plusvalia_score && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Plusvalía:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.plusvalia_score}%
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.bedrooms && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Dormitorios:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.bedrooms}
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.bathrooms && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Baños:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.bathrooms}
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.parking_spaces && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Estacionamientos:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.parking_spaces}
-                  </Typography>
-                </Box>
-              )}
-              
-              <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {propertyData?.description || 'Sin descripción disponible'}
-              </Typography>
-              
-              <Button 
-                variant="outlined" 
-                color="primary"
-                startIcon={<HomeIcon />}
-                fullWidth
-                onClick={() => {
-                  localStorage.setItem('skipAutoFlight', 'true');
-                  navigate(`/property/${propertyData?.id}`);
-                }}
-                sx={{ mt: 2 }}
-              >
-                Ver detalles completos
-              </Button>
             </Box>
           </Drawer>
           
