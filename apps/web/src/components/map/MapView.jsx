@@ -947,14 +947,15 @@ const MapView = forwardRef(({
     if (map && !isNaN(lat) && !isNaN(lon)) {
       map.flyTo({
         center: [lon, lat],
-        zoom: 13.5, // Zoom más temprano para ver polígonos
+        zoom: 15.5, // Zoom más cercano para mejor vista de la propiedad
         pitch: 0,
         bearing: 0,
-        duration: 3500, // Duración más larga para suavidad
+        duration: 5500, // Duración más larga para transición suave y cinética
         easing: (t) => {
-          // Curva de easing más suave: ease-out con deceleración gradual
-          // Esta curva acelera al inicio y desacelera suavemente al final
-          return 1 - Math.pow(1 - t, 3);
+          // Curva de easing muy suave: ease-in-out con aceleración y desaceleración graduales
+          return t < 0.5 
+            ? 4 * t * t * t 
+            : 1 - Math.pow(-2 * t + 2, 3) / 2;
         },
         essential: true,
       });
@@ -967,7 +968,7 @@ const MapView = forwardRef(({
         setActiveTourPropertyId(property.id);
       }
       setNavigatingToTour(false);
-    }, 3600); // Ajustado para coincidir con la duración extendida
+    }, 5700); // Ajustado para coincidir con la duración extendida
   };
 
   const handleMarkerHover = (property) => {
@@ -1846,8 +1847,8 @@ const MapView = forwardRef(({
         if (!url) return false;
 
         const map = mapRef.current;
-        const duration = options.duration || 3000;
-        const zoom = options.zoom || 13.5;
+        const duration = options.duration || 5500;
+        const zoom = options.zoom || 15.5;
         const lat = parseFloat(prop?.latitude);
         const lon = parseFloat(prop?.longitude);
 
@@ -1864,13 +1865,13 @@ const MapView = forwardRef(({
             bearing: 0,
             duration,
             essential: true,
-            easing: (t) => 1 - Math.pow(1 - t, 3)
+            easing: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
           });
           setTimeout(() => {
             setActiveTourUrl(url);
             setActiveTourPropertyId(propertyId);
             setNavigatingToTour(false);
-          }, duration + 120);
+          }, duration + 200);
         } else {
           setActiveTourUrl(url);
           setActiveTourPropertyId(propertyId);
