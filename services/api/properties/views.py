@@ -1381,6 +1381,12 @@ class PilotDocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     queryset = PilotDocument.objects.select_related('pilot', 'pilot__user')
 
+    def _normalize_document_payload(self, data):
+        if 'doc_type' not in data and 'type' in data:
+            data = data.copy()
+            data['doc_type'] = data['type']
+        return data
+
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
@@ -1390,6 +1396,23 @@ class PilotDocumentViewSet(viewsets.ModelViewSet):
         if not pilot_profile:
             return qs.none()
         return qs.filter(pilot=pilot_profile)
+
+    def create(self, request, *args, **kwargs):
+        data = self._normalize_document_payload(request.data)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = self._normalize_document_payload(request.data)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         pilot_profile = getattr(self.request.user, 'pilot_profile', None)

@@ -122,7 +122,7 @@ const CheckoutPage = () => {
       planId,
       planKey,
       planTitle,
-      couponCode: overrides.couponCode ?? coupon?.code ?? couponCode || null,
+      couponCode: (overrides.couponCode ?? coupon?.code ?? couponCode) || null,
       source: overrides.source || planSource,
     }),
     [listingId, planId, planKey, planTitle, coupon?.code, couponCode, planSource]
