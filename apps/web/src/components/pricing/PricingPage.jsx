@@ -10,9 +10,10 @@ import {
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PricingCard from './PricingCard';
 import PlanDetailDialog from './PlanDetailDialog';
+import marketplaceService from '../../services/marketplaceService';
 
 const UF_FORMAT = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 
@@ -152,35 +153,129 @@ const professionalPlans = [
 
 const PricingPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    listingId: incomingListingId = null,
+    highlightPlan: highlightPlanKey = null,
+    from: origin = null,
+  } = location.state || {};
   const [planType, setPlanType] = React.useState('particular');
   const [dialogPlan, setDialogPlan] = React.useState(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [backendPlans, setBackendPlans] = React.useState([]);
+  const [loadingPlans, setLoadingPlans] = React.useState(false);
 
   const handlePlanTypeChange = (event, newPlanType) => {
     if (newPlanType !== null) setPlanType(newPlanType);
   };
 
+  React.useEffect(() => {
+    let mounted = true;
+    const loadPlans = async () => {
+      setLoadingPlans(true);
+      try {
+        const plans = await marketplaceService.fetchPlans();
+        if (mounted) {
+          setBackendPlans(plans);
+        }
+      } catch (error) {
+        console.error('Error fetching available plans', error);
+      } finally {
+        if (mounted) {
+          setLoadingPlans(false);
+        }
+      }
+    };
+    loadPlans();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!highlightPlanKey) return;
+    if (professionalPlans.some((plan) => plan.id === highlightPlanKey)) {
+      setPlanType('professional');
+    } else if (particularPlans.some((plan) => plan.id === highlightPlanKey)) {
+      setPlanType('particular');
+    }
+  }, [highlightPlanKey]);
+
   const plansRaw = planType === 'particular' ? particularPlans : professionalPlans;
   const plans = mapPlansWithRange(plansRaw);
   const title = planType === 'particular' ? 'Para Dueños Particulares' : 'Para Vendedores Profesionales';
+  const resolveBackendPlan = React.useCallback(
+    (plan) => {
+      if (!plan) return null;
+      const normalizedCandidates = [
+        plan.listingPlanKey,
+        plan.key,
+        plan.id,
+        plan.title,
+        plan.name,
+      ]
+        .filter(Boolean)
+        .map((value) => value.toString().toLowerCase());
+      if (normalizedCandidates.length === 0 && highlightPlanKey) {
+        normalizedCandidates.push(highlightPlanKey.toString().toLowerCase());
+      }
+      const matching = backendPlans.find((backendPlan) => {
+        const backendCandidates = [backendPlan.id, backendPlan.key, backendPlan.name]
+          .filter(Boolean)
+          .map((value) => value.toString().toLowerCase());
+        return backendCandidates.some((candidate) => normalizedCandidates.includes(candidate));
+      });
+      return matching || null;
+    },
+    [backendPlans, highlightPlanKey]
+  );
+
+  const withBackendMetadata = React.useCallback(
+    (plan) => {
+      if (!plan) return null;
+      const backend = resolveBackendPlan(plan);
+      return {
+        ...plan,
+        listingPlanId: backend?.id ?? plan.listingPlanId ?? null,
+        listingPlanKey: backend?.key ?? plan.listingPlanKey ?? plan.id ?? plan.key ?? null,
+        backendPlanName: backend?.name ?? plan.title ?? plan.name ?? null,
+      };
+    },
+    [resolveBackendPlan]
+  );
 
   const handleSelectPlan = (plan) => {
+    if (loadingPlans && !backendPlans.length) return;
+    const payload = withBackendMetadata(plan);
     if (plan.tier === 'professional') {
-      setDialogPlan(plan);
+      setDialogPlan(payload);
       setDialogOpen(true);
     } else {
       navigate('/checkout', {
         state: {
-          plan: {
-            ...plan,
-            pricing: {
-              totalUF: parseFloat(plan.priceLabel),
-              breakdown: null,
-              platformFee: 0,
-              discountMultiplier: 1,
-            },
-            propertyTypes: PROPERTY_TYPES,
-          },
+          plan: payload
+            ? {
+                ...payload,
+                pricing: payload.pricing || {
+                  totalUF: parseFloat(plan.priceLabel),
+                  breakdown: null,
+                  platformFee: plan.platformFee ?? 0,
+                  discountMultiplier: plan.discountMultiplier ?? 1,
+                },
+                propertyTypes: PROPERTY_TYPES,
+              }
+            : {
+                ...plan,
+                pricing: {
+                  totalUF: parseFloat(plan.priceLabel),
+                  breakdown: null,
+                  platformFee: plan.platformFee ?? 0,
+                  discountMultiplier: plan.discountMultiplier ?? 1,
+                },
+                propertyTypes: PROPERTY_TYPES,
+              },
+          listingId: incomingListingId,
+          from: origin || 'pricing',
         },
       });
     }
@@ -194,7 +289,7 @@ const PricingPage = () => {
   const handleDialogConfirm = (payload) => {
     setDialogOpen(false);
     setDialogPlan(null);
-    navigate('/checkout', { state: { plan: payload } });
+    navigate('/checkout', { state: { plan: withBackendMetadata(payload), listingId: incomingListingId, from: origin || 'pricing' } });
   };
 
   return (

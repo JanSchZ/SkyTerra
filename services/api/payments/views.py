@@ -1,11 +1,14 @@
-from django.shortcuts import render
 from django.utils import timezone
-from rest_framework import generics, status, viewsets
+from decimal import Decimal, InvalidOperation
+from datetime import timedelta
+from uuid import uuid4
+from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 
-from .models import Coupon
 from .serializers import CouponSerializer
 
 import stripe
@@ -25,8 +28,70 @@ from .models import (
     CoinbaseEvent,
 )
 from .serializers import CouponSerializer, BitcoinPaymentSerializer
+from properties.models import ListingPlan, Property
 
 logger = logging.getLogger(__name__)
+
+# Helpers
+
+def _resolve_listing_plan(plan_id=None, plan_key=None, plan_title=None):
+    queryset = ListingPlan.objects.all()
+    if plan_id:
+        try:
+            return queryset.get(id=plan_id)
+        except (ListingPlan.DoesNotExist, ValueError, TypeError):
+            pass
+    if plan_key:
+        try:
+            return queryset.get(key__iexact=str(plan_key))
+        except ListingPlan.DoesNotExist:
+            pass
+    if plan_title:
+        try:
+            return queryset.filter(name__iexact=str(plan_title)).first()
+        except ListingPlan.DoesNotExist:
+            return None
+    return None
+
+
+def _activate_plan_for_user(
+    user,
+    *,
+    plan=None,
+    plan_id=None,
+    plan_key=None,
+    plan_title=None,
+    listing_id=None,
+    auto_extend_days=30,
+):
+    plan_instance = plan or _resolve_listing_plan(plan_id, plan_key, plan_title)
+    if not plan_instance:
+        raise ValidationError('El plan seleccionado no existe.')
+
+    property_instance = None
+    if listing_id:
+        try:
+            property_instance = Property.objects.get(id=listing_id, owner=user)
+        except Property.DoesNotExist as exc:
+            raise ValidationError('No tienes permisos sobre esta publicación.') from exc
+        property_instance.plan = plan_instance
+        property_instance.save(update_fields=['plan', 'updated_at'])
+
+    subscription, _ = Subscription.objects.get_or_create(user=user)
+    subscription.status = 'active'
+    if not subscription.current_period_end or subscription.current_period_end < timezone.now():
+        subscription.current_period_end = timezone.now() + timedelta(days=auto_extend_days)
+    subscription.save(update_fields=['status', 'current_period_end', 'updated_at'])
+
+    if plan_instance.key:
+        plan_keys = list(ListingPlan.objects.values_list('key', flat=True))
+        plan_group, _ = Group.objects.get_or_create(name=plan_instance.key)
+        existing_plan_groups = user.groups.filter(name__in=plan_keys).exclude(id=plan_group.id)
+        if existing_plan_groups.exists():
+            user.groups.remove(*existing_plan_groups)
+        user.groups.add(plan_group)
+
+    return plan_instance, property_instance, subscription
 
 # Create your views here.
 
@@ -147,6 +212,132 @@ class CreateCheckoutSessionView(APIView):
             # Otros errores
             logger.error(f"Unexpected error creating checkout session: {e}", exc_info=True)
             return Response({'error': f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ZeroAmountCheckoutView(APIView):
+    """
+    Marca como activa una suscripción cuando el total queda en 0 UF tras aplicar un cupón.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        plan_id = request.data.get('planId') or request.data.get('plan_id')
+        plan_key = request.data.get('planKey') or request.data.get('plan_key')
+        plan_title = request.data.get('planTitle') or 'Plan SkyTerra'
+        coupon_code = request.data.get('couponCode')
+        listing_id = request.data.get('listingId') or request.data.get('propertyId')
+        total_uf_raw = request.data.get('totalUF', 0)
+        discounted_uf_raw = request.data.get('discountedUF', 0)
+
+        try:
+            total_uf = Decimal(str(total_uf_raw))
+            discounted_uf = Decimal(str(discounted_uf_raw))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({'error': 'Montos inválidos para el cálculo del cupón.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if discounted_uf != Decimal('0'):
+            return Response({'error': 'El total debe ser 0 para activar el plan sin pago.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            plan_instance, property_instance, subscription = _activate_plan_for_user(
+                request.user,
+                plan_id=plan_id,
+                plan_key=plan_key,
+                plan_title=plan_title,
+                listing_id=listing_id,
+            )
+        except ValidationError as exc:
+            return Response({'error': exc.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        update_fields = []
+        if not subscription.stripe_subscription_id:
+            subscription.stripe_subscription_id = f'zero-{uuid4()}'
+            update_fields.append('stripe_subscription_id')
+        if not subscription.stripe_customer_id:
+            subscription.stripe_customer_id = f'zero-{request.user.id}'
+            update_fields.append('stripe_customer_id')
+        if update_fields:
+            update_fields.append('updated_at')
+            subscription.save(update_fields=update_fields)
+
+        StripeEvent.objects.create(
+            idempotency_key=f'zero_checkout_{uuid4()}',
+            type='zero_checkout.approved',
+            payload={
+                'user_id': request.user.id,
+                'plan_id': plan_id,
+                'plan_key': plan_key,
+                'plan_title': plan_title,
+                'property_id': listing_id,
+                'coupon_code': coupon_code,
+                'total_uf': str(total_uf),
+            },
+        )
+
+        return Response(
+            {
+                'status': subscription.status,
+                'planTitle': plan_title,
+                'couponCode': coupon_code,
+                'currentPeriodEnd': subscription.current_period_end.isoformat() if subscription.current_period_end else None,
+                'planKey': plan_instance.key if plan_instance else plan_key,
+                'propertyId': property_instance.id if property_instance else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class ActivatePlanView(APIView):
+    """Confirma la activación de un plan posterior al pago."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        plan_id = request.data.get('planId') or request.data.get('plan_id')
+        plan_key = request.data.get('planKey') or request.data.get('plan_key')
+        plan_title = request.data.get('planTitle') or 'Plan SkyTerra'
+        listing_id = request.data.get('listingId') or request.data.get('propertyId')
+        coupon_code = request.data.get('couponCode')
+        session_id = request.data.get('sessionId')
+
+        try:
+            plan_instance, property_instance, subscription = _activate_plan_for_user(
+                request.user,
+                plan_id=plan_id,
+                plan_key=plan_key,
+                plan_title=plan_title,
+                listing_id=listing_id,
+            )
+        except ValidationError as exc:
+            return Response({'error': exc.message}, status=status.HTTP_400_BAD_REQUEST)
+
+        if session_id:
+            StripeEvent.objects.get_or_create(
+                idempotency_key=f'plan_activation_{session_id}',
+                defaults={
+                    'type': 'manual_plan_activation',
+                    'payload': {
+                        'user_id': request.user.id,
+                        'plan_id': plan_id,
+                        'plan_key': plan_key,
+                        'plan_title': plan_title,
+                        'property_id': property_instance.id if property_instance else None,
+                        'coupon_code': coupon_code,
+                        'session_id': session_id,
+                    },
+                },
+            )
+
+        return Response(
+            {
+                'status': subscription.status,
+                'planTitle': plan_title,
+                'planKey': plan_instance.key if plan_instance else plan_key,
+                'propertyId': property_instance.id if property_instance else None,
+                'couponCode': coupon_code,
+                'currentPeriodEnd': subscription.current_period_end.isoformat() if subscription.current_period_end else None,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 @method_decorator(csrf_exempt, name='dispatch')
 class StripeWebhookView(APIView):

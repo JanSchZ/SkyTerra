@@ -419,7 +419,7 @@ const AdminDashboardPage = () => {
                     Distribución por etapa
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Publicaciones por hito del workflow (review -> live).
+                    Publicaciones por hito del workflow (review -&gt; live).
                   </Typography>
                 </Box>
                 <Stack

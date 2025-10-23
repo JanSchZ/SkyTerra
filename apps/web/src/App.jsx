@@ -709,9 +709,8 @@ function App() {
   };
 
   // Determine if the top bar should be shown
-  const showTopBar = 
-    location.pathname === '/' || 
-    location.pathname.startsWith('/property/');
+  const hideTopBarRoutes = ['/auth', '/landing', '/checkout', '/payment-success', '/payment-cancelled', '/seller/listings'];
+  const showTopBar = !hideTopBarRoutes.some((route) => location.pathname.startsWith(route));
 
   // Helper function to format ranges (price, size)
   const formatRange = (range, unit = '', prefix = '') => {

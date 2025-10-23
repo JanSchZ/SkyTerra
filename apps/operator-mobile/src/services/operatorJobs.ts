@@ -111,7 +111,7 @@ export interface OperatorJob {
 
 export interface PilotDocument {
   id: number;
-  type: 'id' | 'license' | 'insurance' | 'drone_registration' | 'background_check' | string;
+  doc_type: 'id' | 'license' | 'insurance' | 'drone_registration' | 'background_check' | string;
   status?: 'pending' | 'approved' | 'rejected' | 'expired';
   uploaded_at?: string | null;
   expires_at?: string | null;
@@ -244,7 +244,7 @@ export const updatePilotProfile = async (payload: Partial<PilotProfile>): Promis
 };
 
 export interface PilotDocumentUploadPayload {
-  type: PilotDocument['type'];
+  doc_type: PilotDocument['doc_type'];
   file: DeliverableUploadPayload;
 }
 
@@ -252,7 +252,7 @@ export const uploadPilotDocument = async (
   payload: PilotDocumentUploadPayload
 ): Promise<PilotDocument> => {
   const form = new FormData();
-  form.append('type', payload.type);
+  form.append('doc_type', payload.doc_type);
   form.append('file', {
     uri: payload.file.uri,
     name: payload.file.name,

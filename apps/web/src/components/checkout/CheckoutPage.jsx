@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -9,6 +9,7 @@ import {
   Divider,
   Grid,
   IconButton,
+  Modal,
   Paper,
   Table,
   TableBody,
@@ -18,18 +19,23 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import Fade from '@mui/material/Fade';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import CelebrationIcon from '@mui/icons-material/Celebration';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { api, authService } from '../../services/api';
 import { loadStripe } from '@stripe/stripe-js';
+import paymentsService from '../../services/paymentsService';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 const UF_TO_USD = Number(import.meta.env.VITE_UF_TO_USD || 33);
 const formatUF = (value) => `${new Intl.NumberFormat('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)} UF`;
+const PENDING_PLAN_STORAGE_KEY = 'skyterra.pendingPlan';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { plan } = location.state || {};
+  const { plan, listingId: locationListingId = null, from: origin = null } = location.state || {};
 
   const [couponCode, setCouponCode] = useState('');
   const [coupon, setCoupon] = useState(null);
@@ -40,6 +46,16 @@ const CheckoutPage = () => {
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [user, setUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [zeroCheckoutOpen, setZeroCheckoutOpen] = useState(false);
+  const [zeroCheckoutProcessing, setZeroCheckoutProcessing] = useState(false);
+  const [zeroCheckoutError, setZeroCheckoutError] = useState('');
+  const [zeroCheckoutSuccess, setZeroCheckoutSuccess] = useState(false);
+
+  const listingId = locationListingId ?? null;
+  const planKey = plan?.listingPlanKey || plan?.id || plan?.key || null;
+  const planId = plan?.listingPlanId ?? null;
+  const planTitle = plan?.title || plan?.backendPlanName || plan?.name || null;
+  const planSource = origin || 'pricing';
 
   const pricing = plan?.pricing;
 
@@ -85,6 +101,7 @@ const CheckoutPage = () => {
           setError('Debes iniciar sesión para continuar con el pago.');
         }
       } catch (err) {
+        console.error('Auth verification failed', err);
         setError('Error de autenticación. Por favor, inicia sesión nuevamente.');
       } finally {
         setAuthChecking(false);
@@ -99,6 +116,92 @@ const CheckoutPage = () => {
     setError('');
   }, [plan?.title]);
 
+  const buildActivationPayload = useCallback(
+    (overrides = {}) => ({
+      listingId,
+      planId,
+      planKey,
+      planTitle,
+      couponCode: overrides.couponCode ?? coupon?.code ?? couponCode || null,
+      source: overrides.source || planSource,
+    }),
+    [listingId, planId, planKey, planTitle, coupon?.code, couponCode, planSource]
+  );
+
+  const startZeroCheckout = useCallback(
+    async (couponData, updatedTotalUF) => {
+      setZeroCheckoutOpen(true);
+      setZeroCheckoutProcessing(true);
+      setZeroCheckoutError('');
+      setZeroCheckoutSuccess(false);
+      setError('');
+      setSuccess('');
+
+      try {
+        if (!planKey) {
+          throw new Error('No pudimos identificar el plan seleccionado.');
+        }
+        if (!plan) {
+          throw new Error('No se encontró la información del plan seleccionado.');
+        }
+        await authService.ensureCsrfCookie();
+        await api.post('/payments/zero-checkout/', {
+          planId,
+          planKey,
+          planTitle,
+          totalUF,
+          discountedUF: updatedTotalUF,
+          listingId,
+          couponCode: couponData?.code ?? couponCode,
+        });
+        await paymentsService.activatePlan(
+          buildActivationPayload({
+            couponCode: couponData?.code ?? couponCode,
+            source: 'zero-checkout',
+          })
+        );
+        setZeroCheckoutSuccess(true);
+        setSuccess(
+          `Cupón "${couponData?.code || ''}" aplicado correctamente. ¡Invita la casa! Activamos tu plan sin costo.`
+        );
+        setTimeout(() => {
+          setZeroCheckoutOpen(false);
+          navigate('/payment-success', {
+            replace: true,
+            state: {
+              fromZeroCheckout: true,
+              planActivation: buildActivationPayload({
+                couponCode: couponData?.code ?? couponCode,
+                source: 'zero-checkout',
+              }),
+            },
+          });
+        }, 1200);
+      } catch (err) {
+        const message = err?.response?.data?.error || err?.message || 'No se pudo activar el plan con el cupón.';
+        setZeroCheckoutError(message);
+        setError(message);
+      } finally {
+        setZeroCheckoutProcessing(false);
+      }
+    },
+    [plan, planKey, planTitle, planId, listingId, totalUF, couponCode, navigate, buildActivationPayload]
+  );
+
+  const handleRetryZeroCheckout = () => {
+    if (coupon && discountedUF === 0 && !zeroCheckoutProcessing) {
+      startZeroCheckout(coupon, discountedUF);
+    }
+  };
+
+  const handleCloseZeroCheckout = () => {
+    if (!zeroCheckoutProcessing) {
+      setZeroCheckoutOpen(false);
+      setZeroCheckoutError('');
+      setZeroCheckoutSuccess(false);
+    }
+  };
+
   const handleApplyCoupon = async () => {
     if (!couponCode) {
       setError('Por favor, ingresa un código de cupón.');
@@ -112,7 +215,14 @@ const CheckoutPage = () => {
       const response = await api.post('/payments/validate-coupon/', { code: couponCode });
       const updatedTotal = computeDiscountedUF(totalUF, response.data);
       setCoupon(response.data);
-      setSuccess(`Cupón "${response.data.code}" aplicado con éxito. Nuevo total: ${formatUF(updatedTotal)}.`);
+      if (updatedTotal === 0) {
+        await startZeroCheckout(response.data, updatedTotal);
+      } else {
+        setSuccess(`Cupón "${response.data.code}" aplicado con éxito. Nuevo total: ${formatUF(updatedTotal)}.`);
+        setZeroCheckoutOpen(false);
+        setZeroCheckoutError('');
+        setZeroCheckoutSuccess(false);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo aplicar el cupón.');
     } finally {
@@ -129,6 +239,10 @@ const CheckoutPage = () => {
       setError('Este plan aún no tiene precio configurado en Stripe. Contáctanos para finalizar la compra.');
       return;
     }
+    if (!planKey) {
+      setError('No pudimos identificar el plan seleccionado. Intenta nuevamente.');
+      return;
+    }
 
     setPaymentLoading(true);
     setError('');
@@ -136,10 +250,19 @@ const CheckoutPage = () => {
     try {
       await authService.ensureCsrfCookie();
       const response = await api.post('/payments/create-checkout-session/', { priceId: plan.stripePriceId });
+      const pendingPayload = buildActivationPayload();
+      localStorage.setItem(
+        PENDING_PLAN_STORAGE_KEY,
+        JSON.stringify({
+          ...pendingPayload,
+          createdAt: Date.now(),
+        })
+      );
       const stripe = await stripePromise;
       const { error } = await stripe.redirectToCheckout({ sessionId: response.data.id });
       if (error) setError(error.message);
     } catch (err) {
+      localStorage.removeItem(PENDING_PLAN_STORAGE_KEY);
       if (err.response?.status === 401) {
         setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
       } else {
@@ -155,6 +278,10 @@ const CheckoutPage = () => {
       setError('Debes iniciar sesión para realizar pagos.');
       return;
     }
+    if (!planKey) {
+      setError('No pudimos identificar el plan seleccionado. Intenta nuevamente.');
+      return;
+    }
 
     setPaymentLoading(true);
     setError('');
@@ -162,8 +289,17 @@ const CheckoutPage = () => {
       await authService.ensureCsrfCookie();
       const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
       const response = await api.post('/payments/bitcoin/create-charge/', payload);
+      const pendingPayload = buildActivationPayload({ source: 'bitcoin' });
+      localStorage.setItem(
+        PENDING_PLAN_STORAGE_KEY,
+        JSON.stringify({
+          ...pendingPayload,
+          createdAt: Date.now(),
+        })
+      );
       window.location.href = response.data.hostedUrl;
     } catch (err) {
+      localStorage.removeItem(PENDING_PLAN_STORAGE_KEY);
       if (err.response?.status === 401) {
         setError('Sesión expirada. Por favor, inicia sesión nuevamente.');
       } else {
@@ -198,7 +334,11 @@ const CheckoutPage = () => {
               : 'Debes iniciar sesión para continuar con el proceso de pago.'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-            <Button variant="contained" onClick={() => navigate('/pricing')} sx={{ borderRadius: 2, fontWeight: 'bold' }}>
+            <Button
+              variant="contained"
+              onClick={() => navigate('/pricing', { state: { listingId } })}
+              sx={{ borderRadius: 2, fontWeight: 'bold' }}
+            >
               Ir a planes
             </Button>
             {!user && (
@@ -378,6 +518,81 @@ const CheckoutPage = () => {
           </Grid>
         </Grid>
       </Container>
+
+      <Modal open={zeroCheckoutOpen} onClose={handleCloseZeroCheckout} closeAfterTransition BackdropProps={{ timeout: 300 }}>
+        <Fade in={zeroCheckoutOpen}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: { xs: '90%', sm: 420 },
+              p: 4,
+              borderRadius: 4,
+              textAlign: 'center',
+              color: 'text.primary',
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(236,242,255,0.98) 100%)',
+              boxShadow: '0 32px 80px rgba(18, 47, 122, 0.3)',
+              overflow: 'hidden',
+              '@keyframes pulseGlow': {
+                '0%, 100%': { boxShadow: '0 0 0 rgba(99, 102, 241, 0.0)' },
+                '50%': { boxShadow: '0 0 40px rgba(99, 102, 241, 0.28)' },
+              },
+              animation: zeroCheckoutProcessing && !zeroCheckoutSuccess ? 'pulseGlow 2.4s ease-in-out infinite' : 'none',
+            }}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: '-160px -140px auto auto',
+                width: 320,
+                height: 320,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at center, rgba(99,102,241,0.18), rgba(236,72,153,0.12), transparent 70%)',
+                filter: 'blur(0px)',
+                pointerEvents: 'none',
+              }}
+            />
+            <CelebrationIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+              ¡Invita la casa!
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Tu cupón cubrió el 100% del plan. Estamos activándolo automáticamente sin costo.
+            </Typography>
+            {zeroCheckoutProcessing && !zeroCheckoutSuccess && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <CircularProgress />
+                <Typography variant="caption" color="text.secondary">
+                  Confirmando la activación del plan…
+                </Typography>
+              </Box>
+            )}
+            {!zeroCheckoutProcessing && zeroCheckoutSuccess && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                <CheckCircleOutlineIcon color="success" sx={{ fontSize: 40 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Plan activado. Te redirigiremos en un momento.
+                </Typography>
+              </Box>
+            )}
+            {!zeroCheckoutProcessing && zeroCheckoutError && !zeroCheckoutSuccess && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Alert severity="error">{zeroCheckoutError}</Alert>
+                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                  <Button variant="contained" onClick={handleRetryZeroCheckout}>
+                    Reintentar activación
+                  </Button>
+                  <Button variant="text" onClick={handleCloseZeroCheckout}>
+                    Cerrar
+                  </Button>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </Fade>
+      </Modal>
     </Box>
   );
 };

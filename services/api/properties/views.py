@@ -342,6 +342,17 @@ class PropertyViewSet(viewsets.ModelViewSet):
             has_document_annotation=Exists(PropertyDocument.objects.filter(property=OuterRef('pk')))
         )
 
+        # Filtros específicos del workflow para la consola de aprobaciones
+        workflow_node_param = self.request.query_params.get('workflow_node')
+        if workflow_node_param:
+            requested_nodes = [
+                node.strip()
+                for node in workflow_node_param.split(',')
+                if node.strip() and node.strip().lower() != 'all'
+            ]
+            if requested_nodes:
+                queryset = queryset.filter(workflow_node__in=requested_nodes)
+
         # Filter by publication_status for non-staff users # Comentado para mostrar todas
         # if not self.request.user.is_staff:
         #     queryset = queryset.filter(publication_status='approved')

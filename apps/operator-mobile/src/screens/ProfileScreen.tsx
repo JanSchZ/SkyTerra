@@ -87,9 +87,9 @@ const ProfileScreen = () => {
   const [themeSaving, setThemeSaving] = useState<ThemeMode | null>(null);
   const [droneSelectorVisible, setDroneSelectorVisible] = useState(false);
 
-  const [uploadingType, setUploadingType] = useState<PilotDocument['type'] | null>(null);
+  const [uploadingType, setUploadingType] = useState<PilotDocument['doc_type'] | null>(null);
   const [documentStates, setDocumentStates] = useState<
-    Record<PilotDocument['type'], { status: 'idle' | 'uploading' | 'success' | 'error'; message?: string }>
+    Record<PilotDocument['doc_type'], { status: 'idle' | 'uploading' | 'success' | 'error'; message?: string }>
   >({});
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -168,8 +168,8 @@ const ProfileScreen = () => {
     loadProfile();
   }, [loadProfile]);
 
-  const getDocument = (type: PilotDocument['type']) =>
-    profile?.documents?.find((item) => item.type === type) ?? null;
+  const getDocument = (docType: PilotDocument['doc_type']) =>
+    profile?.documents?.find((item) => item.doc_type === docType) ?? null;
 
   const pendingRequirements = profile?.pending_requirements ?? [];
 
@@ -252,13 +252,16 @@ const ProfileScreen = () => {
     }
   };
 
-  const handleUploadDocument = async (type: PilotDocument['type'], acceptedTypes: string[]) => {
+  const handleUploadDocument = async (
+    docType: PilotDocument['doc_type'],
+    acceptedTypes: string[]
+  ) => {
     setError(null);
     setSuccess(null);
-    setUploadingType(type);
+    setUploadingType(docType);
     setDocumentStates((prev) => ({
       ...prev,
-      [type]: { status: 'uploading', message: 'Subiendo documento…' },
+      [docType]: { status: 'uploading', message: 'Subiendo documento…' },
     }));
     try {
       const picker = await DocumentPicker.getDocumentAsync({
@@ -288,7 +291,7 @@ const ProfileScreen = () => {
         } else if (typeof normalizedPicker.uri === 'string') {
           asset = {
             uri: normalizedPicker.uri,
-            name: normalizedPicker.name ?? `${type}.pdf`,
+            name: normalizedPicker.name ?? `${docType}.pdf`,
             mimeType: normalizedPicker.mimeType ?? acceptedTypes[0] ?? 'application/pdf',
             size: normalizedPicker.size,
           } as DocumentPicker.DocumentPickerAsset;
@@ -299,7 +302,7 @@ const ProfileScreen = () => {
         setUploadingType(null);
         setDocumentStates((prev) => {
           const next = { ...prev };
-          delete next[type];
+          delete next[docType];
           return next;
         });
         return;
@@ -310,23 +313,23 @@ const ProfileScreen = () => {
         setError(message);
         setDocumentStates((prev) => ({
           ...prev,
-          [type]: { status: 'error', message },
+          [docType]: { status: 'error', message },
         }));
         setUploadingType(null);
         return;
       }
       const response = await uploadPilotDocument({
-        type,
+        doc_type: docType,
         file: {
           uri: asset.uri,
-          name: asset.name ?? `${type}.pdf`,
+          name: asset.name ?? `${docType}.pdf`,
           mimeType: asset.mimeType ?? acceptedTypes[0] ?? 'application/pdf',
         },
       });
 
       setProfile((prev) => {
         if (!prev) return prev;
-        const otherDocs = prev.documents?.filter((doc) => doc.type !== type) ?? [];
+        const otherDocs = prev.documents?.filter((doc) => doc.doc_type !== docType) ?? [];
         return {
           ...prev,
           documents: [...otherDocs, response],
@@ -336,14 +339,14 @@ const ProfileScreen = () => {
       setSuccess(successMessage);
       setDocumentStates((prev) => ({
         ...prev,
-        [type]: { status: 'success', message: successMessage },
+        [docType]: { status: 'success', message: successMessage },
       }));
     } catch (err) {
       const message = getErrorMessage(err, 'No pudimos subir el documento. Intenta nuevamente.');
       setError(message);
       setDocumentStates((prev) => ({
         ...prev,
-        [type]: { status: 'error', message },
+        [docType]: { status: 'error', message },
       }));
     } finally {
       setUploadingType(null);

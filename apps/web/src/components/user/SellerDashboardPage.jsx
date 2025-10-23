@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Typography,
@@ -22,6 +22,20 @@ import WorkflowTimeline from '../ui/WorkflowTimeline.jsx';
 const SellerDashboardPage = ({ user }) => {
   const navigate = useNavigate();
   const [state, setState] = useState({ loading: true, refreshing: false, properties: [], plans: [] });
+  const goToPricing = useCallback(
+    (extraState = {}) => {
+      const primaryPropertyId = state.properties?.[0]?.id ?? null;
+      const { from = 'seller-dashboard', listingId = primaryPropertyId, ...rest } = extraState || {};
+      navigate('/pricing', {
+        state: {
+          from,
+          listingId,
+          ...rest,
+        },
+      });
+    },
+    [navigate, state.properties]
+  );
 
   const currentPlanName = useMemo(() => {
     if (state.properties.length) {
@@ -164,7 +178,7 @@ const SellerDashboardPage = ({ user }) => {
                   Actualiza tu plan para acceder a entregables adicionales, tiempos de entrega priorizados y coordinación preferente.
                 </Typography>
               </Box>
-              <Button variant="outlined" onClick={() => navigate('/pricing')}>
+              <Button variant="outlined" onClick={() => goToPricing()}>
                 Ver planes
               </Button>
             </Stack>

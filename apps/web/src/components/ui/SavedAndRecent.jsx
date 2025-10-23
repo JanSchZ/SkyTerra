@@ -6,6 +6,7 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService } from '../../services/api';
+import PropertyPreviewModal from '../property/PropertyPreviewModal';
 
 const HorizontalScroller = ({ children, ariaLabel }) => {
   const [containerRef, setContainerRef] = useState(null);
@@ -148,6 +149,8 @@ const SavedAndRecent = () => {
   const [saved, setSaved] = useState([]);
   const [recent, setRecent] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [previewPropertyId, setPreviewPropertyId] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const normalizeProperty = useCallback((raw) => {
     if (!raw) return null;
@@ -228,7 +231,13 @@ const SavedAndRecent = () => {
 
   const handleView = (propertyId) => {
     if (!propertyId) return;
-    navigate(`/property/${propertyId}`);
+    setPreviewPropertyId(propertyId);
+    setPreviewOpen(true);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewOpen(false);
+    setPreviewPropertyId(null);
   };
 
   const handleClearRecent = () => {
@@ -293,9 +302,9 @@ const SavedAndRecent = () => {
           </HorizontalScroller>
         )}
       </Box>
+      <PropertyPreviewModal open={previewOpen} onClose={handleClosePreview} propertyId={previewPropertyId} />
     </Box>
   );
 };
 
 export default SavedAndRecent;
-

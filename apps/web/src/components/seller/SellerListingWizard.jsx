@@ -123,6 +123,19 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [locating, setLocating] = useState(false);
 
   const currentDocuments = useMemo(() => listing?.documents ?? [], [listing]);
+  const goToPricing = useCallback(
+    (extraState = {}) => {
+      const { from = 'seller-wizard', ...rest } = extraState || {};
+      navigate('/pricing', {
+        state: {
+          from,
+          listingId,
+          ...rest,
+        },
+      });
+    },
+    [navigate, listingId]
+  );
 
   const boundaryAreaHa = useMemo(() => {
     if (boundaryRemovalPending && !boundaryDraft) {
@@ -365,12 +378,12 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     setListingForm((prev) => ({ ...prev, [name]: checked }));
   };
 
-  const handleOverviewSubmit = async () => {
+  const handleOverviewSubmit = async ({ advance = true } = {}) => {
     const errors = validateOverview();
     if (Object.keys(errors).length) {
       setFormErrors(errors);
       showMessage('Revisa los campos obligatorios antes de continuar.', 'warning');
-      return;
+      return false;
     }
 
     setFormErrors({});
@@ -405,6 +418,8 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       payload.address_country = listingForm.address_country?.trim() || '';
       payload.address_postal_code = listingForm.address_postal_code?.trim() || '';
     }
+
+    let success = false;
     try {
       setSaving(true);
       if (!listingId) {
@@ -416,13 +431,18 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
         await loadListing(listingId);
       }
       showMessage('Datos guardados correctamente.');
-      setActiveStep((prev) => prev + 1);
+      success = true;
+      if (advance) {
+        setActiveStep((prev) => prev + 1);
+      }
     } catch (error) {
       console.error('Error saving basic form', error);
       showMessage('No fue posible guardar la información. Revisa los campos.', 'error');
+      success = false;
     } finally {
       setSaving(false);
     }
+    return success;
   };
 
   const handleDocumentUpload = async (docType, file) => {
@@ -749,20 +769,21 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     if (Object.keys(errors).length) {
       setFormErrors(errors);
       showMessage('Completa los datos de coordinación antes de continuar.', 'warning');
-      return;
+      return false;
     }
 
     if (!listingId) {
       showMessage('Guarda primero la información de la propiedad.', 'warning');
-      return;
+      return false;
     }
 
+    let success = false;
     try {
       setSaving(true);
       const boundaryResult = await persistBoundary({ withFeedback: false });
       if (!boundaryResult && (boundaryDirty || boundaryRemovalPending)) {
         // Si hubo error al guardar el polígono, abortamos sin continuar.
-        return;
+        return false;
       }
 
       const payload = {
@@ -785,12 +806,35 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       if (advance) {
         setActiveStep((prev) => prev + 1);
       }
+      success = true;
     } catch (error) {
       console.error('Error saving operations data', error);
       showMessage('No se pudieron guardar los datos operativos.', 'error');
     } finally {
       setSaving(false);
     }
+    return success;
+  };
+
+  const handleSaveForLater = async () => {
+    if (saving) return;
+
+    const stepKey = steps[activeStep].key;
+
+    if (!listingId && stepKey !== 'overview') {
+      showMessage('Guarda primero los datos básicos para crear la publicación.', 'warning');
+      return;
+    }
+
+    if (stepKey === 'overview') {
+      const saved = await handleOverviewSubmit({ advance: false });
+      if (!saved) return;
+    } else if (stepKey === 'operations') {
+      const saved = await handleOperationsSubmit({ advance: false });
+      if (!saved) return;
+    }
+
+    navigate('/dashboard');
   };
 
   const handleSubmitForReview = async () => {
@@ -798,7 +842,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
 
     if (!reviewChecklist.hasPlan) {
       showMessage('Selecciona un plan activo antes de publicar. Te llevaremos a la sección de planes.', 'info');
-      navigate('/pricing', { state: { from: 'seller-listing-review', listingId } });
+      goToPricing({ from: 'seller-listing-review' });
       return;
     }
 
@@ -1421,7 +1465,7 @@ const renderReviewStep = () => {
           severity="info"
           variant="outlined"
           action={
-            <Button color="inherit" size="small" onClick={() => navigate('/pricing')}>
+            <Button color="inherit" size="small" onClick={() => goToPricing({ from: 'seller-review-alert' })}>
               Ver planes
             </Button>
           }
@@ -1507,7 +1551,7 @@ const renderReviewStep = () => {
             </Typography>
           </Box>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <Button variant="outlined" onClick={() => navigate('/pricing')}>
+            <Button variant="outlined" onClick={() => goToPricing({ from: 'seller-plan-card' })}>
               Ver planes disponibles
             </Button>
             {plans
@@ -1517,7 +1561,7 @@ const renderReviewStep = () => {
                 <Button
                   key={plan.id}
                   variant="text"
-                  onClick={() => navigate('/pricing', { state: { highlightPlan: plan.id } })}
+                  onClick={() => goToPricing({ highlightPlan: plan.id })}
                 >
                   {plan.name}
                 </Button>
@@ -1587,15 +1631,21 @@ const renderStepActions = () => {
   switch (stepKey) {
     case 'overview':
       return (
-        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
-          <Button variant="contained" onClick={handleOverviewSubmit} disabled={saving}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button variant="text" onClick={handleSaveForLater} disabled={saving}>
+            Seguir más tarde
+          </Button>
+          <Button variant="contained" onClick={() => handleOverviewSubmit({ advance: true })} disabled={saving}>
             Guardar y continuar
           </Button>
         </Stack>
       );
     case 'documents':
       return (
-        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button variant="text" onClick={handleSaveForLater} disabled={saving}>
+            Seguir más tarde
+          </Button>
           <Button variant="outlined" onClick={handleBack} disabled={saving}>
             Atrás
           </Button>
@@ -1606,7 +1656,10 @@ const renderStepActions = () => {
       );
     case 'operations':
       return (
-        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button variant="text" onClick={handleSaveForLater} disabled={saving}>
+            Seguir más tarde
+          </Button>
           <Button variant="outlined" onClick={handleBack} disabled={saving}>
             Atrás
           </Button>
@@ -1623,11 +1676,11 @@ const renderStepActions = () => {
       return (
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="flex-end">
+            <Button variant="text" onClick={handleSaveForLater} disabled={saving}>
+              Seguir más tarde
+            </Button>
             <Button variant="outlined" onClick={handleBack} disabled={saving}>
               Atrás
-            </Button>
-            <Button variant="outlined" color="secondary" onClick={() => navigate('/dashboard')}>
-              Volver al panel
             </Button>
             <Button
               variant="contained"
@@ -1749,7 +1802,7 @@ return (
                   {listing?.plan_details?.name || 'Sin plan activo'}
                 </Typography>
               </Box>
-              <Button variant="text" size="small" onClick={() => navigate('/pricing')} sx={{ alignSelf: 'flex-start' }}>
+              <Button variant="text" size="small" onClick={() => goToPricing({ from: 'seller-sidebar' })} sx={{ alignSelf: 'flex-start' }}>
                 Ver planes
               </Button>
             </Paper>
@@ -1784,5 +1837,7 @@ return (
     </Snackbar>
   </Box>
 );
+
+};
 
 export default SellerListingWizard;
