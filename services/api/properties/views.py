@@ -20,15 +20,19 @@ import re
 import hashlib
 import logging
 import traceback
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
-from django.utils._os import safe_join
 import mimetypes
 import os
 import uuid
 import zipfile
 import shutil
+from django.core.files import File
+from django.core.files.storage import default_storage
+from django.db import transaction
 
 from .models import (
     Property,
@@ -78,6 +82,9 @@ from .email_service import send_property_status_email, send_recording_order_crea
 
 # Create your views here.
 logger = logging.getLogger(__name__)
+
+
+TOUR_UPLOAD_EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 def generate_cache_key(request, view_name, additional_params=None):
     """
@@ -605,11 +612,15 @@ class PropertyViewSet(viewsets.ModelViewSet):
         """Restringir eliminación a staff; bloquear para clientes."""
         if not self.request.user.is_staff:
             raise PermissionDenied("Eliminación deshabilitada para clientes.")
+        tour_prefixes = list(instance.tours.values_list('package_path', flat=True)) if hasattr(instance, 'tours') else []
         try:
             logger.info(f"Eliminando propiedad {instance.id} por usuario {self.request.user.username}")
             instance.delete()
             invalidate_property_cache()
             logger.info(f"Propiedad {instance.id} eliminada exitosamente")
+            for prefix in tour_prefixes:
+                if prefix:
+                    TourViewSet._delete_storage_prefix(prefix)
         except Exception as e:
             logger.error(f"Error al eliminar propiedad {instance.id}: {str(e)}", exc_info=True)
             raise
@@ -657,6 +668,49 @@ class TourViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status='active').exclude(url__isnull=True).exclude(url='')
         return qs
 
+    @staticmethod
+    def _delete_storage_prefix(prefix: str) -> None:
+        normalized = (prefix or '').strip('/')
+        if not normalized:
+            return
+
+        stack = [normalized]
+        visited = set()
+
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+
+            lookup = current if current.endswith('/') else f"{current}/"
+            try:
+                dirs, files = default_storage.listdir(lookup)
+            except (FileNotFoundError, NotImplementedError):
+                dirs, files = [], []
+
+            for filename in files:
+                target = f"{lookup}{filename}"
+                try:
+                    default_storage.delete(target)
+                except Exception:
+                    logger.warning("No se pudo eliminar %s del storage", target, exc_info=True)
+
+            for dirname in dirs:
+                stack.append(f"{lookup}{dirname}".rstrip('/'))
+
+        try:
+            default_storage.delete(normalized)
+        except Exception:
+            pass
+
+        try:
+            local_path = default_storage.path(normalized)
+        except (AttributeError, NotImplementedError, ValueError):
+            local_path = None
+        if local_path and os.path.isdir(local_path):
+            shutil.rmtree(local_path, ignore_errors=True)
+
     def perform_create(self, serializer):
         package_file = serializer.validated_data.pop('package_file')
         prop = serializer.validated_data.get('property')
@@ -679,14 +733,13 @@ class TourViewSet(viewsets.ModelViewSet):
         # Validación de tamaño removida - permitir archivos de cualquier tamaño
 
         tour_uuid = uuid.uuid4()
-        tour_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
-        
+        storage_prefix = os.path.join('tours', str(tour_uuid)).replace('\\', '/')
+        tmp_root = tempfile.mkdtemp(prefix=f"tour-upload-{tour_uuid}-")
+
         try:
-            os.makedirs(tour_dir, exist_ok=True)
-            
-            package_path = os.path.join(tour_dir, package_file.name)
-            
-            # Guardar archivo con validación de escritura
+            package_path = os.path.join(tmp_root, package_file.name or 'tour.zip')
+
+            # Guardar archivo temporalmente con validación de escritura
             try:
                 with open(package_path, 'wb+') as destination:
                     for chunk in package_file.chunks():
@@ -697,166 +750,35 @@ class TourViewSet(viewsets.ModelViewSet):
                 })
 
             # Validar que es un ZIP válido
-            try:
-                if not zipfile.is_zipfile(package_path):
-                    raise serializers.ValidationError({
-                        'package_file': "El archivo no es un ZIP válido. Verifica que el archivo no esté corrupto."
-                    })
-            except Exception as e:
+            if not zipfile.is_zipfile(package_path):
                 raise serializers.ValidationError({
-                    'package_file': f"Error validando archivo ZIP: {str(e)}"
+                    'package_file': "El archivo no es un ZIP válido. Verifica que el archivo no esté corrupto."
                 })
 
-            # Extraer contenido del ZIP con validación de seguridad
-            try:
-                with zipfile.ZipFile(package_path, 'r') as zip_ref:
-                    # Validar contenido del ZIP
-                    total_size = 0
-                    file_count = 0
-                    
-                    for member in zip_ref.infolist():
-                        # Chequeo de seguridad contra path traversal
-                        if member.filename.startswith('/') or '..' in member.filename:
-                            raise serializers.ValidationError({
-                                'package_file': f"El archivo contiene rutas inseguras: {member.filename}"
-                            })
-                        
-                        # (Compatibilidad) No limitar el tamaño descomprimido aquí.
-                        # Se mantiene un conteo informativo, pero sin bloquear.
-                        try:
-                            total_size += int(getattr(member, 'file_size', 0) or 0)
-                        except Exception:
-                            pass
-                        file_count += 1
-                        
-                        # Nota: se eliminó el límite de cantidad de archivos por requerimiento
-                    
-                    zip_ref.extractall(tour_dir)
-                    
-            except zipfile.BadZipFile:
-                raise serializers.ValidationError({
-                    'package_file': "Archivo ZIP corrupto o inválido"
-                })
-            except Exception as e:
-                if "inseguras" in str(e) or "demasiado" in str(e):
-                    raise  # Re-lanzar nuestros errores personalizados
-                raise serializers.ValidationError({
-                    'package_file': f"Error extrayendo archivo: {str(e)}"
-                })
-            
-            # Eliminar archivo ZIP original
-            os.remove(package_path)
+            source_key = f"{storage_prefix}/source.zip"
+            with open(package_path, 'rb') as fh:
+                if default_storage.exists(source_key):
+                    default_storage.delete(source_key)
+                default_storage.save(source_key, File(fh))
 
-            # Post-proceso: sanitizar referencias absolutas tipo file:///C:/... dentro de html/js para evitar CORS
-            try:
-                file_uri_pattern = re.compile(r"file:///[A-Za-z]:[^'\"\s>]*")
-                for root_dir, _dirs, files in os.walk(tour_dir):
-                    for fname in files:
-                        lower = fname.lower()
-                        if lower.endswith(('.html', '.htm', '.js')):
-                            fpath = os.path.join(root_dir, fname)
-                            try:
-                                with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
-                                    content = f.read()
-                                def _to_relative(m):
-                                    uri = m.group(0)
-                                    # Mantener querystring si existe
-                                    base, sep, query = uri.partition('?')
-                                    basename = os.path.basename(base)
-                                    return basename + (sep + query if sep else '')
-                                new_content = file_uri_pattern.sub(_to_relative, content)
-                                if new_content != content:
-                                    with open(fpath, 'w', encoding='utf-8', errors='ignore') as f:
-                                        f.write(new_content)
-                            except Exception:
-                                # No bloquear por errores de sanitización
-                                pass
-            except Exception:
-                pass
-
-            # Buscar archivos de entrada del tour (HTML, HTM, PHP)
-            entry_files = []
-            try:
-                for root_dir, _dirs, files in os.walk(tour_dir):
-                    for fname in files:
-                        if fname.lower().endswith(('.html', '.htm', '.php')):
-                            rel_path = os.path.relpath(os.path.join(root_dir, fname), tour_dir)
-                            rel_path_posix = rel_path.replace('\\', '/')  # Normalizar separadores
-                            depth = rel_path_posix.count('/')
-                            entry_files.append((depth, rel_path_posix))
-            except Exception as e:
-                raise serializers.ValidationError({
-                    'package_file': f"Error explorando contenido del tour: {str(e)}"
-                })
-
-            # Seleccionar el archivo de entrada principal usando lógica mejorada
-            html_entry = self._select_tour_entry_file(tour_dir, entry_files)
-
-            if not html_entry:
-                # Si no se encontró ningún archivo de entrada válido, intentar generar uno automático para Pano2VR
-                html_entry = self._generate_pano2vr_wrapper(tour_dir)
-
-            # Prefer a stable, backend-served URL to avoid issues with dev media serving
-            # Example: /api/tours/content/<uuid>/<relative-entry>
-            tour_url = f"/api/tours/content/{tour_uuid}/{html_entry}"
-
-            # Validar que el archivo de entrada existe y es accesible
-            entry_file_path = os.path.join(tour_dir, html_entry.replace('/', os.sep))
-            if not os.path.isfile(entry_file_path):
-                logger.error(f"Archivo de entrada no encontrado: {entry_file_path}")
-                raise serializers.ValidationError({
-                    'package_file': f"El archivo de entrada seleccionado '{html_entry}' no existe en el paquete"
-                })
-
-            # Verificar que el archivo no está vacío y tiene contenido válido
-            try:
-                with open(entry_file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(1024)  # Leer primeros 1KB
-                    if not content.strip():
-                        raise serializers.ValidationError({
-                            'package_file': f"El archivo de entrada '{html_entry}' está vacío"
-                        })
-
-                    # Para archivos PHP, verificar que tienen estructura básica
-                    if html_entry.lower().endswith('.php'):
-                        if '<?php' not in content and '<!DOCTYPE' not in content:
-                            logger.warning(f"Archivo PHP '{html_entry}' no parece tener estructura válida")
-
-            except (IOError, OSError) as e:
-                logger.error(f"Error accediendo al archivo de entrada: {e}")
-                raise serializers.ValidationError({
-                    'package_file': f"Error accediendo al archivo de entrada '{html_entry}': {str(e)}"
-                })
-
-            instance = serializer.save(
-                url=tour_url,
-                package_path=os.path.join('tours', str(tour_uuid)),
+            # Crear tour en estado 'processing' y disparar procesamiento en background
+            tour = serializer.save(
+                url=None,
+                package_path=storage_prefix,
                 type='package',
-                status='active',
+                status='processing',
                 tour_id=tour_uuid
             )
 
-            logger.info(f"Tour {instance.id} procesado exitosamente: {len(entry_files)} archivos de entrada encontrados, usando {html_entry}")
+            TOUR_UPLOAD_EXECUTOR.submit(
+                process_tour_package_async,
+                tour.id,
+                source_key,
+                storage_prefix,
+            )
 
-            # Asegurar un solo tour por propiedad: eliminar anteriores
-            deleted_count = Tour.objects.filter(property=instance.property).exclude(id=instance.id).count()
-            if deleted_count > 0:
-                Tour.objects.filter(property=instance.property).exclude(id=instance.id).delete()
-                logger.info(f"Eliminados {deleted_count} tours anteriores de la propiedad {instance.property.id}")
-
-        except serializers.ValidationError:
-            # Limpiar en caso de error de validación
-            if os.path.exists(tour_dir):
-                shutil.rmtree(tour_dir)
-            raise
-        except Exception as e:
-            # Limpiar en caso de cualquier otro error
-            if os.path.exists(tour_dir):
-                shutil.rmtree(tour_dir)
-            logger.error(f"Error inesperado procesando tour: {e}", exc_info=True)
-            raise serializers.ValidationError({
-                'package_file': f"Error interno procesando el tour: {str(e)}"
-            })
+        finally:
+            shutil.rmtree(tmp_root, ignore_errors=True)
 
     @action(detail=False, methods=['get'], url_path=r'content/(?P<tour_uuid>[^/]+)/(?P<subpath>.*)', permission_classes=[permissions.AllowAny])
     def serve_content(self, request, tour_uuid=None, subpath=''):
@@ -875,28 +797,29 @@ class TourViewSet(viewsets.ModelViewSet):
             if not tour:
                 return Response({'detail': 'Tour no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
-            base_dir = os.path.join(settings.MEDIA_ROOT, 'tours', str(tour_uuid))
-            # Normalizar separadores y prevenir traversal
-            subpath = subpath.replace('..', '').lstrip('/').replace('\\', '/')
-            try:
-                full_path = safe_join(base_dir, subpath)
-            except Exception:
+            storage_base = (tour.package_path or os.path.join('tours', str(tour_uuid))).replace('\\', '/')
+            storage_base = storage_base.strip('/')
+
+            normalized = (subpath or '').replace('\\', '/')
+            parts = [segment for segment in normalized.split('/') if segment not in ('', '.')]
+            if any(segment == '..' for segment in parts):
                 return Response({'detail': 'Ruta no permitida'}, status=status.HTTP_404_NOT_FOUND)
 
-            if not os.path.isfile(full_path):
+            storage_path = storage_base
+            if parts:
+                storage_path = f"{storage_base}/{ '/'.join(parts) }"
+
+            if not default_storage.exists(storage_path):
                 return Response({'detail': 'Archivo no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
-            # Detectar content-type
-            ctype, _ = mimetypes.guess_type(full_path)
-            # Evitar descarga de .php: no ejecutamos PHP, pero podemos servirlo como HTML estático
-            if not ctype or os.path.splitext(full_path)[1].lower() == '.php':
+            ctype, _ = mimetypes.guess_type(storage_path)
+            if not ctype or os.path.splitext(storage_path)[1].lower() == '.php':
                 ctype = 'text/html'
 
-            # Usar FileResponse para transmitir el archivo
             from django.http import FileResponse
-            resp = FileResponse(open(full_path, 'rb'), content_type=ctype)
-            # Sugerir nombre del archivo
-            resp["Content-Disposition"] = f"inline; filename=\"{os.path.basename(full_path)}\""
+            file_handle = default_storage.open(storage_path, 'rb')
+            resp = FileResponse(file_handle, content_type=ctype)
+            resp["Content-Disposition"] = f"inline; filename=\"{os.path.basename(storage_path)}\""
             # Establecer una CSP permisiva SOLO para este contenido (no global)
             frame_ancestors = ' '.join(getattr(settings, 'CSP_FRAME_ANCESTORS', ("'self'",)))
             csp_value = (
@@ -917,7 +840,14 @@ class TourViewSet(viewsets.ModelViewSet):
             logger.error(f"Error sirviendo contenido de tour {tour_uuid}: {e}", exc_info=True)
             return Response({'detail': 'Error interno'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def _select_tour_entry_file(self, tour_dir, entry_files):
+    def perform_destroy(self, instance):
+        prefix = instance.package_path
+        super().perform_destroy(instance)
+        if prefix:
+            self._delete_storage_prefix(prefix)
+
+    @staticmethod
+    def _select_tour_entry_file(tour_dir, entry_files):
         """
         Selecciona el archivo de entrada principal del tour usando lógica mejorada.
 
@@ -1083,7 +1013,8 @@ class TourViewSet(viewsets.ModelViewSet):
 
         return best_candidate
 
-    def _generate_pano2vr_wrapper(self, tour_dir):
+    @staticmethod
+    def _generate_pano2vr_wrapper(tour_dir):
         """
         Intenta generar un wrapper automático para tours Pano2VR.
 
@@ -1772,3 +1703,165 @@ class FavoriteViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     http_method_names = ['get', 'post', 'delete']
+
+
+def process_tour_package_async(tour_id: int, source_key: str, storage_prefix: str) -> None:
+    tmp_root = tempfile.mkdtemp(prefix=f"tour-process-{tour_id}-")
+    extracted_dir = os.path.join(tmp_root, 'extracted')
+    os.makedirs(extracted_dir, exist_ok=True)
+    uploaded_to_storage = False
+
+    def cleanup_storage(delete_prefix: bool = False):
+        try:
+            if default_storage.exists(source_key):
+                default_storage.delete(source_key)
+        except Exception:
+            logger.debug("No se pudo eliminar el archivo fuente %s", source_key, exc_info=True)
+        if delete_prefix:
+            TourViewSet._delete_storage_prefix(storage_prefix)
+
+    try:
+        try:
+            tour = Tour.objects.select_related('property').get(id=tour_id)
+        except Tour.DoesNotExist:
+            logger.warning("Tour %s no encontrado para procesamiento", tour_id)
+            return
+
+        tmp_zip_path = os.path.join(tmp_root, 'source.zip')
+        try:
+            with default_storage.open(source_key, 'rb') as src, open(tmp_zip_path, 'wb') as dst:
+                shutil.copyfileobj(src, dst)
+        except Exception as exc:
+            logger.error("No se pudo recuperar el ZIP %s desde storage: %s", source_key, exc, exc_info=True)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=False)
+            return
+
+        if not zipfile.is_zipfile(tmp_zip_path):
+            logger.error("El archivo %s no es un ZIP válido", source_key)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=False)
+            return
+
+        entry_files = []
+        try:
+            with zipfile.ZipFile(tmp_zip_path, 'r') as zip_ref:
+                for member in zip_ref.infolist():
+                    if member.filename.startswith('/') or '..' in member.filename:
+                        raise ValueError(f"Ruta insegura en el ZIP: {member.filename}")
+                zip_ref.extractall(extracted_dir)
+
+            file_uri_pattern = re.compile(r"file:///[A-Za-z]:[^'\"\s>]*")
+            for root_dir, _dirs, files in os.walk(extracted_dir):
+                for fname in files:
+                    if fname.lower().endswith(('.html', '.htm', '.js')):
+                        fpath = os.path.join(root_dir, fname)
+                        try:
+                            with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read()
+
+                            def _to_relative(match):
+                                uri = match.group(0)
+                                base, sep, query = uri.partition('?')
+                                basename = os.path.basename(base)
+                                return basename + (sep + query if sep else '')
+
+                            new_content = file_uri_pattern.sub(_to_relative, content)
+                            if new_content != content:
+                                with open(fpath, 'w', encoding='utf-8', errors='ignore') as out:
+                                    out.write(new_content)
+                        except Exception:
+                            continue
+
+            for root_dir, _dirs, files in os.walk(extracted_dir):
+                for fname in files:
+                    if fname.lower().endswith(('.html', '.htm', '.php')):
+                        rel_path = os.path.relpath(os.path.join(root_dir, fname), extracted_dir)
+                        rel_path_posix = rel_path.replace('\\', '/')
+                        depth = rel_path_posix.count('/')
+                        entry_files.append((depth, rel_path_posix))
+        except Exception as exc:
+            logger.error("Error procesando ZIP de tour %s: %s", tour_id, exc, exc_info=True)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=False)
+            return
+
+        html_entry = TourViewSet._select_tour_entry_file(extracted_dir, entry_files)
+        if not html_entry:
+            html_entry = TourViewSet._generate_pano2vr_wrapper(extracted_dir)
+
+        if not html_entry:
+            logger.error("No se encontró archivo de entrada para el tour %s", tour_id)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=False)
+            return
+
+        entry_file_path = os.path.join(extracted_dir, html_entry.replace('/', os.sep))
+        if not os.path.isfile(entry_file_path):
+            logger.error("Archivo de entrada %s no existe para tour %s", html_entry, tour_id)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=False)
+            return
+
+        try:
+            with open(entry_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read(1024)
+                if not content.strip():
+                    raise ValueError('Archivo de entrada vacío')
+        except Exception as exc:
+            logger.error("Error verificando archivo de entrada %s: %s", html_entry, exc, exc_info=True)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=False)
+            return
+
+        stored_files = []
+        for root_dir, _dirs, files in os.walk(extracted_dir):
+            for fname in files:
+                abs_path = os.path.join(root_dir, fname)
+                rel_path = os.path.relpath(abs_path, extracted_dir).replace('\\', '/')
+                storage_path = f"{storage_prefix}/{rel_path}".replace('//', '/')
+                with open(abs_path, 'rb') as fh:
+                    if default_storage.exists(storage_path):
+                        default_storage.delete(storage_path)
+                    default_storage.save(storage_path, File(fh))
+                stored_files.append(storage_path)
+                uploaded_to_storage = True
+
+        tour_url = f"/api/tours/content/{tour.tour_id}/{html_entry}"
+
+        try:
+            with transaction.atomic():
+                tour = Tour.objects.select_for_update().select_related('property').get(id=tour_id)
+                previous_tours = list(Tour.objects.filter(property=tour.property).exclude(id=tour_id))
+
+                tour.url = tour_url
+                tour.status = 'active'
+                tour.package_path = storage_prefix
+                tour.save(update_fields=['url', 'status', 'package_path', 'updated_at'])
+
+                old_ids = [prev.id for prev in previous_tours]
+
+            if previous_tours:
+                for older in previous_tours:
+                    if older.package_path:
+                        TourViewSet._delete_storage_prefix(older.package_path)
+                Tour.objects.filter(id__in=old_ids).delete()
+
+            try:
+                cleanup_storage(delete_prefix=False)
+            except Exception:
+                pass
+
+            logger.info(
+                "Tour %s listo: %s archivos almacenados en %s",
+                tour_id,
+                len(stored_files),
+                storage_prefix,
+            )
+        except Exception as exc:
+            logger.error("Error finalizando tour %s: %s", tour_id, exc, exc_info=True)
+            Tour.objects.filter(id=tour_id).update(status='error')
+            cleanup_storage(delete_prefix=uploaded_to_storage)
+
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)

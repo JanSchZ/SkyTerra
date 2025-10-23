@@ -147,7 +147,7 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
               sx={{
                 position: 'relative',
                 width: '100%',
-                height: 230,
+                height: 280,
                 borderRadius: 2,
                 overflow: 'hidden',
                 backgroundColor: 'rgba(9,13,22,0.6)',
@@ -345,12 +345,17 @@ const PropertySidePreview = ({ open, property, previewUrl, onClose, onGo, getPri
                 textTransform: 'none',
                 fontWeight: 600,
                 py: 1.05,
-                background: 'linear-gradient(90deg, #38bdf8 0%, #22d3ee 100%)',
-                color: '#04111f',
-                boxShadow: '0 16px 32px rgba(56,189,248,0.32)',
+                background: 'rgba(15,23,42,0.82)',
+                color: 'rgba(248,250,252,0.95)',
+                boxShadow: '0 18px 34px rgba(0,0,0,0.28)',
+                border: '1px solid rgba(148,163,184,0.35)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.25s ease',
                 '&:hover': {
-                  background: 'linear-gradient(90deg, #0ea5e9 0%, #14b8a6 100%)',
-                  boxShadow: '0 18px 36px rgba(34,211,238,0.45)',
+                  background: 'rgba(15,23,42,0.95)',
+                  boxShadow: '0 22px 40px rgba(0,0,0,0.38)',
+                  transform: 'translateY(-1px)',
                 },
               }}
             >
