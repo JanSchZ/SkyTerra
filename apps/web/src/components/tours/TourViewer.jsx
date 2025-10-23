@@ -13,6 +13,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { useParams, useNavigate } from 'react-router-dom';
 import { tourService, propertyService, favoritesService } from '../../services/api';
+import SamPropertyAssistant from './SamPropertyAssistant';
 
 const TourViewer = () => {
   const { tourId } = useParams();
@@ -24,6 +25,16 @@ const TourViewer = () => {
   const [showInfo, setShowInfo] = useState(true);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullScreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchTourData = async () => {
@@ -297,110 +308,257 @@ const TourViewer = () => {
           <Drawer
             anchor="left"
             variant="persistent"
-            open={showInfo && propertyData}
+            open={showInfo && Boolean(propertyData)}
             sx={{
               '& .MuiDrawer-paper': {
-                width: 320,
+                width: { xs: '100%', sm: 360, md: 380 },
                 boxSizing: 'border-box',
-                top: 80,
-                backgroundColor: 'rgba(255,255,255,0.14)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
+                top: isFullScreen ? 0 : 80,
+                height: isFullScreen ? '100%' : 'calc(100% - 80px)',
+                background: 'linear-gradient(160deg, rgba(18,27,33,0.78), rgba(18,27,33,0.55))',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
                 color: 'white',
                 borderRight: '1px solid rgba(255,255,255,0.25)',
-                borderRadius: '0 16px 16px 0',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.35)'
+                borderRadius: { xs: 0, sm: '0 20px 20px 0' },
+                boxShadow: '0 18px 45px rgba(0,0,0,0.35)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
               },
             }}
           >
-            <Box sx={{ p: 2 }}>
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
-                {propertyData?.name || 'Propiedad'}
-              </Typography>
-              
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                overflow: 'hidden',
+                px: { xs: 2, md: 2.5 },
+                py: 2
+              }}
+            >
+              <SamPropertyAssistant property={propertyData} />
+
               <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <LocalOfferIcon sx={{ mr: 1 }} />
-                <Typography variant="h6">
-                  ${propertyData?.price?.toLocaleString() || '---'}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <AspectRatioIcon sx={{ mr: 1 }} />
-                <Typography variant="body1">
-                  {propertyData?.size?.toFixed(1) || '---'} hectáreas
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
-                <RoomIcon sx={{ mr: 1, mt: 0.5 }} />
-                <Typography variant="body2">
-                  {propertyData?.address || 'Ubicación no disponible'}
-                </Typography>
-              </Box>
-              
-              {propertyData?.plusvalia_score && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Plusvalía:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.plusvalia_score}%
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.bedrooms && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Dormitorios:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.bedrooms}
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.bathrooms && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Baños:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.bathrooms}
-                  </Typography>
-                </Box>
-              )}
-              {propertyData?.parking_spaces && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mr: 1, fontWeight: 'bold' }}>
-                    Estacionamientos:
-                  </Typography>
-                  <Typography variant="body1">
-                    {propertyData.parking_spaces}
-                  </Typography>
-                </Box>
-              )}
-              
-              <Divider sx={{ my: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                {propertyData?.description || 'Sin descripción disponible'}
-              </Typography>
-              
-              <Button 
-                variant="outlined" 
-                color="primary"
-                startIcon={<HomeIcon />}
-                fullWidth
-                onClick={() => {
-                  localStorage.setItem('skipAutoFlight', 'true');
-                  navigate(`/property/${propertyData?.id}`);
+
+              <Box
+                sx={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  pr: 1,
+                  pb: 3,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'rgba(255,255,255,0.3) transparent',
+                  '&::-webkit-scrollbar': {
+                    width: 6
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: 'transparent'
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: 'rgba(255,255,255,0.35)',
+                    borderRadius: 8
+                  }
                 }}
-                sx={{ mt: 2 }}
               >
-                Ver detalles completos
-              </Button>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    {propertyData?.name || 'Propiedad'}
+                  </Typography>
+                  {propertyData?.type && (
+                    <Chip
+                      size="small"
+                      label={propertyData.type}
+                      sx={{
+                        mt: 0.5,
+                        backgroundColor: 'rgba(255,255,255,0.12)',
+                        color: 'rgba(255,255,255,0.92)',
+                        textTransform: 'capitalize'
+                      }}
+                    />
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      borderRadius: 2,
+                      p: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
+                    }}
+                  >
+                    <LocalOfferIcon sx={{ opacity: 0.85 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                        Precio
+                      </Typography>
+                      <Typography variant="subtitle2">
+                        {(() => {
+                          const priceValue = Number(propertyData?.price);
+                          return Number.isFinite(priceValue)
+                            ? `$${priceValue.toLocaleString()}`
+                            : '---';
+                        })()}
+                      </Typography>
+                    </Box>
+                  </Paper>
+
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      borderRadius: 2,
+                      p: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1
+                    }}
+                  >
+                    <AspectRatioIcon sx={{ opacity: 0.85 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                        Superficie
+                      </Typography>
+                      <Typography variant="subtitle2">
+                        {(() => {
+                          const sizeValue = Number(propertyData?.size);
+                          return Number.isFinite(sizeValue)
+                            ? `${sizeValue.toFixed(1)} ha`
+                            : '---';
+                        })()}
+                      </Typography>
+                    </Box>
+                  </Paper>
+
+                  {typeof propertyData?.plusvalia_score === 'number' && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        p: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                      }}
+                    >
+                      <LocalOfferIcon sx={{ opacity: 0.85 }} />
+                      <Box>
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Plusvalía
+                        </Typography>
+                        <Typography variant="subtitle2">
+                          {propertyData.plusvalia_score}%
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  )}
+
+                  {propertyData?.bedrooms != null && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        p: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                      }}
+                    >
+                      <HomeIcon sx={{ opacity: 0.85 }} />
+                      <Box>
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Dormitorios
+                        </Typography>
+                        <Typography variant="subtitle2">{propertyData.bedrooms}</Typography>
+                      </Box>
+                    </Paper>
+                  )}
+
+                  {propertyData?.bathrooms != null && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        p: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                      }}
+                    >
+                      <HomeIcon sx={{ opacity: 0.85 }} />
+                      <Box>
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Baños
+                        </Typography>
+                        <Typography variant="subtitle2">{propertyData.bathrooms}</Typography>
+                      </Box>
+                    </Paper>
+                  )}
+
+                  {propertyData?.parking_spaces != null && (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        backgroundColor: 'rgba(255,255,255,0.08)',
+                        borderRadius: 2,
+                        p: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1
+                      }}
+                    >
+                      <HomeIcon sx={{ opacity: 0.85 }} />
+                      <Box>
+                        <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                          Estac.
+                        </Typography>
+                        <Typography variant="subtitle2">{propertyData.parking_spaces}</Typography>
+                      </Box>
+                    </Paper>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                  <RoomIcon sx={{ mt: 0.5, opacity: 0.85 }} />
+                  <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                    {propertyData?.address || 'Ubicación no disponible'}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
+                    Descripción
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.85, lineHeight: 1.6 }}>
+                    {propertyData?.description || 'Sin descripción disponible'}
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<HomeIcon />}
+                  fullWidth
+                  onClick={() => {
+                    localStorage.setItem('skipAutoFlight', 'true');
+                    navigate(`/property/${propertyData?.id}`);
+                  }}
+                  sx={{ mt: 'auto' }}
+                >
+                  Ver detalles completos
+                </Button>
+              </Box>
             </Box>
           </Drawer>
           
