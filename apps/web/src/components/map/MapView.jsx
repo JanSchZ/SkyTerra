@@ -2086,7 +2086,7 @@ const MapView = forwardRef(({
               onMapClick(e);
             }
           }}
-          interactiveLayerIds={!editable ? [unclusteredPointLayer.id] : []}
+          interactiveLayerIds={!editable ? [unclusteredPointLayer.id, 'boundaries-fill', 'boundaries-line'] : []}
           onMouseMove={onMapMouseMove} 
           onMouseLeave={onMapMouseLeave} 
            preserveDrawingBuffer={false}
@@ -2195,12 +2195,11 @@ const MapView = forwardRef(({
                     'interpolate',
                     ['linear'],
                     ['zoom'],
-                    8, 0,
-                    11, 0,
-                    12, 0.05,
-                    12.5, 0.15,
-                    13, 0.25,
-                    14, 0.3
+                    8, 0.15,
+                    10, 0.2,
+                    12, 0.3,
+                    14, 0.4,
+                    16, 0.45
                   ],
                   'fill-opacity-transition': {
                     duration: 800,
@@ -2217,20 +2216,20 @@ const MapView = forwardRef(({
                     'interpolate',
                     ['linear'],
                     ['zoom'],
-                    12, 1,
-                    14, 2,
-                    16, 3
+                    8, 1.5,
+                    12, 2,
+                    14, 2.5,
+                    16, 3.5
                   ],
                   'line-opacity': [
                     'interpolate',
                     ['linear'],
                     ['zoom'],
-                    8, 0,
-                    11, 0,
-                    12, 0.3,
-                    12.5, 0.6,
-                    13, 0.9,
-                    14, 1
+                    8, 0.6,
+                    10, 0.7,
+                    12, 0.8,
+                    14, 0.9,
+                    16, 1
                   ],
                   'line-opacity-transition': {
                     duration: 800,
