@@ -947,7 +947,7 @@ const MapView = forwardRef(({
     if (map && !isNaN(lat) && !isNaN(lon)) {
       map.flyTo({
         center: [lon, lat],
-        zoom: 15.5, // Zoom más cercano para mejor vista de la propiedad
+        zoom: 17.5, // Zoom muy cercano para ver el polígono/perímetro claramente
         pitch: 0,
         bearing: 0,
         duration: 5500, // Duración más larga para transición suave y cinética
@@ -961,14 +961,12 @@ const MapView = forwardRef(({
       });
     }
 
-    // Tras terminar la animación, abrir el tour automáticamente
+    // Tras terminar la animación, NO abrir el tour automáticamente
+    // Dejar que el usuario explore el polígono y haga zoom manualmente
     setTimeout(() => {
-      if (url) {
-        setActiveTourUrl(url);
-        setActiveTourPropertyId(property.id);
-      }
       setNavigatingToTour(false);
-    }, 5700); // Ajustado para coincidir con la duración extendida
+      // El tour se abrirá solo si el usuario hace más zoom (>= 19)
+    }, 5700);
   };
 
   const handleMarkerHover = (property) => {
@@ -1563,7 +1561,8 @@ const MapView = forwardRef(({
       }
       // -------------- Seamless zoom-to-tour logic -----------------
       const currentZoom = map.getZoom();
-      if (currentZoom >= 12.5) {
+      // Solo activar tour si el usuario hace zoom MUY cerca (>= 19.5)
+      if (currentZoom >= 19.5) {
         const center = map.getCenter();
         // Función auxiliar para distancia en metros (Haversine)
         const metersBetween = (lat1, lon1, lat2, lon2) => {
@@ -1587,7 +1586,7 @@ const MapView = forwardRef(({
           }
         });
 
-        const DIST_THRESHOLD = 1200; // metros (más amplio para carga temprana)
+        const DIST_THRESHOLD = 500; // metros (más cercano para activación intencional)
         if (nearest && minDist <= DIST_THRESHOLD && nearest.id !== activeTourPropertyIdRef.current) {
           (async () => {
             try {
@@ -1605,8 +1604,8 @@ const MapView = forwardRef(({
             }
           })();
         }
-      } else if (currentZoom < 11.5 && activeTourUrlRef.current) {
-        // Alejando: cerrar tour
+      } else if (currentZoom < 18 && activeTourUrlRef.current) {
+        // Alejando: cerrar tour si el usuario hace zoom out
         setActiveTourUrl(null);
         setActiveTourPropertyId(null);
       }
