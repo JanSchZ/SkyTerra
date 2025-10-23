@@ -23,7 +23,7 @@ const TourViewer = () => {
   const [tourData, setTourData] = useState(null);
   const [propertyData, setPropertyData] = useState(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = useState(true);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -146,8 +146,8 @@ const TourViewer = () => {
   };
 
   // Calcular dimensiones del panel según el modo fullscreen
-  const topOffset = isFullScreen ? 24 : 96;
-  const bottomOffset = isFullScreen ? 24 : 40;
+  const topOffset = isFullScreen ? 24 : 80;
+  const bottomOffset = isFullScreen ? 24 : 24;
   const panelHeight = `calc(100vh - ${topOffset + bottomOffset}px)`;
 
   // Formatear precio según el tipo de listing
@@ -316,20 +316,15 @@ const TourViewer = () => {
             
             <IconButton 
               onClick={() => setShowInfo(!showInfo)}
-              disabled={!isFullScreen}
               sx={{ 
                 backgroundColor: 'rgba(0,0,0,0.5)', 
                 color: 'white',
                 '&.active': {
                   backgroundColor: 'primary.main'
-                },
-                '&.Mui-disabled': {
-                  backgroundColor: 'rgba(255,255,255,0.18)',
-                  color: 'rgba(255,255,255,0.4)'
                 }
               }}
               className={showInfo ? 'active' : ''}
-              title={isFullScreen ? "Toggle información" : "Panel solo disponible en pantalla completa"}
+              title="Mostrar/Ocultar información de la propiedad"
             >
               <InfoIcon />
             </IconButton>
@@ -364,7 +359,7 @@ const TourViewer = () => {
           <Drawer
             anchor="left"
             variant="persistent"
-            open={showInfo && Boolean(propertyData) && isFullScreen}
+            open={showInfo && Boolean(propertyData)}
             hideBackdrop
             sx={{
               '& .MuiDrawer-paper': {
