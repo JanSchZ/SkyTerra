@@ -16,7 +16,6 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import Slider from '@react-native-community/slider';
 import { useAuth } from '@context/AuthContext';
 import LocationSelector from '@components/LocationSelector';
 import {
@@ -44,7 +43,6 @@ const themeModeOptions: Array<{ value: ThemeMode; label: string; description: st
   { value: 'auto', label: 'Automático', description: 'Se adapta a la configuración del sistema.' },
 ];
 
-const SLIDER_BOUNDS = { min: 5, max: 200 } as const;
 const DEFAULT_COVERAGE_RADIUS = 50;
 
 const DRONE_MODELS = [
@@ -93,13 +91,11 @@ const ProfileScreen = () => {
   >({});
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [coverageRadius, setCoverageRadius] = useState<number>(DEFAULT_COVERAGE_RADIUS);
 
   const [form, setForm] = useState({
     display_name: '',
     phone_number: '',
     base_city: '',
-    coverage_radius_km: '',
     drone_model: '',
     experience_years: '',
     website: '',
@@ -116,13 +112,6 @@ const ProfileScreen = () => {
     return parts.join(' ').trim();
   }, [preferredName, user?.first_name, user?.last_name]);
 
-  const clampCoverageRadius = useCallback((value: number) => {
-    if (!Number.isFinite(value)) {
-      return DEFAULT_COVERAGE_RADIUS;
-    }
-    return Math.min(Math.max(Math.round(value), SLIDER_BOUNDS.min), SLIDER_BOUNDS.max);
-  }, []);
-
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
@@ -138,8 +127,6 @@ const ProfileScreen = () => {
         display_name: resolvedName,
         phone_number: data.phone_number ?? '',
         base_city: data.base_city ?? '',
-        coverage_radius_km:
-          typeof data.coverage_radius_km === 'number' ? String(data.coverage_radius_km) : '',
         drone_model: data.drone_model ?? '',
         experience_years:
           typeof data.experience_years === 'number' ? String(data.experience_years) : '',
@@ -151,18 +138,13 @@ const ProfileScreen = () => {
           ? { latitude: data.location_latitude, longitude: data.location_longitude }
           : null
       );
-      if (typeof data.coverage_radius_km === 'number') {
-        setCoverageRadius(clampCoverageRadius(data.coverage_radius_km));
-      } else {
-        setCoverageRadius(DEFAULT_COVERAGE_RADIUS);
-      }
     } catch (err) {
       console.error('Profile load error', err);
       setError('No pudimos cargar tu perfil. Intenta nuevamente.');
     } finally {
       setLoading(false);
     }
-  }, [clampCoverageRadius, normalizedPreferredName]);
+  }, [normalizedPreferredName]);
 
   useEffect(() => {
     loadProfile();
@@ -176,17 +158,6 @@ const ProfileScreen = () => {
   const handleChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
-
-  useEffect(() => {
-    if (!form.coverage_radius_km) {
-      setCoverageRadius(DEFAULT_COVERAGE_RADIUS);
-      return;
-    }
-    const numeric = Number(form.coverage_radius_km);
-    if (Number.isFinite(numeric)) {
-      setCoverageRadius(clampCoverageRadius(numeric));
-    }
-  }, [clampCoverageRadius, form.coverage_radius_km]);
 
   const handleThemeChange = async (nextMode: ThemeMode) => {
     if (mode === nextMode) {
@@ -207,6 +178,20 @@ const ProfileScreen = () => {
 
   const placeholderColor = isDark ? 'rgba(148,163,184,0.65)' : 'rgba(100,116,139,0.55)';
 
+  const coverageRadius = useMemo(() => {
+    const raw = profile?.coverage_radius_km;
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+      return Math.round(raw);
+    }
+    if (typeof raw === 'string') {
+      const numeric = Number(raw);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        return Math.round(numeric);
+      }
+    }
+    return DEFAULT_COVERAGE_RADIUS;
+  }, [profile?.coverage_radius_km]);
+
   const handleSave = async () => {
     setError(null);
     setSuccess(null);
@@ -216,7 +201,6 @@ const ProfileScreen = () => {
         display_name: form.display_name.trim(),
         phone_number: form.phone_number.trim() || null,
         base_city: form.base_city.trim() || null,
-        coverage_radius_km: form.coverage_radius_km ? Number(form.coverage_radius_km) : null,
         drone_model: form.drone_model.trim() || null,
         experience_years: form.experience_years ? Number(form.experience_years) : null,
         website: form.website.trim() || null,
@@ -474,76 +458,16 @@ const ProfileScreen = () => {
                   />
                 </View>
               </View>
-              <View style={styles.rowFields}>
-                <View style={styles.fieldGroupHalf}>
-                  <Text style={styles.label}>Radio de cobertura (km)</Text>
-                  <TextInput
-                    value={form.coverage_radius_km}
-                    onChangeText={(value) => {
-                      const sanitized = value.replace(/[^0-9]/g, '');
-                      handleChange('coverage_radius_km', sanitized);
-                      if (!sanitized) {
-                        setCoverageRadius(DEFAULT_COVERAGE_RADIUS);
-                        return;
-                      }
-                      const numeric = Number(sanitized);
-                      if (Number.isFinite(numeric)) {
-                        setCoverageRadius(clampCoverageRadius(numeric));
-                      }
-                    }}
-                    placeholder="50"
-                    placeholderTextColor={placeholderColor}
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    onBlur={() => {
-                      if (!form.coverage_radius_km) {
-                        handleChange('coverage_radius_km', String(coverageRadius));
-                        return;
-                      }
-                      const numeric = Number(form.coverage_radius_km);
-                      if (Number.isFinite(numeric)) {
-                        const clamped = clampCoverageRadius(numeric);
-                        if (clamped !== numeric) {
-                          handleChange('coverage_radius_km', String(clamped));
-                        }
-                        setCoverageRadius(clamped);
-                      }
-                    }}
-                  />
-                  <View style={styles.sliderContainer}>
-                    <Slider
-                      value={coverageRadius}
-                      onValueChange={(value) => {
-                        const next = clampCoverageRadius(value);
-                        setCoverageRadius(next);
-                        handleChange('coverage_radius_km', String(next));
-                      }}
-                      minimumValue={SLIDER_BOUNDS.min}
-                      maximumValue={SLIDER_BOUNDS.max}
-                      step={5}
-                      thumbTintColor={isDark ? colors.surface : colors.primary}
-                      minimumTrackTintColor={colors.primary}
-                      maximumTrackTintColor={colors.cardBorder}
-                    />
-                    <View style={styles.sliderLabels}>
-                      <Text style={styles.sliderValue}>{coverageRadius} km</Text>
-                      <Text style={styles.sliderAssist}>
-                        Rango {SLIDER_BOUNDS.min}–{SLIDER_BOUNDS.max} km
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.fieldGroupHalf}>
-                  <Text style={styles.label}>Años de experiencia</Text>
-                  <TextInput
-                    value={form.experience_years}
-                    onChangeText={(value) => handleChange('experience_years', value.replace(/[^0-9]/g, ''))}
-                    placeholder="5"
-                    placeholderTextColor={placeholderColor}
-                    style={styles.input}
-                    keyboardType="number-pad"
-                  />
-                </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Años de experiencia</Text>
+                <TextInput
+                  value={form.experience_years}
+                  onChangeText={(value) => handleChange('experience_years', value.replace(/[^0-9]/g, ''))}
+                  placeholder="5"
+                  placeholderTextColor={placeholderColor}
+                  style={styles.input}
+                  keyboardType="number-pad"
+                />
               </View>
 
               <View style={styles.fieldGroup}>
@@ -1027,23 +951,6 @@ const createStyles = (colors: ThemeColors) => {
     },
     selectPlaceholder: {
       color: colors.textMuted,
-    },
-    sliderContainer: {
-      marginTop: 12,
-      gap: 8,
-    },
-    sliderLabels: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    sliderValue: {
-      color: colors.heading,
-      fontWeight: '700',
-    },
-    sliderAssist: {
-      color: colors.textMuted,
-      fontSize: 12,
     },
     error: {
       color: colors.danger,

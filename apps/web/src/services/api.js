@@ -1222,6 +1222,81 @@ export const recordingOrderService = {
   },
 };
 
+// ---------------------
+// Operator Service (Pilotos)
+// ---------------------
+export const operatorService = {
+  async listOperators(params = {}) {
+    const { data } = await api.get('/pilot-profiles/', { params });
+    const rawResults = Array.isArray(data?.results)
+      ? data.results
+      : Array.isArray(data)
+        ? data
+        : [];
+
+    const results = rawResults.map((item) => ({
+      ...item,
+      documents: Array.isArray(item?.documents)
+        ? item.documents.map((doc) => ({
+            ...doc,
+            file_url: makeAbsoluteUrl(doc?.file_url || doc?.file),
+            file: doc?.file ? makeAbsoluteUrl(doc.file) : doc?.file,
+          }))
+        : [],
+    }));
+
+    const count = typeof data?.count === 'number' ? data.count : results.length;
+    return {
+      results,
+      count,
+      next: data?.next ?? null,
+      previous: data?.previous ?? null,
+    };
+  },
+
+  async fetchOperator(operatorId) {
+    const { data } = await api.get(`/pilot-profiles/${operatorId}/`);
+    const documents = Array.isArray(data?.documents)
+      ? data.documents.map((doc) => ({
+          ...doc,
+          file_url: makeAbsoluteUrl(doc?.file_url || doc?.file),
+          file: doc?.file ? makeAbsoluteUrl(doc.file) : doc?.file,
+        }))
+      : [];
+    return { ...data, documents };
+  },
+
+  async updateOperator(operatorId, payload = {}) {
+    const { data } = await api.patch(`/pilot-profiles/${operatorId}/`, payload);
+    return data;
+  },
+
+  async updateDocument(documentId, payload = {}) {
+    const { data } = await api.patch(`/pilot-documents/${documentId}/`, payload);
+    return {
+      ...data,
+      file_url: makeAbsoluteUrl(data?.file_url || data?.file),
+      file: data?.file ? makeAbsoluteUrl(data.file) : data?.file,
+    };
+  },
+
+  async listOperatorJobs(params = {}) {
+    const { data } = await api.get('/jobs/', { params });
+    const results = Array.isArray(data?.results)
+      ? data.results
+      : Array.isArray(data)
+        ? data
+        : [];
+    const count = typeof data?.count === 'number' ? data.count : results.length;
+    return {
+      results,
+      count,
+      next: data?.next ?? null,
+      previous: data?.previous ?? null,
+    };
+  },
+};
+
 // Hook personalizado para gestión optimizada de propiedades
 export const usePropertyService = () => {
   const [cache, setCache] = React.useState(new Map());
@@ -1337,6 +1412,7 @@ export default {
   tour: tourService,
   image: imageService,
   recordingOrder: recordingOrderService,
+  operator: operatorService,
   savedSearch: savedSearchService,
   favorites: favoritesService,
   compare: compareService,

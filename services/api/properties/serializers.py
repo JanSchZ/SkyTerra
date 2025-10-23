@@ -239,10 +239,33 @@ class TourPackageCreateSerializer(serializers.ModelSerializer):
 
 
 class PilotDocumentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
     class Meta:
         model = PilotDocument
-        fields = ['id', 'pilot', 'doc_type', 'file', 'status', 'notes', 'expires_at', 'uploaded_at', 'reviewed_by', 'reviewed_at']
-        read_only_fields = ['status', 'uploaded_at', 'reviewed_by', 'reviewed_at', 'pilot']
+        fields = [
+            'id',
+            'pilot',
+            'doc_type',
+            'file',
+            'file_url',
+            'status',
+            'notes',
+            'expires_at',
+            'uploaded_at',
+            'reviewed_by',
+            'reviewed_at',
+        ]
+        read_only_fields = ['uploaded_at', 'reviewed_by', 'reviewed_at', 'pilot']
+
+    def get_file_url(self, obj):
+        request = self.context.get('request') if self.context else None
+        if not getattr(obj, 'file', None):
+            return None
+        url = obj.file.url
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class PilotProfileSerializer(serializers.ModelSerializer):
@@ -255,6 +278,13 @@ class PilotProfileSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'display_name',
+            'phone_number',
+            'base_city',
+            'coverage_radius_km',
+            'drone_model',
+            'experience_years',
+            'website',
+            'portfolio_url',
             'rating',
             'score',
             'completed_jobs',

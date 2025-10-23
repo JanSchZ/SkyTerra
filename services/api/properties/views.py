@@ -1421,10 +1421,27 @@ class PilotDocumentViewSet(viewsets.ModelViewSet):
         serializer.save(pilot=pilot_profile, status='pending', reviewed_by=None, reviewed_at=None)
 
     def perform_update(self, serializer):
-        pilot_profile = getattr(self.request.user, 'pilot_profile', None)
-        if not (self.request.user.is_staff or pilot_profile):
-            raise PermissionDenied('No autorizado.')
-        serializer.save(status='pending', reviewed_by=None, reviewed_at=None)
+        user = self.request.user
+        pilot_profile = getattr(user, 'pilot_profile', None)
+        if user.is_staff:
+            status_value = serializer.validated_data.get('status', serializer.instance.status)
+            serializer.save(
+                status=status_value,
+                reviewed_by=user,
+                reviewed_at=timezone.now(),
+            )
+            return
+
+        if pilot_profile:
+            serializer.save(
+                pilot=pilot_profile,
+                status='pending',
+                reviewed_by=None,
+                reviewed_at=None,
+            )
+            return
+
+        raise PermissionDenied('No autorizado.')
 
 
 class JobViewSet(viewsets.ModelViewSet):
@@ -1455,12 +1472,27 @@ class JobViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return qs.none()
-        if user.is_staff:
-            return qs
         pilot_profile = getattr(user, 'pilot_profile', None)
-        if pilot_profile:
-            return qs.filter(Q(assigned_pilot=pilot_profile) | Q(offers__pilot=pilot_profile)).distinct()
-        return qs.filter(property__owner=user)
+
+        if user.is_staff:
+            filtered_qs = qs
+        elif pilot_profile:
+            filtered_qs = qs.filter(Q(assigned_pilot=pilot_profile) | Q(offers__pilot=pilot_profile)).distinct()
+        else:
+            filtered_qs = qs.filter(property__owner=user)
+
+        assigned_pilot_param = self.request.query_params.get('assigned_pilot')
+        if assigned_pilot_param:
+            try:
+                filtered_qs = filtered_qs.filter(assigned_pilot_id=int(assigned_pilot_param))
+            except (TypeError, ValueError):
+                filtered_qs = filtered_qs.none()
+
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            filtered_qs = filtered_qs.filter(status=status_param)
+
+        return filtered_qs
 
     @action(detail=False, methods=['get'], url_path='available', permission_classes=[permissions.IsAuthenticated])
     def available(self, request):

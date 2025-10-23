@@ -801,6 +801,13 @@ class PilotProfile(models.Model):
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='pilot_profile')
     display_name = models.CharField(max_length=120, blank=True)
+    phone_number = models.CharField(max_length=32, blank=True)
+    base_city = models.CharField(max_length=120, blank=True)
+    coverage_radius_km = models.PositiveIntegerField(default=50)
+    drone_model = models.CharField(max_length=120, blank=True)
+    experience_years = models.PositiveIntegerField(null=True, blank=True)
+    website = models.URLField(blank=True)
+    portfolio_url = models.URLField(blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=Decimal('5.00'))
     score = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
     completed_jobs = models.PositiveIntegerField(default=0)

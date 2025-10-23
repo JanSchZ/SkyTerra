@@ -49,6 +49,7 @@ import AdminCouponsPage from './components/admin/AdminCouponsPage.jsx';
 import SamAdminPage from './components/admin/SamAdminPage.jsx';
 import AdminAnalyticsPage from './components/admin/AdminAnalyticsPage.jsx';
 import SellerDashboardPage from './components/user/SellerDashboardPage.jsx';
+import AdminOperatorsPage from './components/admin/AdminOperatorsPage.jsx';
 import SellerListingWizardPage from './components/seller/SellerListingWizardPage.jsx';
 import PricingPage from './components/pricing/PricingPage.jsx';
 import CheckoutPage from './components/checkout/CheckoutPage.jsx';
@@ -810,6 +811,7 @@ function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="approvals" element={<PropertyApprovalPage />} />
+        <Route path="operators" element={<AdminOperatorsPage />} />
         <Route path="properties" element={<AdminDetailedPropertiesPage />} />
         <Route path="analytics" element={<AdminAnalyticsPage />} />
         {/** Eliminado: Gestión de tours ahora vive dentro de Propiedades */}
