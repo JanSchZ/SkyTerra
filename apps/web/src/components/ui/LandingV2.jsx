@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Button, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack, Typography, Chip, Divider, Paper } from '@mui/material';
 import { keyframes } from '@emotion/react';
 import { AnimatePresence, motion } from 'framer-motion';
+import PublicRoundedIcon from '@mui/icons-material/PublicRounded';
+import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
+import TravelExploreRoundedIcon from '@mui/icons-material/TravelExploreRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import VerifiedRoundedIcon from '@mui/icons-material/VerifiedRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import MapView from '../map/MapView';
 import AISearchBar from './AISearchBar';
 
@@ -25,6 +31,72 @@ const heroGlobeSpin = keyframes`
 `;
 
 const HERO_ROTATION_SPEED_DEG_PER_SEC = 3.2;
+
+const HIGHLIGHT_PILLS = [
+  {
+    label: 'Due diligence con IA',
+    icon: InsightsRoundedIcon,
+    accent: 'linear-gradient(120deg, rgba(99,102,241,0.25) 0%, rgba(59,130,246,0.18) 100%)',
+  },
+  {
+    label: 'Visitas inmersivas 3D',
+    icon: TravelExploreRoundedIcon,
+    accent: 'linear-gradient(120deg, rgba(14,165,233,0.24) 0%, rgba(37,99,235,0.16) 100%)',
+  },
+  {
+    label: 'Impacto ESG trazable',
+    icon: PublicRoundedIcon,
+    accent: 'linear-gradient(120deg, rgba(16,185,129,0.24) 0%, rgba(59,130,246,0.14) 100%)',
+  },
+];
+
+const TRUST_METRICS = [
+  {
+    value: '98%',
+    label: 'Satisfacción de inversionistas',
+    caption: 'Net Promoter Score 2024',
+    accent: 'rgba(99, 102, 241, 0.28)',
+  },
+  {
+    value: '1.2K+',
+    label: 'Proyectos verificados',
+    caption: '13 países conectados',
+    accent: 'rgba(37, 99, 235, 0.28)',
+  },
+  {
+    value: '24/7',
+    label: 'Monitoreo del mercado',
+    caption: 'Alertas y reportes en vivo',
+    accent: 'rgba(14, 165, 233, 0.28)',
+  },
+];
+
+const EXPERIENCE_FLOW = [
+  {
+    stage: 'Explora',
+    title: 'Describe tu visión y obtén curaduría instantánea',
+    description:
+      'Nuestra IA entiende criterios complejos y conecta oportunidades con contexto regulatorio, logístico y ambiental.',
+    duration: '±30 s',
+    accent: '#6366f1',
+  },
+  {
+    stage: 'Evalúa',
+    title: 'Compara viabilidad con datos vivos',
+    description:
+      'Simula escenarios financieros, impacto ESG y disponibilidad hídrica colaborando con tu equipo en tiempo real.',
+    duration: '±4 min',
+    accent: '#0ea5e9',
+  },
+  {
+    stage: 'Activa',
+    title: 'Coordina visitas inmersivas y cierra con confianza',
+    description:
+      'Programa inspecciones, comparte recorridos 3D y recibe alertas notariales sin salir de la plataforma.',
+    duration: '±1 día',
+    accent: '#22c55e',
+  },
+];
 
 export default function LandingV2({
   mapRef,
@@ -249,14 +321,27 @@ export default function LandingV2({
                 position: 'absolute',
                 inset: 0,
                 background:
-                  'linear-gradient(110deg, rgba(247,249,255,0.98) 0%, rgba(247,249,255,0.9) 42%, rgba(215,228,255,0.28) 64%, rgba(148,163,255,0.12) 78%, rgba(59,130,246,0) 100%)',
+                  'linear-gradient(110deg, rgba(247,249,255,0.98) 0%, rgba(247,249,255,0.92) 42%, rgba(215,228,255,0.32) 60%, rgba(148,163,255,0.18) 78%, rgba(59,130,246,0.12) 100%)',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: '-24% -16% -12% -18%',
+                  background:
+                    'radial-gradient(circle at 12% 18%, rgba(79,70,229,0.22) 0%, rgba(79,70,229,0) 54%), radial-gradient(circle at 82% 32%, rgba(14,165,233,0.2) 0%, rgba(14,165,233,0) 58%)',
+                  opacity: heroVisible ? 1 : 0,
+                  transition: 'opacity 0.8s ease',
+                  pointerEvents: 'none',
+                },
                 '&::after': {
                   content: '""',
                   position: 'absolute',
                   inset: 0,
                   right: '-12%',
                   background:
-                    'linear-gradient(120deg, rgba(148,163,255,0) 0%, rgba(148,163,255,0.22) 56%, rgba(96,165,250,0.38) 100%)',
+                    'linear-gradient(120deg, rgba(148,163,255,0) 0%, rgba(148,163,255,0.22) 56%, rgba(96,165,250,0.38) 100%), radial-gradient(circle at 70% 20%, rgba(56,189,248,0.12) 0%, rgba(56,189,248,0) 60%)',
+                  backgroundSize: 'auto, 160% 160%',
+                  backgroundPosition: 'center, 0 0',
+                  maskImage: 'linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.1) 80%)',
                   opacity: heroVisible ? 1 : 0,
                   transition: 'opacity 0.6s ease',
                   pointerEvents: 'none',
@@ -319,28 +404,222 @@ export default function LandingV2({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
-                px: { xs: 3, md: 8 },
-                pt: { xs: 6, md: 10 },
+                px: { xs: 2.5, sm: 3, md: 8 },
+                pt: { xs: 4.5, md: 6 },
+                pb: { xs: 5, md: 8 },
               }}
             >
               <Box
                 sx={{
-                  maxWidth: { xs: '100%', md: '1200px' },
                   width: '100%',
+                  maxWidth: { xs: '100%', md: '1200px' },
                   mx: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: { xs: 5, md: 6 },
+                  gap: { xs: 5, md: 7 },
+                  position: 'relative',
+                  zIndex: 5,
                 }}
               >
-                <Box sx={{ maxWidth: { xs: '100%', md: '520px' } }}>
-                  <Stack spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
+                <Box
+                  component={motion.div}
+                  initial={{ opacity: 0, y: -18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: { xs: 2, md: 3 },
+                    px: { xs: 2.5, md: 3.75 },
+                    py: { xs: 1.75, md: 2 },
+                    borderRadius: '999px',
+                    background: 'rgba(255,255,255,0.62)',
+                    border: '1px solid rgba(148,163,255,0.35)',
+                    boxShadow: '0 22px 60px rgba(15,23,42,0.14)',
+                    backdropFilter: 'blur(22px)',
+                    pointerEvents: 'auto',
+                    flexWrap: { xs: 'wrap', md: 'nowrap' },
+                  }}
+                >
+                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                    <Box
+                      sx={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, rgba(79,70,229,0.95) 0%, rgba(37,99,235,0.88) 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#e0f2fe',
+                        boxShadow: '0 16px 36px rgba(37, 99, 235, 0.38)',
+                      }}
+                    >
+                      <AutoAwesomeRoundedIcon fontSize="small" />
+                    </Box>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 700,
+                        letterSpacing: '0.2em',
+                        color: '#0f172a',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Skyterra
+                    </Typography>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    spacing={1.75}
+                    alignItems="center"
+                    sx={{
+                      display: { xs: 'none', md: 'flex' },
+                      color: 'rgba(15,23,42,0.72)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Button
+                      component="a"
+                      href="#producto"
+                      variant="text"
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        color: 'inherit',
+                        '&:hover': { color: '#1d4ed8' },
+                      }}
+                    >
+                      Producto
+                    </Button>
+                    <Button
+                      component="a"
+                      href="#clientes"
+                      variant="text"
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        color: 'inherit',
+                        '&:hover': { color: '#1d4ed8' },
+                      }}
+                    >
+                      Clientes
+                    </Button>
+                    <Button
+                      component="a"
+                      href="/pricing"
+                      variant="text"
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        color: 'inherit',
+                        '&:hover': { color: '#1d4ed8' },
+                      }}
+                    >
+                      Planes
+                    </Button>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    spacing={1.5}
+                    alignItems="center"
+                    sx={{
+                      ml: { xs: 0, md: 'auto' },
+                      width: { xs: '100%', md: 'auto' },
+                      justifyContent: { xs: 'flex-end', md: 'flex-start' },
+                    }}
+                  >
+                    <Box
+                      component={motion.div}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      sx={{ width: { xs: '100%', md: 'auto' } }}
+                    >
+                      <Button
+                        onClick={() => onExplore?.()}
+                        sx={{
+                          width: { xs: '100%', md: 'auto' },
+                          px: { xs: 4, md: 4.5 },
+                          py: { xs: 1.4, md: 1.6 },
+                          borderRadius: '999px',
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          fontSize: '0.95rem',
+                          letterSpacing: '0.01em',
+                          background: 'linear-gradient(135deg, #1f2937 0%, #1d4ed8 52%, #0ea5e9 100%)',
+                          color: '#f8fafc',
+                          boxShadow: '0 24px 48px rgba(37,99,235,0.32)',
+                          '&:hover': {
+                            background: 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 60%, #0284c7 100%)',
+                            boxShadow: '0 28px 56px rgba(30,64,175,0.36)',
+                          },
+                        }}
+                      >
+                        Explorar
+                      </Button>
+                    </Box>
+                    <Button
+                      component="a"
+                      href="/login"
+                      variant="outlined"
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        borderRadius: '999px',
+                        px: { xs: 3.2, md: 3.6 },
+                        py: { xs: 1.3, md: 1.4 },
+                        borderColor: 'rgba(15,23,42,0.18)',
+                        color: '#0f172a',
+                        backgroundColor: 'rgba(255,255,255,0.58)',
+                        boxShadow: '0 18px 40px rgba(15,23,42,0.12)',
+                        '&:hover': {
+                          borderColor: 'rgba(30,64,175,0.42)',
+                          backgroundColor: 'rgba(219,234,254,0.72)',
+                        },
+                      }}
+                    >
+                      Iniciar sesión
+                    </Button>
+                  </Stack>
+                </Box>
+
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: { xs: 4.5, md: 5.5 },
+                    maxWidth: { xs: '100%', md: '620px' },
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  <Stack spacing={{ xs: 2.5, md: 3.5 }} alignItems="flex-start" sx={{ width: '100%' }}>
+                    <Chip
+                      icon={<VerifiedRoundedIcon sx={{ color: '#1d4ed8 !important' }} />}
+                      label="Proptech LATAM nº1 en experiencia digital"
+                      sx={{
+                        px: 1.25,
+                        py: 1,
+                        borderRadius: '999px',
+                        fontWeight: 500,
+                        letterSpacing: '0.03em',
+                        background: 'rgba(59,130,246,0.12)',
+                        color: '#1e3a8a',
+                        '& .MuiChip-icon': {
+                          fontSize: '1.1rem',
+                          ml: 0.5,
+                        },
+                      }}
+                    />
+
                     <Typography
                       component="h1"
                       sx={{
-                        fontSize: { xs: '3rem', sm: '3.75rem', md: '4.5rem' },
-                        lineHeight: { xs: 1.05, md: 1.08 },
+                        fontSize: { xs: '2.85rem', sm: '3.6rem', md: '4.35rem' },
+                        lineHeight: { xs: 1.05, md: 1.07 },
                         fontWeight: 600,
                         color: '#0f172a',
                         fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
@@ -351,7 +630,7 @@ export default function LandingV2({
                         sx={{
                           display: 'inline-flex',
                           alignItems: { xs: 'flex-start', sm: 'center' },
-                          gap: { xs: 1, sm: 1.25 },
+                          gap: { xs: 1, sm: 1.2 },
                           flexWrap: 'wrap',
                         }}
                       >
@@ -384,6 +663,9 @@ export default function LandingV2({
                                 backfaceVisibility: 'hidden',
                                 transformOrigin: '50% 50%',
                                 textTransform: 'none',
+                                background: 'linear-gradient(120deg, #2563eb 0%, #22d3ee 100%)',
+                                WebkitBackgroundClip: 'text',
+                                color: 'transparent',
                               }}
                             >
                               {activeHeroWord}
@@ -391,75 +673,307 @@ export default function LandingV2({
                           </AnimatePresence>
                         </Box>
                         <Box component="span" sx={{ display: 'inline-block' }}>
-                          informado
+                          informado con inteligencia viva
                         </Box>
                       </Box>
                     </Typography>
 
                     <Typography
                       sx={{
-                        fontSize: { xs: '1.05rem', md: '1.15rem' },
-                        color: 'rgba(15,23,42,0.68)',
-                        maxWidth: { xs: '100%', md: '420px' },
+                        fontSize: { xs: '1.05rem', md: '1.18rem' },
+                        color: 'rgba(15,23,42,0.72)',
+                        maxWidth: { xs: '100%', md: '460px' },
                         fontWeight: 400,
                       }}
                     >
-                      Descubre oportunidades únicas alrededor del mundo con análisis precisos y en tiempo real.
+                      Descubre oportunidades extraordinarias alrededor del mundo con análisis predictivos, contexto ESG y un equipo listo para activar cada decisión.
                     </Typography>
 
-                    <Button
-                      onClick={() => onExplore?.()}
-                      sx={{
-                        alignSelf: 'flex-start',
-                        px: { xs: 4, md: 5 },
-                        py: { xs: 1.5, md: 1.75 },
-                        borderRadius: '999px',
-                        textTransform: 'none',
-                        fontSize: { xs: '1rem', md: '1.05rem' },
-                        fontWeight: 500,
-                        letterSpacing: '0.01em',
-                        backgroundColor: '#111827',
-                        color: '#f8fafc',
-                        boxShadow: '0 22px 35px rgba(15,23,42,0.25)',
-                        '&:hover': {
-                          backgroundColor: '#0b1220',
-                          boxShadow: '0 28px 48px rgba(15,23,42,0.28)',
-                        },
-                      }}
-                    >
-                      Explorar
-                    </Button>
-                  </Stack>
-                </Box>
-
-                <AnimatePresence>
-                  {heroVisible && (
                     <Box
-                      component={motion.div}
-                      layoutId="global-search-bar"
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                       sx={{
-                        width: '100%',
-                        maxWidth: '100%',
-                        pointerEvents: 'auto',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 1.2,
                       }}
                     >
-                      <AISearchBar
-                        onSearch={onSearch}
-                        onLocationSearch={onLocationSearch}
-                        onSearchStart={onSearchStart}
-                        onSearchComplete={onSearchComplete}
-                        variant="hero"
-                        placeholder="Buscar terrenos..."
-                        value={searchQuery}
-                        onQueryChange={onQueryChange}
-                      />
+                      {HIGHLIGHT_PILLS.map((pill, index) => {
+                        const PillIcon = pill.icon;
+                        return (
+                          <Box
+                            key={pill.label}
+                            component={motion.div}
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.28 + index * 0.08, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                          >
+                            <Chip
+                              icon={<PillIcon sx={{ color: '#1d4ed8', fontSize: '1.2rem' }} />}
+                              label={pill.label}
+                              sx={{
+                                borderRadius: '16px',
+                                px: 1.2,
+                                py: 1.1,
+                                background: pill.accent,
+                                color: '#1e293b',
+                                fontWeight: 500,
+                                '& .MuiChip-label': {
+                                  px: 0.5,
+                                },
+                                '& .MuiChip-icon': {
+                                  ml: 0.5,
+                                },
+                              }}
+                            />
+                          </Box>
+                        );
+                      })}
                     </Box>
-                  )}
-                </AnimatePresence>
+
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={{ xs: 1.5, sm: 2 }}
+                      alignItems={{ xs: 'stretch', sm: 'center' }}
+                      sx={{ width: '100%' }}
+                    >
+                      <Box
+                        component={motion.div}
+                        whileHover={{ y: -4 }}
+                        whileTap={{ scale: 0.97 }}
+                        sx={{ width: { xs: '100%', sm: 'auto' } }}
+                      >
+                        <Button
+                          onClick={() => onExplore?.()}
+                          sx={{
+                            width: { xs: '100%', sm: 'auto' },
+                            px: { xs: 4.2, md: 5 },
+                            py: { xs: 1.6, md: 1.8 },
+                            borderRadius: '999px',
+                            textTransform: 'none',
+                            fontSize: { xs: '1rem', md: '1.05rem' },
+                            fontWeight: 600,
+                            letterSpacing: '0.01em',
+                            background: 'linear-gradient(135deg, #1f2937 0%, #1d4ed8 52%, #0ea5e9 100%)',
+                            color: '#f8fafc',
+                            boxShadow: '0 28px 58px rgba(30,64,175,0.32)',
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #0f172a 0%, #1d4ed8 60%, #0284c7 100%)',
+                              boxShadow: '0 32px 66px rgba(30,64,175,0.36)',
+                            },
+                          }}
+                        >
+                          Explorar portafolio
+                        </Button>
+                      </Box>
+                      <Box
+                        component={motion.div}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        sx={{ width: { xs: '100%', sm: 'auto' } }}
+                      >
+                        <Button
+                          component="a"
+                          href="/signup"
+                          variant="outlined"
+                          startIcon={<PlayArrowRoundedIcon />}
+                          sx={{
+                            width: { xs: '100%', sm: 'auto' },
+                            px: { xs: 3.8, md: 4.2 },
+                            py: { xs: 1.5, md: 1.6 },
+                            borderRadius: '999px',
+                            textTransform: 'none',
+                            fontSize: { xs: '1rem', md: '1.02rem' },
+                            fontWeight: 500,
+                            borderColor: 'rgba(37,99,235,0.35)',
+                            color: '#1d4ed8',
+                            backgroundColor: 'rgba(255,255,255,0.72)',
+                            '&:hover': {
+                              borderColor: 'rgba(37,99,235,0.55)',
+                              backgroundColor: 'rgba(219,234,254,0.8)',
+                            },
+                          }}
+                        >
+                          Ver historia del producto
+                        </Button>
+                      </Box>
+                    </Stack>
+                  </Stack>
+
+                  <AnimatePresence>
+                    {heroVisible && (
+                      <Box
+                        component={motion.div}
+                        layoutId="global-search-bar"
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        sx={{
+                          width: '100%',
+                          maxWidth: '100%',
+                          pointerEvents: 'auto',
+                          background: 'rgba(255,255,255,0.82)',
+                          borderRadius: { xs: '24px', md: '28px' },
+                          boxShadow: '0 28px 70px rgba(15,23,42,0.18)',
+                          border: '1px solid rgba(148,163,255,0.28)',
+                          p: { xs: 1.5, md: 1.75 },
+                        }}
+                      >
+                        <AISearchBar
+                          onSearch={onSearch}
+                          onLocationSearch={onLocationSearch}
+                          onSearchStart={onSearchStart}
+                          onSearchComplete={onSearchComplete}
+                          variant="hero"
+                          placeholder="Buscar terrenos..."
+                          value={searchQuery}
+                          onQueryChange={onQueryChange}
+                        />
+                      </Box>
+                    )}
+                  </AnimatePresence>
+
+                  <Box
+                    sx={{
+                      width: '100%',
+                      maxWidth: { xs: '100%', md: '680px' },
+                      display: 'grid',
+                      gridTemplateColumns: { xs: 'repeat(1, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
+                      gap: { xs: 2, sm: 2.5, md: 3 },
+                    }}
+                  >
+                    {TRUST_METRICS.map((metric, index) => (
+                      <Paper
+                        key={metric.label}
+                        elevation={0}
+                        component={motion.div}
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 + index * 0.12, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                        whileHover={{ y: -6, scale: 1.01 }}
+                        sx={{
+                          borderRadius: '26px',
+                          p: { xs: 2.6, md: 2.9 },
+                          background: 'linear-gradient(150deg, rgba(255,255,255,0.9) 0%, rgba(244,246,255,0.76) 100%)',
+                          border: '1px solid',
+                          borderColor: metric.accent,
+                          boxShadow: '0 26px 52px rgba(15,23,42,0.16)',
+                          backdropFilter: 'blur(18px)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 0.75,
+                        }}
+                      >
+                        <Typography
+                          variant="h4"
+                          sx={{
+                            fontWeight: 600,
+                            color: '#1f2937',
+                            letterSpacing: '-0.01em',
+                          }}
+                        >
+                          {metric.value}
+                        </Typography>
+                        <Typography
+                          variant="body1"
+                          sx={{ color: 'rgba(15,23,42,0.66)', fontWeight: 500 }}
+                        >
+                          {metric.label}
+                        </Typography>
+                        <Divider sx={{ borderColor: 'rgba(148,163,255,0.36)', my: 1 }} />
+                        <Typography variant="body2" sx={{ color: 'rgba(71,85,105,0.9)' }}>
+                          {metric.caption}
+                        </Typography>
+                      </Paper>
+                    ))}
+                  </Box>
+                </Box>
+              </Box>
+
+              <Box
+                component={motion.div}
+                initial={{ opacity: 0, y: 32, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.9, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                sx={{
+                  position: 'absolute',
+                  bottom: { xs: 28, sm: 36, md: 64 },
+                  right: { xs: 24, sm: 32, md: 110 },
+                  width: { xs: 'calc(100% - 48px)', sm: 300, md: 340 },
+                  pointerEvents: 'auto',
+                  zIndex: 4,
+                }}
+              >
+                <Paper
+                  elevation={0}
+                  sx={{
+                    borderRadius: 4,
+                    p: { xs: 3, md: 3.4 },
+                    background: 'linear-gradient(160deg, rgba(15,23,42,0.94) 0%, rgba(30,41,59,0.88) 100%)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(148,163,255,0.32)',
+                    boxShadow: '0 40px 72px rgba(15,23,42,0.45)',
+                    backdropFilter: 'blur(26px)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2.5,
+                  }}
+                >
+                  <Chip
+                    icon={<VerifiedRoundedIcon sx={{ color: '#38bdf8 !important' }} />}
+                    label="Recorrido guiado"
+                    sx={{
+                      alignSelf: 'flex-start',
+                      borderRadius: '999px',
+                      background: 'rgba(56,189,248,0.16)',
+                      color: '#e0f2fe',
+                      fontWeight: 500,
+                      letterSpacing: '0.04em',
+                      '& .MuiChip-icon': {
+                        ml: 0.5,
+                      },
+                    }}
+                  />
+                  <Stack spacing={2.2}>
+                    {EXPERIENCE_FLOW.map((step, index) => (
+                      <React.Fragment key={step.stage}>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: '8px 1fr',
+                            gap: 1.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              borderRadius: '999px',
+                              background: `linear-gradient(180deg, ${step.accent}, rgba(148,163,255,0))`,
+                            }}
+                          />
+                          <Stack spacing={0.75}>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: 'rgba(191,219,254,0.85)', letterSpacing: '0.18em', textTransform: 'uppercase' }}
+                            >
+                              {step.stage}
+                            </Typography>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#f8fafc', lineHeight: 1.3 }}>
+                              {step.title}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.78)', lineHeight: 1.5 }}>
+                              {step.description}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'rgba(148,163,255,0.85)', fontWeight: 500 }}>
+                              {step.duration}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                        {index < EXPERIENCE_FLOW.length - 1 && (
+                          <Divider sx={{ borderColor: 'rgba(148,163,255,0.18)' }} />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </Stack>
+                </Paper>
               </Box>
             </Box>
           </Box>
