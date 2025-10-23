@@ -27,7 +27,7 @@ from .models import (
     BitcoinPayment,
     CoinbaseEvent,
 )
-from .serializers import CouponSerializer, BitcoinPaymentSerializer
+from .serializers import CouponSerializer, BitcoinPaymentSerializer, SubscriptionSerializer
 from properties.models import ListingPlan, Property
 
 logger = logging.getLogger(__name__)
@@ -338,6 +338,45 @@ class ActivatePlanView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class MySubscriptionView(APIView):
+    """Get the current user's subscription status and plan information."""
+    
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            subscription = Subscription.objects.get(user=request.user)
+            subscription_data = SubscriptionSerializer(subscription).data
+        except Subscription.DoesNotExist:
+            subscription_data = None
+        
+        # Get active plan from user groups
+        plan_keys = list(ListingPlan.objects.values_list('key', flat=True))
+        user_plan_groups = request.user.groups.filter(name__in=plan_keys)
+        active_plan = None
+        
+        if user_plan_groups.exists():
+            plan_key = user_plan_groups.first().name
+            try:
+                plan = ListingPlan.objects.get(key=plan_key)
+                active_plan = {
+                    'id': plan.id,
+                    'key': plan.key,
+                    'name': plan.name,
+                    'description': plan.description,
+                    'price': str(plan.price),
+                }
+            except ListingPlan.DoesNotExist:
+                pass
+        
+        return Response({
+            'subscription': subscription_data,
+            'active_plan': active_plan,
+            'has_active_subscription': subscription_data and subscription_data.get('is_active', False),
+        }, status=status.HTTP_200_OK)
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class StripeWebhookView(APIView):

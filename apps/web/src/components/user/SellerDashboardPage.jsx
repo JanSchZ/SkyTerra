@@ -37,16 +37,29 @@ const SellerDashboardPage = ({ user }) => {
     [navigate, state.properties]
   );
 
+  const hasActivePlan = useMemo(() => {
+    return user?.subscription?.is_active && user?.active_plan;
+  }, [user]);
+
   const currentPlanName = useMemo(() => {
+    if (user?.active_plan?.name) {
+      return user.active_plan.name;
+    }
     if (state.properties.length) {
       const firstPlan = state.properties[0]?.plan_details?.name;
       if (firstPlan) return firstPlan;
     }
-    if (state.plans.length && user?.groups?.length) {
-      return state.plans.find((plan) => plan.key === user.groups[0])?.name || user.groups[0];
-    }
-    return user?.groups?.[0] || 'Sin plan activo';
-  }, [state.properties, state.plans, user]);
+    return 'Sin plan activo';
+  }, [state.properties, user]);
+
+  const subscriptionInfo = useMemo(() => {
+    if (!user?.subscription) return null;
+    return {
+      status: user.subscription.status,
+      daysUntilRenewal: user.subscription.days_until_renewal,
+      periodEnd: user.subscription.current_period_end,
+    };
+  }, [user]);
 
   const loadData = async (refreshOnly = false) => {
     setState((prev) => ({ ...prev, loading: refreshOnly ? prev.loading : true, refreshing: refreshOnly }));
@@ -171,15 +184,32 @@ const SellerDashboardPage = ({ user }) => {
                 <Typography variant="subtitle2" color="text.secondary">
                   Plan activo
                 </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                  {currentPlanName}
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    {currentPlanName}
+                  </Typography>
+                  {hasActivePlan && (
+                    <Chip label="Activo" color="success" size="small" />
+                  )}
+                </Stack>
+                {hasActivePlan && subscriptionInfo?.daysUntilRenewal !== null && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    {subscriptionInfo.daysUntilRenewal > 0 
+                      ? `Renovación en ${subscriptionInfo.daysUntilRenewal} día${subscriptionInfo.daysUntilRenewal !== 1 ? 's' : ''}`
+                      : 'Plan vigente'}
+                  </Typography>
+                )}
                 <Typography variant="body2" color="text.secondary">
-                  Actualiza tu plan para acceder a entregables adicionales, tiempos de entrega priorizados y coordinación preferente.
+                  {hasActivePlan 
+                    ? 'Actualiza tu plan para acceder a entregables adicionales y coordinación preferente.'
+                    : 'Selecciona un plan para activar tus publicaciones y acceder a todos los beneficios.'}
                 </Typography>
               </Box>
-              <Button variant="outlined" onClick={() => goToPricing()}>
-                Ver planes
+              <Button 
+                variant={hasActivePlan ? "outlined" : "contained"} 
+                onClick={() => hasActivePlan ? navigate('/subscription') : goToPricing()}
+              >
+                {hasActivePlan ? 'Gestionar plan' : 'Ver planes'}
               </Button>
             </Stack>
           </Paper>

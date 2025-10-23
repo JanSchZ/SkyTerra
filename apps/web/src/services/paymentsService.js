@@ -14,6 +14,11 @@ const paymentsService = {
     const response = await api.post('/payments/activate-plan/', payload);
     return response?.data ?? response;
   },
+
+  async getMySubscription() {
+    const response = await api.get('/payments/my-subscription/');
+    return response?.data ?? response;
+  },
 };
 
 export default paymentsService;

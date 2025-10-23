@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from properties.models import Property
+from properties.models import Property, ListingPlan
 from rest_framework import serializers
 from dj_rest_auth.serializers import LoginSerializer
 from rest_framework.response import Response
@@ -9,6 +9,9 @@ from allauth.account.adapter import get_adapter
 
 class UserSerializer(serializers.ModelSerializer):
     property_count = serializers.SerializerMethodField()
+    subscription = serializers.SerializerMethodField()
+    groups = serializers.SerializerMethodField()
+    active_plan = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -21,7 +24,10 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name',
             'is_staff',
             'is_superuser',
-            'property_count'
+            'property_count',
+            'subscription',
+            'groups',
+            'active_plan',
         )
 
     def get_property_count(self, obj):
@@ -29,6 +35,39 @@ class UserSerializer(serializers.ModelSerializer):
         Calculates the number of properties owned by the user.
         """
         return Property.objects.filter(owner=obj).count()
+    
+    def get_subscription(self, obj):
+        """Return subscription data if available."""
+        try:
+            from payments.serializers import SubscriptionSerializer
+            if hasattr(obj, 'subscription'):
+                return SubscriptionSerializer(obj.subscription).data
+        except Exception:
+            pass
+        return None
+    
+    def get_groups(self, obj):
+        """Return list of group names the user belongs to."""
+        return list(obj.groups.values_list('name', flat=True))
+    
+    def get_active_plan(self, obj):
+        """Return the active plan details based on user's groups."""
+        plan_keys = list(ListingPlan.objects.values_list('key', flat=True))
+        user_plan_groups = obj.groups.filter(name__in=plan_keys)
+        if user_plan_groups.exists():
+            plan_key = user_plan_groups.first().name
+            try:
+                plan = ListingPlan.objects.get(key=plan_key)
+                return {
+                    'id': plan.id,
+                    'key': plan.key,
+                    'name': plan.name,
+                    'description': plan.description,
+                    'price': str(plan.price),
+                }
+            except ListingPlan.DoesNotExist:
+                pass
+        return None
 
 class UserDetailsSerializer(serializers.ModelSerializer):
     """

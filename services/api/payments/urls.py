@@ -5,6 +5,7 @@ from .views import (
     CreateCheckoutSessionView,
     ZeroAmountCheckoutView,
     ActivatePlanView,
+    MySubscriptionView,
     CouponViewSet,
     StripeWebhookView,
     CreateBitcoinChargeView,
@@ -22,6 +23,7 @@ urlpatterns = [
     path('create-checkout-session/', CreateCheckoutSessionView.as_view(), name='create-checkout-session'),
     path('zero-checkout/', ZeroAmountCheckoutView.as_view(), name='zero-checkout'),
     path('activate-plan/', ActivatePlanView.as_view(), name='activate-plan'),
+    path('my-subscription/', MySubscriptionView.as_view(), name='my-subscription'),
     path('webhook/', StripeWebhookView.as_view(), name='stripe-webhook'),
     # Bitcoin (Coinbase Commerce)
     path('bitcoin/create-charge/', CreateBitcoinChargeView.as_view(), name='bitcoin-create-charge'),

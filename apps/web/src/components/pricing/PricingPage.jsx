@@ -151,7 +151,7 @@ const professionalPlans = [
   },
 ];
 
-const PricingPage = () => {
+const PricingPage = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -168,6 +168,15 @@ const PricingPage = () => {
   const handlePlanTypeChange = (event, newPlanType) => {
     if (newPlanType !== null) setPlanType(newPlanType);
   };
+
+  // Check if user has active plan and redirect to subscription management if needed
+  React.useEffect(() => {
+    const hasActivePlan = user?.subscription?.is_active && user?.active_plan;
+    // Only redirect if coming from a source other than subscription management (to allow upgrades)
+    if (hasActivePlan && origin !== 'subscription-management') {
+      navigate('/subscription', { replace: true });
+    }
+  }, [user, origin, navigate]);
 
   React.useEffect(() => {
     let mounted = true;

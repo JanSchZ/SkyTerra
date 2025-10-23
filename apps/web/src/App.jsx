@@ -55,6 +55,7 @@ import PricingPage from './components/pricing/PricingPage.jsx';
 import CheckoutPage from './components/checkout/CheckoutPage.jsx';
 import PaymentSuccess from './components/checkout/PaymentSuccess.jsx';
 import PaymentCancelled from './components/checkout/PaymentCancelled.jsx';
+import SubscriptionManagementPage from './components/subscription/SubscriptionManagementPage.jsx';
 import Login from './components/auth/Login';
 import SignUp from './components/auth/SignUp';
 import './App.css';
@@ -807,6 +808,7 @@ function App() {
       <Route path="/seller/listings/new" element={<ProtectedRoute user={user} element={<SellerListingWizardPage />} />} />
       <Route path="/seller/listings/:listingId" element={<ProtectedRoute user={user} element={<SellerListingWizardPage />} />} />
       <Route path="/pricing" element={<ProtectedRoute user={user} element={<PricingPage />} />} />
+      <Route path="/subscription" element={<ProtectedRoute user={user} element={<SubscriptionManagementPage user={user} />} />} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<StaffRoute user={user} element={<AdminLayout />} />}>
