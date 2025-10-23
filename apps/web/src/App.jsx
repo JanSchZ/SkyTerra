@@ -708,9 +708,11 @@ function App() {
     duration: 0.4
   };
 
-  // Determine if the top bar should be shown
-  const hideTopBarRoutes = ['/auth', '/landing', '/checkout', '/payment-success', '/payment-cancelled', '/seller/listings'];
-  const showTopBar = !hideTopBarRoutes.some((route) => location.pathname.startsWith(route));
+  // Mostrar la barra superior sólo en mapa principal y visores 360
+  const showTopBar =
+    location.pathname === '/' ||
+    location.pathname.startsWith('/map') ||
+    location.pathname.startsWith('/tour');
 
   // Helper function to format ranges (price, size)
   const formatRange = (range, unit = '', prefix = '') => {
