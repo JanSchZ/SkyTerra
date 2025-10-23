@@ -44,7 +44,34 @@ const CheckoutPage = () => {
   const pricing = plan?.pricing;
 
   const totalUF = pricing?.totalUF || parseFloat(plan?.priceLabel || '0');
-  const usdAmount = useMemo(() => Number((totalUF * UF_TO_USD).toFixed(2)), [totalUF]);
+
+  const computeDiscountedUF = (baseUF, couponData) => {
+    const base = Number.isFinite(baseUF) ? baseUF : 0;
+    if (!couponData) {
+      return Number(base.toFixed(2));
+    }
+    const couponValue = Number(couponData.value || 0);
+    let result = base;
+    if (couponData.discount_type === 'percentage') {
+      result = base * (1 - couponValue / 100);
+    } else if (couponData.discount_type === 'fixed') {
+      result = base - couponValue;
+    }
+    if (!Number.isFinite(result)) {
+      result = base;
+    }
+    if (result < 0) {
+      result = 0;
+    }
+    return Number(result.toFixed(2));
+  };
+
+  const discountedUF = useMemo(() => computeDiscountedUF(totalUF, coupon), [totalUF, coupon]);
+  const discountAmountUF = useMemo(
+    () => Number(Math.max(totalUF - discountedUF, 0).toFixed(2)),
+    [totalUF, discountedUF]
+  );
+  const usdAmount = useMemo(() => Number((discountedUF * UF_TO_USD).toFixed(2)), [discountedUF]);
 
   useEffect(() => {
     const verifyAuth = async () => {
@@ -83,8 +110,9 @@ const CheckoutPage = () => {
     setCoupon(null);
     try {
       const response = await api.post('/payments/validate-coupon/', { code: couponCode });
+      const updatedTotal = computeDiscountedUF(totalUF, response.data);
       setCoupon(response.data);
-      setSuccess(`Cupón "${response.data.code}" aplicado con éxito.`);
+      setSuccess(`Cupón "${response.data.code}" aplicado con éxito. Nuevo total: ${formatUF(updatedTotal)}.`);
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo aplicar el cupón.');
     } finally {
@@ -207,9 +235,27 @@ const CheckoutPage = () => {
               <Typography variant="h6" sx={{ fontWeight: 600 }}>{plan.title}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{plan.audience}</Typography>
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, alignItems: 'flex-start' }}>
                 <Typography variant="subtitle1">Total mensual</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{formatUF(totalUF)}</Typography>
+                <Box sx={{ textAlign: 'right' }}>
+                  {discountAmountUF > 0 ? (
+                    <>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                        {formatUF(discountedUF)}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                        {formatUF(totalUF)}
+                      </Typography>
+                      <Typography variant="caption" color="success.main">
+                        Cupón aplicado: -{formatUF(discountAmountUF)}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                      {formatUF(totalUF)}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
 
               {plan.pricing?.originalUF && plan.pricing.originalUF !== plan.pricing.totalUF && (

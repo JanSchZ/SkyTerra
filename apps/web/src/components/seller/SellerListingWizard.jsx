@@ -5,9 +5,9 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Container,
   Divider,
   FormControl,
-  FormHelperText,
   FormControlLabel,
   FormGroup,
   Grid,
@@ -18,9 +18,6 @@ import {
   Select,
   Snackbar,
   Stack,
-  Step,
-  StepLabel,
-  Stepper,
   Switch,
   TextField,
   Typography,
@@ -29,6 +26,7 @@ import AddIcon from '@mui/icons-material/Add';
 import UploadIcon from '@mui/icons-material/Upload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import Map from 'react-map-gl';
 import { NavigationControl } from 'react-map-gl';
 import * as turf from '@turf/turf';
@@ -40,11 +38,10 @@ import config from '../../config/environment';
 import { normalizeBoundary, areBoundaryCoordinatesEqual } from '../../utils/boundary.js';
 
 const steps = [
-  { key: 'basic', label: 'Datos de la propiedad' },
+  { key: 'overview', label: 'Perfil de la propiedad' },
   { key: 'documents', label: 'Documentos' },
-  { key: 'boundary', label: 'Ubicación y polígono' },
-  { key: 'preferences', label: 'Preferencias de visita' },
-  { key: 'review', label: 'Revisión y envío' },
+  { key: 'operations', label: 'Operación en terreno' },
+  { key: 'review', label: 'Revisión y publicación' },
 ];
 
 const DOCUMENT_TYPES = [
@@ -71,7 +68,18 @@ const DOC_STATUS_COLOR = {
   rejected: 'error',
 };
 
-const initialBasicForm = {
+const SECTION_CARD_SX = {
+  p: { xs: 3, md: 4 },
+  borderRadius: 4,
+  border: '1px solid rgba(15, 23, 42, 0.08)',
+  boxShadow: '0 24px 48px rgba(15, 23, 42, 0.08)',
+  backgroundColor: '#ffffff',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 3,
+};
+
+const initialListingForm = {
   name: '',
   type: '',
   description: '',
@@ -101,8 +109,8 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [plans, setPlans] = useState([]);
   const [listing, setListing] = useState(null);
   const [listingId, setListingId] = useState(initialListingId);
-  const [basicForm, setBasicForm] = useState(initialBasicForm);
-  const [basicErrors, setBasicErrors] = useState({});
+  const [listingForm, setListingForm] = useState(initialListingForm);
+  const [formErrors, setFormErrors] = useState({});
   const [timeSlots, setTimeSlots] = useState([]);
   const [timeSlotDraft, setTimeSlotDraft] = useState({ day: '', from: '', to: '' });
   const [accessNotes, setAccessNotes] = useState('');
@@ -112,6 +120,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
   const [boundaryRemovalPending, setBoundaryRemovalPending] = useState(false);
   const [mapInstance, setMapInstance] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, severity: 'success', message: '' });
+  const [locating, setLocating] = useState(false);
 
   const currentDocuments = useMemo(() => listing?.documents ?? [], [listing]);
 
@@ -129,12 +138,45 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     return Number.isFinite(numericSize) ? numericSize : null;
   }, [boundaryDirty, boundaryDraft, boundaryRemovalPending, savedBoundary, listing]);
 
+  const reviewChecklist = useMemo(() => {
+    if (!listing) {
+      return {
+        requirements: { missing_documents: [], has_boundary: false, can_submit: false },
+        hasContact: false,
+        hasAddress: false,
+        hasPlan: false,
+        missingDocuments: [],
+        canSubmit: false,
+      };
+    }
+
+    const requirements = listing.submission_requirements || {
+      missing_documents: DOCUMENT_TYPES.filter((doc) => doc.key !== 'other').map((doc) => doc.key),
+      has_boundary: Boolean(listing.boundary_polygon),
+      can_submit: false,
+    };
+    const hasContact = Boolean(listing.contact_name && listing.contact_phone);
+    const hasAddress = Boolean(
+      listing.address_line1 &&
+        listing.address_country &&
+        listing.address_region &&
+        listing.address_city
+    );
+    const missingDocuments = Array.isArray(requirements.missing_documents)
+      ? requirements.missing_documents
+      : [];
+    const hasPlan = Boolean(listing.plan || listing.plan_details?.id);
+    const canSubmit = Boolean(requirements.can_submit && hasContact && hasAddress && requirements.has_boundary && hasPlan);
+
+    return { requirements, hasContact, hasAddress, hasPlan, missingDocuments, canSubmit };
+  }, [listing]);
+
   const showMessage = useCallback((message, severity = 'success') => {
     setSnackbar({ open: true, severity, message });
   }, []);
 
-  const clearBasicError = useCallback((name) => {
-    setBasicErrors((prev) => {
+  const clearFormError = useCallback((name) => {
+    setFormErrors((prev) => {
       if (!prev[name]) return prev;
       const next = { ...prev };
       delete next[name];
@@ -152,16 +194,10 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     return Number.isFinite(numeric) ? numeric : null;
   };
 
-  const validateBasicForm = useCallback(() => {
+  const validateOverview = useCallback(() => {
     const errors = {};
-    const trimmedName = basicForm.name.trim();
-    const trimmedType = basicForm.type.trim();
-    const trimmedContactName = basicForm.contact_name.trim();
-    const trimmedContactPhone = basicForm.contact_phone.trim();
-    const trimmedAddressLine1 = basicForm.address_line1.trim();
-    const trimmedCity = basicForm.address_city.trim();
-    const trimmedRegion = basicForm.address_region.trim();
-    const trimmedCountry = basicForm.address_country.trim();
+    const trimmedName = listingForm.name.trim();
+    const trimmedType = listingForm.type.trim();
 
     if (!trimmedName) {
       errors.name = 'Ingresa un nombre descriptivo para la propiedad.';
@@ -171,14 +207,10 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       errors.type = 'Define el tipo de propiedad.';
     }
 
-    if (!basicForm.plan) {
-      errors.plan = 'Selecciona un plan activo antes de continuar.';
-    }
-
-    const priceValue = parseNumber(basicForm.price);
-    const rentPriceValue = parseNumber(basicForm.rent_price);
-    const sizeValue = parseNumber(basicForm.size);
-    const listingType = basicForm.listing_type;
+    const priceValue = parseNumber(listingForm.price);
+    const rentPriceValue = parseNumber(listingForm.rent_price);
+    const sizeValue = parseNumber(listingForm.size);
+    const listingType = listingForm.listing_type;
     const includesSale = listingType === 'sale' || listingType === 'both';
     const includesRent = listingType === 'rent' || listingType === 'both';
 
@@ -194,6 +226,18 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       errors.size = 'Ingresa el tamaño en hectáreas.';
     }
 
+    return errors;
+  }, [listingForm]);
+
+  const validateOperations = useCallback(() => {
+    const errors = {};
+    const trimmedContactName = listingForm.contact_name.trim();
+    const trimmedContactPhone = listingForm.contact_phone.trim();
+    const trimmedAddressLine1 = listingForm.address_line1.trim();
+    const trimmedCity = listingForm.address_city.trim();
+    const trimmedRegion = listingForm.address_region.trim();
+    const trimmedCountry = listingForm.address_country.trim();
+
     if (!trimmedContactName) {
       errors.contact_name = 'Indica quién coordinará las visitas.';
     }
@@ -202,7 +246,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       errors.contact_phone = 'Agrega un teléfono o WhatsApp válido.';
     }
 
-    if (basicForm.contact_email && !validateEmail(basicForm.contact_email)) {
+    if (listingForm.contact_email && !validateEmail(listingForm.contact_email)) {
       errors.contact_email = 'El correo electrónico no tiene un formato válido.';
     }
 
@@ -223,7 +267,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     }
 
     return errors;
-  }, [basicForm]);
+  }, [listingForm]);
 
   const closeSnackbar = useCallback(() => setSnackbar((prev) => ({ ...prev, open: false })), []);
 
@@ -237,8 +281,8 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     async (id) => {
       if (!id) {
         setListing(null);
-        setBasicForm(initialBasicForm);
-        setBasicErrors({});
+        setListingForm(initialListingForm);
+        setFormErrors({});
         setSavedBoundary(null);
         setBoundaryDraft(null);
         setBoundaryDirty(false);
@@ -248,7 +292,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
       const data = await marketplaceService.fetchProperty(id);
       setListing(data);
       setListingId(data.id);
-      setBasicForm({
+      setListingForm({
         name: data.name || '',
         type: data.type || '',
         description: data.description || '',
@@ -286,10 +330,7 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     const bootstrap = async () => {
       try {
         setLoading(true);
-        const [plansData] = await Promise.all([loadPlans(), listingId ? loadListing(listingId) : Promise.resolve(null)]);
-        if (!listingId && plansData?.length) {
-          setBasicForm((prev) => ({ ...prev, plan: prev.plan || plansData[0].id }));
-        }
+        await Promise.all([loadPlans(), listingId ? loadListing(listingId) : Promise.resolve(null)]);
       } catch (error) {
         console.error('Error bootstrapping wizard', error);
         showMessage('No fue posible cargar la información inicial.', 'error');
@@ -303,10 +344,10 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     };
   }, [listingId, loadPlans, loadListing, showMessage]);
 
-  const handleBasicChange = (event) => {
+  const handleFieldChange = (event) => {
     const { name, value } = event.target;
-    clearBasicError(name);
-    setBasicForm((prev) => {
+    clearFormError(name);
+    setListingForm((prev) => {
       if (name === 'listing_type') {
         return {
           ...prev,
@@ -318,50 +359,52 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     });
   };
 
-  const handleBasicSwitchChange = (event) => {
+  const handleSwitchChange = (event) => {
     const { name, checked } = event.target;
-    clearBasicError(name);
-    setBasicForm((prev) => ({ ...prev, [name]: checked }));
+    clearFormError(name);
+    setListingForm((prev) => ({ ...prev, [name]: checked }));
   };
 
-  const handleBasicSubmit = async () => {
-    const errors = validateBasicForm();
+  const handleOverviewSubmit = async () => {
+    const errors = validateOverview();
     if (Object.keys(errors).length) {
-      setBasicErrors(errors);
+      setFormErrors(errors);
       showMessage('Revisa los campos obligatorios antes de continuar.', 'warning');
       return;
     }
 
-    setBasicErrors({});
+    setFormErrors({});
 
-    const listingType = basicForm.listing_type;
+    const listingType = listingForm.listing_type;
     const includesSale = listingType === 'sale' || listingType === 'both';
     const includesRent = listingType === 'rent' || listingType === 'both';
-    const priceValue = parseNumber(basicForm.price) ?? 0;
-    const rentPriceValue = parseNumber(basicForm.rent_price) ?? 0;
-    const sizeValue = parseNumber(basicForm.size) ?? 0;
+    const priceValue = parseNumber(listingForm.price) ?? 0;
+    const rentPriceValue = parseNumber(listingForm.rent_price) ?? 0;
+    const sizeValue = parseNumber(listingForm.size) ?? 0;
 
     const payload = {
-      name: basicForm.name,
-      type: basicForm.type,
-      description: basicForm.description?.trim() || '',
+      name: listingForm.name,
+      type: listingForm.type,
+      description: listingForm.description?.trim() || '',
       price: includesSale ? priceValue : 0,
       size: sizeValue,
       listing_type: listingType,
       rent_price: includesRent ? rentPriceValue : null,
-      plan: basicForm.plan || null,
-      has_water: Boolean(basicForm.has_water),
-      has_views: Boolean(basicForm.has_views),
-      contact_name: basicForm.contact_name?.trim() || '',
-      contact_email: basicForm.contact_email?.trim() || '',
-      contact_phone: basicForm.contact_phone?.trim() || '',
-      address_line1: basicForm.address_line1?.trim() || '',
-      address_line2: basicForm.address_line2?.trim() || '',
-      address_city: basicForm.address_city?.trim() || '',
-      address_region: basicForm.address_region?.trim() || '',
-      address_country: basicForm.address_country?.trim() || '',
-      address_postal_code: basicForm.address_postal_code?.trim() || '',
+      has_water: Boolean(listingForm.has_water),
+      has_views: Boolean(listingForm.has_views),
     };
+
+    if (!listingId) {
+      payload.contact_name = listingForm.contact_name?.trim() || '';
+      payload.contact_email = listingForm.contact_email?.trim() || '';
+      payload.contact_phone = listingForm.contact_phone?.trim() || '';
+      payload.address_line1 = listingForm.address_line1?.trim() || '';
+      payload.address_line2 = listingForm.address_line2?.trim() || '';
+      payload.address_city = listingForm.address_city?.trim() || '';
+      payload.address_region = listingForm.address_region?.trim() || '';
+      payload.address_country = listingForm.address_country?.trim() || '';
+      payload.address_postal_code = listingForm.address_postal_code?.trim() || '';
+    }
     try {
       setSaving(true);
       if (!listingId) {
@@ -510,67 +553,144 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     }
   }, [mapInstance, boundaryDraft, boundaryDirty, boundaryRemovalPending, savedBoundary]);
 
-  const saveBoundary = async () => {
-    if (!listingId) {
-      showMessage('Guarda primero la información básica.', 'warning');
+  const locatePropertyOnMap = useCallback(async () => {
+    if (!mapInstance) {
+      showMessage('El mapa aún no está listo, intenta nuevamente en unos segundos.', 'warning');
       return;
     }
 
-    if (!boundaryDirty) {
-      setActiveStep((prev) => prev + 1);
+    const queryParts = [
+      listingForm.address_line1,
+      listingForm.address_city,
+      listingForm.address_region,
+      listingForm.address_country,
+    ]
+      .map((value) => value?.trim())
+      .filter(Boolean);
+
+    if (!queryParts.length) {
+      showMessage('Completa al menos la dirección base para buscarla en el mapa.', 'warning');
       return;
     }
+
+    if (!config.mapbox.accessToken) {
+      showMessage('Configura el token de Mapbox para habilitar la búsqueda de direcciones.', 'warning');
+      return;
+    }
+
+    const query = queryParts.join(', ');
 
     try {
-      setSaving(true);
-
-      if (boundaryRemovalPending) {
-        await marketplaceService.updateProperty(listingId, {
-          boundary_polygon: null,
-          longitude: null,
-          latitude: null,
-          size: null,
-          has_boundary: false,
-        });
-        await loadListing(listingId);
-        showMessage('Polígono eliminado correctamente.');
-      } else if (boundaryDraft?.feature) {
-        const centroid =
-          boundaryDraft.center && boundaryDraft.center.length === 2
-            ? boundaryDraft.center
-            : turf.centroid(boundaryDraft.feature)?.geometry?.coordinates;
-
-        const payload = {
-          boundary_polygon: boundaryDraft.feature,
-        };
-
-        if (Array.isArray(centroid) && centroid.length === 2) {
-          payload.longitude = centroid[0];
-          payload.latitude = centroid[1];
-        }
-
-        if (Number.isFinite(boundaryDraft?.areaHa)) {
-          payload.size = Number(boundaryDraft.areaHa.toFixed(2));
-        }
-
-        await marketplaceService.updateProperty(listingId, payload);
-        await loadListing(listingId);
-        showMessage('Ubicación guardada correctamente.');
+      setLocating(true);
+      const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${config.mapbox.accessToken}&language=es&limit=1`;
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        throw new Error(`Geocoding failed with status ${response.status}`);
+      }
+      const data = await response.json();
+      const feature = data?.features?.[0];
+      if (feature?.center?.length === 2) {
+        mapInstance.flyTo({ center: feature.center, zoom: Math.max(mapInstance.getZoom() ?? 0, 13), duration: 1200 });
+        showMessage('Dirección localizada en el mapa. Ajusta el polígono para mayor precisión.');
       } else {
-        showMessage('Dibuja un polígono antes de guardar.', 'warning');
-        return;
+        showMessage('No encontramos la ubicación con esa descripción. Ajusta la dirección y vuelve a intentar.', 'info');
+      }
+    } catch (error) {
+      console.error('Error geocoding address', error);
+      showMessage('No fue posible ubicar la dirección. Revisa la ortografía o prueba con una referencia distinta.', 'error');
+    } finally {
+      setLocating(false);
+    }
+  }, [listingForm.address_line1, listingForm.address_city, listingForm.address_region, listingForm.address_country, mapInstance, showMessage]);
+
+  const persistBoundary = useCallback(
+    async ({ withFeedback = true } = {}) => {
+      if (!listingId) {
+        if (withFeedback) {
+          showMessage('Guarda primero la información de la propiedad.', 'warning');
+        }
+        return false;
       }
 
-      setBoundaryDirty(false);
-      setBoundaryRemovalPending(false);
-      setActiveStep((prev) => prev + 1);
-    } catch (error) {
-      console.error('Error saving boundary', error);
-      showMessage('No fue posible guardar el polígono.', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+      if (!boundaryDirty && !boundaryRemovalPending) {
+        if (withFeedback) {
+          showMessage('No hay cambios en el polígono para guardar.', 'info');
+        }
+        return true;
+      }
+
+      try {
+        if (withFeedback) {
+          setSaving(true);
+        }
+
+        if (boundaryRemovalPending) {
+          await marketplaceService.updateProperty(listingId, {
+            boundary_polygon: null,
+            longitude: null,
+            latitude: null,
+            size: null,
+            has_boundary: false,
+          });
+          await loadListing(listingId);
+          if (withFeedback) {
+            showMessage('Polígono eliminado correctamente.');
+          }
+        } else if (boundaryDraft?.feature) {
+          const centroid =
+            boundaryDraft.center && boundaryDraft.center.length === 2
+              ? boundaryDraft.center
+              : turf.centroid(boundaryDraft.feature)?.geometry?.coordinates;
+
+          const payload = {
+            boundary_polygon: boundaryDraft.feature,
+          };
+
+          if (Array.isArray(centroid) && centroid.length === 2) {
+            payload.longitude = centroid[0];
+            payload.latitude = centroid[1];
+          }
+
+          if (Number.isFinite(boundaryDraft?.areaHa)) {
+            payload.size = Number(boundaryDraft.areaHa.toFixed(2));
+          }
+
+          await marketplaceService.updateProperty(listingId, payload);
+          await loadListing(listingId);
+          if (withFeedback) {
+            showMessage('Ubicación guardada correctamente.');
+          }
+        } else {
+          if (withFeedback) {
+            showMessage('Dibuja un polígono antes de guardar.', 'warning');
+          }
+          return false;
+        }
+
+        setBoundaryDirty(false);
+        setBoundaryRemovalPending(false);
+        return true;
+      } catch (error) {
+        console.error('Error saving boundary', error);
+        if (withFeedback) {
+          showMessage('No fue posible guardar el polígono.', 'error');
+        }
+        return false;
+      } finally {
+        if (withFeedback) {
+          setSaving(false);
+        }
+      }
+    },
+    [
+      listingId,
+      boundaryDirty,
+      boundaryRemovalPending,
+      boundaryDraft,
+      loadListing,
+      showMessage,
+    ]
+  );
 
   const handleAddTimeSlot = () => {
     if (!timeSlotDraft.day || !timeSlotDraft.from || !timeSlotDraft.to) {
@@ -624,24 +744,50 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     setTimeSlots((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const savePreferences = async () => {
-    if (!listingId) {
-      showMessage('Guarda primero la información básica.', 'warning');
+  const handleOperationsSubmit = async ({ advance = true } = {}) => {
+    const errors = validateOperations();
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      showMessage('Completa los datos de coordinación antes de continuar.', 'warning');
       return;
     }
+
+    if (!listingId) {
+      showMessage('Guarda primero la información de la propiedad.', 'warning');
+      return;
+    }
+
     try {
       setSaving(true);
+      const boundaryResult = await persistBoundary({ withFeedback: false });
+      if (!boundaryResult && (boundaryDirty || boundaryRemovalPending)) {
+        // Si hubo error al guardar el polígono, abortamos sin continuar.
+        return;
+      }
+
       const payload = {
+        contact_name: listingForm.contact_name?.trim() || '',
+        contact_email: listingForm.contact_email?.trim() || '',
+        contact_phone: listingForm.contact_phone?.trim() || '',
+        address_line1: listingForm.address_line1?.trim() || '',
+        address_line2: listingForm.address_line2?.trim() || '',
+        address_city: listingForm.address_city?.trim() || '',
+        address_region: listingForm.address_region?.trim() || '',
+        address_country: listingForm.address_country?.trim() || '',
+        address_postal_code: listingForm.address_postal_code?.trim() || '',
         preferred_time_windows: timeSlots,
         access_notes: accessNotes,
       };
+
       await marketplaceService.updateProperty(listingId, payload);
       await loadListing(listingId);
-      showMessage('Preferencias guardadas.');
-      setActiveStep((prev) => prev + 1);
+      showMessage('Coordinación operativa actualizada.');
+      if (advance) {
+        setActiveStep((prev) => prev + 1);
+      }
     } catch (error) {
-      console.error('Error saving preferences', error);
-      showMessage('No se pudieron guardar las preferencias.', 'error');
+      console.error('Error saving operations data', error);
+      showMessage('No se pudieron guardar los datos operativos.', 'error');
     } finally {
       setSaving(false);
     }
@@ -649,6 +795,18 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
 
   const handleSubmitForReview = async () => {
     if (!listingId) return;
+
+    if (!reviewChecklist.hasPlan) {
+      showMessage('Selecciona un plan activo antes de publicar. Te llevaremos a la sección de planes.', 'info');
+      navigate('/pricing', { state: { from: 'seller-listing-review', listingId } });
+      return;
+    }
+
+    if (!reviewChecklist.canSubmit) {
+      showMessage('Aún faltan requisitos para enviar la publicación.', 'warning');
+      return;
+    }
+
     try {
       setSaving(true);
       await marketplaceService.submitProperty(listingId, {
@@ -677,727 +835,954 @@ const SellerListingWizard = ({ listingId: initialListingId }) => {
     setActiveStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const renderBasicStep = () => {
-    const includesRent = basicForm.listing_type === 'rent' || basicForm.listing_type === 'both';
-    const includesSale = basicForm.listing_type === 'sale' || basicForm.listing_type === 'both';
-
-    return (
-      <Stack spacing={4}>
-        <Box>
-          <Typography variant="h6">Información general</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Cuéntanos sobre el terreno para que el equipo de operadores y los compradores entiendan de inmediato su potencial.
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="Nombre del terreno"
-              name="name"
-              value={basicForm.name}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.name)}
-              helperText={basicErrors.name || 'Por ejemplo: "Campo Los Boldos" o "Parcela en Lago Ranco"'}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth error={Boolean(basicErrors.plan)}>
-              <InputLabel id="plan-label">Plan</InputLabel>
-              <Select
-                labelId="plan-label"
-                label="Plan"
-                name="plan"
-                value={basicForm.plan}
-                onChange={handleBasicChange}
-              >
-                {plans.map((plan) => (
-                  <MenuItem key={plan.id} value={plan.id}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Typography fontWeight={500}>{plan.name}</Typography>
-                      <Chip size="small" label={`$${plan.price}`} color="primary" variant="outlined" />
-                    </Stack>
-                  </MenuItem>
-                ))}
-              </Select>
-              <FormHelperText error={Boolean(basicErrors.plan)}>
-                {basicErrors.plan || 'El plan define la visibilidad, reportes y soporte que recibes.'}
-              </FormHelperText>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="Tipo de propiedad"
-              name="type"
-              value={basicForm.type}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.type)}
-              helperText={basicErrors.type || 'Ejemplos: terreno agrícola, parcela urbanizada, predio forestal.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Precio de venta (USD)"
-              name="price"
-              type="number"
-              value={basicForm.price}
-              onChange={handleBasicChange}
-              fullWidth
-              required={includesSale}
-              error={Boolean(basicErrors.price)}
-              helperText={basicErrors.price || (includesSale ? 'Indica el precio total solicitado.' : 'Solo visible si habilitas venta.')}
-              InputProps={{ inputProps: { min: 0, step: 100 } }}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Tamaño (hectáreas)"
-              name="size"
-              type="number"
-              value={basicForm.size}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.size)}
-              helperText={basicErrors.size || 'Redondea a dos decimales si es necesario.'}
-              InputProps={{ inputProps: { min: 0, step: 0.01 } }}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
-              <Select
-                labelId="listing-type-label"
-                label="Tipo de publicación"
-                name="listing_type"
-                value={basicForm.listing_type}
-                onChange={handleBasicChange}
-              >
-                <MenuItem value="sale">Venta</MenuItem>
-                <MenuItem value="rent">Arriendo</MenuItem>
-                <MenuItem value="both">Venta y arriendo</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          {includesRent && (
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Precio de arriendo mensual (USD)"
-                name="rent_price"
-                type="number"
-                value={basicForm.rent_price}
-                onChange={handleBasicChange}
-                fullWidth
-                required
-                error={Boolean(basicErrors.rent_price)}
-                helperText={basicErrors.rent_price || 'Si arriendas por temporada, acláralo en la descripción.'}
-                InputProps={{ inputProps: { min: 0, step: 50 } }}
-              />
-            </Grid>
-          )}
-          <Grid item xs={12}>
-            <TextField
-              label="Descripción"
-              name="description"
-              value={basicForm.description}
-              onChange={handleBasicChange}
-              fullWidth
-              multiline
-              minRows={4}
-              helperText="Resalta atributos únicos, accesos, servidumbres y potencial de uso."
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <FormGroup row>
-              <FormControlLabel
-                control={<Switch checked={Boolean(basicForm.has_water)} onChange={handleBasicSwitchChange} name="has_water" />}
-                label="Cuenta con acceso a agua"
-              />
-              <FormControlLabel
-                control={<Switch checked={Boolean(basicForm.has_views)} onChange={handleBasicSwitchChange} name="has_views" />}
-                label="Tiene vistas destacadas"
-              />
-            </FormGroup>
-          </Grid>
-        </Grid>
-
-        <Divider />
-
-        <Box>
-          <Typography variant="h6">Contacto operativo</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Estos datos permiten coordinar al piloto de SkyTerra y responder a potenciales compradores.
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <TextField
-              label="Nombre del contacto"
-              name="contact_name"
-              value={basicForm.contact_name}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.contact_name)}
-              helperText={basicErrors.contact_name || 'Persona que abrirá el campo o atenderá visitas.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TextField
-              label="Correo del contacto"
-              name="contact_email"
-              value={basicForm.contact_email}
-              onChange={handleBasicChange}
-              fullWidth
-              error={Boolean(basicErrors.contact_email)}
-              helperText={basicErrors.contact_email || 'Usaremos este correo para enviar confirmaciones y reportes.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TextField
-              label="Teléfono o WhatsApp"
-              name="contact_phone"
-              value={basicForm.contact_phone}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.contact_phone)}
-              helperText={basicErrors.contact_phone || 'Incluye código de país. Ej: +56 9 1234 5678.'}
-            />
-          </Grid>
-        </Grid>
-
-        <Divider />
-
-        <Box>
-          <Typography variant="h6">Ubicación y referencias</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Indica la dirección base y cualquier detalle que ayude al operador a llegar sin contratiempos.
-          </Typography>
-        </Box>
-
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="Dirección o punto de referencia"
-              name="address_line1"
-              value={basicForm.address_line1}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.address_line1)}
-              helperText={basicErrors.address_line1 || 'Puedes usar coordenadas o una descripción clara si no existe dirección formal.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              label="Detalle adicional (interior, lote, portón...)"
-              name="address_line2"
-              value={basicForm.address_line2}
-              onChange={handleBasicChange}
-              fullWidth
-              helperText="Información opcional para llegar sin perder tiempo."
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Ciudad / Comuna"
-              name="address_city"
-              value={basicForm.address_city}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.address_city)}
-              helperText={basicErrors.address_city || 'Es clave para programar al operador local.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Región / Estado"
-              name="address_region"
-              value={basicForm.address_region}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.address_region)}
-              helperText={basicErrors.address_region || 'Indica la división administrativa correspondiente.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="País"
-              name="address_country"
-              value={basicForm.address_country}
-              onChange={handleBasicChange}
-              fullWidth
-              required
-              error={Boolean(basicErrors.address_country)}
-              helperText={basicErrors.address_country || 'Si recibes visitas internacionales, esto ayuda a los pilotos.'}
-            />
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <TextField
-              label="Código postal"
-              name="address_postal_code"
-              value={basicForm.address_postal_code}
-              onChange={handleBasicChange}
-              fullWidth
-              helperText="Opcional, pero útil para notificaciones y logística."
-            />
-          </Grid>
-        </Grid>
-      </Stack>
-    );
-  };
-
-  const renderDocumentsStep = () => (
-    <Stack spacing={2}>
-      {DOCUMENT_TYPES.map((doc) => {
-        const existing = currentDocuments.find((d) => d.doc_type === doc.key);
-        return (
-          <Paper key={doc.key} variant="outlined" sx={{ p: 2 }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
-              <Box sx={{ flexGrow: 1 }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="subtitle1">{doc.label}</Typography>
-                  {existing && (
-                    <Chip
-                      size="small"
-                      label={DOC_STATUS_LABELS[existing.status] || existing.status}
-                      color={DOC_STATUS_COLOR[existing.status] || 'default'}
-                    />
-                  )}
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {existing
-                    ? existing.reviewed_at
-                      ? `Revisado ${new Date(existing.reviewed_at).toLocaleString()}${existing.reviewed_by_details ? ` por ${existing.reviewed_by_details.username}` : ''}`
-                      : 'En revisión por el equipo de SkyTerra'
-                    : 'Pendiente de subir'}
-                </Typography>
-                {existing?.description && (
-                  <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    {existing.description}
-                  </Typography>
-                )}
-              </Box>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Button
-                  variant="outlined"
-                  component="label"
-                  startIcon={<UploadIcon />}
-                  disabled={saving}
-                >
-                  Subir
-                  <input
-                    hidden
-                    type="file"
-                    accept="application/pdf,image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) handleDocumentUpload(doc.key, file);
-                      event.target.value = '';
-                    }}
-                  />
-                </Button>
-                {existing && (
-                  <IconButton color="error" onClick={() => handleDocumentDelete(existing.id)} disabled={saving}>
-                    <DeleteIcon />
-                  </IconButton>
-                )}
-              </Stack>
-            </Stack>
-          </Paper>
-        );
-      })}
-    </Stack>
-  );
-
-  const renderBoundaryStep = () => {
-    const hasSavedBoundary = Boolean(savedBoundary?.geojson);
-    const hasDraftBoundary = Boolean(boundaryDraft?.geojson);
-    const areaLabel =
-      boundaryRemovalPending || boundaryAreaHa == null
-        ? '—'
-        : `${boundaryAreaHa.toFixed(2)} ha`;
-
-    let statusSeverity = 'warning';
-    let statusMessage =
-      'Dibuja los límites del terreno para que el equipo de operadores pueda ubicarlo con precisión.';
-
-    if (boundaryRemovalPending) {
-      statusSeverity = 'warning';
-      statusMessage =
-        'Eliminarás el polígono guardado al confirmar los cambios. Si fue un error, vuelve a dibujarlo antes de guardar.';
-    } else if (boundaryDirty) {
-      statusSeverity = 'info';
-      statusMessage = 'Tienes cambios sin guardar. Presiona “Guardar polígono” para actualizar la publicación.';
-    } else if (hasSavedBoundary) {
-      statusSeverity = 'success';
-      statusMessage = 'El polígono guardado se utilizará para asignar al operador en terreno.';
-    }
-
-    const targetBoundary = boundaryDirty && !boundaryRemovalPending && hasDraftBoundary ? boundaryDraft : savedBoundary;
-    const initialLatitude = targetBoundary?.latitude ?? listing?.latitude ?? -33.4489;
-    const initialLongitude = targetBoundary?.longitude ?? listing?.longitude ?? -70.6693;
-    const initialZoom = targetBoundary ? 16 : listing?.boundary_polygon ? 15 : 4;
-
-    const canPersistBoundary = boundaryDirty ? boundaryRemovalPending || hasDraftBoundary : true;
-    const canRecenter =
-      Boolean(mapInstance) &&
-      Boolean(
-        (boundaryDirty && !boundaryRemovalPending && hasDraftBoundary) ||
-          (!boundaryDirty && hasSavedBoundary)
-      );
-
-    return (
-      <Stack spacing={3}>
-        <Alert severity={statusSeverity} variant="outlined">
-          {statusMessage}
-        </Alert>
-        <Typography variant="body2" color="text.secondary">
-          Dibuja el polígono que representa la propiedad. Ajusta tanto como necesites y asegúrate de que el área sea representativa.
-        </Typography>
-        <Box sx={{ position: 'relative', height: 420, borderRadius: 2, overflow: 'hidden' }}>
-          <Map
-            initialViewState={{
-              latitude: initialLatitude,
-              longitude: initialLongitude,
-              zoom: initialZoom,
-            }}
-            mapboxAccessToken={config.mapbox.accessToken}
-            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
-            style={{ width: '100%', height: '100%' }}
-            onLoad={(event) => setMapInstance(event.target)}
-          >
-            <NavigationControl position="top-right" />
-            {mapInstance && (
-              <PropertyBoundaryDraw
-                map={mapInstance}
-                onBoundariesUpdate={handleBoundaryUpdate}
-                existingBoundaries={savedBoundary?.geojson || listing?.boundary_polygon}
-              />
-            )}
-          </Map>
-        </Box>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          justifyContent="space-between"
-          alignItems={{ xs: 'flex-start', sm: 'center' }}
-        >
-          <Box>
-            <Typography variant="body2" color="text.secondary">
-              Área estimada: {areaLabel}
-            </Typography>
-            {boundaryRemovalPending && hasSavedBoundary && (
-              <Typography variant="caption" color="warning.main">
-                El polígono actual se eliminará al guardar.
-              </Typography>
-            )}
-            {!boundaryRemovalPending &&
-              listing?.size &&
-              boundaryAreaHa != null &&
-              Math.abs(boundaryAreaHa - Number(listing.size)) > 0.5 && (
-              <Typography variant="caption" color="text.secondary">
-                Tamaño registrado en ficha: {Number(listing.size).toFixed(2)} ha.
-              </Typography>
-            )}
-          </Box>
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="outlined"
-              startIcon={<MyLocationIcon />}
-              onClick={recenterOnBoundary}
-              disabled={!canRecenter}
-            >
-              Recentrar mapa
-            </Button>
-            <Button variant="contained" onClick={saveBoundary} disabled={saving || !canPersistBoundary}>
-              Guardar polígono
-            </Button>
-          </Stack>
-        </Stack>
-      </Stack>
-    );
-  };
-
-  const renderPreferencesStep = () => (
-    <Stack spacing={3}>
-      <Box>
-        <Typography variant="subtitle1">Ventanas horarias sugeridas</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Agrega disponibilidad estimada para coordinar la visita del piloto.
-        </Typography>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <TextField
-            label="Fecha"
-            type="date"
-            value={timeSlotDraft.day}
-            onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, day: event.target.value }))}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-            helperText="Selecciona el día disponible."
-          />
-          <TextField
-            label="Desde"
-            type="time"
-            value={timeSlotDraft.from}
-            onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, from: event.target.value }))}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Hasta"
-            type="time"
-            value={timeSlotDraft.to}
-            onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, to: event.target.value }))}
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTimeSlot}>
-            Agregar
-          </Button>
-        </Stack>
-        <Stack direction="row" spacing={1} mt={2} flexWrap="wrap">
-          {timeSlots.map((slot, index) => (
-            <Chip
-              key={`${slot.day}-${slot.from}-${slot.to}-${index}`}
-              label={`${slot.day} • ${slot.from} - ${slot.to}`}
-              onDelete={() => handleRemoveTimeSlot(index)}
-              sx={{ mb: 1 }}
-            />
-          ))}
-          {!timeSlots.length && <Typography variant="body2" color="text.secondary">Sin ventanas registradas aún.</Typography>}
-        </Stack>
-      </Box>
-      <Box>
-        <Typography variant="subtitle1">Instrucciones de acceso</Typography>
-        <TextField
-          label="Notas para el piloto (portón, contacto, seguridad...)"
-          value={accessNotes}
-          onChange={(event) => setAccessNotes(event.target.value)}
-          multiline
-          minRows={4}
-          fullWidth
-        />
-      </Box>
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button variant="contained" onClick={savePreferences} disabled={saving}>
-          Guardar preferencias
-        </Button>
-      </Stack>
-    </Stack>
-  );
-
-  const renderReviewStep = () => {
-    const requirements = listing?.submission_requirements || {
-      missing_documents: DOCUMENT_TYPES.filter((doc) => doc.key !== 'other').map((doc) => doc.key),
-      has_boundary: Boolean(listing?.boundary_polygon),
-      can_submit: false,
-    };
-
-    const hasContact = Boolean(listing?.contact_name && listing?.contact_phone);
-    const hasAddress = Boolean(
-      listing?.address_line1 &&
-        listing?.address_country &&
-        listing?.address_region &&
-        listing?.address_city
-    );
-    const missingDocuments = Array.isArray(requirements.missing_documents)
-      ? requirements.missing_documents
-      : [];
-    const canSubmit = Boolean(requirements.can_submit && hasContact && hasAddress && requirements.has_boundary);
-
-    return (
-    <Stack spacing={3}>
-      <Box>
-        <Typography variant="h6">Resumen</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Revisa la información antes de enviar a revisión. Puedes volver atrás para ajustar cualquier detalle.
-        </Typography>
-      </Box>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle1">{listing?.name}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {listing?.type} · {listing?.size ? `${listing.size} ha` : '—'} · ${listing?.price ?? '—'}
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          {listing?.description || 'Sin descripción'}
-        </Typography>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="subtitle2">Plan contratado</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {listing?.plan_details?.name || 'Sin plan asignado'}
-        </Typography>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="subtitle2">Contacto operativo</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {listing?.contact_name || '—'} · {listing?.contact_phone || 'Teléfono pendiente'}
-        </Typography>
-        {listing?.contact_email && (
-          <Typography variant="body2" color="text.secondary">{listing.contact_email}</Typography>
-        )}
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="subtitle2">Dirección de grabación</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {[listing?.address_line1, listing?.address_line2].filter(Boolean).join(', ') || 'Dirección pendiente'}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {[listing?.address_city, listing?.address_region, listing?.address_country]
-            .filter(Boolean)
-            .join(', ') || 'Completa ciudad y país para coordinar el vuelo.'}
-        </Typography>
-      </Paper>
-      <Box>
-        <StatusBar status={listing?.status_bar} />
-      </Box>
-      {!canSubmit && (
-        <Alert severity="warning">
-          {!requirements.has_boundary
-            ? 'Dibuja y guarda el polígono del terreno para continuar.'
-            : !hasContact
-            ? 'Agrega un nombre y teléfono de contacto para coordinar el vuelo.'
-            : !hasAddress
-            ? 'Completa la dirección principal para orientar al piloto.'
-            : 'Faltan documentos aprobados para continuar.'}
-          {!!missingDocuments.length && (
-            <Box component="span"> Documentos pendientes: {missingDocuments.map((code) => DOCUMENT_LABEL_MAP[code] || code).join(', ')}.</Box>
-          )}
-        </Alert>
-      )}
-      <Box>
-        <Typography variant="subtitle2">Historial de estado</Typography>
-        <Stack spacing={1} mt={1}>
-          {(listing?.status_history || []).slice(0, 6).map((entry) => (
-            <Paper key={entry.id} variant="outlined" sx={{ p: 1.5 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {entry.substate}
-              </Typography>
-              {entry.message && (
-                <Typography variant="body2" color="text.secondary">
-                  {entry.message}
-                </Typography>
-              )}
-              <Typography variant="caption" color="text.secondary">
-                {new Date(entry.created_at).toLocaleString()}
-              </Typography>
-            </Paper>
-          ))}
-          {!listing?.status_history?.length && (
-            <Typography variant="body2" color="text.secondary">
-              Aún no hay eventos registrados.
-            </Typography>
-          )}
-        </Stack>
-      </Box>
-      <Stack direction="row" spacing={1} justifyContent="space-between">
-        <Button variant="outlined" onClick={() => navigate('/dashboard')}>
-          Volver al panel
-        </Button>
-        <Button variant="contained" color="primary" onClick={handleSubmitForReview} disabled={saving || !listingId || !canSubmit}>
-          Enviar a revisión
-        </Button>
-      </Stack>
-    </Stack>
-  );
-  };
-
-  const renderStepContent = () => {
-    switch (steps[activeStep].key) {
-      case 'basic':
-        return renderBasicStep();
-      case 'documents':
-        return renderDocumentsStep();
-      case 'boundary':
-        return renderBoundaryStep();
-      case 'preferences':
-        return renderPreferencesStep();
-      case 'review':
-        return renderReviewStep();
-      default:
-        return null;
-    }
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  const actionButtons = (
-    <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-      {activeStep > 0 && (
-        <Button variant="text" onClick={handleBack} disabled={saving}>
-          Atrás
-        </Button>
-      )}
-      {activeStep < steps.length - 1 && steps[activeStep].key !== 'preferences' && steps[activeStep].key !== 'boundary' && (
-        <Button variant="contained" onClick={handleBasicSubmit} disabled={saving}>
-          Guardar y continuar
-        </Button>
-      )}
-    </Stack>
-  );
+  
+const renderOverviewStep = () => {
+  const includesRent = listingForm.listing_type === 'rent' || listingForm.listing_type === 'both';
+  const includesSale = listingForm.listing_type === 'sale' || listingForm.listing_type === 'both';
 
   return (
-    <Box sx={{ pb: 6 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
-        {listingId ? 'Editar publicación' : 'Nueva publicación'}
-      </Typography>
-      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
-        {steps.map((step) => (
-          <Step key={step.key}>
-            <StepLabel>{step.label}</StepLabel>
-          </Step>
-        ))}
-      </Stepper>
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-        {renderStepContent()}
-        {steps[activeStep].key === 'basic' && actionButtons}
-        {steps[activeStep].key === 'documents' && (
-          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="text" onClick={handleBack} disabled={saving}>
-              Atrás
-            </Button>
-            <Button variant="contained" onClick={() => setActiveStep((prev) => prev + 1)} disabled={saving}>
-              Continuar
-            </Button>
-          </Stack>
-        )}
-        {steps[activeStep].key === 'preferences' && (
-          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="text" onClick={handleBack} disabled={saving}>
-              Atrás
-            </Button>
-            <Button variant="contained" onClick={savePreferences} disabled={saving}>
-              Guardar y continuar
-            </Button>
-          </Stack>
-        )}
-        {steps[activeStep].key === 'boundary' && (
-          <Stack direction="row" spacing={2} mt={3} justifyContent="flex-end">
-            <Button variant="text" onClick={handleBack} disabled={saving}>
-              Atrás
-            </Button>
-          </Stack>
-        )}
+    <Stack spacing={3}>
+      <Paper sx={SECTION_CARD_SX}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Identidad del terreno
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Define los datos esenciales que verán los compradores y que usaremos para perfilar la operación en terreno.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Nombre del terreno"
+                name="name"
+                value={listingForm.name}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.name)}
+                helperText={formErrors.name || 'Por ejemplo: “Campo Los Boldos” o “Parcela en Lago Ranco”.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Tipo de propiedad"
+                name="type"
+                value={listingForm.type}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.type)}
+                helperText={formErrors.type || 'Ejemplos: terreno agrícola, parcela urbanizada, predio forestal.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel id="listing-type-label">Tipo de publicación</InputLabel>
+                <Select
+                  labelId="listing-type-label"
+                  label="Tipo de publicación"
+                  name="listing_type"
+                  value={listingForm.listing_type}
+                  onChange={handleFieldChange}
+                >
+                  <MenuItem value="sale">Venta</MenuItem>
+                  <MenuItem value="rent">Arriendo</MenuItem>
+                  <MenuItem value="both">Venta y arriendo</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {includesSale && (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Precio de venta (USD)"
+                  name="price"
+                  type="number"
+                  value={listingForm.price}
+                  onChange={handleFieldChange}
+                  fullWidth
+                  required
+                  error={Boolean(formErrors.price)}
+                  helperText={formErrors.price || 'Indica el precio total solicitado.'}
+                  InputProps={{ inputProps: { min: 0, step: 100 } }}
+                />
+              </Grid>
+            )}
+            {includesRent && (
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Precio de arriendo mensual (USD)"
+                  name="rent_price"
+                  type="number"
+                  value={listingForm.rent_price}
+                  onChange={handleFieldChange}
+                  fullWidth
+                  required
+                  error={Boolean(formErrors.rent_price)}
+                  helperText={formErrors.rent_price || 'Si arriendas por temporada, acláralo en la descripción.'}
+                  InputProps={{ inputProps: { min: 0, step: 50 } }}
+                />
+              </Grid>
+            )}
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Superficie (hectáreas)"
+                name="size"
+                type="number"
+                value={listingForm.size}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.size)}
+                helperText={formErrors.size || 'Redondea a dos decimales si es necesario.'}
+                InputProps={{ inputProps: { min: 0, step: 0.01 } }}
+              />
+            </Grid>
+          </Grid>
+
+          <Divider />
+
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                label="Descripción"
+                name="description"
+                value={listingForm.description}
+                onChange={handleFieldChange}
+                fullWidth
+                multiline
+                minRows={4}
+                helperText="Resalta atributos únicos, accesos, servidumbres y potencial de uso."
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormGroup row>
+                <FormControlLabel
+                  control={<Switch checked={Boolean(listingForm.has_water)} onChange={handleSwitchChange} name="has_water" />}
+                  label="Cuenta con acceso a agua"
+                />
+                <FormControlLabel
+                  control={<Switch checked={Boolean(listingForm.has_views)} onChange={handleSwitchChange} name="has_views" />}
+                  label="Tiene vistas destacadas"
+                />
+              </FormGroup>
+            </Grid>
+          </Grid>
+        </Stack>
       </Paper>
-      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={closeSnackbar}>
-        <Alert severity={snackbar.severity} onClose={closeSnackbar} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+
+      <Alert severity="info" variant="outlined">
+        Podrás definir ubicación, contacto operativo y plan de publicación en los siguientes pasos sin perder la información ingresada.
+      </Alert>
+    </Stack>
   );
 };
+
+const renderDocumentsStep = () => (
+  <Stack spacing={3}>
+    <Paper sx={SECTION_CARD_SX}>
+      <Stack spacing={3}>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Documentación de respaldo
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Adjunta los documentos que acrediten dominio y características del terreno. Esto acelera la revisión y aumenta la confianza de los compradores.
+          </Typography>
+        </Box>
+
+        <Stack spacing={2.5}>
+          {DOCUMENT_TYPES.map((doc) => {
+            const existing = currentDocuments.find((d) => d.doc_type === doc.key);
+            return (
+              <Box
+                key={doc.key}
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  gap: 2,
+                  p: { xs: 2.5, md: 3 },
+                  borderRadius: 3,
+                  border: '1px solid rgba(15, 23, 42, 0.12)',
+                  backgroundColor: 'rgba(248, 249, 255, 0.8)',
+                }}
+              >
+                <Box sx={{ flexGrow: 1 }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      {doc.label}
+                    </Typography>
+                    {existing && (
+                      <Chip
+                        size="small"
+                        label={DOC_STATUS_LABELS[existing.status] || existing.status}
+                        color={DOC_STATUS_COLOR[existing.status] || 'default'}
+                      />
+                    )}
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {existing
+                      ? existing.reviewed_at
+                        ? `Revisado ${new Date(existing.reviewed_at).toLocaleString()}${existing.reviewed_by_details ? ` por ${existing.reviewed_by_details.username}` : ''}`
+                        : 'En revisión por el equipo de SkyTerra'
+                      : 'Pendiente de subir'}
+                  </Typography>
+                  {existing?.description && (
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                      {existing.description}
+                    </Typography>
+                  )}
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<UploadIcon />}
+                    disabled={saving}
+                  >
+                    Subir
+                    <input
+                      hidden
+                      type="file"
+                      accept="application/pdf,image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) handleDocumentUpload(doc.key, file);
+                        event.target.value = '';
+                      }}
+                    />
+                  </Button>
+                  {existing && (
+                    <IconButton color="error" onClick={() => handleDocumentDelete(existing.id)} disabled={saving}>
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
+                </Stack>
+              </Box>
+            );
+          })}
+        </Stack>
+      </Stack>
+    </Paper>
+
+    <Alert severity="info" variant="outlined">
+      Puedes continuar sin subir todos los archivos, pero necesitaremos al menos escritura, plano y certificado para publicar.
+    </Alert>
+  </Stack>
+);
+
+const renderOperationsStep = () => {
+  const hasSavedBoundary = Boolean(savedBoundary?.geojson);
+  const hasDraftBoundary = Boolean(boundaryDraft?.geojson);
+  const areaLabel = boundaryRemovalPending || boundaryAreaHa == null ? '—' : `${boundaryAreaHa.toFixed(2)} ha`;
+
+  let statusSeverity = 'warning';
+  let statusMessage = 'Dibuja los límites del terreno para que el equipo operativo pueda ubicarlo con precisión.';
+
+  if (boundaryRemovalPending) {
+    statusSeverity = 'warning';
+    statusMessage = 'Eliminarás el polígono guardado al confirmar los cambios. Si fue un error, vuelve a dibujarlo antes de guardar.';
+  } else if (boundaryDirty) {
+    statusSeverity = 'info';
+    statusMessage = 'Tienes cambios sin guardar. Presiona “Guardar polígono” para actualizar la publicación.';
+  } else if (hasSavedBoundary) {
+    statusSeverity = 'success';
+    statusMessage = 'El polígono guardado se utilizará para asignar al operador en terreno.';
+  }
+
+  const targetBoundary = boundaryDirty && !boundaryRemovalPending && hasDraftBoundary ? boundaryDraft : savedBoundary;
+  const initialLatitude = targetBoundary?.latitude ?? listing?.latitude ?? -33.4489;
+  const initialLongitude = targetBoundary?.longitude ?? listing?.longitude ?? -70.6693;
+  const initialZoom = targetBoundary ? 16 : listing?.boundary_polygon ? 15 : 4;
+  const canPersistBoundary = boundaryDirty || boundaryRemovalPending;
+  const canRecenter =
+    Boolean(mapInstance) &&
+    Boolean((boundaryDirty && !boundaryRemovalPending && hasDraftBoundary) || (!boundaryDirty && hasSavedBoundary));
+
+  return (
+    <Stack spacing={3}>
+      <Paper sx={SECTION_CARD_SX}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Contacto operativo y agenda
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Indica quién coordinará en terreno y define ventanas de visita para agilizar la programación del vuelo.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Nombre del contacto"
+                name="contact_name"
+                value={listingForm.contact_name}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.contact_name)}
+                helperText={formErrors.contact_name || 'Persona que abrirá el campo o atenderá visitas.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Correo del contacto"
+                name="contact_email"
+                value={listingForm.contact_email}
+                onChange={handleFieldChange}
+                fullWidth
+                error={Boolean(formErrors.contact_email)}
+                helperText={formErrors.contact_email || 'Usaremos este correo para enviar confirmaciones y reportes.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <TextField
+                label="Teléfono o WhatsApp"
+                name="contact_phone"
+                value={listingForm.contact_phone}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.contact_phone)}
+                helperText={formErrors.contact_phone || 'Incluye código de país. Ej: +56 9 1234 5678.'}
+              />
+            </Grid>
+          </Grid>
+
+          <Divider />
+
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Disponibilidad sugerida
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Agrega bloques tentativos para coordinar al equipo de vuelo. Puedes editarlos en cualquier momento.
+            </Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <TextField
+                label="Fecha"
+                type="date"
+                value={timeSlotDraft.day}
+                onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, day: event.target.value }))}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Desde"
+                type="time"
+                value={timeSlotDraft.from}
+                onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, from: event.target.value }))}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Hasta"
+                type="time"
+                value={timeSlotDraft.to}
+                onChange={(event) => setTimeSlotDraft((prev) => ({ ...prev, to: event.target.value }))}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddTimeSlot}>
+                Agregar
+              </Button>
+            </Stack>
+            <Stack direction="row" spacing={1} mt={2} flexWrap="wrap">
+              {timeSlots.map((slot, index) => (
+                <Chip
+                  key={`${slot.day}-${slot.from}-${slot.to}-${index}`}
+                  label={`${slot.day} • ${slot.from} - ${slot.to}`}
+                  onDelete={() => handleRemoveTimeSlot(index)}
+                  sx={{ mb: 1 }}
+                />
+              ))}
+              {!timeSlots.length && (
+                <Typography variant="body2" color="text.secondary">
+                  Aún no hay bloques registrados.
+                </Typography>
+              )}
+            </Stack>
+          </Box>
+
+          <TextField
+            label="Instrucciones de acceso (portón, referencias, seguridad...)"
+            value={accessNotes}
+            onChange={(event) => setAccessNotes(event.target.value)}
+            multiline
+            minRows={4}
+            fullWidth
+          />
+        </Stack>
+      </Paper>
+
+      <Paper sx={SECTION_CARD_SX}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Ubicación y polígono
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Usa una sola búsqueda para posicionar el terreno y dibuja el polígono que utilizaremos como referencia oficial.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Dirección o punto de referencia"
+                name="address_line1"
+                value={listingForm.address_line1}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.address_line1)}
+                helperText={formErrors.address_line1 || 'Puedes usar coordenadas o una descripción clara si no existe dirección formal.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                label="Detalle adicional (interior, lote, portón...)"
+                name="address_line2"
+                value={listingForm.address_line2}
+                onChange={handleFieldChange}
+                fullWidth
+                helperText="Información opcional para llegar sin perder tiempo."
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="Ciudad / Comuna"
+                name="address_city"
+                value={listingForm.address_city}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.address_city)}
+                helperText={formErrors.address_city || 'Es clave para programar al operador local.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="Región / Estado"
+                name="address_region"
+                value={listingForm.address_region}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.address_region)}
+                helperText={formErrors.address_region || 'Asegura una ubicación precisa para logística y permisos.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="País"
+                name="address_country"
+                value={listingForm.address_country}
+                onChange={handleFieldChange}
+                fullWidth
+                required
+                error={Boolean(formErrors.address_country)}
+                helperText={formErrors.address_country || 'Selecciona el país del predio.'}
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="Código postal"
+                name="address_postal_code"
+                value={listingForm.address_postal_code}
+                onChange={handleFieldChange}
+                fullWidth
+                helperText="Opcional, pero útil para notificaciones y logística."
+              />
+            </Grid>
+          </Grid>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+            <Button
+              variant="outlined"
+              onClick={locatePropertyOnMap}
+              disabled={locating}
+              startIcon={locating ? <CircularProgress size={16} /> : <MyLocationIcon />}
+            >
+              {locating ? 'Buscando...' : 'Buscar en el mapa'}
+            </Button>
+            <Typography variant="body2" color="text.secondary">
+              Ajusta la dirección y reutiliza esta búsqueda para posicionar el polígono solo una vez.
+            </Typography>
+          </Stack>
+
+          <Alert severity={statusSeverity} variant="outlined">
+            {statusMessage}
+          </Alert>
+
+          <Box sx={{ position: 'relative', height: { xs: 360, md: 420 }, borderRadius: 3, overflow: 'hidden' }}>
+            <Map
+              initialViewState={{
+                latitude: initialLatitude,
+                longitude: initialLongitude,
+                zoom: initialZoom,
+              }}
+              mapboxAccessToken={config.mapbox.accessToken}
+              mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+              style={{ width: '100%', height: '100%' }}
+              onLoad={(event) => setMapInstance(event.target)}
+            >
+              <NavigationControl position="top-right" />
+              {mapInstance && (
+                <PropertyBoundaryDraw
+                  map={mapInstance}
+                  onBoundariesUpdate={handleBoundaryUpdate}
+                  existingBoundaries={savedBoundary?.geojson || listing?.boundary_polygon}
+                />
+              )}
+            </Map>
+          </Box>
+
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            justifyContent="space-between"
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
+          >
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                Área estimada: {areaLabel}
+              </Typography>
+              {boundaryRemovalPending && hasSavedBoundary && (
+                <Typography variant="caption" color="warning.main">
+                  El polígono actual se eliminará al guardar.
+                </Typography>
+              )}
+              {!boundaryRemovalPending &&
+                listing?.size &&
+                boundaryAreaHa != null &&
+                Math.abs(boundaryAreaHa - Number(listing.size)) > 0.5 && (
+                  <Typography variant="caption" color="text.secondary">
+                    Tamaño registrado en ficha: {Number(listing.size).toFixed(2)} ha.
+                  </Typography>
+                )}
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                startIcon={<MyLocationIcon />}
+                onClick={recenterOnBoundary}
+                disabled={!canRecenter}
+              >
+                Recentrar mapa
+              </Button>
+              <Button
+                variant="contained"
+                onClick={async () => {
+                  await persistBoundary({ withFeedback: true });
+                }}
+                disabled={saving || !canPersistBoundary}
+              >
+                Guardar polígono
+              </Button>
+            </Stack>
+          </Stack>
+        </Stack>
+      </Paper>
+    </Stack>
+  );
+};
+
+const renderReviewStep = () => {
+  const { requirements, hasContact, hasAddress, hasPlan, missingDocuments, canSubmit } = reviewChecklist;
+  const planName = listing?.plan_details?.name;
+
+  const blockingMessage = !requirements.has_boundary
+    ? 'Dibuja y guarda el polígono del terreno para continuar.'
+    : !hasContact
+    ? 'Agrega un nombre y teléfono de contacto para coordinar el vuelo.'
+    : !hasAddress
+    ? 'Completa la dirección principal para orientar al piloto.'
+    : !hasPlan
+    ? 'Selecciona un plan activo para habilitar la publicación.'
+    : missingDocuments.length
+    ? `Faltan documentos aprobados: ${missingDocuments.map((code) => DOCUMENT_LABEL_MAP[code] || code).join(', ')}.`
+    : null;
+
+  return (
+    <Stack spacing={3}>
+      {!canSubmit && blockingMessage && (
+        <Alert severity="warning" variant="outlined">
+          {blockingMessage}
+        </Alert>
+      )}
+
+      {!hasPlan && (
+        <Alert
+          severity="info"
+          variant="outlined"
+          action={
+            <Button color="inherit" size="small" onClick={() => navigate('/pricing')}>
+              Ver planes
+            </Button>
+          }
+        >
+          Necesitas un plan activo para publicar. Puedes contratarlo sin perder el progreso actual.
+        </Alert>
+      )}
+
+      <Paper sx={SECTION_CARD_SX}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Resumen de la publicación
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Revisa que toda la información sea correcta antes de enviar a revisión.
+            </Typography>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {listing?.name || 'Nombre pendiente'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {[listing?.type, listing?.size ? `${listing.size} ha` : null]
+                .filter(Boolean)
+                .join(' • ') || 'Completa los datos de la propiedad en el paso 1.'}
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {listing?.description || 'Sin descripción registrada.'}
+            </Typography>
+          </Box>
+
+          <Divider />
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Contacto operativo
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {listing?.contact_name || 'Nombre pendiente'} · {listing?.contact_phone || 'Teléfono pendiente'}
+              </Typography>
+              {listing?.contact_email && (
+                <Typography variant="body2" color="text.secondary">
+                  {listing.contact_email}
+                </Typography>
+              )}
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Dirección de grabación
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {[listing?.address_line1, listing?.address_line2].filter(Boolean).join(', ') || 'Dirección pendiente'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {[listing?.address_city, listing?.address_region, listing?.address_country]
+                  .filter(Boolean)
+                  .join(', ') || 'Completa ciudad y país para coordinar el vuelo.'}
+              </Typography>
+            </Grid>
+          </Grid>
+        </Stack>
+      </Paper>
+
+      <Paper sx={SECTION_CARD_SX}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Plan contratado
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              El plan define la visibilidad de tu publicación y el acompañamiento del equipo SkyTerra.
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {planName || 'Sin plan asignado'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {!planName ? 'Selecciona un plan para activar la publicación.' : 'Puedes cambiar de plan en cualquier momento antes de publicar.'}
+            </Typography>
+          </Box>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <Button variant="outlined" onClick={() => navigate('/pricing')}>
+              Ver planes disponibles
+            </Button>
+            {plans
+              .filter((plan) => plan.is_active !== false)
+              .slice(0, 2)
+              .map((plan) => (
+                <Button
+                  key={plan.id}
+                  variant="text"
+                  onClick={() => navigate('/pricing', { state: { highlightPlan: plan.id } })}
+                >
+                  {plan.name}
+                </Button>
+              ))}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <Paper sx={SECTION_CARD_SX}>
+        <Stack spacing={3}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Seguimiento y estado
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Consulta el historial de revisión y la trazabilidad de tu publicación.
+            </Typography>
+          </Box>
+          <StatusBar status={listing?.status_bar} />
+          <Divider />
+          <Stack spacing={1}>
+            {(listing?.status_history || []).slice(0, 6).map((entry) => (
+              <Paper key={entry.id} variant="outlined" sx={{ p: 1.5, borderRadius: 3 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {entry.substate}
+                </Typography>
+                {entry.message && (
+                  <Typography variant="body2" color="text.secondary">
+                    {entry.message}
+                  </Typography>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(entry.created_at).toLocaleString()}
+                </Typography>
+              </Paper>
+            ))}
+            {!listing?.status_history?.length && (
+              <Typography variant="body2" color="text.secondary">
+                Aún no hay eventos registrados.
+              </Typography>
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+    </Stack>
+  );
+};
+
+const renderStepContent = () => {
+  switch (steps[activeStep].key) {
+    case 'overview':
+      return renderOverviewStep();
+    case 'documents':
+      return renderDocumentsStep();
+    case 'operations':
+      return renderOperationsStep();
+    case 'review':
+      return renderReviewStep();
+    default:
+      return null;
+  }
+};
+
+const renderStepActions = () => {
+  const stepKey = steps[activeStep].key;
+
+  switch (stepKey) {
+    case 'overview':
+      return (
+        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button variant="contained" onClick={handleOverviewSubmit} disabled={saving}>
+            Guardar y continuar
+          </Button>
+        </Stack>
+      );
+    case 'documents':
+      return (
+        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button variant="outlined" onClick={handleBack} disabled={saving}>
+            Atrás
+          </Button>
+          <Button variant="contained" onClick={() => setActiveStep((prev) => prev + 1)} disabled={saving}>
+            Continuar
+          </Button>
+        </Stack>
+      );
+    case 'operations':
+      return (
+        <Stack direction={{ xs: 'column-reverse', sm: 'row' }} spacing={2} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button variant="outlined" onClick={handleBack} disabled={saving}>
+            Atrás
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => handleOperationsSubmit({ advance: true })}
+            disabled={saving}
+          >
+            Guardar y continuar
+          </Button>
+        </Stack>
+      );
+    case 'review':
+      return (
+        <Stack spacing={2} sx={{ pt: 1 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="flex-end">
+            <Button variant="outlined" onClick={handleBack} disabled={saving}>
+              Atrás
+            </Button>
+            <Button variant="outlined" color="secondary" onClick={() => navigate('/dashboard')}>
+              Volver al panel
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSubmitForReview}
+              disabled={saving || !reviewChecklist.canSubmit}
+            >
+              Enviar a revisión
+            </Button>
+          </Stack>
+        </Stack>
+      );
+    default:
+      return null;
+  }
+};
+
+if (loading) {
+  return (
+    <Box sx={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress />
+    </Box>
+  );
+}
+
+const headerSubtitle = listingId
+  ? 'Actualiza los datos clave de tu publicación sin perder el contexto.'
+  : 'Completa los pasos para preparar tu publicación y coordinar al equipo de operaciones.';
+
+return (
+  <Box sx={{ backgroundColor: '#f5f7fb', minHeight: '100vh', py: { xs: 6, md: 8 } }}>
+    <Container maxWidth="xl">
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={4} lg={3}>
+          <Stack spacing={3}>
+            <Paper
+              sx={{
+                p: { xs: 2.5, md: 3 },
+                borderRadius: 4,
+                border: '1px solid rgba(15, 23, 42, 0.08)',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
+              }}
+            >
+              <Stack spacing={2}>
+                <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', letterSpacing: '.12em', color: 'text.secondary' }}>
+                  Progreso
+                </Typography>
+                <Stack spacing={1.5}>
+                  {steps.map((step, index) => {
+                    const isActive = index === activeStep;
+                    const isCompleted = index < activeStep;
+                    return (
+                      <Box
+                        key={step.key}
+                        sx={{
+                          p: 2,
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: isActive ? 'primary.main' : 'rgba(15, 23, 42, 0.12)',
+                          backgroundColor: isActive ? 'primary.main' : '#fff',
+                          color: isActive ? '#fff' : 'inherit',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: '.1em', opacity: 0.72, display: 'block' }}>
+                            Paso {index + 1}
+                          </Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            {step.label}
+                          </Typography>
+                        </Box>
+                        {isCompleted ? (
+                          <CheckCircleRoundedIcon fontSize="small" sx={{ color: isActive ? '#fff' : 'success.main' }} />
+                        ) : (
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            {index + 1}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+            </Paper>
+
+            <Paper
+              sx={{
+                p: { xs: 2.5, md: 3 },
+                borderRadius: 4,
+                border: '1px solid rgba(15, 23, 42, 0.08)',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', letterSpacing: '.12em', color: 'text.secondary' }}>
+                Estado actual
+              </Typography>
+              {listing ? (
+                <StatusBar status={listing?.status_bar} />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Guarda el primer paso para habilitar el seguimiento de revisión.
+                </Typography>
+              )}
+              <Divider />
+              <Box>
+                <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: '.1em', color: 'text.secondary' }}>
+                  Plan
+                </Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {listing?.plan_details?.name || 'Sin plan activo'}
+                </Typography>
+              </Box>
+              <Button variant="text" size="small" onClick={() => navigate('/pricing')} sx={{ alignSelf: 'flex-start' }}>
+                Ver planes
+              </Button>
+            </Paper>
+          </Stack>
+        </Grid>
+
+        <Grid item xs={12} md={8} lg={9}>
+          <Stack spacing={3}>
+            <Box>
+              <Typography variant="overline" sx={{ letterSpacing: '.16em', color: 'text.secondary' }}>
+                Publicaciones
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                {listingId ? 'Editar publicación' : 'Nueva publicación'}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                {headerSubtitle}
+              </Typography>
+            </Box>
+
+            {renderStepContent()}
+
+            {renderStepActions()}
+          </Stack>
+        </Grid>
+      </Grid>
+    </Container>
+    <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={closeSnackbar}>
+      <Alert severity={snackbar.severity} onClose={closeSnackbar} sx={{ width: '100%' }}>
+        {snackbar.message}
+      </Alert>
+    </Snackbar>
+  </Box>
+);
 
 export default SellerListingWizard;
