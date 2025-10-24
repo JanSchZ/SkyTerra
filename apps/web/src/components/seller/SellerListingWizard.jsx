@@ -1716,7 +1716,6 @@ return (
       <Grid container spacing={4}>
         <Grid xs={12} md={4} lg={3}>
           <Stack spacing={3}>
-            {/* Progress Bar - Minimalista */}
             <Paper
               sx={{
                 p: { xs: 2.5, md: 3 },
@@ -1726,112 +1725,45 @@ return (
                 boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
               }}
             >
-              <Stack spacing={3}>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', letterSpacing: '.12em', color: 'text.secondary', fontSize: '0.75rem' }}>
-                    Progreso
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600, mt: 0.5 }}>
-                    {Math.round(((activeStep + 1) / steps.length) * 100)}% completado
-                  </Typography>
-                </Box>
-
-                {/* Progress Bar Horizontal */}
-                <Box sx={{ position: 'relative', py: 1.5 }}>
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      width: '100%',
-                      height: 2,
-                      backgroundColor: 'rgba(15, 23, 42, 0.1)',
-                      borderRadius: 1,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        width: `${((activeStep + 1) / steps.length) * 100}%`,
-                        height: '100%',
-                        backgroundColor: '#000000',
-                        borderRadius: 1,
-                        transition: 'width 0.4s ease',
-                      }}
-                    />
-                  </Box>
-
-                  {/* Step circles */}
-                  <Box sx={{ position: 'absolute', top: -5, left: 0, right: 0, display: 'flex', justifyContent: 'space-between' }}>
-                    {steps.map((step, index) => {
-                      const isActive = index === activeStep;
-                      const isCompleted = index < activeStep;
-
-                      return (
-                        <Box
-                          key={step.key}
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            backgroundColor: isCompleted || isActive ? '#000000' : 'rgba(15, 23, 42, 0.25)',
-                            border: isActive ? '2px solid #ffffff' : 'none',
-                            boxShadow: isActive ? '0 0 0 2px rgba(0, 0, 0, 0.08)' : 'none',
-                            transition: 'all 0.3s ease',
-                            zIndex: 1,
-                          }}
-                        />
-                      );
-                    })}
-                  </Box>
-                </Box>
-
-                {/* Step labels */}
-                <Stack spacing={0.75}>
+              <Stack spacing={2}>
+                <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', letterSpacing: '.12em', color: 'text.secondary' }}>
+                  Progreso
+                </Typography>
+                <Stack spacing={1.5}>
                   {steps.map((step, index) => {
                     const isActive = index === activeStep;
                     const isCompleted = index < activeStep;
                     return (
-                      <Box key={step.key} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Box
-                          sx={{
-                            minWidth: 18,
-                            width: 18,
-                            height: 18,
-                            borderRadius: '50%',
-                            backgroundColor: isCompleted ? '#000000' : 'transparent',
-                            border: `1px solid ${isCompleted || isActive ? '#000000' : 'rgba(15, 23, 42, 0.25)'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease',
-                          }}
-                        >
-                          {isCompleted ? (
-                            <CheckCircleRoundedIcon sx={{ fontSize: 11, color: '#ffffff' }} />
-                          ) : (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                fontSize: '0.7rem',
-                                fontWeight: isActive ? 700 : 400,
-                                color: isActive ? '#000000' : 'rgba(15, 23, 42, 0.5)',
-                              }}
-                            >
-                              {index + 1}
-                            </Typography>
-                          )}
+                      <Box
+                        key={step.key}
+                        sx={{
+                          p: 2,
+                          borderRadius: 3,
+                          border: '1px solid',
+                          borderColor: isActive ? 'primary.main' : 'rgba(15, 23, 42, 0.12)',
+                          backgroundColor: isActive ? 'primary.main' : '#fff',
+                          color: isActive ? '#fff' : 'inherit',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <Box>
+                          <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: '.1em', opacity: 0.72, display: 'block' }}>
+                            Paso {index + 1}
+                          </Typography>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            {step.label}
+                          </Typography>
                         </Box>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontSize: '0.85rem',
-                            fontWeight: isActive ? 600 : 400,
-                            color: isActive ? '#000000' : isCompleted ? 'rgba(15, 23, 42, 0.9)' : 'rgba(15, 23, 42, 0.5)',
-                            transition: 'all 0.2s ease',
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {step.label}
-                        </Typography>
+                        {isCompleted ? (
+                          <CheckCircleRoundedIcon fontSize="small" sx={{ color: isActive ? '#fff' : 'success.main' }} />
+                        ) : (
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            {index + 1}
+                          </Typography>
+                        )}
                       </Box>
                     );
                   })}
@@ -1839,57 +1771,40 @@ return (
               </Stack>
             </Paper>
 
-            {/* Estado actual - Compacto */}
             <Paper
               sx={{
-                p: { xs: 2, md: 2.5 },
+                p: { xs: 2.5, md: 3 },
                 borderRadius: 4,
                 border: '1px solid rgba(15, 23, 42, 0.08)',
                 backgroundColor: '#ffffff',
                 boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
               }}
             >
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', letterSpacing: '.12em', color: 'text.secondary', fontSize: '0.7rem' }}>
-                    Estado actual
-                  </Typography>
-                  {listing ? (
-                    <Box sx={{ mt: 1 }}>
-                      <StatusBar status={listing?.status_bar} />
-                    </Box>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontSize: '0.8rem' }}>
-                      Guarda el primer paso para habilitar el seguimiento de revisión.
-                    </Typography>
-                  )}
-                </Box>
-
-                <Box sx={{ pt: 1.5, borderTop: '1px solid rgba(15, 23, 42, 0.08)' }}>
-                  <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: '.1em', color: 'text.secondary', fontSize: '0.7rem' }}>
-                    Plan activo
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5, fontSize: '0.85rem' }}>
-                    {listing?.plan_details?.name || 'Sin plan activo'}
-                  </Typography>
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={() => goToPricing({ from: 'seller-sidebar' })}
-                    sx={{
-                      mt: 0.5,
-                      alignSelf: 'flex-start',
-                      fontSize: '0.75rem',
-                      color: 'text.secondary',
-                      '&:hover': { color: 'primary.main' },
-                      padding: '2px 8px',
-                      minHeight: 'auto'
-                    }}
-                  >
-                    Ver planes disponibles
-                  </Button>
-                </Box>
-              </Stack>
+              <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', letterSpacing: '.12em', color: 'text.secondary' }}>
+                Estado actual
+              </Typography>
+              {listing ? (
+                <StatusBar status={listing?.status_bar} />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Guarda el primer paso para habilitar el seguimiento de revisión.
+                </Typography>
+              )}
+              <Divider />
+              <Box>
+                <Typography variant="caption" sx={{ textTransform: 'uppercase', letterSpacing: '.1em', color: 'text.secondary' }}>
+                  Plan
+                </Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  {listing?.plan_details?.name || 'Sin plan activo'}
+                </Typography>
+              </Box>
+              <Button variant="text" size="small" onClick={() => goToPricing({ from: 'seller-sidebar' })} sx={{ alignSelf: 'flex-start' }}>
+                Ver planes
+              </Button>
             </Paper>
           </Stack>
         </Grid>
@@ -1897,13 +1812,13 @@ return (
         <Grid xs={12} md={8} lg={9}>
           <Stack spacing={3}>
             <Box>
-              <Typography variant="overline" sx={{ letterSpacing: '.16em', color: 'text.secondary', fontSize: '0.75rem' }}>
+              <Typography variant="overline" sx={{ letterSpacing: '.16em', color: 'text.secondary' }}>
                 Publicaciones
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 700, mt: 0.5 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
                 {listingId ? 'Editar publicación' : 'Nueva publicación'}
               </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ fontSize: '0.9rem', mt: 0.5 }}>
+              <Typography variant="body1" color="text.secondary">
                 {headerSubtitle}
               </Typography>
             </Box>

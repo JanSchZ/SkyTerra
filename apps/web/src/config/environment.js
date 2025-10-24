@@ -74,6 +74,12 @@ const skyTerraCustomStyle = {
       tileSize: 512,
       maxzoom: 14 // Maxzoom para DEM
     },
+    "mapbox-dem-hillshade": {
+      url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+      type: "raster-dem",
+      tileSize: 512,
+      maxzoom: 14 // Fuente DEM separada para hillshade
+    },
     composite: {
       url: "mapbox://mapbox.mapbox-streets-v8", // Fuente estándar para límites, carreteras, etc.
       type: "vector"
@@ -137,7 +143,7 @@ const skyTerraCustomStyle = {
     {
       id: "terrain-hillshade",
       type: "hillshade",
-      source: "mapbox-dem",
+      source: "mapbox-dem-hillshade",
       paint: {
         "hillshade-exaggeration": 0.15, // Más sutil
         "hillshade-shadow-color": "hsla(210, 15%, 8%, 0.45)", // Menos saturado
@@ -308,7 +314,7 @@ const skyTerraCustomStyle = {
       filter: ["==", ["get", "type"], "country"],
       layout: {
         "text-field": ["get", "name_es"],
-        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-font": ["Inter", "Helvetica Bold", "Helvetica", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           0, 10,
@@ -344,7 +350,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["coalesce", ["get", "name_es"], ["get", "name"]],
-        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-font": ["Inter", "Helvetica Bold", "Helvetica", "Open Sans Bold", "Arial Unicode MS Bold"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           4, 14,
@@ -376,7 +382,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-font": ["Inter", "Helvetica Bold", "Helvetica", "Open Sans Semibold", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           7, 10,
@@ -408,7 +414,7 @@ const skyTerraCustomStyle = {
       ],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-font": ["Inter", "Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           10, 9,
@@ -432,14 +438,14 @@ const skyTerraCustomStyle = {
       id: "village-labels",
       type: "symbol",
       source: "composite",
-      "source-layer": "place-label",
+      "source-layer": "place_label",
       minzoom: 12,
       filter: ["all",
         ["==", ["get", "type"], "village"]
       ],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-font": ["Inter", "Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
         "text-size": [
           "interpolate", ["linear"], ["zoom"],
           12, 8,
@@ -468,7 +474,7 @@ const skyTerraCustomStyle = {
       filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], true, false],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Helvetica Bold", "Helvetica", "Open Sans Semibold", "Arial Unicode MS Regular"],
+        "text-font": ["Inter", "Helvetica Bold", "Helvetica", "Open Sans Semibold", "Arial Unicode MS Regular"],
         "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 16],
         "text-anchor": "top",
         "icon-image": ["concat", ["get", "maki"], "-15"],
@@ -491,7 +497,7 @@ const skyTerraCustomStyle = {
       filter: ["match", ["get", "class"], ["airport", "hospital", "university", "national_park"], false, true],
       layout: {
         "text-field": ["get", "name"],
-        "text-font": ["Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
+        "text-font": ["Inter", "Helvetica", "Open Sans Regular", "Arial Unicode MS Regular"],
         "text-size": ["interpolate", ["linear"], ["zoom"], 14, 9, 17, 13],
         "text-anchor": "top",
         "icon-image": ["concat", ["get", "maki"], "-11"],

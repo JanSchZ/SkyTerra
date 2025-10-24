@@ -171,7 +171,7 @@ const Pano2VRViewer = ({ src, title, sx }) => {
             opacity: loading ? 0 : 1,
             transition: 'opacity 0.3s ease-in-out'
           }}
-          allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
+          allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking; deviceorientation; geolocation"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
           allowFullScreen

@@ -1,7 +1,10 @@
 /* Estilos globales - SkyTerra Portal */
 
 /* Tipografías principales */
-/* Local Helvetica fonts */
+/* Import Google Fonts para Helvetica confiable */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Fallback local para Helvetica si es necesario */
 @font-face {
   font-family: 'Helvetica';
   src: url('/fonts/helvetica-255/Helvetica.ttf') format('truetype');
@@ -14,30 +17,6 @@
   font-family: 'Helvetica';
   src: url('/fonts/helvetica-255/Helvetica-Bold.ttf') format('truetype');
   font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica';
-  src: url('/fonts/helvetica-255/Helvetica-Oblique.ttf') format('truetype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica';
-  src: url('/fonts/helvetica-255/Helvetica-BoldOblique.ttf') format('truetype');
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Helvetica';
-  src: url('/fonts/helvetica-255/helvetica-light-587ebe5a59211.ttf') format('truetype');
-  font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
@@ -58,7 +37,7 @@
 }
 
 body {
-  font-family: 'Helvetica', Arial, sans-serif;
+  font-family: 'Inter', 'Helvetica', Arial, sans-serif;
   font-weight: 400;
   line-height: 1.6;
   color: var(--glass-text-primary);
@@ -71,7 +50,7 @@ body {
 
 /* Headings over glass surfaces */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Helvetica', Arial, sans-serif;
+  font-family: 'Inter', 'Helvetica', Arial, sans-serif;
   font-weight: 700;
   color: var(--glass-text-primary);
   line-height: 1.25;
@@ -86,7 +65,7 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: none !important;
   border: none !important;
   max-width: unset;
-  font-family: 'Helvetica', Arial, sans-serif;
+  font-family: 'Inter', 'Helvetica', Arial, sans-serif;
 }
 
 .mapboxgl-popup-close-button {
@@ -193,7 +172,7 @@ iframe {
   padding: 12px 16px;
   border: 1px solid var(--border-medium);
   border-radius: 8px;
-  font-family: 'Helvetica', Arial, sans-serif;
+  font-family: 'Inter', 'Helvetica', Arial, sans-serif;
   font-size: 14px;
   background-color: var(--bg-primary);
   color: var(--text-primary);

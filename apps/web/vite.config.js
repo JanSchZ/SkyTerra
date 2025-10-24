@@ -15,6 +15,7 @@ export default defineConfig({
       }
     }
   },
+  assetsInclude: ['**/*.woff', '**/*.woff2', '**/*.ttf', '**/*.otf'],
   test: {
     globals: true,
     environment: 'jsdom',

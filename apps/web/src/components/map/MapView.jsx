@@ -200,22 +200,22 @@ const MapView = forwardRef(({
       showOverlay: false,
       isRotating: false
     });
-  }, []);
+  }, [updateAnimationState]);
 
   const completeAutoFly = useCallback(() => {
     updateAnimationState({
       autoFlyCompleted: true,
       isLoading: false
     });
-  }, []);
+  }, [updateAnimationState]);
 
   const startRotation = useCallback(() => {
     updateAnimationState({ isRotating: true });
-  }, []);
+  }, [updateAnimationState]);
 
   const stopRotation = useCallback(() => {
     updateAnimationState({ isRotating: false });
-  }, []);
+  }, [updateAnimationState]);
 
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -1343,7 +1343,7 @@ const MapView = forwardRef(({
       // Default to Chile without solicitar ubicación del usuario al cargar
       performAutoFlight('chile');
     } 
-  }, [isMapUIReady, isMapLoaded, loading, properties, editable, animationState.autoFlyCompleted, animationState.userInteracted, getCountryFromCoords, performAutoFlight, disableIntroAnimation, completeAutoFly]);
+  }, [isMapUIReady, isMapLoaded, loading, editable, animationState.autoFlyCompleted, animationState.userInteracted, disableIntroAnimation]);
 
   // Función para ir a la ubicación actual del usuario (botón manual)
   const handleGoToMyLocation = () => {
