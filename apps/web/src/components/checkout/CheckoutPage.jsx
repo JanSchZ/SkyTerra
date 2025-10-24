@@ -287,7 +287,16 @@ const CheckoutPage = () => {
     setError('');
     try {
       await authService.ensureCsrfCookie();
-      const payload = { amount: usdAmount, currency: 'USD', planTitle: plan?.title };
+      const payload = {
+        amount: usdAmount,
+        currency: 'USD',
+        planTitle: plan?.title,
+        planKey: planKey,
+        planId: planId,
+        couponCode: coupon?.code ?? couponCode,
+        originalAmount: totalUF * UF_TO_USD,
+        discountedAmount: discountedUF * UF_TO_USD
+      };
       const response = await api.post('/payments/bitcoin/create-charge/', payload);
       const pendingPayload = buildActivationPayload({ source: 'bitcoin' });
       localStorage.setItem(

@@ -78,8 +78,34 @@ class Subscription(models.Model):
 
         period_end = data.get('current_period_end')
         if period_end:
-            dt_value = timezone.datetime.fromtimestamp(period_end, tz=timezone.utc)
-            if self.current_period_end != dt_value:
+            dt_value = None
+
+            # Try parsing as timestamp first (int/float or numeric string)
+            try:
+                if isinstance(period_end, (int, float)):
+                    dt_value = timezone.datetime.fromtimestamp(period_end, tz=timezone.utc)
+                elif isinstance(period_end, str) and period_end.isdigit():
+                    dt_value = timezone.datetime.fromtimestamp(float(period_end), tz=timezone.utc)
+            except (ValueError, TypeError, OSError):
+                pass
+
+            # If timestamp parsing failed, try parsing as ISO8601 or other datetime string
+            if dt_value is None:
+                try:
+                    from django.utils.dateparse import parse_datetime
+                    parsed_dt = parse_datetime(period_end)
+                    if parsed_dt:
+                        # Ensure it's timezone-aware
+                        if timezone.is_naive(parsed_dt):
+                            dt_value = timezone.make_aware(parsed_dt)
+                        else:
+                            dt_value = parsed_dt
+                except (ValueError, TypeError):
+                    # Invalid datetime string, dt_value remains None
+                    pass
+
+            # Only update if we successfully parsed a datetime
+            if dt_value and self.current_period_end != dt_value:
                 self.current_period_end = dt_value
                 updated_fields.append('current_period_end')
 
@@ -161,6 +187,8 @@ class BitcoinPayment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     currency = models.CharField(max_length=10, default='USD')
     plan_title = models.CharField(max_length=100, blank=True, null=True)
+    plan_id = models.IntegerField(blank=True, null=True)  # Reference to ListingPlan
+    coupon_code = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

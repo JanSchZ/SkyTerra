@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -33,6 +33,7 @@ import {
 } from '@services/operatorJobs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, ThemeColors } from '@theme';
+import analytics from '@services/analytics';
 
 type JobsScreenNav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Jobs'>,
@@ -104,7 +105,10 @@ const JobListScreen = () => {
   const [radiusCommitted, setRadiusCommitted] = useState<number>(DEFAULT_RADIUS);
   const [radiusSaving, setRadiusSaving] = useState(false);
   const [radiusError, setRadiusError] = useState<string | null>(null);
+  const [loadingOffers, setLoadingOffers] = useState<Record<number, 'accepting' | 'declining'>>({});
   const radiusRef = useRef<number>(DEFAULT_RADIUS);
+  const lastRefreshTime = useRef<number>(0);
+  const REFRESH_INTERVAL = 30 * 1000; // 30 seconds
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const backgroundGradient = useMemo(
@@ -149,7 +153,7 @@ const JobListScreen = () => {
       setActiveJob(nextActive ?? null);
 
       // Load debug info if no jobs available and no error
-      if (availableJobs.length === 0 && !err) {
+      if (availableJobs.length === 0 && !error) {
         try {
           const debug = await getDebugInfo();
           setDebugInfo(debug);
@@ -164,6 +168,7 @@ const JobListScreen = () => {
     } finally {
       if (mode === 'initial') setLoading(false);
       if (mode === 'refresh') setRefreshing(false);
+      lastRefreshTime.current = Date.now();
     }
   };
 
@@ -185,17 +190,39 @@ const JobListScreen = () => {
     bootstrap();
   }, []);
 
+  // Refresh data when screen comes into focus (but not too frequently)
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      if (now - lastRefreshTime.current > REFRESH_INTERVAL) {
+        loadJobs('silent').catch((err) => {
+          console.warn('Focus refresh failed', err);
+        });
+      }
+    }, [loadJobs])
+  );
+
   const toggleAvailability = async (value: boolean) => {
     const previous = isAvailable;
     setIsAvailable(value);
+    setError(null); // Clear any previous errors
     try {
       const confirmed = await setAvailability(value);
+      // Always use the server response as source of truth
       setIsAvailable(confirmed);
+
+      // Track analytics
+      analytics.trackAvailabilityChanged({
+        previous_status: previous,
+        new_status: confirmed,
+      });
+
       // Refresh profile to get updated data
       await refreshPilotProfile();
       await loadJobs('silent');
     } catch (err) {
       console.warn('No se pudo actualizar la disponibilidad', err);
+      // Rollback to previous state on error
       setIsAvailable(previous);
       setError('No pudimos actualizar tu disponibilidad. Intenta nuevamente.');
     }
@@ -203,25 +230,42 @@ const JobListScreen = () => {
 
   const commitRadius = async (value: number) => {
     const normalized = clampRadius(value);
+    const previousRadius = radiusCommitted;
+    const previousDraft = radiusDraft;
+
     setRadiusDraft(normalized);
     if (normalized === radiusCommitted && radiusError === null) {
       return;
     }
+
     setRadiusError(null);
     setRadiusSaving(true);
     try {
+      // Optimistic local update
       radiusRef.current = normalized;
       await AsyncStorage.setItem(RADIUS_STORAGE_KEY, String(normalized));
+
+      // Server update
       await updatePilotProfile({ coverage_radius_km: normalized });
       setRadiusCommitted(normalized);
-      // Refresh profile to get updated data
+
+      // Track analytics
+      analytics.trackRadiusChanged({
+        previous_radius_km: previousRadius,
+        new_radius_km: normalized,
+      });
+
+      // Refresh profile to get updated data and sync with server
       await refreshPilotProfile();
       await loadJobs('silent');
     } catch (err) {
       console.warn('No se pudo actualizar el radio de cobertura', err);
+      // Rollback all changes on error
       setRadiusError('No pudimos actualizar el radio de trabajo. Intenta nuevamente.');
-      setRadiusDraft(radiusCommitted);
-      radiusRef.current = radiusCommitted;
+      setRadiusDraft(previousDraft);
+      setRadiusCommitted(previousRadius);
+      radiusRef.current = previousRadius;
+      await AsyncStorage.setItem(RADIUS_STORAGE_KEY, String(previousRadius));
     } finally {
       setRadiusSaving(false);
     }
@@ -241,24 +285,77 @@ const JobListScreen = () => {
   const handleAccept = async (job: OperatorJob) => {
     const offer = job.offers?.find((item) => item.status === 'pending');
     if (!offer) return;
+
+    // Prevent double-tap
+    if (loadingOffers[job.id]) return;
+
+    setLoadingOffers(prev => ({ ...prev, [job.id]: 'accepting' }));
     try {
       await acceptOffer(offer.id);
+
+      // Track analytics
+      analytics.trackOfferAccepted({
+        job_id: job.id,
+        offer_id: offer.id,
+        payout_amount: job.pilot_payout_amount,
+        distance_km: job.travel_estimate?.distance_km,
+        property_type: job.property_details?.type,
+      });
+
       await loadJobs(true);
-      navigation.navigate('JobDetail', { jobId: String(job.id) });
+      navigateToJobDetail(job, 'jobs_list');
     } catch (err) {
       console.error('Error al aceptar la oferta', err);
+      setError('No pudimos aceptar la oferta. Intenta nuevamente.');
+    } finally {
+      setLoadingOffers(prev => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
     }
   };
 
   const handleDecline = async (job: OperatorJob) => {
     const offer = job.offers?.find((item) => item.status === 'pending');
     if (!offer) return;
+
+    // Prevent double-tap
+    if (loadingOffers[job.id]) return;
+
+    setLoadingOffers(prev => ({ ...prev, [job.id]: 'declining' }));
     try {
       await declineOffer(offer.id);
+
+      // Track analytics
+      analytics.trackOfferDeclined({
+        job_id: job.id,
+        offer_id: offer.id,
+        payout_amount: job.pilot_payout_amount,
+        distance_km: job.travel_estimate?.distance_km,
+        property_type: job.property_details?.type,
+      });
+
       await loadJobs(true);
     } catch (err) {
       console.error('Error al declinar la oferta', err);
+      setError('No pudimos declinar la oferta. Intenta nuevamente.');
+    } finally {
+      setLoadingOffers(prev => {
+        const next = { ...prev };
+        delete next[job.id];
+        return next;
+      });
     }
+  };
+
+  // Helper function to navigate to job detail with analytics
+  const navigateToJobDetail = (job: OperatorJob, source: 'dashboard' | 'jobs_list' | 'notification' = 'jobs_list') => {
+    analytics.trackJobViewed({
+      job_id: job.id,
+      source,
+    });
+    navigation.navigate('JobDetail', { jobId: String(job.id) });
   };
 
   const renderJobCard = ({ item }: { item: OperatorJob }) => {
@@ -279,7 +376,7 @@ const JobListScreen = () => {
 
     return (
       <Pressable
-        onPress={() => navigation.navigate('JobDetail', { jobId: String(item.id) })}
+        onPress={() => navigateToJobDetail(item, 'jobs_list')}
         style={styles.jobCardWrapper}
       >
         <View style={styles.jobCard}>
@@ -327,11 +424,31 @@ const JobListScreen = () => {
           ) : null}
 
           <View style={styles.jobActions}>
-            <TouchableOpacity style={styles.secondary} onPress={() => handleDecline(item)} disabled={!offer}>
-              <Text style={styles.secondaryText}>Pasar</Text>
+            <TouchableOpacity
+              style={[styles.secondary, loadingOffers[item.id] && styles.disabled]}
+              onPress={() => handleDecline(item)}
+              disabled={!offer || loadingOffers[item.id]}
+              accessibilityLabel={`Declinar oferta ${item.property_details?.name ?? `trabajo ${item.id}`}`}
+              testID={`decline-offer-${item.id}`}
+            >
+              {loadingOffers[item.id] === 'declining' ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Text style={styles.secondaryText}>Pasar</Text>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primary} onPress={() => handleAccept(item)} disabled={!offer}>
-              <Text style={styles.primaryText}>Aceptar</Text>
+            <TouchableOpacity
+              style={[styles.primary, loadingOffers[item.id] && styles.disabled]}
+              onPress={() => handleAccept(item)}
+              disabled={!offer || loadingOffers[item.id]}
+              accessibilityLabel={`Aceptar oferta ${item.property_details?.name ?? `trabajo ${item.id}`}`}
+              testID={`accept-offer-${item.id}`}
+            >
+              {loadingOffers[item.id] === 'accepting' ? (
+                <ActivityIndicator size="small" color={colors.primaryOn} />
+              ) : (
+                <Text style={styles.primaryText}>Aceptar</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -389,6 +506,8 @@ const JobListScreen = () => {
                   onValueChange={toggleAvailability}
                   thumbColor={availabilityThumbColor}
                   trackColor={availabilityTrackColor}
+                  accessibilityLabel={`Cambiar disponibilidad: ${isAvailable ? 'Operativo' : 'Pausado'}`}
+                  testID="availability-switch"
                 />
               </View>
             </View>
@@ -430,12 +549,16 @@ const JobListScreen = () => {
                 minimumTrackTintColor={colors.primary}
                 maximumTrackTintColor={colors.cardBorder}
                 disabled={radiusSaving}
+                accessibilityLabel={`Radio de cobertura: ${radiusDraft} kilómetros`}
+                testID="coverage-radius-slider"
               />
               <View style={styles.radiusActions}>
                 <TouchableOpacity
                   style={[styles.radiusButton, decreaseDisabled && styles.radiusButtonDisabled]}
                   onPress={() => adjustRadius(-RADIUS_BOUNDS.step)}
                   disabled={decreaseDisabled}
+                  accessibilityLabel="Disminuir radio de cobertura 5 km"
+                  testID="decrease-radius-button"
                 >
                   <Ionicons
                     name="remove-outline"
@@ -448,6 +571,8 @@ const JobListScreen = () => {
                   style={[styles.radiusButton, increaseDisabled && styles.radiusButtonDisabled]}
                   onPress={() => adjustRadius(RADIUS_BOUNDS.step)}
                   disabled={increaseDisabled}
+                  accessibilityLabel="Aumentar radio de cobertura 5 km"
+                  testID="increase-radius-button"
                 >
                   <Ionicons
                     name="add-outline"
@@ -467,7 +592,7 @@ const JobListScreen = () => {
           {activeJob ? (
             <ActiveJobCard
               job={activeJob}
-              onPress={() => navigation.navigate('JobDetail', { jobId: String(activeJob.id) })}
+              onPress={() => navigateToJobDetail(activeJob, 'jobs_list')}
             />
           ) : null}
         </View>
@@ -820,6 +945,9 @@ const createStyles = (colors: ThemeColors) =>
     secondaryText: {
       color: colors.textPrimary,
       fontWeight: '600',
+    },
+    disabled: {
+      opacity: 0.6,
     },
     emptyCard: {
       borderRadius: 26,

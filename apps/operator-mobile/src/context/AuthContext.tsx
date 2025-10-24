@@ -25,6 +25,8 @@ import {
 } from '@services/apiClient';
 import { PilotProfile, fetchPilotProfile } from '@services/operatorJobs';
 import { usePushNotifications } from '@hooks/usePushNotifications';
+import { setToastFunction } from '@services/apiClient';
+import { useToast } from '@context/ToastContext';
 
 interface AuthContextValue {
   user: OperatorUser | null;
@@ -38,6 +40,7 @@ interface AuthContextValue {
   refreshPilotProfile: () => Promise<void>;
   pilotProfile: PilotProfile | null;
   preferredName: string | null;
+  deviceToken: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -48,8 +51,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(false);
   const [preferredName, setPreferredName] = useState<string | null>(null);
   const [pilotProfile, setPilotProfile] = useState<PilotProfile | null>(null);
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const autoLoginPromiseRef = useRef<Promise<boolean> | null>(null);
-  const { registerForPushNotifications } = usePushNotifications();
+  const { registerForPushNotifications, unregisterDevice } = usePushNotifications();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const loadName = async () => {
@@ -58,6 +63,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     loadName();
   }, []);
+
+  // Initialize toast function for API client
+  useEffect(() => {
+    setToastFunction(showToast);
+  }, [showToast]);
 
   const computePreferredName = useCallback((candidate: OperatorUser | null | undefined) => {
     if (!candidate) return null;
@@ -102,7 +112,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // Register for push notifications after successful sign in
           try {
-            await registerForPushNotifications();
+            const token = await registerForPushNotifications();
+            if (token) {
+              setDeviceToken(token);
+            }
           } catch (notificationError) {
             console.warn('Failed to register for push notifications after sign in', notificationError);
           }
@@ -187,7 +200,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               // Register for push notifications after successful authentication
               try {
-                await registerForPushNotifications();
+                const token = await registerForPushNotifications();
+                if (token) {
+                  setDeviceToken(token);
+                }
               } catch (notificationError) {
                 console.warn('Failed to register for push notifications during bootstrap', notificationError);
               }
@@ -256,6 +272,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = useCallback(async () => {
+    // Deregister push notifications if we have a device token
+    if (deviceToken) {
+      try {
+        await unregisterDevice(deviceToken);
+      } catch (error) {
+        console.warn('Failed to unregister push notifications during sign out', error);
+      }
+    }
+
     await clearStoredTokens();
     await clearStoredCredentials();
     await clearPreferredName();
@@ -263,11 +288,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setPreferredName(null);
     setPilotProfile(null);
-  }, []);
+    setDeviceToken(null);
+  }, [deviceToken, unregisterDevice]);
 
   const value = useMemo(
-    () => ({ user, loading, initializing, signInWithCredentials, signOut, refreshUser, refreshPilotProfile, pilotProfile, preferredName }),
-    [user, loading, initializing, signInWithCredentials, signOut, refreshUser, refreshPilotProfile, pilotProfile, preferredName]
+    () => ({ user, loading, initializing, signInWithCredentials, signOut, refreshUser, refreshPilotProfile, pilotProfile, preferredName, deviceToken }),
+    [user, loading, initializing, signInWithCredentials, signOut, refreshUser, refreshPilotProfile, pilotProfile, preferredName, deviceToken]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Box, IconButton, Typography, CircularProgress, Paper, Drawer, Divider, Chip, Button, Stack, Grid } from '@mui/material';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Box, IconButton, Typography, CircularProgress, Paper, Drawer, Divider, Chip, Button, Stack, Grid, Fade, Slide } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
@@ -26,6 +26,13 @@ const TourViewer = () => {
   const [showInfo, setShowInfo] = useState(true);
   const [error, setError] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [iframeKey, setIframeKey] = useState(0);
+  const [isPanelAnimating, setIsPanelAnimating] = useState(false);
+  const iframeTimeoutRef = useRef(null);
+  const detailsScrollRef = useRef(null);
 
   // Listener para detectar cambios en el estado de fullscreen
   useEffect(() => {
@@ -59,18 +66,26 @@ const TourViewer = () => {
         
         const tour = await tourService.getTour(tourId);
 
-        // Validación adicional de seguridad y compatibilidad
+        // Validación adicional de seguridad y compatibilidad usando whitelist approach
         const urlStr = tour?.url || '';
-        const looksMedia = typeof urlStr === 'string' && (
+        const isValidTour = typeof urlStr === 'string' && (
           urlStr.includes('/media/tours/') ||
           urlStr.includes('/api/tours/content/') ||
           urlStr.includes('/media\\tours\\')
         );
-        const isInvalid = !tour || !urlStr || !looksMedia || urlStr.includes('placeholder');
-        if (isInvalid) {
+
+        // Solo rechazar si es exactamente un placeholder/test file, no si contiene estas palabras
+        const isPlaceholder = urlStr.includes('placeholder.svg') ||
+                             urlStr.includes('/placeholder/') ||
+                             urlStr.includes('test.svg') ||
+                             urlStr.includes('/test/');
+
+        if (!tour || !urlStr || !isValidTour || isPlaceholder) {
           const propId = tour?.property || tour?.property_id;
           if (propId) {
-            navigate(`/property/${propId}`);
+            // Mostrar error en lugar de redirigir automáticamente
+            setError(`El tour 360° no está disponible. Puedes ver más detalles de la propiedad haciendo clic en "Ver detalles completos".`);
+            setLoading(false);
             return;
           } else {
             setError('No se encontró el tour solicitado.');
@@ -110,6 +125,19 @@ const TourViewer = () => {
     fetchTourData();
   }, [tourId, navigate]);
 
+  // Función para manejar el toggle del panel con animación suave
+  const toggleInfoPanel = () => {
+    if (isPanelAnimating) return;
+
+    setIsPanelAnimating(true);
+    setShowInfo(!showInfo);
+
+    // Reset animation state after transition completes
+    setTimeout(() => {
+      setIsPanelAnimating(false);
+    }, 300);
+  };
+
   // Función para ir a pantalla completa
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -129,16 +157,60 @@ const TourViewer = () => {
     }
   };
 
-  // Función para manejar el estado de carga del iframe
-  const handleIframeLoad = () => {
-    setLoading(false);
-  };
+  // Función para manejar el estado de carga del iframe con timeout
+  const handleIframeLoad = useCallback(() => {
+    setIframeLoading(false);
+    setIframeError(false);
+    // Clear any existing timeout
+    if (iframeTimeoutRef.current) {
+      clearTimeout(iframeTimeoutRef.current);
+      iframeTimeoutRef.current = null;
+    }
+  }, []);
 
-  // Función para gestionar errores del iframe
-  const handleIframeError = () => {
-    setLoading(false);
-    setError('No se pudo cargar el tour 360°. Verifique la conexión.');
-  };
+  // Función para gestionar errores del iframe con retry logic
+  const handleIframeError = useCallback(() => {
+    setIframeLoading(false);
+    setIframeError(true);
+
+    // Clear timeout if exists
+    if (iframeTimeoutRef.current) {
+      clearTimeout(iframeTimeoutRef.current);
+      iframeTimeoutRef.current = null;
+    }
+
+    // Retry logic: try up to 2 times with increasing delay
+    if (retryCount < 2) {
+      setRetryCount(prev => prev + 1);
+      setTimeout(() => {
+        setIframeLoading(true);
+        setIframeError(false);
+        // Force iframe reload by updating key
+        setIframeKey(prev => prev + 1);
+      }, 1000 * (retryCount + 1)); // 1s, then 2s delay
+    } else {
+      setError('No se pudo cargar el tour 360° después de varios intentos. Verifique la conexión.');
+    }
+  }, [retryCount]);
+
+  // Timeout for iframe loading (15 seconds)
+  useEffect(() => {
+    if (iframeLoading && tourData) {
+      iframeTimeoutRef.current = setTimeout(() => {
+        if (iframeLoading) {
+          console.warn('Tour iframe loading timeout');
+          handleIframeError();
+        }
+      }, 15000); // 15 second timeout
+    }
+
+    return () => {
+      if (iframeTimeoutRef.current) {
+        clearTimeout(iframeTimeoutRef.current);
+        iframeTimeoutRef.current = null;
+      }
+    };
+  }, [iframeLoading, tourData, handleIframeError]);
 
   // Función para volver a la página anterior
   const handleBack = () => {
@@ -314,16 +386,22 @@ const TourViewer = () => {
               {isFullScreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
             </IconButton>
             
-            <IconButton 
-              onClick={() => setShowInfo(!showInfo)}
-              sx={{ 
-                backgroundColor: 'rgba(0,0,0,0.5)', 
+            <IconButton
+              onClick={toggleInfoPanel}
+              disabled={isPanelAnimating}
+              sx={{
+                backgroundColor: showInfo ? 'rgba(59,130,246,0.8)' : 'rgba(0,0,0,0.5)',
                 color: 'white',
-                '&.active': {
-                  backgroundColor: 'primary.main'
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  backgroundColor: showInfo ? 'rgba(59,130,246,0.9)' : 'rgba(0,0,0,0.7)',
+                  transform: 'scale(1.05)'
+                },
+                '&.Mui-disabled': {
+                  opacity: 0.6,
+                  backgroundColor: 'rgba(0,0,0,0.3)'
                 }
               }}
-              className={showInfo ? 'active' : ''}
               title="Mostrar/Ocultar información de la propiedad"
             >
               <InfoIcon />
@@ -356,13 +434,17 @@ const TourViewer = () => {
           </Box>
           
           {/* Panel lateral con info y asistente Sam */}
-          <Drawer
-            anchor="left"
-            variant="persistent"
-            open={showInfo && Boolean(propertyData)}
-            hideBackdrop
-            sx={{
-              '& .MuiDrawer-paper': {
+          <Slide
+            direction="right"
+            in={showInfo && Boolean(propertyData)}
+            timeout={300}
+            easing="cubic-bezier(0.4, 0, 0.2, 1)"
+            appear={false}
+          >
+            <Paper
+              elevation={0}
+              sx={{
+                position: 'absolute',
                 width: { xs: 'calc(100% - 32px)', sm: 380, md: 420 },
                 maxWidth: 440,
                 boxSizing: 'border-box',
@@ -380,10 +462,48 @@ const TourViewer = () => {
                 border: '1px solid rgba(255,255,255,0.18)',
                 boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
                 overflow: 'hidden',
-              },
-            }}
-          >
+                zIndex: 10,
+                transform: showInfo ? 'translateX(0)' : 'translateX(-100%)',
+                opacity: showInfo ? 1 : 0,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
+                  borderRadius: '24px',
+                  pointerEvents: 'none'
+                }
+              }}
+            >
             <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Header con indicador de cierre */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: 1,
+                position: 'relative'
+              }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'rgba(255,255,255,0.6)',
+                    fontSize: '0.75rem',
+                    fontStyle: 'italic',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5
+                  }}
+                >
+                  <InfoIcon sx={{ fontSize: '14px' }} />
+                  Panel de análisis · Haz clic en el botón azul para ocultar
+                </Typography>
+              </Box>
+
               {/* Asistente Sam */}
               <SamPropertyAssistant property={propertyData} />
 
@@ -391,6 +511,7 @@ const TourViewer = () => {
 
               {/* Información de la propiedad */}
               <Box
+                ref={detailsScrollRef}
                 sx={{
                   flex: 1,
                   overflowY: 'auto',
@@ -400,11 +521,21 @@ const TourViewer = () => {
                   gap: 2.5,
                   scrollbarWidth: 'thin',
                   scrollbarColor: 'rgba(148,163,184,0.35) transparent',
+                  scrollBehavior: 'smooth',
+                  WebkitOverflowScrolling: 'touch',
                   '&::-webkit-scrollbar': {
                     width: 6,
                   },
                   '&::-webkit-scrollbar-thumb': {
                     background: 'rgba(148,163,184,0.38)',
+                    borderRadius: 999,
+                    transition: 'background 0.2s ease',
+                  },
+                  '&::-webkit-scrollbar-thumb:hover': {
+                    background: 'rgba(148,163,184,0.6)',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: 'rgba(255,255,255,0.05)',
                     borderRadius: 999,
                   },
                 }}
@@ -447,6 +578,13 @@ const TourViewer = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
+                        transition: 'all 0.2s ease-in-out',
+                        cursor: 'default',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255,255,255,0.12)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 8px 24px rgba(255,255,255,0.1)',
+                        },
                       }}
                     >
                       <LocalOfferIcon sx={{ opacity: 0.85, fontSize: 28 }} />
@@ -472,6 +610,13 @@ const TourViewer = () => {
                         flexDirection: 'column',
                         gap: 0.5,
                         height: '100%',
+                        transition: 'all 0.2s ease-in-out',
+                        cursor: 'default',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255,255,255,0.12)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 8px 24px rgba(255,255,255,0.1)',
+                        },
                       }}
                     >
                       <AspectRatioIcon sx={{ opacity: 0.85, fontSize: 24 }} />
@@ -497,6 +642,14 @@ const TourViewer = () => {
                           gap: 0.5,
                           border: '1px solid rgba(59,130,246,0.3)',
                           height: '100%',
+                          transition: 'all 0.2s ease-in-out',
+                          cursor: 'default',
+                          '&:hover': {
+                            backgroundColor: 'rgba(59,130,246,0.2)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 8px 24px rgba(59,130,246,0.2)',
+                            borderColor: 'rgba(59,130,246,0.4)',
+                          },
                         }}
                       >
                         <LocalOfferIcon sx={{ opacity: 0.85, fontSize: 24 }} />
@@ -521,6 +674,13 @@ const TourViewer = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 0.5,
+                          transition: 'all 0.2s ease-in-out',
+                          cursor: 'default',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.12)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 8px 24px rgba(255,255,255,0.1)',
+                          },
                         }}
                       >
                         <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
@@ -545,6 +705,13 @@ const TourViewer = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 0.5,
+                          transition: 'all 0.2s ease-in-out',
+                          cursor: 'default',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.12)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 8px 24px rgba(255,255,255,0.1)',
+                          },
                         }}
                       >
                         <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
@@ -569,6 +736,13 @@ const TourViewer = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 0.5,
+                          transition: 'all 0.2s ease-in-out',
+                          cursor: 'default',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.12)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 8px 24px rgba(255,255,255,0.1)',
+                          },
                         }}
                       >
                         <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
@@ -593,6 +767,13 @@ const TourViewer = () => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 0.5,
+                          transition: 'all 0.2s ease-in-out',
+                          cursor: 'default',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.12)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 8px 24px rgba(255,255,255,0.1)',
+                          },
                         }}
                       >
                         <HomeIcon sx={{ opacity: 0.85, fontSize: 24 }} />
@@ -608,7 +789,21 @@ const TourViewer = () => {
                 </Grid>
 
                 {/* Ubicación */}
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1,
+                  p: 1.5,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(255,255,255,0.08)',
+                  },
+                }}>
                   <RoomIcon sx={{ mt: 0.2, opacity: 0.85 }} />
                   <Box>
                     <Typography variant="caption" sx={{ opacity: 0.75, display: 'block', mb: 0.5 }}>
@@ -617,13 +812,29 @@ const TourViewer = () => {
                     <Typography variant="body2" sx={{ color: 'rgba(226,232,240,0.9)' }}>
                       {propertyData?.address || 'Ubicación no disponible'}
                     </Typography>
+                    {propertyData?.latitude && propertyData?.longitude && (
+                      <Typography variant="caption" sx={{ opacity: 0.6, mt: 0.5, display: 'block' }}>
+                        {propertyData.latitude.toFixed(6)}, {propertyData.longitude.toFixed(6)}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
 
                 <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
 
                 {/* Descripción */}
-                <Box>
+                <Box sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(255,255,255,0.08)',
+                  },
+                }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, opacity: 0.85 }}>
                     Descripción
                   </Typography>
@@ -647,11 +858,17 @@ const TourViewer = () => {
                     borderRadius: 2,
                     textTransform: 'none',
                     fontWeight: 600,
-                    py: 1.2,
+                    py: 1.5,
                     background: 'linear-gradient(135deg, rgba(59,130,246,0.95), rgba(96,165,250,0.85))',
                     boxShadow: '0 8px 24px rgba(59,130,246,0.35)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
                       background: 'linear-gradient(135deg, rgba(59,130,246,1), rgba(37,99,235,0.95))',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 12px 32px rgba(59,130,246,0.45)',
+                    },
+                    '&:active': {
+                      transform: 'translateY(0)',
                     },
                   }}
                   fullWidth
@@ -660,32 +877,100 @@ const TourViewer = () => {
                 </Button>
               </Box>
             </Box>
-          </Drawer>
+            </Paper>
+          </Slide>
           
           {/* Tour 360° */}
           {tourData && (
-            <iframe
-              src={getModifiedTourUrl()}
-              width="100%"
-              height="100%"
-              frameBorder="0"
-              allowFullScreen
-              allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
-              onLoad={handleIframeLoad}
-              onError={handleIframeError}
-              title="Tour Virtual 360°"
-              style={{ 
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                width: '100%', 
-                height: '100%',
-                backgroundColor: '#000',
-                border: 'none'
-              }}
-            />
+            <>
+              {/* Enhanced loading overlay with retry info */}
+              {iframeLoading && (
+                <Box sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  zIndex: 15
+                }}>
+                  <CircularProgress color="primary" size={60} />
+                  <Typography variant="h6" color="white" sx={{ mt: 2, mb: 1 }}>
+                    {retryCount > 0 ? `Reintentando... (${retryCount}/2)` : 'Cargando tour 360°...'}
+                  </Typography>
+                  <Typography variant="body2" color="rgba(255,255,255,0.7)">
+                    {retryCount === 0 ? 'Esto puede tomar unos momentos' : 'Verificando conexión...'}
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Error overlay with retry option */}
+              {iframeError && retryCount >= 2 && (
+                <Box sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.9)',
+                  zIndex: 15
+                }}>
+                  <Typography variant="h6" color="error" gutterBottom>
+                    Error al cargar el tour
+                  </Typography>
+                  <Typography variant="body2" color="rgba(255,255,255,0.7)" sx={{ mb: 2 }}>
+                    No se pudo cargar el tour después de varios intentos
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => {
+                      setRetryCount(0);
+                      setIframeLoading(true);
+                      setIframeError(false);
+                      setIframeKey(prev => prev + 1);
+                    }}
+                  >
+                    Reintentar
+                  </Button>
+                </Box>
+              )}
+
+              {/* Main iframe with forced reload capability */}
+              <iframe
+                key={iframeKey}
+                src={getModifiedTourUrl()}
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                allowFullScreen
+                allow="fullscreen; accelerometer; gyroscope; magnetometer; vr; xr-spatial-tracking"
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+                title="Tour Virtual 360°"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#000',
+                  border: 'none',
+                  opacity: iframeLoading ? 0 : 1,
+                  transition: 'opacity 0.3s ease-in-out'
+                }}
+              />
+            </>
           )}
         </>
       )}

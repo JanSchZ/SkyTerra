@@ -14,6 +14,40 @@ const parseMaybeJSON = (value) => {
   }
 };
 
+// Safe parsing function for boundary data that handles various formats and validates structure
+const safeParseBoundary = (value) => {
+  if (!value) return null;
+
+  try {
+    // If it's already a string, try to parse it as JSON
+    if (typeof value === 'string') {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== 'object') {
+        console.warn('Invalid boundary JSON structure:', parsed);
+        return null;
+      }
+      return parsed;
+    }
+
+    // If it's already an object, validate basic structure
+    if (typeof value === 'object') {
+      // Check if it has the basic structure of a GeoJSON feature or geometry
+      if (value.type && (value.coordinates || value.geometry)) {
+        return value;
+      }
+
+      // If it doesn't have the expected structure, it might be malformed
+      console.warn('Boundary object missing required structure:', value);
+      return null;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('Error parsing boundary data:', error, 'Input:', value);
+    return null;
+  }
+};
+
 const normalizePolygonRings = (feature) => {
   if (!feature?.geometry || feature.geometry.type !== 'Polygon') {
     return feature;
@@ -107,7 +141,8 @@ const asFeature = (boundary) => {
 };
 
 const ensureFeature = (candidate) => {
-  const parsed = parseMaybeJSON(candidate);
+  // Use safeParseBoundary for better error handling and validation
+  const parsed = safeParseBoundary(candidate) || parseMaybeJSON(candidate);
   const feature = asFeature(parsed ?? candidate);
   if (!feature) return null;
   if (feature.geometry?.type === 'Polygon') {
@@ -282,4 +317,4 @@ const areBoundaryCoordinatesEqual = (first, second) => {
   }
 };
 
-export { asFeature, toFeaturePolygon, normalizeBoundary, buildBoundaryEvent, areBoundaryCoordinatesEqual };
+export { asFeature, toFeaturePolygon, normalizeBoundary, buildBoundaryEvent, areBoundaryCoordinatesEqual, safeParseBoundary };

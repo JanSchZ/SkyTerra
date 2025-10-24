@@ -3,6 +3,110 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { extractMessageFromData, getErrorMessage } from '@utils/errorMessages';
 
+// Types for retry configuration
+interface RetryConfig {
+  maxRetries: number;
+  retryDelay: number;
+  retryCondition: (error: AxiosError) => boolean;
+}
+
+// Global toast function - will be set by the app
+let showToast: ((message: string, type: 'success' | 'error' | 'warning' | 'info', duration?: number) => void) | null = null;
+
+export const setToastFunction = (toastFn: (message: string, type: 'success' | 'error' | 'warning' | 'info', duration?: number) => void) => {
+  showToast = toastFn;
+};
+
+// Retry configuration for different types of requests
+const getRetryConfig = (config: InternalAxiosRequestConfig): RetryConfig | null => {
+  const method = config.method?.toUpperCase();
+  const url = config.url || '';
+
+  // Retry GET requests and POST requests to non-auth endpoints
+  if (method === 'GET') {
+    return {
+      maxRetries: 3,
+      retryDelay: 1000,
+      retryCondition: (error: AxiosError) => {
+        // Retry on network errors, 5xx server errors, and timeouts
+        return (
+          !error.response ||
+          error.response.status >= 500 ||
+          error.code === 'ECONNABORTED' ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ETIMEDOUT'
+        );
+      },
+    };
+  }
+
+  // Retry POST requests to specific endpoints (jobs, profile updates, etc.)
+  if (method === 'POST' && (
+    url.includes('/accept/') ||
+    url.includes('/decline/') ||
+    url.includes('/schedule/') ||
+    url.includes('/availability/') ||
+    url.includes('/pilot-profiles/') ||
+    url.includes('/pilot-documents/') ||
+    url.includes('/pilot-devices/')
+  )) {
+    return {
+      maxRetries: 2,
+      retryDelay: 1500,
+      retryCondition: (error: AxiosError) => {
+        // Retry on network errors, 5xx server errors, and timeouts
+        return (
+          !error.response ||
+          error.response.status >= 500 ||
+          error.code === 'ECONNABORTED' ||
+          error.code === 'ENOTFOUND' ||
+          error.code === 'ETIMEDOUT'
+        );
+      },
+    };
+  }
+
+  return null;
+};
+
+// Sleep function for retry delays
+const sleep = (ms: number): Promise<void> =>
+  new Promise(resolve => setTimeout(resolve, ms));
+
+// Enhanced error handler with toast notifications
+const handleApiError = (error: AxiosError, config?: InternalAxiosRequestConfig) => {
+  if (showToast) {
+    let message = 'Ocurrió un error inesperado';
+    let type: 'error' | 'warning' = 'error';
+
+    if (error.response) {
+      // Server responded with error status
+      const status = error.response.status;
+      if (status === 400) {
+        message = extractMessageFromData(error.response.data) || 'Datos inválidos';
+        type = 'warning';
+      } else if (status === 403) {
+        message = 'No tienes permisos para esta acción';
+        type = 'warning';
+      } else if (status === 404) {
+        message = 'El recurso solicitado no existe';
+        type = 'warning';
+      } else if (status >= 500) {
+        message = 'Error del servidor. Intenta nuevamente';
+        type = 'error';
+      }
+    } else if (error.request) {
+      // Network error
+      message = 'Error de conexión. Verifica tu internet';
+      type = 'error';
+    }
+
+    showToast(message, type, 4000);
+  }
+
+  return Promise.reject(error);
+};
+
 const apiBaseUrl = Constants?.expoConfig?.extra?.apiUrl || process.env.API_URL;
 
 if (!apiBaseUrl) {
@@ -157,8 +261,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const { response, config } = error;
-    const originalRequest = config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
+    const originalRequest = config as (InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }) | undefined;
 
+    // Handle 401 unauthorized (token refresh)
     if (response?.status === 401 && originalRequest && !originalRequest._retry && refreshToken) {
       originalRequest._retry = true;
       const token = await queueRefresh();
@@ -170,11 +275,35 @@ api.interceptors.response.use(
         return api(originalRequest);
       }
       unauthorizedHandler?.();
+      return Promise.reject(error);
     } else if (response?.status === 401) {
       unauthorizedHandler?.();
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    // Handle other errors with retry logic
+    if (originalRequest && !originalRequest._retry) {
+      const retryConfig = getRetryConfig(originalRequest);
+
+      if (retryConfig && retryConfig.retryCondition(error)) {
+        const retryCount = (originalRequest._retryCount || 0);
+
+        if (retryCount < retryConfig.maxRetries) {
+          originalRequest._retryCount = retryCount + 1;
+
+          console.log(`Retrying request (${retryCount + 1}/${retryConfig.maxRetries}) after ${retryConfig.retryDelay}ms`);
+
+          await sleep(retryConfig.retryDelay * Math.pow(2, retryCount)); // Exponential backoff
+
+          return api(originalRequest);
+        } else {
+          console.log(`Max retries (${retryConfig.maxRetries}) reached for request`);
+        }
+      }
+    }
+
+    // Handle error with toast notification
+    return handleApiError(error, config);
   }
 );
 

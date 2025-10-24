@@ -21,7 +21,7 @@ import PropertySidePreview from '../property/PropertySidePreview';
 import { demoMapProperties } from '../../_mocks/demoMapProperties';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
-import { normalizeBoundary, toFeaturePolygon } from '../../utils/boundary.js';
+import { normalizeBoundary, toFeaturePolygon, safeParseBoundary, areBoundaryCoordinatesEqual } from '../../utils/boundary.js';
 
 // Function to transform properties to GeoJSON
 const propertiesToGeoJSON = (properties) => {
@@ -50,17 +50,19 @@ const boundariesToGeoJSON = (properties) => {
     
     try {
       let coordinates = null;
-      
-      // Handle different boundary formats
-      if (typeof prop.boundary_polygon === 'string') {
-        const parsed = JSON.parse(prop.boundary_polygon);
-        coordinates = parsed.coordinates || parsed;
-      } else if (prop.boundary_polygon.coordinates) {
-        coordinates = prop.boundary_polygon.coordinates;
-      } else if (Array.isArray(prop.boundary_polygon)) {
-        coordinates = prop.boundary_polygon;
+
+      // Handle different boundary formats using safe parsing
+      const parsedBoundary = safeParseBoundary(prop.boundary_polygon);
+      if (parsedBoundary) {
+        if (parsedBoundary.coordinates) {
+          coordinates = parsedBoundary.coordinates;
+        } else if (parsedBoundary.geometry?.coordinates) {
+          coordinates = parsedBoundary.geometry.coordinates;
+        } else if (Array.isArray(parsedBoundary)) {
+          coordinates = parsedBoundary;
+        }
       }
-      
+
       // Validate coordinates structure
       if (!coordinates || !Array.isArray(coordinates)) continue;
       
@@ -151,11 +153,17 @@ const MapView = forwardRef(({
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [navigatingToTour, setNavigatingToTour] = useState(false);
   const [tourTransitionDuration, setTourTransitionDuration] = useState(350);
-  const [autoFlyCompleted, setAutoFlyCompleted] = useState(disableIntroAnimation);
-  const [showOverlay, setShowOverlay] = useState(!disableIntroAnimation);
+  // Unified animation state to prevent conflicts and race conditions
+  const [animationState, setAnimationState] = useState({
+    autoFlyCompleted: disableIntroAnimation,
+    showOverlay: !disableIntroAnimation,
+    isRotating: false,
+    userInteracted: false,
+    isLoading: false
+  });
+
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [isRotating, setIsRotating] = useState(false); // Estado para la rotación del globo
   const [connectionType, setConnectionType] = useState('4g');
   const [isMapUIReady, setIsMapUIReady] = useState(false); // Mapa listo (idle)
   const mapRef = useRef(null);
@@ -163,7 +171,6 @@ const MapView = forwardRef(({
   const rotationFrameId = useRef(null); // Ref para el ID de la animación de rotación
   const rotationPrevTimeRef = useRef(null); // timestamp del frame previo
   const flightTimeoutIdRef = useRef(null);
-  const userInteractedRef = useRef(false);
   const lastLoadViewportRef = useRef(null);
   const debounceTimeoutRef = useRef(null);
   const lastFetchedPage1FiltersRef = useRef(null);
@@ -172,6 +179,35 @@ const MapView = forwardRef(({
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const skipNextClickRef = useRef(false);
   const attemptedBoundaryFetchRef = useRef(new Set());
+
+  // Helper functions for unified animation state management
+  const updateAnimationState = useCallback((updates) => {
+    setAnimationState(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const markUserInteracted = useCallback(() => {
+    updateAnimationState({
+      userInteracted: true,
+      autoFlyCompleted: true,
+      showOverlay: false,
+      isRotating: false
+    });
+  }, [updateAnimationState]);
+
+  const completeAutoFly = useCallback(() => {
+    updateAnimationState({
+      autoFlyCompleted: true,
+      isLoading: false
+    });
+  }, [updateAnimationState]);
+
+  const startRotation = useCallback(() => {
+    updateAnimationState({ isRotating: true });
+  }, [updateAnimationState]);
+
+  const stopRotation = useCallback(() => {
+    updateAnimationState({ isRotating: false });
+  }, [updateAnimationState]);
 
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -256,13 +292,13 @@ const MapView = forwardRef(({
   const boundaryAnimationTimeoutsRef = useRef(new Map());
   const animatedBoundariesRef = useRef(new Set());
 
-  // Animate boundary appearance with smooth dissolve - simplified version
-  const animateBoundaryAppearance = useCallback((boundaryId) => {
-    // Skip if this boundary is already animating or has been animated
+  // Animate boundary appearance with smooth dissolve using RAF and better debouncing
+  const animateBoundaryAppearance = useCallback((boundaryId, newBoundary = null) => {
+    // Skip if this boundary is already animating
     if (animatedBoundariesRef.current.has(boundaryId)) {
       return;
     }
-    
+
     // Mark this boundary as animating
     animatedBoundariesRef.current.add(boundaryId);
 
@@ -272,25 +308,9 @@ const MapView = forwardRef(({
       clearTimeout(existingTimeout);
     }
 
-    // Set initial opacity to 0 in feature properties
-    setPropertyBoundaries(prev => {
-      if (prev && prev.id === boundaryId) {
-        return {
-          ...prev,
-          feature: {
-            ...prev.feature,
-            properties: {
-              ...prev.feature.properties,
-              opacity: 0
-            }
-          }
-        };
-      }
-      return prev;
-    });
-
-    // After a brief delay, set opacity to 1 (Mapbox will handle smooth transition)
-    const timeoutId = setTimeout(() => {
+    // Use requestAnimationFrame for smooth animation timing
+    const animateWithRAF = () => {
+      // Set initial opacity to 0 in feature properties
       setPropertyBoundaries(prev => {
         if (prev && prev.id === boundaryId) {
           return {
@@ -299,17 +319,46 @@ const MapView = forwardRef(({
               ...prev.feature,
               properties: {
                 ...prev.feature.properties,
-                opacity: 1
+                opacity: 0,
+                animationProgress: 0
               }
             }
           };
         }
         return prev;
       });
-      boundaryAnimationTimeoutsRef.current.delete(boundaryId);
-    }, 100); // Slightly longer delay for smoother appearance
-    
-    boundaryAnimationTimeoutsRef.current.set(boundaryId, timeoutId);
+
+      // Schedule the fade-in animation
+      const timeoutId = setTimeout(() => {
+        requestAnimationFrame(() => {
+          setPropertyBoundaries(prev => {
+            if (prev && prev.id === boundaryId) {
+              return {
+                ...prev,
+                feature: {
+                  ...prev.feature,
+                  properties: {
+                    ...prev.feature.properties,
+                    opacity: 1,
+                    animationProgress: 1
+                  }
+                }
+              };
+            }
+            return prev;
+          });
+        });
+
+        // Clean up animation state
+        animatedBoundariesRef.current.delete(boundaryId);
+        boundaryAnimationTimeoutsRef.current.delete(boundaryId);
+      }, 50); // Brief delay for smoother appearance
+
+      boundaryAnimationTimeoutsRef.current.set(boundaryId, timeoutId);
+    };
+
+    // Use RAF to schedule the animation
+    requestAnimationFrame(animateWithRAF);
   }, []);
 
   useEffect(() => {
@@ -377,12 +426,12 @@ const MapView = forwardRef(({
     const normalized = normalizeBoundary(sidePanelProperty.boundary_polygon);
     if (normalized) {
       setPropertyBoundaries((prev) => {
-        // Only update if it's a different boundary
-        if (prev && prev.id === normalized.id) {
+        // Only update if it's a different boundary or coordinates changed
+        if (prev && prev.id === normalized.id && areBoundaryCoordinatesEqual(prev, normalized)) {
           return prev;
         }
-        // New boundary, trigger animation
-        animateBoundaryAppearance(normalized.id);
+        // New boundary or coordinates changed, trigger animation
+        animateBoundaryAppearance(normalized.id, normalized);
         return normalized;
       });
       return;
@@ -409,11 +458,11 @@ const MapView = forwardRef(({
         if (normalized) {
           completed = true;
           setPropertyBoundaries((prev) => {
-            if (prev && prev.id === normalized.id) {
+            if (prev && prev.id === normalized.id && areBoundaryCoordinatesEqual(prev, normalized)) {
               return prev;
             }
-            // New boundary, trigger animation
-            animateBoundaryAppearance(normalized.id);
+            // New boundary or coordinates changed, trigger animation
+            animateBoundaryAppearance(normalized.id, normalized);
             return normalized;
           });
           return;
@@ -532,7 +581,7 @@ const MapView = forwardRef(({
     setDynamicWordIndex(0);
     const slide = descriptiveTexts[currentTextIndex];
     if (
-      slide && slide.dynamicWords && slide.dynamicWords.length > 0 && showOverlay && !disableIntroAnimation
+      slide && slide.dynamicWords && slide.dynamicWords.length > 0 && animationState.showOverlay && !disableIntroAnimation
     ) {
       const initialDelay = 2000; // Delay inicial para mostrar "Compra" más tiempo
       const stepMs = 2200; // Aumentar el tiempo de cada palabra para mejor lectura
@@ -556,19 +605,19 @@ const MapView = forwardRef(({
       dynamicTimersRef.current.forEach(clearTimeout);
       dynamicTimersRef.current = [];
     };
-  }, [currentTextIndex, showOverlay, disableIntroAnimation]);
+  }, [currentTextIndex, animationState.showOverlay, disableIntroAnimation]);
 
   // Reset de índices cuando aparece el overlay por primera vez
   useEffect(() => {
-    if (showOverlay && !disableIntroAnimation) {
+    if (animationState.showOverlay && !disableIntroAnimation) {
       setCurrentTextIndex(0);
       setDynamicWordIndex(0);
     }
-  }, [showOverlay, disableIntroAnimation]);
+  }, [animationState.showOverlay, disableIntroAnimation]);
 
   // Rotar texto (slides normales) cada ~7.5s para mejor lectura
   useEffect(() => {
-    if (showOverlay && !disableIntroAnimation && !userInteractedRef.current) {
+    if (animationState.showOverlay && !disableIntroAnimation && !animationState.userInteracted) {
       const slide = descriptiveTexts[currentTextIndex];
       // Si el slide actual usa palabras dinámicas, su propio efecto se encarga del avance
       if (slide && slide.dynamicWords && slide.dynamicWords.length > 0) {
@@ -579,28 +628,32 @@ const MapView = forwardRef(({
       }, 8200);
       return () => clearInterval(interval);
     }
-  }, [showOverlay, descriptiveTexts.length, disableIntroAnimation, userInteractedRef.current, currentTextIndex]);
+  }, [animationState.showOverlay, animationState.userInteracted, descriptiveTexts.length, disableIntroAnimation, currentTextIndex]);
 
   // Ocultar overlay cuando la animación termine O el usuario interactúe O cuando se active la búsqueda AI
   useEffect(() => {
-    if (autoFlyCompleted || userInteractedRef.current) {
+    if (animationState.autoFlyCompleted || animationState.userInteracted) {
       const timer = setTimeout(() => {
-        if (!disableIntroAnimation) setShowOverlay(false);
+        if (!disableIntroAnimation) {
+          updateAnimationState({ showOverlay: false });
+        }
       }, 300); // Reduced timeout for snappier overlay dismissal
       return () => clearTimeout(timer);
     }
-  }, [autoFlyCompleted, userInteractedRef.current, disableIntroAnimation]);
+  }, [animationState.autoFlyCompleted, animationState.userInteracted, disableIntroAnimation, updateAnimationState]);
 
   // Ocultar overlay inmediatamente cuando se detecta búsqueda AI
   useEffect(() => {
     if (appliedFilters && Object.keys(appliedFilters).length > 0) {
-      setShowOverlay(false);
-      setAutoFlyCompleted(true);
-      userInteractedRef.current = true;
+      updateAnimationState({
+        showOverlay: false,
+        autoFlyCompleted: true,
+        userInteracted: true
+      });
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, updateAnimationState]);
 
-  // Función para detener/omitir la animación de forma controlada
+  // Función para detener/omitir la animación de forma controlada usando estado unificado
   const stopAndSkipAnimation = useCallback(() => {
     if (flightTimeoutIdRef.current) {
       clearTimeout(flightTimeoutIdRef.current);
@@ -608,23 +661,21 @@ const MapView = forwardRef(({
       // console.log('🚁 Futuros vuelos de animación cancelados por usuario.');
     }
 
-    userInteractedRef.current = true;
-    setAutoFlyCompleted(true);
-    setShowOverlay(false); // Ocultar overlay inmediatamente
-    setIsRotating(false); // Detener la rotación del globo
+    // Usar estado unificado para evitar conflictos
+    markUserInteracted();
 
     // Ya NO llamamos a map.stop() ni a map.easeTo() aquí.
     // La interacción del usuario (si ocurre) o la finalización natural del segmento actual de flyTo
     // se encargarán de detener el movimiento.
 
-  }, [setAutoFlyCompleted, setShowOverlay, setIsRotating]);
+  }, [markUserInteracted]);
 
   useEffect(() => {
     if (disableIntroAnimation) return;
-    if (disableOverlayForMobile && showOverlay) {
+    if (disableOverlayForMobile && animationState.showOverlay) {
       stopAndSkipAnimation();
     }
-  }, [disableOverlayForMobile, showOverlay, stopAndSkipAnimation, disableIntroAnimation]);
+  }, [disableOverlayForMobile, animationState.showOverlay, stopAndSkipAnimation, disableIntroAnimation]);
 
   const mapStyle = config.mapbox.style;
   
@@ -890,9 +941,9 @@ const MapView = forwardRef(({
       if (!editable) {
         const normalizedBoundary = normalizeBoundary(property.boundary_polygon);
         setPropertyBoundaries((prev) => {
-          if (normalizedBoundary && (!prev || prev.id !== normalizedBoundary.id)) {
-            // New boundary, trigger animation
-            animateBoundaryAppearance(normalizedBoundary.id);
+          if (normalizedBoundary && (!prev || (prev.id !== normalizedBoundary.id || !areBoundaryCoordinatesEqual(prev, normalizedBoundary)))) {
+            // New boundary or coordinates changed, trigger animation
+            animateBoundaryAppearance(normalizedBoundary.id, normalizedBoundary);
             if (normalizedBoundary) {
               forceMapResize();
             }
@@ -1047,13 +1098,15 @@ const MapView = forwardRef(({
   };
 
   const startGrandFinale = useCallback(() => {
-    if (!mapRef.current || userInteractedRef.current) {
-      if (!userInteractedRef.current) setAutoFlyCompleted(true);
+    if (!mapRef.current || animationState.userInteracted) {
+      if (!animationState.userInteracted) {
+        completeAutoFly();
+      }
       return;
     }
-    
+
     const map = mapRef.current.getMap();
-    
+
     // Vuelo final a una vista global, centrando por longitud actual
     map.flyTo({
       center: [map.getCenter().lng, 0],
@@ -1069,22 +1122,25 @@ const MapView = forwardRef(({
     // Se ejecuta un poco después de que la animación 'flyTo' debería haber terminado.
     const finaleTimeoutId = setTimeout(() => {
         // Si el usuario interactuó en el último momento, no hacemos nada.
-        if (userInteractedRef.current || !mapRef.current) return;
+        if (animationState.userInteracted || !mapRef.current) return;
 
         const m = mapRef.current.getMap();
-        
+
         // 1. Detener cualquier animación residual para 'liberar' el mapa.
         try { m.stop(); } catch (e) { console.error("Error al detener el mapa en el final:", e); }
-        
+
         // 2. Limpiar temporizadores de la secuencia de vuelo anterior.
         if (flightTimeoutIdRef.current) {
             clearTimeout(flightTimeoutIdRef.current);
             flightTimeoutIdRef.current = null;
         }
 
-        // 3. Actualizar el estado de la aplicación.
-        setAutoFlyCompleted(true);
-        setShowOverlay(false);
+        // 3. Actualizar el estado de la aplicación usando estado unificado.
+        updateAnimationState({
+          autoFlyCompleted: true,
+          showOverlay: false,
+          isRotating: true
+        });
 
         // 4. Habilitar explícitamente TODOS los controles de interacción del usuario.
         try {
@@ -1099,24 +1155,25 @@ const MapView = forwardRef(({
             console.error("Error al habilitar los controles del mapa:", e);
         }
 
-        // 5. Iniciar la rotación del globo.
-        setIsRotating(true);
-
     }, 6600); // 100ms después de la duración del flyTo
-  }, [initialMapViewState, setAutoFlyCompleted, setIsRotating]);
+  }, [initialMapViewState, animationState.userInteracted, completeAutoFly, updateAnimationState]);
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
     // Skip animation for slow connections
     if (['slow-2g', '2g', '3g'].includes(connectionType)) {
       // console.log(`Conexión lenta (${connectionType}), omitiendo animación de vuelo automático.`);
-      if (!autoFlyCompleted) setAutoFlyCompleted(true);
+      if (!animationState.autoFlyCompleted) {
+        completeAutoFly();
+      }
       return;
     }
 
-    if (!mapRef.current || !isMapLoaded || userInteractedRef.current || autoFlyCompleted) {
+    if (!mapRef.current || !isMapLoaded || animationState.userInteracted || animationState.autoFlyCompleted) {
       // console.warn('Intento de iniciar auto-vuelo pero el mapa no está listo, o usuario ya interactuó, o ya completó.');
-      if (!userInteractedRef.current) setAutoFlyCompleted(true);
+      if (!animationState.userInteracted) {
+        completeAutoFly();
+      }
       return;
     }
     
@@ -1124,7 +1181,7 @@ const MapView = forwardRef(({
 
     let flightPerformed = false;
     try {
-      if (Array.isArray(properties) && properties.length > 0 && !userInteractedRef.current) {
+      if (Array.isArray(properties) && properties.length > 0 && !animationState.userInteracted) {
         const selectedProperties = [];
         // Priorizar Chile: primero escogeremos propiedades dentro de Chile
         const CHILE_LAT_MIN = -56, CHILE_LAT_MAX = -17;
@@ -1190,8 +1247,8 @@ const MapView = forwardRef(({
         if (selectedProperties.length > 0) {
           let currentStep = 0;
           const flyToNextSelectedProperty = () => {
-            if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= selectedProperties.length) {
-              if (!userInteractedRef.current) startGrandFinale();
+            if (animationState.userInteracted || !mapRef.current || !isMapLoaded || currentStep >= selectedProperties.length) {
+              if (!animationState.userInteracted) startGrandFinale();
               // console.log('Secuencia de propiedades terminada o interrumpida (modo paseo lento).');
               return;
             }
@@ -1209,21 +1266,21 @@ const MapView = forwardRef(({
               flyToNextSelectedProperty();
             }, currentStep === 1 ? 8000 : 9000);
           };
-          if (!userInteractedRef.current) {
+          if (!animationState.userInteracted) {
             flightTimeoutIdRef.current = setTimeout(() => flyToNextSelectedProperty(), 500);
             flightPerformed = true;
           }
         }
       }
 
-      if (!flightPerformed && !userInteractedRef.current) {
+      if (!flightPerformed && !animationState.userInteracted) {
         // Si no hay propiedades chilenas en memoria, usa recorrido de Chile por defecto
         const flightPath = countryFlightPaths['chile'];
         let currentStep = 0;
 
         const flyToNextGenericPoint = () => {
-          if (userInteractedRef.current || !mapRef.current || !isMapLoaded || currentStep >= flightPath.length) {
-            if (!userInteractedRef.current) startGrandFinale();
+          if (animationState.userInteracted || !mapRef.current || !isMapLoaded || currentStep >= flightPath.length) {
+            if (!animationState.userInteracted) startGrandFinale();
             // console.log('Secuencia genérica terminada o interrumpida (modo paseo lento).');
             return;
           }
@@ -1240,23 +1297,27 @@ const MapView = forwardRef(({
             flyToNextGenericPoint();
           }, currentStep === 1 ? 8000 : 9000);
         };
-        if (!userInteractedRef.current) {
+        if (!animationState.userInteracted) {
           flightTimeoutIdRef.current = setTimeout(() => flyToNextGenericPoint(), 500);
         }
       }
 
     } catch (error) {
       console.error('Error durante la animación de vuelo automático:', error);
-      if (!userInteractedRef.current) setAutoFlyCompleted(true);
+      if (!animationState.userInteracted) {
+        completeAutoFly();
+      }
     }
-  }, [isMapLoaded, properties, countryFlightPaths, autoFlyCompleted, setAutoFlyCompleted, connectionType, startGrandFinale]);
+  }, [isMapLoaded, properties, countryFlightPaths, animationState.autoFlyCompleted, animationState.userInteracted, connectionType, startGrandFinale, completeAutoFly]);
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {
-    if (editable || autoFlightAttemptedRef.current || disableIntroAnimation || userInteractedRef.current || autoFlyCompleted) {
-      if (editable || disableIntroAnimation || userInteractedRef.current) {
-          if (!userInteractedRef.current) setAutoFlyCompleted(true); // Asegurar que se marque como completado
-          setShowOverlay(false);
+    if (editable || autoFlightAttemptedRef.current || disableIntroAnimation || animationState.userInteracted || animationState.autoFlyCompleted) {
+      if (editable || disableIntroAnimation || animationState.userInteracted) {
+          if (!animationState.userInteracted) {
+            completeAutoFly();
+          }
+          updateAnimationState({ showOverlay: false });
       }
       return;
     }
@@ -1266,7 +1327,7 @@ const MapView = forwardRef(({
       // Default to Chile without solicitar ubicación del usuario al cargar
       performAutoFlight('chile');
     } 
-  }, [isMapUIReady, isMapLoaded, loading, properties, editable, autoFlyCompleted, getCountryFromCoords, performAutoFlight, disableIntroAnimation]);
+  }, [isMapUIReady, isMapLoaded, loading, properties, editable, animationState.autoFlyCompleted, animationState.userInteracted, getCountryFromCoords, performAutoFlight, disableIntroAnimation, completeAutoFly, updateAnimationState]);
 
   // Función para ir a la ubicación actual del usuario (botón manual)
   const handleGoToMyLocation = () => {
@@ -1370,7 +1431,7 @@ const MapView = forwardRef(({
 
     const onMoveStart = (e) => {
       if (e && e.originalEvent) {
-        setIsRotating(false);
+        updateAnimationState({ isRotating: false });
         if (idleRotationTimeoutRef.current) {
           clearTimeout(idleRotationTimeoutRef.current);
           idleRotationTimeoutRef.current = null;
@@ -1387,7 +1448,7 @@ const MapView = forwardRef(({
           if (zoom <= 3.2 && !activeTourUrlRef.current) {
             map.setPitch(0);
             map.setBearing(0);
-            setIsRotating(true);
+            updateAnimationState({ isRotating: true });
           }
         }, 7000);
       }
@@ -1407,7 +1468,7 @@ const MapView = forwardRef(({
     const ROTATION_DEG_PER_SEC = 40; // velocidad alta para que se note claramente
 
     const step = (timestamp) => {
-      if (!mapRef.current || !isRotating || userInteractedRef.current) {
+      if (!mapRef.current || !animationState.isRotating || animationState.userInteracted) {
         if (rotationFrameId.current) cancelAnimationFrame(rotationFrameId.current);
         rotationFrameId.current = null;
         rotationPrevTimeRef.current = null;
@@ -1424,7 +1485,7 @@ const MapView = forwardRef(({
       rotationFrameId.current = requestAnimationFrame(step);
     };
 
-    if (isRotating) {
+    if (animationState.isRotating) {
       rotationFrameId.current = requestAnimationFrame(step);
     } else if (rotationFrameId.current) {
       cancelAnimationFrame(rotationFrameId.current);
@@ -1437,7 +1498,7 @@ const MapView = forwardRef(({
       rotationFrameId.current = null;
       rotationPrevTimeRef.current = null;
     };
-  }, [isRotating]);
+  }, [animationState.isRotating, animationState.userInteracted]);
 
   // Prefetch tours when zoom is moderate
   const prefetchToursInViewport = useCallback(async () => {
@@ -1512,11 +1573,11 @@ const MapView = forwardRef(({
               const normalized = normalizeBoundary(data.boundary_polygon);
               if (normalized) {
                 setPropertyBoundaries((prev) => {
-                  if (prev && prev.id === normalized.id) {
+                  if (prev && prev.id === normalized.id && areBoundaryCoordinatesEqual(prev, normalized)) {
                     return prev;
                   }
-                  // New boundary, trigger animation
-                  animateBoundaryAppearance(normalized.id);
+                  // New boundary or coordinates changed, trigger animation
+                  animateBoundaryAppearance(normalized.id, normalized);
                   return normalized;
                 });
               }
@@ -1554,14 +1615,14 @@ const MapView = forwardRef(({
       const map = mapRef.current.getMap();
       // Reprogramar rotación por inactividad tras cualquier movimiento
       if (!activeTourUrlRef.current) {
-        setIsRotating(false);
+        updateAnimationState({ isRotating: false });
         if (idleRotationTimeoutRef.current) clearTimeout(idleRotationTimeoutRef.current);
         idleRotationTimeoutRef.current = setTimeout(() => {
           const zoom = map.getZoom();
           if (zoom <= 3.2) {
             map.setPitch(0);
             map.setBearing(0);
-            setIsRotating(true);
+            updateAnimationState({ isRotating: true });
           }
         }, 7000);
       }
@@ -1695,7 +1756,7 @@ const MapView = forwardRef(({
   };
   
   const onMapClick = useCallback(event => {
-    if (!userInteractedRef.current && !autoFlyCompleted) {
+    if (!animationState.userInteracted && !animationState.autoFlyCompleted) {
       // console.log('Interacción de click en mapa, deteniendo animación intro.');
       stopAndSkipAnimation();
     }
@@ -1734,7 +1795,7 @@ const MapView = forwardRef(({
         handleMarkerClick(feature.properties);
       }
     }
-  }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, autoFlyCompleted, isTouchDevice]);
+  }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, animationState.autoFlyCompleted, isTouchDevice]);
 
   const scheduleIdleRotation = useCallback(() => {
     if (idleRotationTimeoutRef.current) {
@@ -1748,23 +1809,23 @@ const MapView = forwardRef(({
       if (zoom <= 3.2 && !activeTourUrlRef.current) {
         map.setPitch(0);
         map.setBearing(0);
-        setIsRotating(true);
+        updateAnimationState({ isRotating: true });
       }
     }, 7000);
   }, []);
 
   const handleUserInteraction = useCallback((event) => {
     // Detectar si es una interacción genuina del usuario
-    if (event.originalEvent && !userInteractedRef.current && !autoFlyCompleted) {
+    if (event.originalEvent && !animationState.userInteracted && !animationState.autoFlyCompleted) {
         // console.log('Interacción de movimiento en mapa, deteniendo animación intro.');
         stopAndSkipAnimation();
     }
     if (event.originalEvent) {
       // Pausar rotación y reprogramar tras 7s de inactividad
-      setIsRotating(false);
+      updateAnimationState({ isRotating: false });
       scheduleIdleRotation();
     }
-  }, [stopAndSkipAnimation, autoFlyCompleted, scheduleIdleRotation]);
+  }, [stopAndSkipAnimation, animationState.autoFlyCompleted, animationState.userInteracted, scheduleIdleRotation, updateAnimationState]);
 
   const onMapMouseMove = useCallback(event => {
     if (!mapRef.current) return;
@@ -1936,9 +1997,11 @@ const MapView = forwardRef(({
       flyToNext();
     },
     hideIntroOverlay: () => {
-      setShowOverlay(false);
-      setAutoFlyCompleted(true);
-      userInteractedRef.current = true;
+      updateAnimationState({
+        showOverlay: false,
+        autoFlyCompleted: true,
+        userInteracted: true
+      });
       if (flightTimeoutIdRef.current) {
         clearTimeout(flightTimeoutIdRef.current);
         flightTimeoutIdRef.current = null;
@@ -2077,7 +2140,7 @@ const MapView = forwardRef(({
               onMapClick(e);
             }
             if (!e.features || e.features.length === 0) {
-                if (!userInteractedRef.current && !autoFlyCompleted) {
+                if (!animationState.userInteracted && !animationState.autoFlyCompleted) {
                     // console.log('Click genérico en mapa, deteniendo animación intro.');
                     stopAndSkipAnimation();
                 }
@@ -2431,7 +2494,7 @@ const MapView = forwardRef(({
 
       {/* Intro/animación solo cuando el mapa ya está listo y no hay carga */}
       <AnimatePresence>
-        {!disableIntroAnimation && showOverlay && isMapUIReady && !loading && (
+        {!disableIntroAnimation && animationState.showOverlay && isMapUIReady && !loading && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2447,7 +2510,7 @@ const MapView = forwardRef(({
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 100,
-              pointerEvents: autoFlyCompleted ? 'none' : 'auto'
+              pointerEvents: animationState.autoFlyCompleted ? 'none' : 'auto'
             }}
           >
           <Box

@@ -593,9 +593,45 @@ class CreateBitcoinChargeView(APIView):
             amount = request.data.get('amount')
             currency = request.data.get('currency') or getattr(settings, 'COINBASE_COMMERCE_DEFAULT_CURRENCY', 'USD')
             plan_title = request.data.get('planTitle', 'SkyTerra Subscription')
+            plan_key = request.data.get('planKey')
+            plan_id = request.data.get('planId')
+            coupon_code = request.data.get('couponCode')
+            original_amount = request.data.get('originalAmount')
+            discounted_amount = request.data.get('discountedAmount')
 
             if not amount:
                 return Response({'error': 'Missing amount'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Validate plan exists
+            plan = _resolve_listing_plan(plan_id, plan_key, plan_title)
+            if not plan:
+                return Response({'error': 'Invalid plan selected'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Calculate expected amount server-side
+            expected_amount = plan.price  # This should be in USD, adjust if needed
+            if coupon_code:
+                try:
+                    coupon = Coupon.objects.get(
+                        code__iexact=coupon_code,
+                        is_active=True,
+                        valid_from__lte=timezone.now(),
+                        valid_to__gte=timezone.now()
+                    )
+
+                    # Apply coupon discount to expected amount
+                    if coupon.discount_type == 'percentage':
+                        expected_amount = expected_amount * (1 - coupon.value / 100)
+                    elif coupon.discount_type == 'fixed':
+                        expected_amount = max(0, expected_amount - coupon.value)
+
+                    expected_amount = round(expected_amount, 2)
+                except Coupon.DoesNotExist:
+                    return Response({'error': 'Invalid or expired coupon code'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Allow small rounding differences (within 1 cent)
+            if abs(float(amount) - float(expected_amount)) > 0.01:
+                logger.warning(f"Bitcoin payment amount mismatch: expected ${expected_amount}, got ${amount}")
+                return Response({'error': 'Invalid payment amount'}, status=status.HTTP_400_BAD_REQUEST)
 
             headers = {
                 'X-CC-Api-Key': api_key,
@@ -628,6 +664,8 @@ class CreateBitcoinChargeView(APIView):
                 amount=amount,
                 currency=currency,
                 plan_title=plan_title,
+                plan_id=plan.id if plan else None,
+                coupon_code=coupon_code,
             )
 
             return Response({'chargeId': bp.charge_id, 'hostedUrl': bp.hosted_url}, status=status.HTTP_201_CREATED)

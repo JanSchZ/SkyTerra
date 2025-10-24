@@ -30,7 +30,7 @@ const computeDelta = (radiusKm: number) => {
   return Math.min(Math.max(delta * 1.8, 0.05), 2);
 };
 
-const shouldDisableMap = Platform.OS === 'android' && Constants.appOwnership === 'standalone';
+const shouldDisableMap = Constants.appOwnership === 'expo';
 type MapsModule = typeof import('react-native-maps');
 let MapViewComponent: MapsModule['default'] | null = null;
 let MarkerComponent: MapsModule['Marker'] | null = null;
@@ -126,9 +126,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, on
       {shouldDisableMap || !MapViewComponent ? (
         <View style={styles.mapFallback}>
           <Ionicons name="map-outline" size={32} color={colors.textSecondary} />
-          <Text style={[styles.fallbackTitle, { color: colors.textPrimary }]}>Mapa no disponible en esta build</Text>
+          <Text style={[styles.fallbackTitle, { color: colors.textPrimary }]}>Mapa no disponible</Text>
           <Text style={[styles.fallbackDescription, { color: colors.textSecondary }]}>
-            Próximamente podrás seleccionar la ubicación desde el mapa. Mientras tanto, usa tu ubicación actual para
+            El mapa está disponible en la aplicación instalada. Usa tu ubicación actual para
             guardar el punto base.
           </Text>
         </View>
@@ -161,6 +161,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({ value, radiusKm, on
           onPress={handleUseCurrentLocation}
           disabled={locating}
           activeOpacity={0.85}
+          accessibilityLabel="Usar mi ubicación actual como punto base"
+          testID="use-current-location-button"
         >
           {locating ? (
             <ActivityIndicator size="small" color={colors.primaryOn} />

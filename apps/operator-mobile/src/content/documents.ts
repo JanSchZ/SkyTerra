@@ -10,7 +10,25 @@ export interface DocumentBlueprint {
   title: string;
   description: string;
   acceptedTypes: string[];
+  maxSizeBytes?: number; // Optional max file size in bytes
 }
+
+export const DOCUMENT_UPLOAD_LIMITS = {
+  maxFileSizeBytes: 10 * 1024 * 1024, // 10MB
+  maxFileSizeMB: 10,
+} as const;
+
+// Helper function to get file size limit for a document type
+export const getDocumentSizeLimit = (docType: PilotDocumentType): number => {
+  return DOCUMENT_UPLOAD_LIMITS.maxFileSizeBytes;
+};
+
+// Helper function to format file size for display
+export const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 export const documentBlueprints: DocumentBlueprint[] = [
   {

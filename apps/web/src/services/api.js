@@ -2,6 +2,30 @@ import axios from 'axios';
 import React from 'react';
 import compareService from './api/compareService';
 
+// Helper function to validate tour URLs with whitelist approach instead of blacklist
+const isValidTourUrl = (url) => {
+  if (!url) return false;
+  const urlStr = url.toLowerCase();
+
+  // Whitelist: accept URLs that point to media or tour content endpoints
+  const validPatterns = [
+    '/media/tours/',
+    '/api/tours/content/',
+    '/content/',
+    '/media\\tours\\'
+  ];
+
+  const isValid = validPatterns.some(pattern => urlStr.includes(pattern));
+
+  // Reject only if it's exactly a placeholder or test file (not if it contains these words)
+  const isPlaceholder = urlStr.includes('placeholder.svg') ||
+                       urlStr.includes('/placeholder/') ||
+                       urlStr.includes('test.svg') ||
+                       urlStr.includes('/test/');
+
+  return isValid && !isPlaceholder;
+};
+
 // Configuración dinámica de la URL base
 const getBaseURL = () => {
   const envBase = import.meta.env.VITE_API_BASE_URL?.trim();
@@ -1107,9 +1131,8 @@ export const tourService = {
       const response = await api.get(`/tours/${tourId}/`);
       const tour = response.data;
       
-      // Validar que el tour sea válido y no sea un tour de prueba o placeholder
-      if (!tour || !tour.url ||
-          tour.url.includes('placeholder') || tour.url.includes('test')) {
+      // Validar que el tour sea válido usando whitelist approach
+      if (!tour || !tour.url || !isValidTourUrl(tour.url)) {
         throw new Error('Invalid tour');
       }
       

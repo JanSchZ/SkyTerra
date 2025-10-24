@@ -26,9 +26,10 @@ import {
   uploadPilotDocument,
 } from '@services/operatorJobs';
 import { persistPreferredName } from '@services/apiClient';
-import { documentBlueprints, DOCUMENT_TOTAL } from '@content/documents';
+import { documentBlueprints, DOCUMENT_TOTAL, DOCUMENT_UPLOAD_LIMITS, formatFileSize, getDocumentSizeLimit } from '@content/documents';
 import { getErrorMessage } from '@utils/errorMessages';
 import { useTheme, ThemeColors, ThemeMode } from '@theme';
+import analytics from '@services/analytics';
 
 const statusCopy: Record<NonNullable<PilotDocument['status']>, { label: string; tone: string }> = {
   pending: { label: 'En revisión', tone: '#FBBF24' },
@@ -98,6 +99,41 @@ const ProfileScreen = () => {
   const [documentStates, setDocumentStates] = useState<
     Record<PilotDocument['doc_type'], { status: 'idle' | 'uploading' | 'success' | 'error'; message?: string }>
   >({});
+  const [uploadProgress, setUploadProgress] = useState<Record<PilotDocument['doc_type'], number>>({});
+
+  // Helper function to check if document is expiring soon (within 30 days)
+  const isDocumentExpiringSoon = (document: PilotDocument | null): boolean => {
+    if (!document?.expires_at || document.is_expired) return false;
+    const expiryDate = new Date(document.expires_at);
+    const now = new Date();
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+  };
+
+  // Validation functions
+  const validateFile = (asset: DocumentPicker.DocumentPickerAsset, docType: PilotDocument['doc_type']): string | null => {
+    const blueprint = documentBlueprints.find(doc => doc.type === docType);
+    if (!blueprint) return 'Tipo de documento no válido';
+
+    // Check file size
+    const maxSize = getDocumentSizeLimit(docType);
+    if (asset.size && asset.size > maxSize) {
+      return `El archivo es demasiado grande. Máximo ${formatFileSize(maxSize)}`;
+    }
+
+    // Check file type
+    if (asset.mimeType && !blueprint.acceptedTypes.includes(asset.mimeType)) {
+      const extensions = blueprint.acceptedTypes.map(type => {
+        if (type.includes('pdf')) return 'PDF';
+        if (type.includes('jpeg')) return 'JPG';
+        if (type.includes('png')) return 'PNG';
+        return type.split('/')[1].toUpperCase();
+      }).join(', ');
+      return `Tipo de archivo no válido. Solo se permiten: ${extensions}`;
+    }
+
+    return null; // Valid
+  };
 
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
@@ -243,6 +279,13 @@ const ProfileScreen = () => {
           ? { latitude: updated.location_latitude, longitude: updated.location_longitude }
           : null
       );
+
+      // Track analytics
+      analytics.trackProfileUpdated({
+        fields_updated: Object.keys(payload),
+        location_updated: Boolean(location?.latitude && location?.longitude),
+      });
+
       setSuccess('Perfil actualizado correctamente.');
     } catch (err) {
       const message = getErrorMessage(err, 'No pudimos guardar los cambios. Intenta nuevamente.');
@@ -261,8 +304,9 @@ const ProfileScreen = () => {
     setUploadingType(docType);
     setDocumentStates((prev) => ({
       ...prev,
-      [docType]: { status: 'uploading', message: 'Subiendo documento…' },
+      [docType]: { status: 'uploading', message: 'Validando archivo…' },
     }));
+
     try {
       const picker = await DocumentPicker.getDocumentAsync({
         type: acceptedTypes,
@@ -318,29 +362,90 @@ const ProfileScreen = () => {
         setUploadingType(null);
         return;
       }
-      const response = await uploadPilotDocument({
-        doc_type: docType,
-        file: {
-          uri: asset.uri,
-          name: asset.name ?? `${docType}.pdf`,
-          mimeType: asset.mimeType ?? acceptedTypes[0] ?? 'application/pdf',
-        },
-      });
 
-      setProfile((prev) => {
-        if (!prev) return prev;
-        const otherDocs = prev.documents?.filter((doc) => doc.doc_type !== docType) ?? [];
-        return {
+      // Validate file before upload
+      const validationError = validateFile(asset, docType);
+      if (validationError) {
+        setError(validationError);
+        setDocumentStates((prev) => ({
           ...prev,
-          documents: [...otherDocs, response],
-        };
-      });
-      const successMessage = `Documento actualizado el ${new Date().toLocaleString()}.`;
-      setSuccess(successMessage);
+          [docType]: { status: 'error', message: validationError },
+        }));
+        setUploadingType(null);
+        return;
+      }
+
+      // Start upload with progress tracking
       setDocumentStates((prev) => ({
         ...prev,
-        [docType]: { status: 'success', message: successMessage },
+        [docType]: { status: 'uploading', message: 'Subiendo documento…' },
       }));
+      setUploadProgress(prev => ({ ...prev, [docType]: 0 }));
+
+      // Simulate progress updates (since expo doesn't provide real upload progress)
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const current = prev[docType] || 0;
+          if (current >= 90) return prev; // Stop at 90%, complete when upload finishes
+          return { ...prev, [docType]: current + 10 };
+        });
+      }, 200);
+
+      try {
+        const response = await uploadPilotDocument({
+          doc_type: docType,
+          file: {
+            uri: asset.uri,
+            name: asset.name ?? `${docType}.pdf`,
+            mimeType: asset.mimeType ?? acceptedTypes[0] ?? 'application/pdf',
+          },
+        });
+
+        clearInterval(progressInterval);
+        setUploadProgress(prev => ({ ...prev, [docType]: 100 }));
+
+        setProfile((prev) => {
+          if (!prev) return prev;
+          const otherDocs = prev.documents?.filter((doc) => doc.doc_type !== docType) ?? [];
+          return {
+            ...prev,
+            documents: [...otherDocs, response],
+          };
+        });
+
+        // Track analytics
+        analytics.trackDocumentUploaded({
+          document_type: docType,
+          file_size_bytes: asset.size,
+          is_update: Boolean(current), // true if updating existing document
+        });
+
+        const successMessage = `Documento actualizado el ${new Date().toLocaleString()}.`;
+        setSuccess(successMessage);
+        setDocumentStates((prev) => ({
+          ...prev,
+          [docType]: { status: 'success', message: successMessage },
+        }));
+
+        // Clear progress after success
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const next = { ...prev };
+            delete next[docType];
+            return next;
+          });
+        }, 1000);
+
+      } catch (uploadError) {
+        clearInterval(progressInterval);
+        setUploadProgress(prev => {
+          const next = { ...prev };
+          delete next[docType];
+          return next;
+        });
+        throw uploadError;
+      }
+
     } catch (err) {
       const message = getErrorMessage(err, 'No pudimos subir el documento. Intenta nuevamente.');
       setError(message);
@@ -348,6 +453,11 @@ const ProfileScreen = () => {
         ...prev,
         [docType]: { status: 'error', message },
       }));
+      setUploadProgress(prev => {
+        const next = { ...prev };
+        delete next[docType];
+        return next;
+      });
     } finally {
       setUploadingType(null);
     }
@@ -402,7 +512,12 @@ const ProfileScreen = () => {
                   <Text style={styles.headerTitle}>{headerDisplayName}</Text>
                   <Text style={styles.headerSubtitle}>{user?.email}</Text>
                 </View>
-                <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+                <TouchableOpacity
+                  style={styles.signOutButton}
+                  onPress={handleSignOut}
+                  accessibilityLabel="Cerrar sesión de la aplicación"
+                  testID="sign-out-button"
+                >
                   <Ionicons name="log-out-outline" size={18} color={colors.textPrimary} />
                   <Text style={styles.signOutLabel}>Salir</Text>
                 </TouchableOpacity>
@@ -548,6 +663,8 @@ const ProfileScreen = () => {
                 style={[styles.saveButton, saving && styles.disabled]}
                 onPress={handleSave}
                 disabled={saving}
+                accessibilityLabel="Guardar cambios del perfil"
+                testID="save-profile-button"
               >
                 {saving ? (
                   <ActivityIndicator color={colors.primaryOn} />
@@ -634,6 +751,8 @@ const ProfileScreen = () => {
                       ) : null}
                       {isExpired ? (
                         <Text style={styles.documentWarning}>Actualiza este documento para mantenerte activo.</Text>
+                      ) : isDocumentExpiringSoon(current) ? (
+                        <Text style={styles.documentExpiryWarning}>Este documento vence pronto. Actualízalo para evitar interrupciones.</Text>
                       ) : null}
                       {current?.file_url ? (
                         <TouchableOpacity
@@ -667,11 +786,29 @@ const ProfileScreen = () => {
                       {docState?.status === 'error' ? (
                         <Text style={styles.documentFeedbackError}>{docState.message}</Text>
                       ) : null}
+                      {docState?.status === 'uploading' && uploadProgress[doc.type] !== undefined ? (
+                        <View style={styles.progressContainer}>
+                          <View style={styles.progressBar}>
+                            <View
+                              style={[
+                                styles.progressFill,
+                                {
+                                  width: `${uploadProgress[doc.type]}%`,
+                                  backgroundColor: colors.primary,
+                                }
+                              ]}
+                            />
+                          </View>
+                          <Text style={styles.progressText}>{uploadProgress[doc.type]}%</Text>
+                        </View>
+                      ) : null}
                     </View>
                     <TouchableOpacity
                       style={[styles.uploadButton, uploadingType === doc.type && styles.disabled]}
                       onPress={() => handleUploadDocument(doc.type, doc.acceptedTypes)}
                       disabled={uploadingType === doc.type}
+                      accessibilityLabel={`${current ? 'Actualizar' : 'Subir'} ${doc.title.toLowerCase()}`}
+                      testID={`upload-${doc.type}-button`}
                     >
                       {uploadingType === doc.type ? (
                         <ActivityIndicator color={colors.primaryOn} />
@@ -1127,6 +1264,12 @@ const createStyles = (colors: ThemeColors) => {
       fontSize: 12,
       fontWeight: '600',
     },
+    documentExpiryWarning: {
+      marginTop: 6,
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: '600',
+    },
     documentFile: {
       marginTop: 8,
       flexDirection: 'row',
@@ -1171,6 +1314,26 @@ const createStyles = (colors: ThemeColors) => {
       color: colors.danger,
       fontSize: 13,
       fontWeight: '600',
+    },
+    progressContainer: {
+      marginTop: 8,
+      gap: 6,
+    },
+    progressBar: {
+      height: 4,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 2,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 2,
+    },
+    progressText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
     },
     uploadButton: {
       alignSelf: 'center',

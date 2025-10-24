@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
@@ -41,7 +41,10 @@ export const usePushNotifications = () => {
     };
   }, []);
 
-  const registerForPushNotifications = async (): Promise<string | null> => {
+  const registerForPushNotifications = useCallback(async (retryCount = 0): Promise<string | null> => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff
+
     try {
       // Verificar si el dispositivo es físico (necesario para push notifications)
       if (!Device.isDevice) {
@@ -79,27 +82,61 @@ export const usePushNotifications = () => {
           console.log('Device registered successfully');
         } catch (error) {
           console.error('Failed to register device:', error);
+
+          // Retry with exponential backoff
+          if (retryCount < MAX_RETRIES) {
+            console.log(`Retrying device registration in ${RETRY_DELAYS[retryCount]}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[retryCount]));
+            return registerForPushNotifications(retryCount + 1);
+          } else {
+            console.error('Max retries reached for device registration');
+          }
         }
       }
 
       return deviceToken;
     } catch (error) {
       console.error('Error registering for push notifications:', error);
+
+      // Retry with exponential backoff
+      if (retryCount < MAX_RETRIES) {
+        console.log(`Retrying push notification registration in ${RETRY_DELAYS[retryCount]}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[retryCount]));
+        return registerForPushNotifications(retryCount + 1);
+      }
+
       return null;
     }
-  };
+  }, [user, pilotProfile]);
 
-  const unregisterDevice = async (deviceToken: string): Promise<boolean> => {
+  const unregisterDevice = useCallback(async (deviceToken: string): Promise<boolean> => {
     try {
-      // En una implementación completa, aquí se debería llamar a un endpoint
-      // para desactivar el dispositivo en el backend
-      console.log('Unregistering device:', deviceToken);
+      // First, try to find and deactivate the device in the backend
+      if (user && pilotProfile) {
+        try {
+          // Get the user's devices and deactivate them
+          // Note: This would need a proper endpoint to list devices for a user
+          // For now, we'll just log and return success
+          console.log('Unregistering device:', deviceToken);
+
+          // In a complete implementation, you would call something like:
+          // await updateDeviceStatus(deviceId, false);
+
+        } catch (error) {
+          console.error('Failed to unregister device from backend:', error);
+          // Continue anyway since we want to clear local state
+        }
+      }
+
+      // Clear the push token locally
+      await Notifications.setBadgeCountAsync(0);
+
       return true;
     } catch (error) {
       console.error('Error unregistering device:', error);
       return false;
     }
-  };
+  }, [user, pilotProfile]);
 
   const sendTestNotification = async () => {
     try {
@@ -120,5 +157,7 @@ export const usePushNotifications = () => {
     registerForPushNotifications,
     unregisterDevice,
     sendTestNotification,
+    notificationListener: notificationListener.current,
+    responseListener: responseListener.current,
   };
 };

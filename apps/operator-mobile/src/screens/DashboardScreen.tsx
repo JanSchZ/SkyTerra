@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -27,6 +27,7 @@ import {
 } from '@services/operatorJobs';
 import { useTheme, ThemeColors } from '@theme';
 import { DOCUMENT_TOTAL } from '@content/documents';
+import analytics from '@services/analytics';
 import GuidedTourOverlay from '@components/GuidedTourOverlay';
 
 type DashboardNavigation = CompositeNavigationProp<
@@ -70,6 +71,8 @@ const DashboardScreen = () => {
   );
   const [showTour, setShowTour] = useState(false);
   const hasRequestedProfileName = useRef(false);
+  const lastRefreshTime = useRef<number>(0);
+  const REFRESH_INTERVAL = 30 * 1000; // 30 seconds
 
   const load = useCallback(
     async (refreshOnly = false) => {
@@ -100,6 +103,7 @@ const DashboardScreen = () => {
       } finally {
         setLoading(false);
         setRefreshing(false);
+        lastRefreshTime.current = Date.now();
       }
     },
     [user, pilotProfile?.is_available, refreshPilotProfile]
@@ -143,6 +147,18 @@ const DashboardScreen = () => {
     };
     checkTour();
   }, []);
+
+  // Refresh data when screen comes into focus (but not too frequently)
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      if (now - lastRefreshTime.current > REFRESH_INTERVAL) {
+        load(true).catch((err) => {
+          console.warn('Focus refresh failed', err);
+        });
+      }
+    }, [load])
+  );
 
   const finishTour = useCallback(async () => {
     try {
@@ -212,6 +228,13 @@ const DashboardScreen = () => {
     return 'Mantente atento a nuevas asignaciones.';
   }, [activeJob, nextScheduledJob]);
   const handleOpenJob = (jobId: number) => {
+    const job = pilotJobs.find(j => j.id === jobId);
+    if (job) {
+      analytics.trackJobViewed({
+        job_id: job.id,
+        source: 'dashboard',
+      });
+    }
     navigation.navigate('JobDetail', { jobId: String(jobId) });
   };
 
@@ -320,7 +343,11 @@ const DashboardScreen = () => {
                         : `Tienes ${pendingDocuments.length} documentos pendientes.`}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('Profile')}
+                    accessibilityLabel="Ir al perfil para revisar documentos pendientes"
+                    testID="review-documents-button"
+                  >
                     <Text style={styles.inlineAlertAction}>Revisar</Text>
                   </TouchableOpacity>
                 </View>
@@ -332,13 +359,20 @@ const DashboardScreen = () => {
               </View>
 
               <View style={styles.heroActions}>
-                <TouchableOpacity style={styles.secondaryAction} onPress={handleViewOffers}>
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={handleViewOffers}
+                  accessibilityLabel="Ver todas las ofertas de trabajo disponibles"
+                  testID="view-offers-button"
+                >
                   <Ionicons name="briefcase-outline" size={16} color={colors.textPrimary} />
                   <Text style={styles.secondaryActionLabel}>Ver ofertas</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryAction}
                   onPress={() => navigation.navigate('Profile')}
+                  accessibilityLabel="Ir al perfil para actualizar información personal"
+                  testID="update-profile-button"
                 >
                   <Ionicons name="person-circle-outline" size={18} color={colors.primaryOn} />
                   <Text style={styles.primaryActionLabel}>Actualizar perfil</Text>
@@ -357,7 +391,11 @@ const DashboardScreen = () => {
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Agenda inmediata</Text>
                 {activeJob ? (
-                  <TouchableOpacity onPress={() => handleOpenJob(activeJob.id)}>
+                  <TouchableOpacity
+                    onPress={() => handleOpenJob(activeJob.id)}
+                    accessibilityLabel={`Ver detalles del trabajo activo: ${activeJob.property_details?.name ?? `Trabajo #${activeJob.id}`}`}
+                    testID="view-active-job-button"
+                  >
                     <Text style={styles.sectionLink}>Ver trabajo</Text>
                   </TouchableOpacity>
                 ) : null}
@@ -368,6 +406,8 @@ const DashboardScreen = () => {
                   onPress={() => activeJob && handleOpenJob(activeJob.id)}
                   disabled={!activeJob}
                   activeOpacity={0.9}
+                  accessibilityLabel={activeJob ? `Ver detalles del trabajo activo: ${activeJob.property_details?.name ?? `Trabajo #${activeJob.id}`}` : "No hay trabajo activo en este momento"}
+                  testID="active-job-card"
                 >
                   <Text style={styles.summaryTitle}>Trabajo activo</Text>
                   {activeJob ? (
@@ -403,6 +443,8 @@ const DashboardScreen = () => {
                   onPress={() => nextScheduledJob && handleOpenJob(nextScheduledJob.id)}
                   disabled={!nextScheduledJob}
                   activeOpacity={0.9}
+                  accessibilityLabel={nextScheduledJob ? `Ver detalles de la próxima visita: ${nextScheduledJob.property_details?.name ?? `Trabajo #${nextScheduledJob.id}`}` : "No hay visitas programadas"}
+                  testID="next-job-card"
                 >
                   <Text style={styles.summaryTitle}>Próxima visita</Text>
                   {nextScheduledJob ? (
@@ -436,7 +478,11 @@ const DashboardScreen = () => {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Ofertas disponibles</Text>
-                <TouchableOpacity onPress={handleViewOffers}>
+                <TouchableOpacity
+                  onPress={handleViewOffers}
+                  accessibilityLabel="Ver todas las ofertas disponibles"
+                  testID="view-all-offers-button"
+                >
                   <Text style={styles.sectionLink}>Ver todas</Text>
                 </TouchableOpacity>
               </View>

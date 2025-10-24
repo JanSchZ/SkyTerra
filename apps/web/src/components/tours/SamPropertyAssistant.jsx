@@ -17,9 +17,12 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { api } from '../../services/api';
 
 const QUICK_PROMPTS = [
-  'Dame un resumen rápido de esta propiedad',
-  '¿Cuáles son los puntos fuertes que ves?',
-  '¿Qué debo revisar con más detalle antes de invertir?',
+  'Dame un resumen rápido de esta propiedad del tour',
+  '¿Qué aspectos visuales te llaman la atención de este tour?',
+  '¿Cuáles son los puntos fuertes que identificas en el tour 360°?',
+  '¿Qué debo revisar con más detalle antes de invertir? (basado en lo que veo)',
+  '¿Cómo evalúas el potencial de esta propiedad desde el tour virtual?',
+  '¿Qué preguntas específicas del tour puedo responderte?',
 ];
 
 // Helper para construir snapshot de la propiedad para el historial
@@ -27,15 +30,34 @@ const buildPropertySnapshot = (property) => {
   if (!property) return null;
   const priceValue = Number(property.price);
   const sizeValue = Number(property.size);
+  const rentPriceValue = Number(property.rent_price);
+
   return {
     id: property.id,
     name: property.name,
     price: Number.isFinite(priceValue) ? priceValue : undefined,
+    rent_price: Number.isFinite(rentPriceValue) ? rentPriceValue : undefined,
     size: Number.isFinite(sizeValue) ? sizeValue : undefined,
     type: property.type,
+    listing_type: property.listing_type,
     latitude: property.latitude,
     longitude: property.longitude,
-    reason: 'Propiedad en análisis dentro del tour virtual.',
+    address: property.address,
+    plusvalia_score: property.plusvalia_score,
+    bedrooms: property.bedrooms,
+    bathrooms: property.bathrooms,
+    parking_spaces: property.parking_spaces,
+    year_built: property.year_built,
+    has_water: property.has_water,
+    has_views: property.has_views,
+    has_electricity: property.has_electricity,
+    has_accessibility: property.has_accessibility,
+    is_fenced: property.is_fenced,
+    description: property.description?.slice(0, 200) || undefined,
+    status: property.status,
+    reason: 'Propiedad en análisis dentro del tour virtual 360°. El usuario está explorando visualmente la propiedad.',
+    analysis_context: 'tour_virtual_360',
+    context_source: 'property_tour_analysis'
   };
 };
 
@@ -43,45 +65,101 @@ const buildPropertySnapshot = (property) => {
 const buildPropertyContext = (property) => {
   if (!property) return '';
   const lines = [];
-  lines.push(`Estamos analizando la propiedad "${property.name || 'sin nombre'}" (ID: ${property.id || 'N/A'}).`);
-  
-  if (property.listing_type) {
-    lines.push(`Tipo de listing: ${property.listing_type}.`);
-  }
+  lines.push(`=== ANÁLISIS DE PROPIEDAD EN TOUR VIRTUAL ===`);
+  lines.push(`Propiedad: "${property.name || 'sin nombre'}" (ID: ${property.id || 'N/A'})`);
+  lines.push(`Estamos dentro del tour virtual 360° analizando esta propiedad específica.`);
+  lines.push('');
+
+  // Información básica
   if (property.type) {
-    lines.push(`Tipo de propiedad: ${property.type}.`);
+    lines.push(`📍 Tipo de propiedad: ${property.type}`);
   }
-  
+  if (property.listing_type) {
+    const listingLabel = property.listing_type === 'both' ? 'Venta y arriendo' :
+                        property.listing_type === 'rent' ? 'Solo arriendo' : 'Solo venta';
+    lines.push(`🏷️  Modalidad: ${listingLabel}`);
+  }
+  lines.push('');
+
+  // Precios y valor
   const priceValue = Number(property.price);
   if (!Number.isNaN(priceValue) && priceValue > 0) {
-    lines.push(`Precio listado: $${priceValue.toLocaleString()}.`);
+    lines.push(`💰 Precio de venta: $${priceValue.toLocaleString('es-ES')}`);
   }
-  
+
+  const rentPriceValue = Number(property.rent_price);
+  if (!Number.isNaN(rentPriceValue) && rentPriceValue > 0) {
+    lines.push(`🏠 Precio de arriendo: $${rentPriceValue.toLocaleString('es-ES')} ${property.listing_type === 'rent' ? '(mensual)' : '(opcional)'}`);
+  }
+
   const sizeValue = Number(property.size);
   if (!Number.isNaN(sizeValue) && sizeValue > 0) {
-    lines.push(`Superficie: ${sizeValue} hectáreas.`);
+    lines.push(`📐 Superficie: ${sizeValue.toFixed(2)} hectáreas (${(sizeValue * 10000).toFixed(0).toLocaleString('es-ES')} m²)`);
   }
-  
-  if (property.address) {
-    lines.push(`Dirección: ${property.address}.`);
-  }
-  
+
   if (property.plusvalia_score !== null && property.plusvalia_score !== undefined) {
-    lines.push(`Plusvalía estimada: ${property.plusvalia_score}%.`);
+    lines.push(`📈 Plusvalía estimada: ${property.plusvalia_score}%`);
   }
-  
-  if (property.description) {
-    const desc = property.description.length > 350
-      ? `${property.description.slice(0, 347)}...`
-      : property.description;
-    lines.push(`Descripción: ${desc}`);
-  }
-  
   lines.push('');
-  lines.push('INSTRUCCIONES: Enfócate exclusivamente en esta propiedad del tour virtual.');
-  lines.push('No sugieras visitar otras zonas del mapa ni listar propiedades adicionales.');
-  lines.push('Si el usuario pregunta por otras propiedades, recuérdale amablemente que estamos analizando esta propiedad específica en el tour.');
-  
+
+  // Ubicación y coordenadas
+  if (property.address) {
+    lines.push(`🗺️  Dirección: ${property.address}`);
+  }
+  if (property.latitude && property.longitude) {
+    lines.push(`📍 Coordenadas GPS: ${property.latitude}, ${property.longitude}`);
+  }
+  lines.push('');
+
+  // Características físicas
+  const features = [];
+  if (property.bedrooms) features.push(`${property.bedrooms} dormitorios`);
+  if (property.bathrooms) features.push(`${property.bathrooms} baños`);
+  if (property.parking_spaces) features.push(`${property.parking_spaces} estacionamientos`);
+  if (property.year_built) features.push(`construido en ${property.year_built}`);
+
+  if (features.length > 0) {
+    lines.push(`🏡 Características: ${features.join(', ')}`);
+  }
+
+  // Servicios y amenities
+  const services = [];
+  if (property.has_water) services.push('agua');
+  if (property.has_views) services.push('vistas panorámicas');
+  if (property.has_electricity) services.push('electricidad');
+  if (property.has_accessibility) services.push('accesibilidad');
+  if (property.is_fenced) services.push('cercada');
+
+  if (services.length > 0) {
+    lines.push(`⚡ Servicios disponibles: ${services.join(', ')}`);
+  }
+  lines.push('');
+
+  // Descripción detallada
+  if (property.description) {
+    const desc = property.description.length > 500
+      ? `${property.description.slice(0, 497)}...`
+      : property.description;
+    lines.push(`📝 Descripción:`);
+    lines.push(`${desc}`);
+    lines.push('');
+  }
+
+  // Contexto del tour virtual
+  lines.push(`🎯 CONTEXTO: El usuario está explorando esta propiedad dentro de un tour virtual 360°.`);
+  lines.push(`   - Puedes referirte a elementos visuales que el usuario está viendo en el tour`);
+  lines.push(`   - Enfócate en aspectos específicos de ubicación, orientación y características visibles`);
+  lines.push(`   - Si el usuario pregunta sobre vistas, orientación solar, o aspectos visuales, responde basado en la ubicación y datos disponibles`);
+  lines.push('');
+
+  // Instrucciones finales
+  lines.push(`🔒 INSTRUCCIONES IMPORTANTES:`);
+  lines.push(`   - Enfócate EXCLUSIVAMENTE en esta propiedad del tour virtual`);
+  lines.push(`   - No sugieras visitar otras zonas del mapa ni listar propiedades adicionales`);
+  lines.push(`   - Si el usuario pregunta por otras propiedades, recuérdale que estamos analizando esta propiedad específica en el tour`);
+  lines.push(`   - Proporciona análisis detallado basado en los datos disponibles`);
+  lines.push(`   - Si necesitas más información sobre algún aspecto específico, pregúntale al usuario`);
+
   return lines.join('\n');
 };
 
@@ -108,9 +186,9 @@ const createPropertyHistoryEntry = (recommendations) => {
 
 const formatAssistantIntro = (property) => {
   if (!property) {
-    return 'Hola, soy Sam. Estoy aquí para ayudarte a analizar los detalles de esta propiedad.';
+    return 'Hola, soy Sam. Estoy aquí para ayudarte a analizar los detalles de esta propiedad en el tour virtual.';
   }
-  return `Hola, soy Sam 👋 Estoy analizando contigo la propiedad "${property.name || 'sin nombre'}". Pregúntame lo que quieras y me enfocaré solo en este activo.`;
+  return `¡Hola! Soy Sam 👋 y estoy aquí dentro del tour virtual 360° analizando contigo la propiedad "${property.name || 'sin nombre'}". Puedo ver que estás explorando visualmente esta propiedad, así que puedo ayudarte con preguntas sobre lo que estás viendo, las características específicas, el valor de inversión, o cualquier aspecto que te llame la atención mientras navegas por el tour. ¿Qué te gustaría saber sobre este activo?`;
 };
 
 const SamPropertyAssistant = ({ property }) => {
@@ -353,7 +431,7 @@ const SamPropertyAssistant = ({ property }) => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'rgba(255,255,255,0.75)' }}>
               <CircularProgress size={18} sx={{ color: 'rgba(255,255,255,0.75)' }} />
               <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                Sam está analizando esta propiedad...
+                Sam está analizando el tour virtual y los detalles de esta propiedad...
               </Typography>
             </Box>
           </Fade>
@@ -396,7 +474,7 @@ const SamPropertyAssistant = ({ property }) => {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Pregúntale algo a Sam sobre esta propiedad"
+          placeholder="Pregúntale a Sam sobre lo que ves en el tour 360°..."
           fullWidth
           variant="outlined"
           size="small"
