@@ -161,10 +161,14 @@ const MapView = forwardRef(({
     userInteracted: false,
     isLoading: false
   });
+  
+  // Refs for animation state to avoid re-creating callbacks
+  const animationStateRef = useRef(animationState);
 
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [connectionType, setConnectionType] = useState('4g');
+  const connectionTypeRef = useRef('4g');
   const [isMapUIReady, setIsMapUIReady] = useState(false); // Mapa listo (idle)
   const mapRef = useRef(null);
   const containerRef = useRef(null);
@@ -182,7 +186,11 @@ const MapView = forwardRef(({
 
   // Helper functions for unified animation state management
   const updateAnimationState = useCallback((updates) => {
-    setAnimationState(prev => ({ ...prev, ...updates }));
+    setAnimationState(prev => {
+      const newState = { ...prev, ...updates };
+      animationStateRef.current = newState;
+      return newState;
+    });
   }, []);
 
   const markUserInteracted = useCallback(() => {
@@ -192,22 +200,22 @@ const MapView = forwardRef(({
       showOverlay: false,
       isRotating: false
     });
-  }, [updateAnimationState]);
+  }, []);
 
   const completeAutoFly = useCallback(() => {
     updateAnimationState({
       autoFlyCompleted: true,
       isLoading: false
     });
-  }, [updateAnimationState]);
+  }, []);
 
   const startRotation = useCallback(() => {
     updateAnimationState({ isRotating: true });
-  }, [updateAnimationState]);
+  }, []);
 
   const stopRotation = useCallback(() => {
     updateAnimationState({ isRotating: false });
-  }, [updateAnimationState]);
+  }, []);
 
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
@@ -502,8 +510,10 @@ const MapView = forwardRef(({
     const updateConnectionType = () => {
       const connection = navigator.connection;
       if (connection) {
-        setConnectionType(connection.effectiveType);
-        // console.log(`🌐 Connection type: ${connection.effectiveType}`);
+        const newType = connection.effectiveType;
+        setConnectionType(newType);
+        connectionTypeRef.current = newType;
+        // console.log(`🌐 Connection type: ${newType}`);
       }
     };
 
@@ -640,7 +650,7 @@ const MapView = forwardRef(({
       }, 300); // Reduced timeout for snappier overlay dismissal
       return () => clearTimeout(timer);
     }
-  }, [animationState.autoFlyCompleted, animationState.userInteracted, disableIntroAnimation, updateAnimationState]);
+  }, [animationState.autoFlyCompleted, animationState.userInteracted, disableIntroAnimation]);
 
   // Ocultar overlay inmediatamente cuando se detecta búsqueda AI
   useEffect(() => {
@@ -651,7 +661,7 @@ const MapView = forwardRef(({
         userInteracted: true
       });
     }
-  }, [appliedFilters, updateAnimationState]);
+  }, [appliedFilters]);
 
   // Función para detener/omitir la animación de forma controlada usando estado unificado
   const stopAndSkipAnimation = useCallback(() => {
@@ -662,13 +672,19 @@ const MapView = forwardRef(({
     }
 
     // Usar estado unificado para evitar conflictos
-    markUserInteracted();
+    // Llamar directamente updateAnimationState en lugar de markUserInteracted para evitar dependencias
+    updateAnimationState({
+      userInteracted: true,
+      autoFlyCompleted: true,
+      showOverlay: false,
+      isRotating: false
+    });
 
     // Ya NO llamamos a map.stop() ni a map.easeTo() aquí.
     // La interacción del usuario (si ocurre) o la finalización natural del segmento actual de flyTo
     // se encargarán de detener el movimiento.
 
-  }, [markUserInteracted]);
+  }, []);
 
   useEffect(() => {
     if (disableIntroAnimation) return;
@@ -1156,13 +1172,13 @@ const MapView = forwardRef(({
         }
 
     }, 6600); // 100ms después de la duración del flyTo
-  }, [initialMapViewState, animationState.userInteracted, completeAutoFly, updateAnimationState]);
+  }, [initialMapViewState, animationState.userInteracted, completeAutoFly]);
 
   // Función para realizar vuelo automático inicial sobre propiedades reales
   const performAutoFlight = useCallback(async (userCountry = 'default') => {
     // Skip animation for slow connections
-    if (['slow-2g', '2g', '3g'].includes(connectionType)) {
-      // console.log(`Conexión lenta (${connectionType}), omitiendo animación de vuelo automático.`);
+    if (['slow-2g', '2g', '3g'].includes(connectionTypeRef.current)) {
+      // console.log(`Conexión lenta (${connectionTypeRef.current}), omitiendo animación de vuelo automático.`);
       if (!animationState.autoFlyCompleted) {
         completeAutoFly();
       }
@@ -1308,7 +1324,7 @@ const MapView = forwardRef(({
         completeAutoFly();
       }
     }
-  }, [isMapLoaded, properties, countryFlightPaths, animationState.autoFlyCompleted, animationState.userInteracted, connectionType, startGrandFinale, completeAutoFly]);
+  }, [isMapLoaded, properties, countryFlightPaths, animationState.autoFlyCompleted, animationState.userInteracted, startGrandFinale, completeAutoFly]);
 
   // Detectar ubicación del usuario y comenzar vuelo automático
   useEffect(() => {
@@ -1327,7 +1343,7 @@ const MapView = forwardRef(({
       // Default to Chile without solicitar ubicación del usuario al cargar
       performAutoFlight('chile');
     } 
-  }, [isMapUIReady, isMapLoaded, loading, properties, editable, animationState.autoFlyCompleted, animationState.userInteracted, getCountryFromCoords, performAutoFlight, disableIntroAnimation, completeAutoFly, updateAnimationState]);
+  }, [isMapUIReady, isMapLoaded, loading, properties, editable, animationState.autoFlyCompleted, animationState.userInteracted, getCountryFromCoords, performAutoFlight, disableIntroAnimation, completeAutoFly]);
 
   // Función para ir a la ubicación actual del usuario (botón manual)
   const handleGoToMyLocation = () => {
@@ -1756,7 +1772,7 @@ const MapView = forwardRef(({
   };
   
   const onMapClick = useCallback(event => {
-    if (!animationState.userInteracted && !animationState.autoFlyCompleted) {
+    if (!animationStateRef.current.userInteracted && !animationStateRef.current.autoFlyCompleted) {
       // console.log('Interacción de click en mapa, deteniendo animación intro.');
       stopAndSkipAnimation();
     }
@@ -1795,7 +1811,7 @@ const MapView = forwardRef(({
         handleMarkerClick(feature.properties);
       }
     }
-  }, [navigatingToTour, handleMarkerClick, stopAndSkipAnimation, animationState.autoFlyCompleted, isTouchDevice]);
+  }, [navigatingToTour, handleMarkerClick, isTouchDevice]);
 
   const scheduleIdleRotation = useCallback(() => {
     if (idleRotationTimeoutRef.current) {
@@ -1816,7 +1832,7 @@ const MapView = forwardRef(({
 
   const handleUserInteraction = useCallback((event) => {
     // Detectar si es una interacción genuina del usuario
-    if (event.originalEvent && !animationState.userInteracted && !animationState.autoFlyCompleted) {
+    if (event.originalEvent && !animationStateRef.current.userInteracted && !animationStateRef.current.autoFlyCompleted) {
         // console.log('Interacción de movimiento en mapa, deteniendo animación intro.');
         stopAndSkipAnimation();
     }
@@ -1825,7 +1841,12 @@ const MapView = forwardRef(({
       updateAnimationState({ isRotating: false });
       scheduleIdleRotation();
     }
-  }, [stopAndSkipAnimation, animationState.autoFlyCompleted, animationState.userInteracted, scheduleIdleRotation, updateAnimationState]);
+  }, []);
+
+  const onMapMove = useCallback((evt) => {
+    setViewState(evt.viewState);
+    handleUserInteraction(evt);
+  }, []);
 
   const onMapMouseMove = useCallback(event => {
     if (!mapRef.current) return;
@@ -2114,10 +2135,7 @@ const MapView = forwardRef(({
         <MapGL
           ref={mapRef}
           {...viewState}
-          onMove={evt => {
-            setViewState(evt.viewState);
-            handleUserInteraction(evt); // Llamar aquí para detectar interacción
-          }}
+          onMove={onMapMove}
           initialViewState={propInitialViewState || initialMapViewState}
           onLoad={onMapLoad}
           mapStyle={mapStyle}
@@ -2140,7 +2158,7 @@ const MapView = forwardRef(({
               onMapClick(e);
             }
             if (!e.features || e.features.length === 0) {
-                if (!animationState.userInteracted && !animationState.autoFlyCompleted) {
+                if (!animationStateRef.current.userInteracted && !animationStateRef.current.autoFlyCompleted) {
                     // console.log('Click genérico en mapa, deteniendo animación intro.');
                     stopAndSkipAnimation();
                 }
